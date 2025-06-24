@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,7 +19,7 @@ const Sidebar = () => {
   const { isAdmin, isProfessor } = useAuth();
 
   const adminLinks = [
-    { name: 'Dashboard', path: '/', icon: <Home className="h-5 w-5" /> },
+    { name: 'Dashboard', path: '/admin/dashboard', icon: <Home className="h-5 w-5" /> },
     { name: 'Education Structure', path: '/admin/structure', icon: <Layers className="h-5 w-5" /> },
     { name: 'Courses', path: '/admin/courses', icon: <BookOpen className="h-5 w-5" /> },
     { name: 'Pending Approvals', path: '/admin/pending', icon: <Clock className="h-5 w-5" /> },
@@ -32,7 +31,7 @@ const Sidebar = () => {
   ];
 
   const professorLinks = [
-    { name: 'Dashboard', path: '/', icon: <Home className="h-5 w-5" /> },
+    { name: 'Dashboard', path: '/professor/dashboard', icon: <Home className="h-5 w-5" /> },
     { name: 'My Courses', path: '/professor/courses', icon: <BookOpen className="h-5 w-5" /> },
     { name: 'Create Course', path: '/professor/create', icon: <FileText className="h-5 w-5" /> },
     { name: 'Create Quiz', path: '/professor/quiz', icon: <HelpCircle className="h-5 w-5" /> },
