@@ -1,0 +1,11 @@
+export { default as TTHProfileSection } from './TTHProfileSection.jsx';
+export { default as TTHCoursesSection } from './TTHCoursesSection.jsx';
+export { default as TTHCommentsSection } from './TTHCommentsSection.jsx';
+export { default as TTHCalendarSection } from './TTHCalendarSection.jsx';
+export { default as TTHSearchBar } from './TTHSearchBar.jsx';
+export { default as TTHFooter } from './TTHFooter.jsx';
+export { default as TTHAboutUs } from './TTHAboutUs.jsx';
+export { default as TTHAvis } from './TTHAvis.jsx';
+export { default as TTHCards } from './TTHCards.jsx';
+export { default as TTHFanCard } from './TTHFanCard.jsx';
+export { default as TTHHero } from './TTHHero.jsx'; 
