@@ -1,11 +1,11 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { Toaster } from './components/ui/toaster';
 import { Toaster as Sonner } from './components/ui/sonner';
 import { TooltipProvider } from './components/ui/tooltip';
 import { AuthProvider } from './contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
+
 
 // TTH Pages
 import TTHHome from './Pages/TTHHome';
@@ -19,7 +19,7 @@ import TTHLiveClasses from './Pages/TTHLiveClasses';
 import TTHSession from './Pages/TTHSession';
 import TTHPrivateClasses from './Pages/TTHPrivateClasses';
 import TTHTeacherProfile from './Pages/TTHTeacherProfile';
-
+import TTHDashboardStudent from './Pages/TTHDashboaedStudent'
 // Schoolhouse Layouts & Pages
 import AppLayout from './components/layouts/AppLayout';
 import Login from './Pages/Login';
@@ -67,53 +67,54 @@ const App: React.FC = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter>
-          <Routes>
-            {/* TTH always public */}
-            <Route path="/" element={<TTHHome />} />
-            <Route path="/register" element={<TTHFormulair />} />
-            <Route path="/login" element={<TTHLogin />} />
-            <Route path="/description" element={<TTHCourseDetail />} />
-            <Route path="/TTHStudentDashboard" element={<TTHStudentDashboard />} />
-            <Route path="/TTHCourses" element={<TTHCourses />} />
-            <Route path="/TTHLanguages" element={<TTHLanguages />} />
-            <Route path="/TTHLiveClasses" element={<TTHLiveClasses />} />
-            <Route path="/TTHSession" element={<TTHSession />} />
-            <Route path="/TTHPrivateClasses" element={<TTHPrivateClasses />} />
-            <Route path="/TTHTeacherProfile" element={<TTHTeacherProfile />} />
-            <Route path="/coursesList/courses/:id" element={<TTHCourseDetail />} />
+            <Routes>
+              {/* TTH always public */}
+              <Route path="/" element={<TTHHome />} />
+              <Route path="/register" element={<TTHFormulair />} />
+              <Route path="/login" element={<TTHLogin />} />
+              <Route path="/description" element={<TTHCourseDetail />} />
+              <Route path="/TTHStudentDashboard" element={<TTHStudentDashboard />} />
+              <Route path="/TTHCourses" element={<TTHCourses />} />
+              <Route path="/TTHLanguages" element={<TTHLanguages />} />
+              <Route path="/TTHLiveClasses" element={<TTHLiveClasses />} />
+              <Route path="/TTHSession" element={<TTHSession />} />
+              <Route path="/TTHPrivateClasses" element={<TTHPrivateClasses />} />
+              <Route path="/TTHTeacherProfile" element={<TTHTeacherProfile />} />
+              <Route path="/coursesList/courses/:id" element={<TTHCourseDetail />} />
+              <Route path="/TTHDashboardStudent" element={<TTHDashboardStudent/>}/>
 
-            {/* Schoolhouse public */}
-            <Route path="/schoolhouse/login" element={<Login />} />
-            <Route path="/schoolhouse" element={<Index />} />
+              {/* Schoolhouse public */}
+              <Route path="/schoolhouse/login" element={<Login />} />
+              <Route path="/schoolhouse" element={<Index />} />
 
-            {/* Admin (protected) */}
-            <Route path="/admin/*" element={<AppLayout />}>
-              <Route path="dashboard" element={<AdminDashboard />} />
-              <Route path="structure" element={<AdminStructure />} />
-              <Route path="pending" element={<AdminPending />} />
-              <Route path="courses" element={<AdminCourses />} />
-              <Route path="courses/:courseId" element={<AdminCourseDetails />} />
-              <Route path="quizzes" element={<QuizManagement />} />
-              <Route path="users" element={<UserManagement />} />
-              <Route path="slides" element={<HomepageSlides />} />
-              <Route path="enhanced-slides" element={<EnhancedHomepageSlides />} />
-              <Route path="live-sessions" element={<LiveSessionsOverview />} />
-              <Route path="settings" element={<AdminSettings />} />
-            </Route>
+              {/* Admin (protected) */}
+              <Route path="/admin/*" element={<AppLayout />}>
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="structure" element={<AdminStructure />} />
+                <Route path="pending" element={<AdminPending />} />
+                <Route path="courses" element={<AdminCourses />} />
+                <Route path="courses/:courseId" element={<AdminCourseDetails />} />
+                <Route path="quizzes" element={<QuizManagement />} />
+                <Route path="users" element={<UserManagement />} />
+                <Route path="slides" element={<HomepageSlides />} />
+                <Route path="enhanced-slides" element={<EnhancedHomepageSlides />} />
+                <Route path="live-sessions" element={<LiveSessionsOverview />} />
+                <Route path="settings" element={<AdminSettings />} />
+              </Route>
 
-            {/* Professor (protected) */}
-            <Route path="/professor/*" element={<AppLayout />}>
-              <Route path="dashboard" element={<ProfessorDashboard />} />
-              <Route path="courses" element={<ProfessorCourses />} />
-              <Route path="create" element={<ProfessorCreate />} />
-              <Route path="quiz" element={<QuizCreation />} />
-              <Route path="results" element={<QuizResults professorId="1" />} />
-              <Route path="settings" element={<ProfessorSettings />} />
-            </Route>
+              {/* Professor (protected) */}
+              <Route path="/professor/*" element={<AppLayout />}>
+                <Route path="dashboard" element={<ProfessorDashboard />} />
+                <Route path="courses" element={<ProfessorCourses />} />
+                <Route path="create" element={<ProfessorCreate />} />
+                <Route path="quiz" element={<QuizCreation />} />
+                <Route path="results" element={<QuizResults professorId="1" />} />
+                <Route path="settings" element={<ProfessorSettings />} />
+              </Route>
 
-            {/* Catch-all */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              {/* Catch-all */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

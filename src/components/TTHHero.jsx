@@ -6,7 +6,7 @@ export default function Hero() {
 
 
     return (
-        <section className=" text-white bg-[url('public/Etudiente1.PNG')] bg-cover bg-center h-[120vh] md:h-screen min-h-screen flex flex-col md:flex-row items-center justify-between p-6 md:p-12">
+        <section className=" text-white bg-[url('public/Etudiente1.PNG')] bg-cover bg-center h-[120vh] md:h-screen min-h-screen flex flex-col md:flex-row items-center justify-between p-6 mt-[0.1rem] md:p-12">
             <div dir='rtl' className="max-w-2xl w-[90%]  sm:w-[40%]">
                 <p className="text-gray-2 text-center sm:text-right  md:text-[1.28rem]  opacity-60 mb-4">المعلمون المميزون يصنعون مستقبل الأجيال</p>
                 <div className="flex flex-col sm:items-start items-center mb-16 space-y-4">

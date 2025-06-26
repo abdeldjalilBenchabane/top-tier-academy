@@ -9,14 +9,14 @@ const Navbar = () => {
     const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
     return (
-        <nav dir="rtl" className="bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg">
+        <nav dir="rtl" className="bg-gradient-to-r from-blue-600 to-purple-700 text-white shadow-lg">
             <div className="container mx-auto px-4">
                 <div className="flex items-center justify-between py-3 w-full">
                     {/* Logo (TTH) on the far right for RTL */}
-                    <Link to="/" className="font-bold text-xl md:text-2xl ml-4 whitespace-nowrap">TTH</Link>
+                    <Link to="/" className="font-bold mr-6 text-xl md:text-2xl  whitespace-nowrap">TTH</Link>
 
                     {/* Main navigation links */}
-                    <div className="hidden md:flex flex-1 items-center justify-center gap-6">
+                    <div className="hidden md:flex flex-1 items-center justify-start mr-16 gap-6">
                         <Link to="/TTHCourses" className="hover:underline transition flex items-center whitespace-nowrap"><FaHistory className="ml-2" /> الحصص المسجلة</Link>
                         <Link to="/TTHPrivateClasses" className="hover:underline transition flex items-center whitespace-nowrap"><FaUserLock className="ml-2" /> الحصص الخاصة</Link>
                         <Link to="/TTHLiveClasses" className="hover:underline transition flex items-center whitespace-nowrap"><FaVideo className="ml-2" /> الحصص المباشرة</Link>
