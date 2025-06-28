@@ -24,16 +24,19 @@ const Login = () => {
     try {
       const user = await login(email, password);
       toast.success('Logged in successfully');
+      
+      // Redirect based on user role
       if (user.role === 'admin') {
         navigate('/admin/dashboard');
       } else if (user.role === 'professor') {
         navigate('/professor/dashboard');
       } else {
-        navigate('/'); // fallback or student
+        navigate('/'); // Student or fallback
       }
-    } catch (err) {
-      setError('Invalid email or password');
-      console.error(err);
+    } catch (err: any) {
+      setError(err.message || 'Invalid email or password');
+      toast.error(err.message || 'Login failed');
+      console.error('Login error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -71,6 +74,7 @@ const Login = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  disabled={isLoading}
                 />
               </div>
               
@@ -83,6 +87,7 @@ const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  disabled={isLoading}
                 />
               </div>
               
@@ -95,12 +100,17 @@ const Login = () => {
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="flex flex-col space-y-2">
-            <div className="text-sm text-gray-500 text-center">
-              <p>Demo credentials:</p>
-              <p>Admin: admin@school.edu / password</p>
-              <p>Professor: smith@school.edu / password</p>
-            </div>
+          <CardFooter className="flex justify-center">
+            <p className="text-sm text-gray-600">
+              Don't have an account?{' '}
+              <button
+                type="button"
+                onClick={() => navigate('/register')}
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Sign up
+              </button>
+            </p>
           </CardFooter>
         </Card>
       </div>
