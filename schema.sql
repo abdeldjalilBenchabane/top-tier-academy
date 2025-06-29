@@ -97,7 +97,17 @@ CREATE TABLE pending_section_blocks (
     title VARCHAR(255),
     content TEXT,
     "order" INTEGER
-);
+)
+
+ -- permet de connecter un live à une matière
+ALTER TABLE live_sessions
+ADD COLUMN material_id INTEGER REFERENCES materials(id) ON DELETE SET NULL;
+
+
+-- (Optionnel) Ajouter is_published pour la bibliothèque
+ALTER TABLE live_sessions
+ADD COLUMN is_published BOOLEAN DEFAULT FALSE;
+
 
 -- QUIZZES
 CREATE TABLE quizzes (
@@ -149,19 +159,22 @@ CREATE TABLE quiz_attempt_answers (
 -- LIVE SESSIONS
 CREATE TABLE live_sessions (
     id SERIAL PRIMARY KEY,
+    professor_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
     title VARCHAR(255) NOT NULL,
-    description TEXT,
-    scheduled_at TIMESTAMP NOT NULL,
-    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    course_id INTEGER REFERENCES courses(id) ON DELETE SET NULL
+    start_time TIMESTAMP NOT NULL,
+    duration INTEGER NOT NULL, -- in minutes
+    price NUMERIC(10, 2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- LIVE SESSION PARTICIPANTS
-CREATE TABLE live_session_participants (
+-- PURCHASES
+CREATE TABLE purchases (
     id SERIAL PRIMARY KEY,
-    session_id INTEGER REFERENCES live_sessions(id) ON DELETE CASCADE,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    session_id INTEGER REFERENCES live_sessions(id) ON DELETE CASCADE NOT NULL,
+    student_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    amount_paid NUMERIC(10, 2) NOT NULL,
+    purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(session_id, student_id)
 );
 
 -- LIVE PRIVATE SESSIONS (1-on-1 or small group private classes)
