@@ -1,5 +1,5 @@
 import React from 'react'
-import Hero from "../components/TTHHero";
+import TTHSlides from "../components/TTHSlides";
 import NavBar from "../components/NavBar";
 import Cardes from "../components/TTHCards";
 import AboutUs from "../components/TTHAboutUs";
@@ -11,7 +11,7 @@ const Home = () => {
     return (
         <div className="">
             <NavBar/>
-            <Hero />
+            <TTHSlides />
             <Cardes />
             <AboutUs />
             <FanCard/>

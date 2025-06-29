@@ -197,15 +197,73 @@ CREATE TABLE live_private_participants (
     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- SLIDES (Homepage and Enhanced)
-CREATE TABLE slides (
+-- ENHANCED SLIDES (Homepage and Enhanced)
+CREATE TABLE enhanced_slides (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
-    image_url VARCHAR(255),
     description TEXT,
-    is_enhanced BOOLEAN DEFAULT FALSE,
-    "order" INTEGER
+    image_url VARCHAR(500),
+    video_url VARCHAR(500),
+    media_type VARCHAR(20) NOT NULL DEFAULT 'image' CHECK (media_type IN ('image', 'video')),
+    "order" INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    duration INTEGER, -- in seconds for video slides
+    start_date TIMESTAMP,
+    end_date TIMESTAMP,
+    target_audience TEXT[], -- array of roles: ['student', 'professor', 'admin']
+    cta_text VARCHAR(100),
+    cta_link VARCHAR(500),
+    overlay_color VARCHAR(7) DEFAULT '#000000', -- hex color
+    overlay_opacity DECIMAL(3,2) DEFAULT 0.3 CHECK (overlay_opacity >= 0 AND overlay_opacity <= 1),
+    transition VARCHAR(20) DEFAULT 'fade' CHECK (transition IN ('fade', 'slide', 'zoom', 'none')),
+    alt_text VARCHAR(255),
+    views INTEGER DEFAULT 0,
+    clicks INTEGER DEFAULT 0,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- SLIDE ANALYTICS (for tracking views and clicks)
+CREATE TABLE slide_analytics (
+    id SERIAL PRIMARY KEY,
+    slide_id INTEGER REFERENCES enhanced_slides(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    action_type VARCHAR(20) NOT NULL CHECK (action_type IN ('view', 'click')),
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- SLIDE TARGET AUDIENCE (many-to-many relationship for better performance)
+CREATE TABLE slide_target_audience (
+    slide_id INTEGER REFERENCES enhanced_slides(id) ON DELETE CASCADE,
+    audience_role VARCHAR(20) NOT NULL CHECK (audience_role IN ('student', 'professor', 'admin')),
+    PRIMARY KEY (slide_id, audience_role)
+);
+
+-- Create indexes for better performance
+CREATE INDEX idx_enhanced_slides_active ON enhanced_slides(is_active);
+CREATE INDEX idx_enhanced_slides_order ON enhanced_slides("order");
+CREATE INDEX idx_enhanced_slides_created_at ON enhanced_slides(created_at);
+CREATE INDEX idx_slide_analytics_slide_id ON slide_analytics(slide_id);
+CREATE INDEX idx_slide_analytics_created_at ON slide_analytics(created_at);
+CREATE INDEX idx_slide_target_audience_slide_id ON slide_target_audience(slide_id);
+
+-- Function to update the updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Trigger to automatically update updated_at
+CREATE TRIGGER update_enhanced_slides_updated_at 
+    BEFORE UPDATE ON enhanced_slides 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
 
 -- COMMENTS/FEEDBACK
 CREATE TABLE comments (

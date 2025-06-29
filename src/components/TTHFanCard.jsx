@@ -14,9 +14,9 @@ export default function FanCard() {
       title: "اللغات",
       description: (
         <div className="space-y-4 text-right">
-          <p className="text-gray-700 leading-relaxed mb-4">
+          <div className="text-gray-700 leading-relaxed mb-4">
             نقدم ثلاث لغات رئيسية مع مستويات تعليمية متنوعة وفقًا للإطار الأوروبي المرجعي المشترك للغات:
-          </p>
+          </div>
 
           <div className="flex justify-start gap-3 mb-4">
             <Button
@@ -144,9 +144,9 @@ export default function FanCard() {
       title: "جميع المواد",
       description: (
         <div className="space-y-4 text-right">
-          <p className="text-gray-700 leading-relaxed mb-4">
+          <div className="text-gray-700 leading-relaxed mb-4">
             المواد الدراسية الأساسية حسب المراحل التعليمية:
-          </p>
+          </div>
 
           <div className="flex justify-start gap-3 mb-4">
             <Button
@@ -425,9 +425,9 @@ export default function FanCard() {
           <div
             className={`w-full h-[2px]  bg-gradient-to-r ${cardData[selectedCard].gradient} rounded-full mb-6 mr-auto transition-all duration-500`}
           />
-          <p className="text-gray-700 leading-relaxed text-lg animate-in fade-in duration-500">
+          <div className="text-gray-700 leading-relaxed text-lg animate-in fade-in duration-500">
             {cardData[selectedCard].description}
-          </p>
+          </div>
         </div>
 
 

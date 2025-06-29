@@ -70,6 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
       return response.user;
     } catch (error) {
+      console.error('AuthContext: Registration error:', error);
       setIsLoading(false);
       throw error;
     }

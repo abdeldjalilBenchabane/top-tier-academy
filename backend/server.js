@@ -6,23 +6,31 @@ import userRoutes from './routes/users.js';
 import courseRoutes from './routes/courses.js';
 import authRoutes from './routes/auth.js';
 import liveSessionRoutes from './routes/live-sessions.js';
+import slidesRoutes from './routes/slides.js';
 import AgoraToken from 'agora-access-token';
 import hierarchyRoutes from './routes/hierarchy.routes.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 
-app.use('/api', hierarchyRoutes);
+// app.use('/api', hierarchyRoutes);
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-
+// Get current directory
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Middlewares
 app.use(cors({ origin: '*' }));     // En dev : '*' ; en prod, remplace par ton domaine
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -48,11 +56,11 @@ app.get('/api/db-health', async (req, res) => {
   }
 });
 
-
 // Routes métier
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/courses', courseRoutes);
+app.use('/api/slides', slidesRoutes);
 app.use('/api', liveSessionRoutes);
 
 // Vérification de la DB au démarrage

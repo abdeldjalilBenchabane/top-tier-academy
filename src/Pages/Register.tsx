@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -19,8 +19,23 @@ const Register = () => {
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { register } = useAuth();
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const { register, user } = useAuth();
   const navigate = useNavigate();
+
+  // Navigate when user is set after successful registration
+  useEffect(() => {
+    if (registrationSuccess && user) {
+      // Redirect based on user role
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else if (user.role === 'professor') {
+        navigate('/professor/dashboard');
+      } else {
+        navigate('/'); // Student or fallback
+      }
+    }
+  }, [user, registrationSuccess, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -67,14 +82,7 @@ const Register = () => {
       const user = await register(userData);
       toast.success('Registration successful!');
       
-      // Redirect based on user role
-      if (user.role === 'admin') {
-        navigate('/admin/dashboard');
-      } else if (user.role === 'professor') {
-        navigate('/professor/dashboard');
-      } else {
-        navigate('/'); // Student or fallback
-      }
+      setRegistrationSuccess(true);
     } catch (err: any) {
       setError(err.message || 'Registration failed');
       toast.error(err.message || 'Registration failed');

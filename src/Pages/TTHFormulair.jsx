@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FaUser, FaEnvelope, FaLock, FaPhone, FaIdCard } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import { authAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 
@@ -18,6 +18,7 @@ const Formulair = () => {
     const [errors, setErrors] = useState({})
     const [Loading, setLoading] = useState(false)
     const navigate = useNavigate();
+    const { register } = useAuth();
 
     const validate = () => {
         const NewError = {}
@@ -47,13 +48,13 @@ const Formulair = () => {
                 role: formData.role
             };
 
-            const response = await authAPI.register(userData);
-            console.log('Registration successful:', response);
+            const user = await register(userData);
+            console.log('Registration successful:', user);
             
             // Redirect based on user role
-            if (response.user.role === 'admin') {
+            if (user.role === 'admin') {
                 navigate('/admin/dashboard');
-            } else if (response.user.role === 'professor') {
+            } else if (user.role === 'professor') {
                 navigate('/professor/dashboard');
             } else {
                 navigate('/'); // Student or fallback

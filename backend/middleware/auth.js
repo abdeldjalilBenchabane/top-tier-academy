@@ -39,4 +39,12 @@ export const requireStudent = (req, res, next) => {
     return res.status(403).json({ error: 'Access denied. Valid role required.' });
   }
   next();
+};
+
+// Flexible middleware to check for any allowed roles
+export const requireRole = (roles) => (req, res, next) => {
+  if (!req.user || !roles.includes(req.user.role)) {
+    return res.status(403).json({ error: 'Forbidden: insufficient role' });
+  }
+  next();
 }; 

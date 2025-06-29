@@ -121,6 +121,108 @@ export const coursesAPI = {
   getMaterials: () => apiRequest('/courses/materials/list'),
 };
 
+// Slides API calls
+export const slidesAPI = {
+  // Get all slides (admin only)
+  getAll: () => apiRequest('/slides'),
+  
+  // Get active slides for homepage (public)
+  getActive: (role = 'student') => apiRequest(`/slides/active?role=${role}`),
+  
+  // Get single slide
+  getById: (id) => apiRequest(`/slides/${id}`),
+  
+  // Create new slide
+  create: (slideData) => {
+    const formData = new FormData();
+    
+    // Add file if present
+    if (slideData.media) {
+      formData.append('media', slideData.media);
+    }
+    
+    // Add other fields
+    Object.keys(slideData).forEach(key => {
+      if (key !== 'media') {
+        if (typeof slideData[key] === 'object') {
+          formData.append(key, JSON.stringify(slideData[key]));
+        } else {
+          formData.append(key, slideData[key]);
+        }
+      }
+    });
+    
+    return fetch(`${API_BASE_URL}/slides`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+      body: formData,
+    }).then(response => {
+      if (!response.ok) {
+        return response.json().then(errorData => {
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        });
+      }
+      return response.json();
+    });
+  },
+  
+  // Update slide
+  update: (id, slideData) => {
+    const formData = new FormData();
+    
+    // Add file if present
+    if (slideData.media) {
+      formData.append('media', slideData.media);
+    }
+    
+    // Add other fields
+    Object.keys(slideData).forEach(key => {
+      if (key !== 'media') {
+        if (typeof slideData[key] === 'object') {
+          formData.append(key, JSON.stringify(slideData[key]));
+        } else {
+          formData.append(key, slideData[key]);
+        }
+      }
+    });
+    
+    return fetch(`${API_BASE_URL}/slides/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+      body: formData,
+    }).then(response => {
+      if (!response.ok) {
+        return response.json().then(errorData => {
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        });
+      }
+      return response.json();
+    });
+  },
+  
+  // Delete slide
+  delete: (id) => apiRequest(`/slides/${id}`, { method: 'DELETE' }),
+  
+  // Track slide view
+  trackView: (id, userAgent) => apiRequest(`/slides/${id}/view`, {
+    method: 'POST',
+    body: JSON.stringify({ userAgent }),
+  }),
+  
+  // Track slide click
+  trackClick: (id, userAgent) => apiRequest(`/slides/${id}/click`, {
+    method: 'POST',
+    body: JSON.stringify({ userAgent }),
+  }),
+  
+  // Get slide analytics
+  getAnalytics: (id, period = '7d') => apiRequest(`/slides/${id}/analytics?period=${period}`),
+};
+
 // Health check
 export const healthAPI = {
   check: () => apiRequest('/health'),

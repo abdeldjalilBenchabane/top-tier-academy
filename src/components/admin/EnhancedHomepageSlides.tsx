@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,84 +14,79 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { Plus, Edit, Trash2, Eye, EyeOff, Image, Video, Calendar, Users, TrendingUp, Settings } from 'lucide-react';
 import { HomeSlide } from '@/types';
+import { slidesAPI } from '@/services/api';
+import { toast } from '@/lib/toast';
 
 const EnhancedHomepageSlides = () => {
   const [slides, setSlides] = useState<HomeSlide[]>([]);
   const [editingSlide, setEditingSlide] = useState<HomeSlide | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [analytics, setAnalytics] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Mock data for initial load
+  // Load slides from API
   useEffect(() => {
-    const mockSlides: HomeSlide[] = [
-      {
-        id: '1',
-        title: 'Welcome to Our Platform',
-        description: 'Discover amazing courses and learning opportunities',
-        imageUrl: '/api/placeholder/800/400',
-        mediaType: 'image' as const,
-        order: 1,
-        isActive: true,
-        views: 1250,
-        clicks: 89,
-        createdAt: '2024-01-15T10:00:00Z',
-        updatedAt: '2024-01-15T10:00:00Z',
-        targetAudience: ['student'] as ('admin' | 'professor' | 'student')[],
-        ctaText: 'Get Started',
-        ctaLink: '/courses',
-        overlayColor: '#000000',
-        overlayOpacity: 0.3,
-        transition: 'fade' as const,
-        altText: 'Students learning together'
-      }
-    ];
-    setSlides(mockSlides);
+    loadSlides();
   }, []);
 
-  const handleSaveSlide = (slideData: Partial<HomeSlide>) => {
-    const newSlide: HomeSlide = {
-      id: editingSlide ? editingSlide.id : Date.now().toString(),
-      title: slideData.title || '',
-      description: slideData.description || '',
-      imageUrl: slideData.imageUrl || '',
-      videoUrl: slideData.videoUrl,
-      mediaType: slideData.mediaType || 'image',
-      order: slideData.order || slides.length + 1,
-      isActive: slideData.isActive !== undefined ? slideData.isActive : true,
-      duration: slideData.duration,
-      startDate: slideData.startDate,
-      endDate: slideData.endDate,
-      targetAudience: (slideData.targetAudience || ['student']) as ('admin' | 'professor' | 'student')[],
-      ctaText: slideData.ctaText,
-      ctaLink: slideData.ctaLink,
-      overlayColor: slideData.overlayColor,
-      overlayOpacity: slideData.overlayOpacity,
-      transition: slideData.transition || 'fade',
-      altText: slideData.altText,
-      views: slideData.views || 0,
-      clicks: slideData.clicks || 0,
-      createdAt: slideData.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    if (editingSlide) {
-      setSlides(slides.map(s => s.id === editingSlide.id ? newSlide : s));
-    } else {
-      setSlides([...slides, newSlide]);
+  const loadSlides = async () => {
+    try {
+      setIsLoading(true);
+      const response = await slidesAPI.getAll();
+      setSlides(response.slides || []);
+    } catch (error) {
+      console.error('Error loading slides:', error);
+      toast.error('Failed to load slides');
+    } finally {
+      setIsLoading(false);
     }
-
-    setEditingSlide(null);
-    setIsDialogOpen(false);
   };
 
-  const handleDeleteSlide = (id: string) => {
-    setSlides(slides.filter(s => s.id !== id));
+  const handleSaveSlide = async (slideData: Partial<HomeSlide>) => {
+    try {
+      if (editingSlide) {
+        // Update existing slide
+        const response = await slidesAPI.update(editingSlide.id, slideData);
+        setSlides(slides.map(s => s.id === editingSlide.id ? response.slide : s));
+        toast.success('Slide updated successfully');
+      } else {
+        // Create new slide
+        const response = await slidesAPI.create(slideData);
+        setSlides([...slides, response.slide]);
+        toast.success('Slide created successfully');
+      }
+      
+      setEditingSlide(null);
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error('Error saving slide:', error);
+      toast.error('Failed to save slide');
+    }
   };
 
-  const toggleSlideStatus = (id: string) => {
-    setSlides(slides.map(s => 
-      s.id === id ? { ...s, isActive: !s.isActive } : s
-    ));
+  const handleDeleteSlide = async (id: string) => {
+    try {
+      await slidesAPI.delete(id);
+      setSlides(slides.filter(s => s.id !== id));
+      toast.success('Slide deleted successfully');
+    } catch (error) {
+      console.error('Error deleting slide:', error);
+      toast.error('Failed to delete slide');
+    }
+  };
+
+  const toggleSlideStatus = async (id: string) => {
+    try {
+      const slide = slides.find(s => s.id === id);
+      if (!slide) return;
+      
+      const response = await slidesAPI.update(id, { isActive: !slide.isActive });
+      setSlides(slides.map(s => s.id === id ? response.slide : s));
+      toast.success(`Slide ${response.slide.isActive ? 'activated' : 'deactivated'} successfully`);
+    } catch (error) {
+      console.error('Error toggling slide status:', error);
+      toast.error('Failed to update slide status');
+    }
   };
 
   return (
@@ -232,7 +226,7 @@ const EnhancedHomepageSlides = () => {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {editingSlide ? 'Edit Slide' : 'Add New Slide'}
@@ -241,11 +235,20 @@ const EnhancedHomepageSlides = () => {
               Configure your homepage slide settings
             </DialogDescription>
           </DialogHeader>
-          <SlideForm
-            slide={editingSlide}
-            onSave={handleSaveSlide}
-            onCancel={() => setIsDialogOpen(false)}
-          />
+          <div className="flex-1 overflow-y-auto pr-2">
+            <SlideForm
+              slide={editingSlide}
+              onSave={handleSaveSlide}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="slide-form">
+              {editingSlide ? 'Update' : 'Create'} Slide
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -256,10 +259,9 @@ const EnhancedHomepageSlides = () => {
 interface SlideFormProps {
   slide: HomeSlide | null;
   onSave: (slide: Partial<HomeSlide>) => void;
-  onCancel: () => void;
 }
 
-const SlideForm = ({ slide, onSave, onCancel }: SlideFormProps) => {
+const SlideForm = ({ slide, onSave }: SlideFormProps) => {
   const [formData, setFormData] = useState<Partial<HomeSlide>>({
     title: slide?.title || '',
     description: slide?.description || '',
@@ -306,7 +308,22 @@ const SlideForm = ({ slide, onSave, onCancel }: SlideFormProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    
+    // Convert camelCase to snake_case for backend compatibility
+    const slideData = {
+      title: formData.title,
+      description: formData.description,
+      mediaType: formData.mediaType,
+      isActive: formData.isActive,
+      ctaText: formData.ctaText,
+      ctaLink: formData.ctaLink,
+      targetAudience: formData.targetAudience,
+      transition: formData.transition,
+      altText: formData.altText,
+      media: selectedFile, // Include the selected file
+    };
+    
+    onSave(slideData);
   };
 
   const getAcceptedFileTypes = () => {
@@ -316,7 +333,7 @@ const SlideForm = ({ slide, onSave, onCancel }: SlideFormProps) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="slide-form" onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="title">Title</Label>
@@ -402,14 +419,23 @@ const SlideForm = ({ slide, onSave, onCancel }: SlideFormProps) => {
         <Label htmlFor="isActive">Active</Label>
       </div>
 
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit">
-          {slide ? 'Update' : 'Create'} Slide
-        </Button>
-      </DialogFooter>
+      <div>
+        <Label htmlFor="targetAudience">Target Audience</Label>
+        <Select 
+          value={formData.targetAudience?.[0] || 'student'} 
+          onValueChange={(value) => setFormData({...formData, targetAudience: [value]})}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="student">Student</SelectItem>
+            <SelectItem value="teacher">Teacher</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="parent">Parent</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </form>
   );
 };
