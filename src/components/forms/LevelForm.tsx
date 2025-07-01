@@ -2,16 +2,18 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { api } from '@/lib/api';
+import { structureAPI } from '@/services/api';
 import { toast } from '@/lib/toast';
 
 interface LevelFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
+  level?: { id: string; name: string };
+  isEditing?: boolean;
 }
 
-const LevelForm = ({ onSuccess, onCancel }: LevelFormProps) => {
-  const [name, setName] = useState('');
+const LevelForm = ({ onSuccess, onCancel, level, isEditing = false }: LevelFormProps) => {
+  const [name, setName] = useState(level?.name || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,13 +27,19 @@ const LevelForm = ({ onSuccess, onCancel }: LevelFormProps) => {
     setIsSubmitting(true);
     
     try {
-      await api.createLevel({ name });
-      toast.success('Level created successfully');
+      if (isEditing && level) {
+        await structureAPI.updateLevel(level.id, { name });
+        toast.success('Level updated successfully');
+      } else {
+        await structureAPI.createLevel({ name });
+        toast.success('Level created successfully');
+      }
+      
       setName('');
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error('Failed to create level');
+      toast.error(error.message || 'Failed to save level');
     } finally {
       setIsSubmitting(false);
     }
@@ -61,7 +69,7 @@ const LevelForm = ({ onSuccess, onCancel }: LevelFormProps) => {
           </Button>
         )}
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating...' : 'Create Level'}
+          {isSubmitting ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Level' : 'Create Level')}
         </Button>
       </div>
     </form>

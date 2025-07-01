@@ -62,6 +62,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/slides', slidesRoutes);
 app.use('/api', liveSessionRoutes);
+app.use('/api', hierarchyRoutes);
 
 // Vérification de la DB au démarrage
 pool.query('SELECT NOW()', (err, result) => {

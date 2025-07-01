@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { api } from '@/lib/api';
+import { structureAPI } from '@/services/api';
 import { Level } from '@/types';
 import { toast } from '@/lib/toast';
 
@@ -18,15 +17,19 @@ interface YearFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
   preselectedLevelId?: string;
+  year?: { id: string; name: string; levelId: string };
+  isEditing?: boolean;
 }
 
 const YearForm = ({ 
   onSuccess, 
   onCancel,
-  preselectedLevelId 
+  preselectedLevelId,
+  year,
+  isEditing = false
 }: YearFormProps) => {
-  const [name, setName] = useState('');
-  const [levelId, setLevelId] = useState(preselectedLevelId || '');
+  const [name, setName] = useState(year?.name || '');
+  const [levelId, setLevelId] = useState(year?.levelId || preselectedLevelId || '');
   const [levels, setLevels] = useState<Level[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,7 +37,7 @@ const YearForm = ({
   useEffect(() => {
     const fetchLevels = async () => {
       try {
-        const data = await api.getLevels();
+        const data = await structureAPI.getLevels();
         setLevels(data);
       } catch (error) {
         console.error(error);
@@ -63,13 +66,19 @@ const YearForm = ({
     setIsSubmitting(true);
     
     try {
-      await api.createYear({ name, levelId });
-      toast.success('Year created successfully');
+      if (isEditing && year) {
+        await structureAPI.updateYear(year.id, { name, level_id: levelId });
+        toast.success('Year updated successfully');
+      } else {
+        await structureAPI.createYear({ name, level_id: levelId });
+        toast.success('Year created successfully');
+      }
+      
       setName('');
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error('Failed to create year');
+      toast.error(error.message || 'Failed to save year');
     } finally {
       setIsSubmitting(false);
     }
@@ -86,7 +95,7 @@ const YearForm = ({
         <Select
           value={levelId || undefined}
           onValueChange={setLevelId}
-          disabled={!!preselectedLevelId}
+          disabled={!!preselectedLevelId && !isEditing}
         >
           <SelectTrigger id="level-select">
             <SelectValue placeholder="Select a level" />
@@ -123,7 +132,7 @@ const YearForm = ({
           </Button>
         )}
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating...' : 'Create Year'}
+          {isSubmitting ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Year' : 'Create Year')}
         </Button>
       </div>
     </form>
