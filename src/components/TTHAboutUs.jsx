@@ -56,7 +56,7 @@ const AboutUs = () => {
                 alt="Decoration"
             />
             <img
-                className='hidden md:block absolute h-16 md:h-20 lg:h-24 w-40 md:w-48 lg:w-56 left-0 bottom-32 md:bottom-40 z-10'
+                className='hidden md:block absolute h-16 md:h-20 lg:h-24 w-40 md:w-48 lg:w-56 left-0 top-[50rem] z-10'
                 src="/public/form3.PNG"
                 alt="Decoration"
             />
@@ -71,7 +71,7 @@ const AboutUs = () => {
                 initial="hidden"
                 animate={controls}
                 variants={containerVariants}
-                className='flex flex-col justify-center items-center pt-6 md:pt-9'
+                className='flex flex-col justify-center items-center pt-6 md:pt-12 lg:pt-16'
             >
                 {/* Titre principal */}
                 <motion.h1
@@ -81,11 +81,9 @@ const AboutUs = () => {
                     ماذا<span className='text-cyan-400'> نوفر</span>
                 </motion.h1>
 
-
                 {/* Section 1 - حصص مباشرة */}
-                <div dir='rtl' className='w-full min-h-screen flex mt-[-7rem] items-center justify-center py-4 md:py-6'>
-                    <div className='container mx-auto px-4 md:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 items-center max-w-7xl'>
-                        {/* Texte d'abord en sm/md */}
+                <div dir='rtl' className='w-full min-h-[80vh] md:min-h-screen flex items-center justify-center py-8 md:py-12 lg:py-16'>
+                    <div className='container mx-auto px-4 md:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-center max-w-7xl'>
                         <motion.div
                             className='flex flex-col justify-center order-1 lg:order-1 text-center lg:text-right'
                             variants={slideFromRight}
@@ -99,7 +97,6 @@ const AboutUs = () => {
                             </motion.p>
                         </motion.div>
 
-
                         <motion.div
                             variants={slideFromLeft}
                             className='flex justify-center items-center order-2 lg:order-2'
@@ -108,21 +105,20 @@ const AboutUs = () => {
                                 whileHover={{ scale: 1.02 }}
                                 src='public/photo1.PNG'
                                 alt='حصص مباشرة'
-                                className='w-full max-w-md md:max-w-lg lg:max-w-xl mt-10 h-auto rounded-lg shadow-lg'
+                                className='w-full max-w-md md:max-w-lg lg:max-w-xl h-auto '
                             />
                         </motion.div>
                     </div>
                 </div>
 
-
                 {/* Section 2 - كل ما تحتاجه */}
-                <div className='w-full min-h-screen flex items-center justify-center py-4 mt-[-20rem] md:py-6'>
-                    <div className='container mx-auto px-4 md:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8  items-center max-w-7xl'>
-                        {/* Texte d'abord en sm/md */}
+                <div className='w-full min-h-[80vh] md:min-h-screen flex items-center justify-center py-8 md:py-12 lg:py-16'>
+                    <div className='container mx-auto px-4 md:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-center max-w-7xl'>
                         <motion.div
-                            className='flex flex-col justify-center order-1 lg:order-2 text-center lg:text-right'
+                            className='flex flex-col justify-center order-1 lg:order-1 text-center lg:text-right'
                             variants={slideFromRight}
                         >
+
                             <motion.h1 className='text-2xl md:text-3xl lg:text-4xl text-[#2F327D] font-bold mb-4 md:mb-6'>
                                 كل ما تحتاجه <span className='text-cyan-400'>كما في القسم</span>
                             </motion.h1>
@@ -132,14 +128,14 @@ const AboutUs = () => {
                             </motion.p>
                         </motion.div>
 
-            
                         <motion.div
-                            className='flex justify-center items-center order-2 lg:order-1'
+                            className='flex justify-center items-center order-2 lg:order-2'
                             variants={slideFromLeft}
                         >
+
                             <motion.img
                                 whileHover={{ scale: 1.02 }}
-                                className='w-full mt-16 max-w-md md:max-w-lg lg:max-w-xl h-auto rounded-lg shadow-lg'
+                                className='w-full max-w-md md:max-w-lg lg:max-w-xl h-auto '
                                 src='public/photo2.PNG'
                                 alt='كل ما تحتاجه'
                             />
@@ -148,9 +144,8 @@ const AboutUs = () => {
                 </div>
 
                 {/* Section 3 - دروس خصوصية */}
-                <div dir='rtl' className='w-full min-h-screen flex items-center justify-center mt-[-16rem] py-4 md:py-6'>
-                    <div className='container mx-auto px-4 md:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 items-center max-w-7xl'>
-                       
+                <div dir='rtl' className='w-full min-h-[80vh] md:min-h-screen flex items-center justify-center py-8 md:py-12 lg:py-16'>
+                    <div className='container mx-auto px-4 md:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-center max-w-7xl'>
                         <motion.div
                             className='flex flex-col justify-center order-1 lg:order-1 text-center lg:text-right'
                             variants={slideFromRight}
@@ -164,7 +159,6 @@ const AboutUs = () => {
                             </motion.p>
                         </motion.div>
 
-                        {/* Image ensuite */}
                         <motion.div
                             className='flex justify-center items-center order-2 lg:order-2'
                             variants={slideFromLeft}
@@ -173,16 +167,15 @@ const AboutUs = () => {
                                 whileHover={{ scale: 1.02 }}
                                 src='public/photo3.PNG'
                                 alt='دروس خصوصية'
-                                className='w-full max-w-md mt-16 md:max-w-lg lg:max-w-xl h-auto rounded-lg shadow-lg'
+                                className='w-full max-w-md md:max-w-lg lg:max-w-xl h-auto '
                             />
                         </motion.div>
                     </div>
                 </div>
-
             </motion.section>
 
             {/* Titre de fin */}
-            <div className='w-full py-8 md:py-12 relative z-20'>
+            <div className='w-full py-12 md:py-16 lg:py-20 relative z-20'>
                 <h1 className='text-[#2F327D] text-2xl md:text-3xl lg:text-4xl text-center font-semibold px-4'>
                     ما يمكنك <span className='text-cyan-400'>دراسته </span>هنا
                 </h1>
