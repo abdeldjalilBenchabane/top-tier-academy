@@ -103,6 +103,25 @@ export const usersAPI = {
     body: JSON.stringify(userData),
   }),
   delete: (id) => apiRequest(`/users/${id}`, { method: 'DELETE' }),
+  uploadAvatar: (id, avatarFile) => {
+    const formData = new FormData();
+    formData.append('avatar', avatarFile);
+    
+    return fetch(`${API_BASE_URL}/users/${id}/avatar`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+      body: formData,
+    }).then(response => {
+      if (!response.ok) {
+        return response.json().then(errorData => {
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        });
+      }
+      return response.json();
+    });
+  },
 };
 
 // Courses API calls
@@ -207,6 +226,12 @@ export const slidesAPI = {
   // Delete slide
   delete: (id) => apiRequest(`/slides/${id}`, { method: 'DELETE' }),
   
+  // Bulk reorder slides
+  reorder: (slides) => apiRequest('/slides/reorder', {
+    method: 'POST',
+    body: JSON.stringify({ slides }),
+  }),
+  
   // Track slide view
   trackView: (id, userAgent) => apiRequest(`/slides/${id}/view`, {
     method: 'POST',
@@ -227,6 +252,85 @@ export const slidesAPI = {
 export const healthAPI = {
   check: () => apiRequest('/health'),
   dbCheck: () => apiRequest('/db-health'),
+};
+
+// Structure Management API calls
+export const structureAPI = {
+  // Levels
+  getLevels: async () => {
+    const data = await apiRequest('/levels');
+    return data.map(level => ({
+      id: level.id,
+      name: level.name
+    }));
+  },
+  createLevel: (levelData) => apiRequest('/levels', {
+    method: 'POST',
+    body: JSON.stringify(levelData),
+  }),
+  updateLevel: (id, levelData) => apiRequest(`/levels/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(levelData),
+  }),
+  deleteLevel: (id) => apiRequest(`/levels/${id}`, { method: 'DELETE' }),
+  
+  // Years
+  getYears: async (levelId) => {
+    const data = await (levelId ? apiRequest(`/levels/${levelId}/years`) : apiRequest('/years'));
+    return data.map(year => ({
+      id: year.id,
+      name: year.name,
+      levelId: year.level_id
+    }));
+  },
+  createYear: (yearData) => apiRequest('/years', {
+    method: 'POST',
+    body: JSON.stringify(yearData),
+  }),
+  updateYear: (id, yearData) => apiRequest(`/years/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(yearData),
+  }),
+  deleteYear: (id) => apiRequest(`/years/${id}`, { method: 'DELETE' }),
+  
+  // Specialities
+  getSpecialities: async (yearId) => {
+    const data = await (yearId ? apiRequest(`/years/${yearId}/specialities`) : apiRequest('/specialities'));
+    return data.map(speciality => ({
+      id: speciality.id,
+      name: speciality.name,
+      yearId: speciality.year_id
+    }));
+  },
+  createSpeciality: (specialityData) => apiRequest('/specialities', {
+    method: 'POST',
+    body: JSON.stringify(specialityData),
+  }),
+  updateSpeciality: (id, specialityData) => apiRequest(`/specialities/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(specialityData),
+  }),
+  deleteSpeciality: (id) => apiRequest(`/specialities/${id}`, { method: 'DELETE' }),
+  
+  // Materials
+  getMaterials: async (specialityId) => {
+    const data = await (specialityId ? apiRequest(`/specialities/${specialityId}/materials`) : apiRequest('/materials'));
+    return data.map(material => ({
+      id: material.id,
+      name: material.name,
+      specialityId: material.speciality_id,
+      price: material.price
+    }));
+  },
+  createMaterial: (materialData) => apiRequest('/materials', {
+    method: 'POST',
+    body: JSON.stringify(materialData),
+  }),
+  updateMaterial: (id, materialData) => apiRequest(`/materials/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(materialData),
+  }),
+  deleteMaterial: (id) => apiRequest(`/materials/${id}`, { method: 'DELETE' }),
 };
 
 export { getAuthToken, setAuthToken, removeAuthToken }; 

@@ -30,7 +30,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '..', 'public', 'uploads')));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -62,6 +62,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/slides', slidesRoutes);
 app.use('/api', liveSessionRoutes);
+app.use('/api', hierarchyRoutes);
 
 // Vérification de la DB au démarrage
 pool.query('SELECT NOW()', (err, result) => {

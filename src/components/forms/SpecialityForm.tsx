@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { api } from '@/lib/api';
+import { structureAPI } from '@/services/api';
 import { Year } from '@/types';
 import { toast } from '@/lib/toast';
 
@@ -18,15 +17,19 @@ interface SpecialityFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
   preselectedYearId?: string;
+  speciality?: { id: string; name: string; yearId: string };
+  isEditing?: boolean;
 }
 
 const SpecialityForm = ({ 
   onSuccess, 
   onCancel,
-  preselectedYearId
+  preselectedYearId,
+  speciality,
+  isEditing = false
 }: SpecialityFormProps) => {
-  const [name, setName] = useState('');
-  const [yearId, setYearId] = useState(preselectedYearId || '');
+  const [name, setName] = useState(speciality?.name || '');
+  const [yearId, setYearId] = useState(speciality?.yearId || preselectedYearId || '');
   const [years, setYears] = useState<Year[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,7 +37,7 @@ const SpecialityForm = ({
   useEffect(() => {
     const fetchYears = async () => {
       try {
-        const data = await api.getYears();
+        const data = await structureAPI.getYears();
         setYears(data);
       } catch (error) {
         console.error(error);
@@ -63,13 +66,19 @@ const SpecialityForm = ({
     setIsSubmitting(true);
     
     try {
-      await api.createSpeciality({ name, yearId });
-      toast.success('Speciality created successfully');
+      if (isEditing && speciality) {
+        await structureAPI.updateSpeciality(speciality.id, { name, year_id: yearId });
+        toast.success('Speciality updated successfully');
+      } else {
+        await structureAPI.createSpeciality({ name, year_id: yearId });
+        toast.success('Speciality created successfully');
+      }
+      
       setName('');
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error('Failed to create speciality');
+      toast.error(error.message || 'Failed to save speciality');
     } finally {
       setIsSubmitting(false);
     }
@@ -86,7 +95,7 @@ const SpecialityForm = ({
         <Select
           value={yearId || undefined}
           onValueChange={setYearId}
-          disabled={!!preselectedYearId}
+          disabled={!!preselectedYearId && !isEditing}
         >
           <SelectTrigger id="year-select">
             <SelectValue placeholder="Select a year" />
@@ -123,7 +132,7 @@ const SpecialityForm = ({
           </Button>
         )}
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating...' : 'Create Speciality'}
+          {isSubmitting ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Speciality' : 'Create Speciality')}
         </Button>
       </div>
     </form>

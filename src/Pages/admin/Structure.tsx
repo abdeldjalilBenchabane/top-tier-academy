@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '@/lib/api';
+import { structureAPI } from '@/services/api';
 import { Level, Year, Speciality, Material } from '@/types';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/common/PageHeader';
@@ -17,6 +17,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   Card, 
@@ -55,17 +56,30 @@ const Structure = () => {
   const [showForm, setShowForm] = useState<FormType | null>(null);
   const [selectedAccordion, setSelectedAccordion] = useState<string[]>([]);
   
+  // Edit state
+  const [editingItem, setEditingItem] = useState<{
+    type: FormType;
+    data: Level | Year | Speciality | Material;
+  } | null>(null);
+  
   const navigate = useNavigate();
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
       const [levelsData, yearsData, specialitiesData, materialsData] = await Promise.all([
-        api.getLevels(),
-        api.getYears(),
-        api.getSpecialities(),
-        api.getMaterials()
+        structureAPI.getLevels(),
+        structureAPI.getYears(),
+        structureAPI.getSpecialities(),
+        structureAPI.getMaterials()
       ]);
+      
+      console.log('Fetched data:', {
+        levels: levelsData,
+        years: yearsData,
+        specialities: specialitiesData,
+        materials: materialsData
+      });
       
       setLevels(levelsData);
       setYears(yearsData);
@@ -85,6 +99,7 @@ const Structure = () => {
 
   const handleFormSuccess = () => {
     setShowForm(null);
+    setEditingItem(null);
     fetchData();
   };
 
@@ -125,9 +140,150 @@ const Structure = () => {
     setCurrentSpeciality(speciality);
   };
 
+  // Edit handlers
+  const handleEditLevel = (level: Level) => {
+    setEditingItem({ type: 'level', data: level });
+  };
+
+  const handleEditYear = (year: Year) => {
+    setEditingItem({ type: 'year', data: year });
+  };
+
+  const handleEditSpeciality = (speciality: Speciality) => {
+    setEditingItem({ type: 'speciality', data: speciality });
+  };
+
+  const handleEditMaterial = (material: Material) => {
+    setEditingItem({ type: 'material', data: material });
+  };
+
+  // Delete handlers
+  const handleDeleteLevel = async (level: Level) => {
+    if (!confirm(`Are you sure you want to delete "${level.name}"? This will also delete all associated years, specialities, and materials.`)) {
+      return;
+    }
+    
+    try {
+      await structureAPI.deleteLevel(level.id);
+      toast.success('Level deleted successfully');
+      fetchData();
+      
+      // Clear current selection if deleted
+      if (currentLevel?.id === level.id) {
+        setCurrentLevel(null);
+        setCurrentYear(null);
+        setCurrentSpeciality(null);
+      }
+    } catch (error: any) {
+      console.error('Failed to delete level:', error);
+      toast.error(error.message || 'Failed to delete level');
+    }
+  };
+
+  const handleDeleteYear = async (year: Year) => {
+    if (!confirm(`Are you sure you want to delete "${year.name}"? This will also delete all associated specialities and materials.`)) {
+      return;
+    }
+    
+    try {
+      await structureAPI.deleteYear(year.id);
+      toast.success('Year deleted successfully');
+      fetchData();
+      
+      // Clear current selection if deleted
+      if (currentYear?.id === year.id) {
+        setCurrentYear(null);
+        setCurrentSpeciality(null);
+      }
+    } catch (error: any) {
+      console.error('Failed to delete year:', error);
+      toast.error(error.message || 'Failed to delete year');
+    }
+  };
+
+  const handleDeleteSpeciality = async (speciality: Speciality) => {
+    if (!confirm(`Are you sure you want to delete "${speciality.name}"? This will also delete all associated materials.`)) {
+      return;
+    }
+    
+    try {
+      await structureAPI.deleteSpeciality(speciality.id);
+      toast.success('Speciality deleted successfully');
+      fetchData();
+      
+      // Clear current selection if deleted
+      if (currentSpeciality?.id === speciality.id) {
+        setCurrentSpeciality(null);
+      }
+    } catch (error: any) {
+      console.error('Failed to delete speciality:', error);
+      toast.error(error.message || 'Failed to delete speciality');
+    }
+  };
+
+  const handleDeleteMaterial = async (material: Material) => {
+    if (!confirm(`Are you sure you want to delete "${material.name}"?`)) {
+      return;
+    }
+    
+    try {
+      await structureAPI.deleteMaterial(material.id);
+      toast.success('Material deleted successfully');
+      fetchData();
+    } catch (error: any) {
+      console.error('Failed to delete material:', error);
+      toast.error(error.message || 'Failed to delete material');
+    }
+  };
+
   const renderForm = () => {
+    if (editingItem) {
+      // Render edit form
+      switch (editingItem.type) {
+        case 'level':
+          return (
+            <LevelForm 
+              onSuccess={handleFormSuccess} 
+              onCancel={() => setEditingItem(null)} 
+              level={editingItem.data as Level}
+              isEditing={true}
+            />
+          );
+        case 'year':
+          return (
+            <YearForm 
+              onSuccess={handleFormSuccess} 
+              onCancel={() => setEditingItem(null)} 
+              year={editingItem.data as Year}
+              isEditing={true}
+            />
+          );
+        case 'speciality':
+          return (
+            <SpecialityForm 
+              onSuccess={handleFormSuccess} 
+              onCancel={() => setEditingItem(null)} 
+              speciality={editingItem.data as Speciality}
+              isEditing={true}
+            />
+          );
+        case 'material':
+          return (
+            <MaterialForm 
+              onSuccess={handleFormSuccess} 
+              onCancel={() => setEditingItem(null)} 
+              material={editingItem.data as Material}
+              isEditing={true}
+            />
+          );
+        default:
+          return null;
+      }
+    }
+    
     if (!showForm) return null;
     
+    // Render create form
     switch (showForm) {
       case 'level':
         return <LevelForm onSuccess={handleFormSuccess} onCancel={() => setShowForm(null)} />;
@@ -229,12 +385,32 @@ const Structure = () => {
                 >
                   {levels.map(level => (
                     <AccordionItem key={level.id} value={level.id}>
-                      <AccordionTrigger
-                        onClick={() => handleLevelClick(level)}
-                        className={`${currentLevel?.id === level.id ? 'font-medium text-blue-600' : ''}`}
-                      >
-                        {level.name}
-                      </AccordionTrigger>
+                      <div className="flex items-center justify-between">
+                        <AccordionTrigger
+                          onClick={() => handleLevelClick(level)}
+                          className={`flex-1 ${currentLevel?.id === level.id ? 'font-medium text-blue-600' : ''}`}
+                        >
+                          {level.name}
+                        </AccordionTrigger>
+                        <div className="flex items-center gap-1 pr-4">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditLevel(level)}
+                            className="h-6 w-6 p-0 hover:bg-blue-100 hover:text-blue-600"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteLevel(level)}
+                            className="h-6 w-6 p-0 hover:bg-red-100 hover:text-red-600"
+                          >
+                            <Trash className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
                       <AccordionContent>
                         <div className="pl-4 border-l border-gray-200">
                           {getYearsForLevel(level.id).length > 0 ? (
@@ -246,28 +422,68 @@ const Structure = () => {
                             >
                               {getYearsForLevel(level.id).map(year => (
                                 <AccordionItem key={year.id} value={year.id}>
-                                  <AccordionTrigger
-                                    onClick={() => handleYearClick(year)}
-                                    className={`${currentYear?.id === year.id ? 'font-medium text-blue-600' : ''}`}
-                                  >
-                                    {year.name}
-                                  </AccordionTrigger>
+                                  <div className="flex items-center justify-between">
+                                    <AccordionTrigger
+                                      onClick={() => handleYearClick(year)}
+                                      className={`flex-1 ${currentYear?.id === year.id ? 'font-medium text-blue-600' : ''}`}
+                                    >
+                                      {year.name}
+                                    </AccordionTrigger>
+                                    <div className="flex items-center gap-1 pr-4">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleEditYear(year)}
+                                        className="h-5 w-5 p-0 hover:bg-blue-100 hover:text-blue-600"
+                                      >
+                                        <Edit className="h-3 w-3" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteYear(year)}
+                                        className="h-5 w-5 p-0 hover:bg-red-100 hover:text-red-600"
+                                      >
+                                        <Trash className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
                                   <AccordionContent>
                                     <div className="pl-4 border-l border-gray-200">
                                       {getSpecialitiesForYear(year.id).length > 0 ? (
                                         <ul className="space-y-1">
                                           {getSpecialitiesForYear(year.id).map(speciality => (
                                             <li key={speciality.id}>
-                                              <button
-                                                onClick={() => handleSpecialityClick(speciality)}
-                                                className={`w-full text-left py-1 px-2 rounded text-sm ${
-                                                  currentSpeciality?.id === speciality.id
-                                                    ? 'bg-blue-100 text-blue-700'
-                                                    : 'hover:bg-gray-100'
-                                                }`}
-                                              >
-                                                {speciality.name}
-                                              </button>
+                                              <div className="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-50">
+                                                <div
+                                                  onClick={() => handleSpecialityClick(speciality)}
+                                                  className={`text-left text-sm flex-1 cursor-pointer ${
+                                                    currentSpeciality?.id === speciality.id
+                                                      ? 'font-medium text-blue-600'
+                                                      : ''
+                                                  }`}
+                                                >
+                                                  {speciality.name}
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleEditSpeciality(speciality)}
+                                                    className="h-4 w-4 p-0 hover:bg-blue-100 hover:text-blue-600"
+                                                  >
+                                                    <Edit className="h-2 w-2" />
+                                                  </Button>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteSpeciality(speciality)}
+                                                    className="h-4 w-4 p-0 hover:bg-red-100 hover:text-red-600"
+                                                  >
+                                                    <Trash className="h-2 w-2" />
+                                                  </Button>
+                                                </div>
+                                              </div>
                                             </li>
                                           ))}
                                         </ul>
@@ -353,6 +569,22 @@ const Structure = () => {
                                 >
                                   View
                                 </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditYear(year)}
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteYear(year)}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash className="h-3 w-3" />
+                                </Button>
                               </CardFooter>
                             </Card>
                           ))}
@@ -415,6 +647,22 @@ const Structure = () => {
                                     onClick={() => handleSpecialityClick(speciality)}
                                   >
                                     View
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditSpeciality(speciality)}
+                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteSpeciality(speciality)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash className="h-3 w-3" />
                                   </Button>
                                 </CardFooter>
                               </Card>
@@ -483,6 +731,22 @@ const Structure = () => {
                                   >
                                     View Courses
                                   </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditMaterial(material)}
+                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteMaterial(material)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash className="h-3 w-3" />
+                                  </Button>
                                 </CardFooter>
                               </Card>
                             ))}
@@ -507,15 +771,28 @@ const Structure = () => {
         </div>
       )}
       
-      <Dialog open={!!showForm} onOpenChange={(open) => !open && setShowForm(null)}>
+      <Dialog open={!!showForm || !!editingItem} onOpenChange={(open) => {
+        if (!open) {
+          setShowForm(null);
+          setEditingItem(null);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
+              {editingItem && `Edit ${editingItem.type.charAt(0).toUpperCase() + editingItem.type.slice(1)}`}
               {showForm === 'level' && 'Create New Level'}
               {showForm === 'year' && 'Create New Year'}
               {showForm === 'speciality' && 'Create New Speciality'}
               {showForm === 'material' && 'Create New Material'}
             </DialogTitle>
+            <DialogDescription>
+              {editingItem && `Update the details for this ${editingItem.type}`}
+              {showForm === 'level' && 'Create a new education level'}
+              {showForm === 'year' && 'Create a new year within the selected level'}
+              {showForm === 'speciality' && 'Create a new speciality within the selected year'}
+              {showForm === 'material' && 'Create a new material within the selected speciality'}
+            </DialogDescription>
           </DialogHeader>
           {renderForm()}
         </DialogContent>

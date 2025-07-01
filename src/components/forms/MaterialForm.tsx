@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { api } from '@/lib/api';
+import { structureAPI } from '@/services/api';
 import { Speciality } from '@/types';
 import { toast } from '@/lib/toast';
 
@@ -17,15 +17,20 @@ interface MaterialFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
   preselectedSpecialityId?: string;
+  material?: { id: string; name: string; price?: number; specialityId: string };
+  isEditing?: boolean;
 }
 
 const MaterialForm = ({ 
   onSuccess, 
   onCancel,
-  preselectedSpecialityId 
+  preselectedSpecialityId,
+  material,
+  isEditing = false
 }: MaterialFormProps) => {
-  const [name, setName] = useState('');
-  const [specialityId, setSpecialityId] = useState(preselectedSpecialityId || '');
+  const [name, setName] = useState(material?.name || '');
+  const [price, setPrice] = useState(material?.price?.toString() || '');
+  const [specialityId, setSpecialityId] = useState(material?.specialityId || preselectedSpecialityId || '');
   const [specialities, setSpecialities] = useState<Speciality[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,7 +38,7 @@ const MaterialForm = ({
   useEffect(() => {
     const fetchSpecialities = async () => {
       try {
-        const data = await api.getSpecialities();
+        const data = await structureAPI.getSpecialities();
         setSpecialities(data);
       } catch (error) {
         console.error(error);
@@ -59,16 +64,37 @@ const MaterialForm = ({
       return;
     }
     
+    const priceValue = price ? parseFloat(price) : 0;
+    if (price && (isNaN(priceValue) || priceValue < 0)) {
+      toast.error('Please enter a valid price');
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
-      await api.createMaterial({ name, specialityId });
-      toast.success('Material created successfully');
+      if (isEditing && material) {
+        await structureAPI.updateMaterial(material.id, { 
+          name, 
+          price: priceValue, 
+          speciality_id: specialityId 
+        });
+        toast.success('Material updated successfully');
+      } else {
+        await structureAPI.createMaterial({ 
+          name, 
+          price: priceValue, 
+          speciality_id: specialityId 
+        });
+        toast.success('Material created successfully');
+      }
+      
       setName('');
+      setPrice('');
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error('Failed to create material');
+      toast.error(error.message || 'Failed to save material');
     } finally {
       setIsSubmitting(false);
     }
@@ -85,7 +111,7 @@ const MaterialForm = ({
         <Select
           value={specialityId}
           onValueChange={setSpecialityId}
-          disabled={!!preselectedSpecialityId}
+          disabled={!!preselectedSpecialityId && !isEditing}
         >
           <SelectTrigger id="speciality-select">
             <SelectValue placeholder="Select a speciality" />
@@ -111,6 +137,19 @@ const MaterialForm = ({
         />
       </div>
       
+      <div className="space-y-2">
+        <Label htmlFor="material-price">Price (Optional)</Label>
+        <Input
+          id="material-price"
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder="0.00"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+        />
+      </div>
+      
       <div className="flex justify-end gap-2">
         {onCancel && (
           <Button 
@@ -122,7 +161,7 @@ const MaterialForm = ({
           </Button>
         )}
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating...' : 'Create Material'}
+          {isSubmitting ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Material' : 'Create Material')}
         </Button>
       </div>
     </form>
