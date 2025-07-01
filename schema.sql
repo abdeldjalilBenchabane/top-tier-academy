@@ -99,16 +99,6 @@ CREATE TABLE pending_section_blocks (
     "order" INTEGER
 )
 
- -- permet de connecter un live à une matière
-ALTER TABLE live_sessions
-ADD COLUMN material_id INTEGER REFERENCES materials(id) ON DELETE SET NULL;
-
-
--- (Optionnel) Ajouter is_published pour la bibliothèque
-ALTER TABLE live_sessions
-ADD COLUMN is_published BOOLEAN DEFAULT FALSE;
-
-
 -- QUIZZES
 CREATE TABLE quizzes (
     id SERIAL PRIMARY KEY,
@@ -197,6 +187,14 @@ CREATE TABLE live_private_participants (
     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- permet de connecter un live à une matière
+ALTER TABLE live_sessions
+ADD COLUMN material_id INTEGER REFERENCES materials(id) ON DELETE SET NULL;
+
+-- (Optionnel) Ajouter is_published pour la bibliothèque
+ALTER TABLE live_sessions
+ADD COLUMN is_published BOOLEAN DEFAULT FALSE;
+
 -- ENHANCED SLIDES (Homepage and Enhanced)
 CREATE TABLE enhanced_slides (
     id SERIAL PRIMARY KEY,
@@ -223,6 +221,8 @@ CREATE TABLE enhanced_slides (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
 
 -- SLIDE ANALYTICS (for tracking views and clicks)
 CREATE TABLE slide_analytics (

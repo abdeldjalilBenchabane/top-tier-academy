@@ -65,6 +65,7 @@ router.post('/login', async (req, res) => {
 
 // Register endpoint
 router.post('/register', async (req, res) => {
+  console.log('--- /register endpoint hit ---');
   try {
     console.log('Received registration request:', req.body);
     const { name, email, password, role = 'student', phoneNumber, nationalId } = req.body;
@@ -151,7 +152,7 @@ router.post('/logout', (req, res) => {
 
 // Verify token endpoint
 router.post('/verify', verifyToken, (req, res) => {
-  res.json({ 
+  res.json({
     message: 'Token is valid',
     user: req.user
   });
