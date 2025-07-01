@@ -113,6 +113,13 @@ The following new tables have been added:
 
 ## 🎠 Slides System
 
+### Admin Slides Feature Dependencies
+If you are working on the admin slides management interface, make sure you have the following packages installed in your frontend project:
+
+```bash
+npm install recharts lucide-react
+```
+
 ### Admin Slides Management
 - **Location**: `/admin/enhanced-slides`
 - **Features**:

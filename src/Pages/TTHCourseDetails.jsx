@@ -122,7 +122,8 @@ export default function CourseDetail() {
     const navigate = useNavigate();
     const [isVideoPlaying, setIsVideoPlaying] = useState(false);
     const [activeTab, setActiveTab] = useState("overview");
-
+    const [newReview, setNewReview] = useState({ name: '', rating: 5, comment: '' });
+    const [reviews, setReviews] = useState(fakeVideos.find(v => v.id === 1)?.reviews || []);
 
     // SECTION À REMPLACER
     // À remplacer par un appel API (ex: fetch(`/api/courses/${id}`))
@@ -139,79 +140,94 @@ export default function CourseDetail() {
         );
     }
 
+    const handleReviewChange = (e) => {
+        const { name, value } = e.target;
+        setNewReview((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const handleRatingChange = (rating) => {
+        setNewReview((prev) => ({ ...prev, rating }));
+    };
+
+    const handleReviewSubmit = (e) => {
+        e.preventDefault();
+        if (!newReview.name.trim() || !newReview.comment.trim()) return;
+        setReviews([
+            { ...newReview, date: 'الآن' },
+            ...reviews,
+        ]);
+        setNewReview({ name: '', rating: 5, comment: '' });
+    };
+
     return (
         <div dir="rtl" className="min-h-screen bg-gray-50">
             {/* Header */}
-            <Navbar></Navbar>
-
+            <Navbar />
+            <div className="border-b border-blue-100" /> {/* Thin divider line between Navbar and hero section */}
             {/* Hero Section */}
-            <div className="bg-[#090D84] text-white py-12">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className=" lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-2">
-                            <h1 className="text-4xl font-bold mb-4">{course.title}</h1>
-                            <p className="text-xl text-gray-300 mb-6">{course.description}</p>
-
-                            <div className="flex items-center gap-6 mb-6">
-                                <div className="flex items-center gap-1">
-                                    <Star className="text-yellow-400 fill-current" size={20} />
-                                    <span className="font-bold text-lg">{course.rating}</span>
-                                    <span className="text-gray-300">({course.students} طالب)</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <Clock size={18} />
-                                    <span>{course.duration}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <Globe size={18} />
-                                    <span>{course.language}</span>
-                                </div>
-                            </div>
-
-                            <p className="text-gray-300">
-                                من إعداد <span className="text-white font-semibold">{course.instructor}</span>
-                            </p>
-                        </div>
-
-                        {/* Video Preview */}
-                        <div className="mt-6 lg:col-span-1">
-                            <div className="bg-black rounded-lg overflow-hidden">
-                                <div className="relative aspect-video">
-                                    {course.videoUrl ? (
-                                        <video
-                                            controls
-                                            src={course.videoUrl}
-                                            className="w-full h-full"
-                                            poster={course.thumbnail}
-                                            onPlay={() => setIsVideoPlaying(true)}
-                                            onPause={() => setIsVideoPlaying(false)}
-                                        >
-                                            <source src={course.videoUrl} type="video/mp4" />
-                                            متصفحك لا يدعم عرض الفيديو.
-                                        </video>
-                                    ) : (
-                                        <div className="flex items-center justify-center h-full">
-                                            <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
-                                            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                                                <Play size={64} className="text-white" />
-                                            </div>
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-16 shadow-lg rounded-b-3xl">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center gap-10">
+                    {/* Video Preview */}
+                    <div className="w-full lg:w-1/2 order-2 lg:order-1 mt-8 lg:mt-0">
+                        <div className="bg-black rounded-2xl overflow-hidden shadow-xl border-4 border-white/20">
+                            <div className="relative aspect-video">
+                                {course.videoUrl ? (
+                                    <video
+                                        controls
+                                        src={course.videoUrl}
+                                        className="w-full h-full rounded-2xl"
+                                        poster={course.thumbnail}
+                                        onPlay={() => setIsVideoPlaying(true)}
+                                        onPause={() => setIsVideoPlaying(false)}
+                                    >
+                                        <source src={course.videoUrl} type="video/mp4" />
+                                        متصفحك لا يدعم عرض الفيديو.
+                                    </video>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full">
+                                        <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                                            <Play size={64} className="text-white" />
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
+                    </div>
+                    {/* Course Info */}
+                    <div className="w-full lg:w-1/2 order-1 lg:order-2">
+                        <h1 className="text-5xl font-extrabold mb-4 drop-shadow-lg">{course.title}</h1>
+                        <p className="text-xl text-blue-100 mb-6 font-medium drop-shadow-sm">{course.description}</p>
+                        <div className="flex flex-wrap items-center gap-6 mb-6">
+                            <div className="flex items-center gap-1">
+                                <Star className="text-yellow-400 fill-current" size={22} />
+                                <span className="font-bold text-lg">{course.rating}</span>
+                                <span className="text-blue-100">({course.students} طالب)</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <Clock size={20} />
+                                <span>{course.duration}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <Globe size={20} />
+                                <span>{course.language}</span>
+                            </div>
+                        </div>
+                        <p className="text-blue-100 font-semibold">
+                            من إعداد <span className="text-white font-bold">{course.instructor}</span>
+                        </p>
                     </div>
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className=" lg:grid-cols-3 gap-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                <div className="lg:grid lg:grid-cols-3 gap-10">
                     {/* Main Content */}
                     <div className="lg:col-span-2">
                         {/* Tabs */}
-                        <div className="bg-white rounded-lg shadow-sm mb-6">
-                            <div className="border-b border-gray-200">
-                                <nav className="flex space-x-8 px-6">
+                        <div className="bg-white rounded-3xl shadow-lg mb-8 border border-blue-100">
+                            <div className="border-b border-blue-100 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-t-3xl">
+                                <nav className="flex space-x-8 px-8">
                                     {[
                                         { id: "overview", label: "نظرة عامة" },
                                         { id: "curriculum", label: "المنهج" },
@@ -220,9 +236,9 @@ export default function CourseDetail() {
                                         <button
                                             key={tab.id}
                                             onClick={() => setActiveTab(tab.id)}
-                                            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
-                                                ? "border-blue-500 text-blue-600"
-                                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                            className={`py-5 px-2 border-b-4 font-bold text-base transition-all duration-200 ${activeTab === tab.id
+                                                ? "border-cyan-500 text-cyan-700 bg-cyan-50 rounded-t-2xl shadow"
+                                                : "border-transparent text-blue-400 hover:text-cyan-700 hover:border-cyan-200"
                                                 }`}
                                         >
                                             {tab.label}
@@ -230,8 +246,7 @@ export default function CourseDetail() {
                                     ))}
                                 </nav>
                             </div>
-
-                            <div className="p-6">
+                            <div className="p-8">
                                 {activeTab === "overview" && (
                                     <div className="space-y-8">
                                         {/* Learning Objectives */}
@@ -309,8 +324,51 @@ export default function CourseDetail() {
                                             </div>
                                         </div>
 
+                                        {/* Add Review Form */}
+                                        <form onSubmit={handleReviewSubmit} className="bg-blue-50 rounded-xl p-4 mb-6 shadow flex flex-col gap-4">
+                                            <div className="flex flex-col md:flex-row gap-4">
+                                                <input
+                                                    type="text"
+                                                    name="name"
+                                                    value={newReview.name}
+                                                    onChange={handleReviewChange}
+                                                    placeholder="اسمك"
+                                                    className="flex-1 rounded-lg border border-blue-200 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300 text-right"
+                                                    required
+                                                />
+                                                <div className="flex items-center gap-1">
+                                                    {Array.from({ length: 5 }).map((_, i) => (
+                                                        <button
+                                                            type="button"
+                                                            key={i}
+                                                            onClick={() => handleRatingChange(i + 1)}
+                                                            className="focus:outline-none"
+                                                        >
+                                                            <Star size={22} className={i < newReview.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'} />
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <textarea
+                                                name="comment"
+                                                value={newReview.comment}
+                                                onChange={handleReviewChange}
+                                                placeholder="اكتب تعليقك هنا..."
+                                                className="rounded-lg border border-blue-200 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300 text-right min-h-[60px]"
+                                                required
+                                            />
+                                            <div className="flex justify-end">
+                                                <button
+                                                    type="submit"
+                                                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-2 px-6 rounded-lg shadow transition"
+                                                >
+                                                    أضف تقييمك
+                                                </button>
+                                            </div>
+                                        </form>
+
                                         <div className="space-y-4">
-                                            {course.reviews?.map((review, index) => (
+                                            {reviews.map((review, index) => (
                                                 <div key={index} className="border-b border-gray-200 pb-4">
                                                     <div className="flex items-center justify-between mb-2">
                                                         <div className="flex items-center gap-3">
@@ -346,7 +404,7 @@ export default function CourseDetail() {
                                 <div className="space-y-4">
                                     <div className="flex items-center pt-4  gap-3">
                                         {course.pdfUrl && (
-                                            <Button className="flex-1 flex justify-center items-center bg-cyan-400" >
+                                            <Button className="flex-1 flex justify-center items-center bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold shadow hover:from-blue-700 hover:to-purple-700 transition">
                                                 <a href={course.pdfUrl} download target="_blank" rel="noopener noreferrer">
                                                     <FileText size={18} className="absolute mr-[-1.5rem]" />
                                                     ملخص الدرس PDF

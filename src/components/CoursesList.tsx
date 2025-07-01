@@ -114,88 +114,90 @@ const CoursesList = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Mes Cours</h2>
-        <div className="flex space-x-2">
-          <Badge variant="outline" className="bg-blue-50 text-blue-700">
-            {courses.filter(c => c.status === "en_cours").length} en cours
-          </Badge>
-          <Badge variant="outline" className="bg-green-50 text-green-700">
-            {courses.filter(c => c.progress === 100).length} terminés
-          </Badge>
+    <div className="min-h-screen py-10 px-2 md:px-8 bg-gradient-to-br from-blue-50 via-cyan-50 to-white">
+      <div className="max-w-5xl mx-auto space-y-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-3xl font-bold text-blue-900 tracking-tight">Mes Cours</h2>
+          <div className="flex space-x-2">
+            <Badge variant="outline" className="bg-cyan-100 text-cyan-700 border-cyan-300 font-semibold px-3 py-1">
+              {courses.filter(c => c.status === "en_cours").length} en cours
+            </Badge>
+            <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300 font-semibold px-3 py-1">
+              {courses.filter(c => c.progress === 100).length} terminés
+            </Badge>
+          </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {courses.map((course) => (
-          <Card key={course.id} className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-blue-500">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <CardTitle className="text-lg mb-2">{course.title}</CardTitle>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    {course.description}
-                  </p>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    <Badge className={getStatusColor(course.status)}>
-                      {getStatusText(course.status)}
-                    </Badge>
-                    <Badge variant="outline" className={getDifficultyColor(course.difficulty)}>
-                      {course.difficulty}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="space-y-4">
-                {/* Progression */}
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">Progression</span>
-                    <span className="text-sm font-bold text-blue-600">{course.progress}%</span>
-                  </div>
-                  <Progress value={course.progress} className="h-3" />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>{course.completedModules}/{course.modules} modules</span>
-                    <span>{course.duration}</span>
-                  </div>
-                </div>
-
-                {/* Prochaine leçon */}
-                {course.status !== "pas_commence" && (
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <BookOpen className="h-4 w-4 text-blue-500" />
-                      <span className="text-sm font-medium text-gray-700">Prochaine leçon</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {courses.map((course) => (
+            <Card key={course.id} className="bg-white rounded-2xl shadow-xl border-0 hover:scale-[1.025] hover:shadow-2xl transition-all duration-300">
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="text-xl font-bold text-blue-900 mb-2">{course.title}</CardTitle>
+                    <p className="text-base text-gray-600 mb-4">
+                      {course.description}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <Badge className={getStatusColor(course.status) + " text-white font-semibold px-2 py-1"}>
+                        {getStatusText(course.status)}
+                      </Badge>
+                      <Badge variant="outline" className={getDifficultyColor(course.difficulty) + " font-semibold px-2 py-1"}>
+                        {course.difficulty}
+                      </Badge>
                     </div>
-                    <p className="text-sm text-gray-600">{course.nextLesson}</p>
                   </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex space-x-2 pt-2">
-                  {course.status === "pas_commence" ? (
-                    <Button className="flex-1 bg-blue-600 hover:bg-blue-700">
-                      <Play className="h-4 w-4 mr-2" />
-                      Commencer
-                    </Button>
-                  ) : (
-                    <Button className="flex-1 bg-blue-600 hover:bg-blue-700">
-                      <Play className="h-4 w-4 mr-2" />
-                      Continuer
-                    </Button>
-                  )}
-                  <Button variant="outline" className="flex-1">
-                    <BookOpen className="h-4 w-4 mr-2" />
-                    Détails
-                  </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-5">
+                  {/* Progression */}
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-blue-900">Progression</span>
+                      <span className="text-sm font-bold text-cyan-600">{course.progress}%</span>
+                    </div>
+                    <Progress value={course.progress} className="h-4 rounded-full bg-cyan-100" />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>{course.completedModules}/{course.modules} modules</span>
+                      <span>{course.duration}</span>
+                    </div>
+                  </div>
+
+                  {/* Prochaine leçon */}
+                  {course.status !== "pas_commence" && (
+                    <div className="bg-cyan-50 rounded-xl p-4">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <BookOpen className="h-4 w-4 text-cyan-500" />
+                        <span className="text-sm font-semibold text-blue-900">Prochaine leçon</span>
+                      </div>
+                      <p className="text-sm text-cyan-700 font-medium">{course.nextLesson}</p>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex space-x-2 pt-2">
+                    {course.status === "pas_commence" ? (
+                      <Button className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-lg shadow">
+                        <Play className="h-4 w-4 mr-2" />
+                        Commencer
+                      </Button>
+                    ) : (
+                      <Button className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-lg shadow">
+                        <Play className="h-4 w-4 mr-2" />
+                        Continuer
+                      </Button>
+                    )}
+                    <Button variant="outline" className="flex-1 border-cyan-200 text-cyan-700 font-bold rounded-lg">
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      Détails
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   )

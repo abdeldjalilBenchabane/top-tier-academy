@@ -210,7 +210,7 @@ const TTHSlides = () => {
       <div 
         className="absolute inset-0 transition-all duration-1000 ease-in-out"
         style={{
-          backgroundColor: currentSlideData.overlayColor || '#000000',
+          
           opacity: currentSlideData.overlayOpacity || 0.3,
         }}
       />
@@ -220,16 +220,25 @@ const TTHSlides = () => {
         <p className="text-gray-200 text-center sm:text-right md:text-[1.28rem] opacity-60 mb-4">
           {currentSlideData.description || "المعلمون المميزون يصنعون مستقبل الأجيال"}
         </p>
-        <div className="flex flex-col sm:items-start items-center mb-16 space-y-4">
-          <div className="text-4xl md:text-5xl font-semibold">
-            {currentSlideData.title || "ابدأ"} <span className="text-cyan-400">{currentSlideData.title ? "" : "رحلتك "}</span>{currentSlideData.title ? "" : "التعليمية"}
+        <div className="flex flex-col sm:items-start items-center ">
+          <div className="text-4xl md:text-5xl font-semibold leading-[3.5rem] md:leading-[4.5rem] mb-16">
+            {currentSlideData.title ? (
+              (() => {
+                const words = currentSlideData.title.trim().split(/\s+/).filter(Boolean);
+                if (words.length === 1) {
+                  return words[0];
+                } else if (words.length === 2) {
+                  return <>{words[0]} <span className="text-cyan-400">{words[1]}</span></>;
+                } else {
+                  return <>{words[0]} <span className="text-cyan-400">{words[1]}</span> {words.slice(2).join(' ')}</>;
+                }
+              })()
+            ) : (
+              <>
+                ابدأ <span className="text-cyan-400">رحلتك </span>التعليمية
+              </>
+            )}
           </div>
-          {!currentSlideData.title && (
-            <>
-              <div className="text-4xl md:text-5xl font-bold">من بيتك مع أفضل</div>
-              <div className="text-4xl md:text-5xl font-bold">الأساتذة في الجزائر</div>
-            </>
-          )}
         </div>
         <div className="flex md:flex-row items-center md:justify-start justify-center gap-4">
           {currentSlideData.ctaText && currentSlideData.ctaLink ? (
