@@ -48,7 +48,7 @@ const PrivateClasses = () => {
       <Navbar />
       <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
         {/* Page Header */}
-        <div className="text-center mb-8 sm:mb-12">
+        <div className="mr-28 mt-10 mb-8 sm:mb-12">
           <div className="inline-flex flex-col sm:flex-row items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
             <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl">
               <svg className="w-8 h-8 sm:w-10 sm:h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -56,10 +56,10 @@ const PrivateClasses = () => {
               </svg>
             </div>
             <div className="text-center sm:text-right">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-blue-600 leading-tight mb-2">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-blue-600  mb-4">
                 تحتاج دعم أكثر؟
               </h1>
-              <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold text-purple-600 leading-tight">
+              <h2 className="text-sm sm:text-lg md:text-lg lg:text-2xl  opacity-75     font-semibold text-purple-600 ">
                 اطلب حصة خاصة مع أستاذك المفضل
               </h2>
             </div>
@@ -87,10 +87,7 @@ const PrivateClasses = () => {
           <div className="flex-1 order-2 lg:order-2">
             {/* Content Header */}
             <div className="mb-6 sm:mb-8">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">الحصص المتاحة</h2>
-                <p className="text-sm sm:text-base text-gray-600">تم العثور على {filteredSessions.length} حصة</p>
-              </div>
+             
             </div>
 
             {/* Sessions Grid */}
@@ -123,7 +120,7 @@ const PrivateClasses = () => {
           </div>
 
           {/* Sidebar */}
-          <div className="order-1 lg:order-1 lg:w-80">
+          <div className="order-1 mt-6 lg:order-1 lg:w-80">
             <PrivateClassSidebar
               onFilterChange={handleFilterChange}
               onSearch={handleSidebarSearch}

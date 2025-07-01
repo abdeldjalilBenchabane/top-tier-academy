@@ -22,10 +22,10 @@ const PrivateClassFilter = ({
   const currentGrade = gradeOptions.find(g => g.label === selectedGrade);
 
   return (
-    <div className="w-full flex justify-center mb-8 sm:mb-10" dir="rtl">
-      <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-2xl shadow-xl px-4 sm:px-6 py-4 sm:py-4 flex flex-col items-center gap-4 w-full max-w-6xl backdrop-blur-sm relative z-10" style={{background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #e0f7fa 100%)'}}>
+    <div className="w-full  flex justify-center mb-8 sm:mb-10" dir="rtl">
+      <div className="bg-gradient-to-br from-white  to-gray-50 border border-gray-200 rounded-2xl shadow-xl px-4 sm:px-6 py-4 sm:py-4 flex flex-col items-center gap-4 w-full max-w-6xl backdrop-blur-sm relative z-10 ]" >
         {/* Header */}
-        <div className="flex items-center gap-2 sm:gap-3 mb-2">
+        <div className="flex items-center gap-2 sm:gap-3 mb-4">
           <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
             <FaFilter className="text-white text-sm sm:text-lg" />
           </div>

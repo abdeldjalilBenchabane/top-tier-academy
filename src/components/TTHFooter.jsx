@@ -18,16 +18,16 @@ export default function Footer() {
                         {/* Réseaux Sociaux */}
                         <div className="flex gap-4 mt-4">
                             <a href="#" aria-label="Facebook">
-                                <FaFacebook className="text-gray-200 hover:text-blue-200 text-xl transition-colors" />
+                                <FaFacebook className="text-gray-200 hover:text-purple-200 text-xl transition-colors" />
                             </a>
                             <a href="#" aria-label="Twitter">
-                                <FaTwitter className="text-gray-200 hover:text-blue-200 text-xl transition-colors" />
+                                <FaTwitter className="text-gray-200 hover:text-purple-200 text-xl transition-colors" />
                             </a>
                             <a href="#" aria-label="Instagram">
-                                <FaInstagram className="text-gray-200 hover:text-blue-200 text-xl transition-colors" />
+                                <FaInstagram className="text-gray-200 hover:text-purple-200 text-xl transition-colors" />
                             </a>
                             <a href="#" aria-label="YouTube">
-                                <FaYoutube className="text-gray-200 hover:text-blue-200 text-xl transition-colors" />
+                                <FaYoutube className="text-gray-200 hover:text-purple-200 text-xl transition-colors" />
                             </a>
                         </div>
                     </div>
@@ -37,27 +37,27 @@ export default function Footer() {
                         <h4 className="text-lg font-semibold mb-4 border-b border-blue-200 pb-2">روابط سريعة</h4>
                         <ul className="space-y-2">
                             <li><Link to="/" className="text-gray-200 hover:text-blue-200 transition">الصفحة الرئيسية</Link></li>
-                            <li><Link to="/private-classes" className="text-gray-200 hover:text-blue-200 transition">حصص خاصة</Link></li>
-                            <li><a href="#" className="text-gray-200 hover:text-blue-200 transition">الدورات المتاحة</a></li>
-                            <li><a href="#" className="text-gray-200 hover:text-blue-200 transition">الأساتذة</a></li>
-                            <li><a href="#" className="text-gray-200 hover:text-blue-200 transition">الشهادات</a></li>
+                            <li><Link to="/private-classes" className="text-gray-200 hover:text-purple-200 transition">حصص خاصة</Link></li>
+                            <li><a href="#" className="text-gray-200 hover:text-purple-200 transition">الدورات المتاحة</a></li>
+                            <li><a href="#" className="text-gray-200 hover:text-purple-200 transition">الأساتذة</a></li>
+                            <li><a href="#" className="text-gray-200 hover:text-purple-200 transition">الشهادات</a></li>
                         </ul>
                     </div>
 
                     {/* Section 3 : Contact */}
                     <div>
-                        <h4 className="text-lg font-semibold mb-4 border-b border-blue-200 pb-2">اتصل بنا</h4>
+                        <h4 className="text-lg font-semibold mb-4 border-b border-purple-200 pb-2">اتصل بنا</h4>
                         <ul className="space-y-3">
                             <li className="flex items-center gap-2">
-                                <FaPhone className="text-blue-200" />
+                                <FaPhone className="text-purple-200" />
                                 <span className="text-gray-200">+213 123 456 789</span>
                             </li>
                             <li className="flex items-center gap-2">
-                                <FaEnvelope className="text-blue-200" />
+                                <FaEnvelope className="text-purple-200" />
                                 <span className="text-gray-200">contact@example.com</span>
                             </li>
                             <li className="flex items-center gap-2">
-                                <FaMapMarkerAlt className="text-blue-200" />
+                                <FaMapMarkerAlt className="text-purple-200" />
                                 <span className="text-gray-200">الجزائر العاصمة، الجزائر</span>
                             </li>
                         </ul>
@@ -65,7 +65,7 @@ export default function Footer() {
 
                     {/* Section 4 : Newsletter */}
                     <div>
-                        <h4 className="text-lg font-semibold mb-4 border-b border-blue-200 pb-2">النشرة البريدية</h4>
+                        <h4 className="text-lg font-semibold mb-4 border-b border-purple-200 pb-2">النشرة البريدية</h4>
                         <p className="text-gray-200 mb-3">اشترك ليصلك كل جديد عن الدورات والعروض.</p>
                         <form className="flex flex-col gap-2">
                             <input
@@ -75,7 +75,7 @@ export default function Footer() {
                             />
                             <button
                                 type="submit"
-                                className="bg-white hover:bg-blue-100 text-blue-600 py-2 px-4 rounded transition font-medium"
+                                className="bg-white hover:bg-purple-100 text-blue-600 py-2 px-4 rounded transition font-medium"
                             >
                                 اشتراك
                             </button>

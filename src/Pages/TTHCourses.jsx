@@ -66,8 +66,8 @@ export default function Courses() {
                   <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
                     الثالثة علوم تجريبية ثانوي
                   </span>
-                  {/* Decorative line */}
-                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-24 h-1 bg-gradient-to-r from-purple-400 to-blue-500 rounded-full"></div>
+
+                 
                 </h2>
               </div>
               <p className="text-gray-600 mt-6 text-lg max-w-2xl mx-auto">
@@ -75,15 +75,17 @@ export default function Courses() {
               </p>
             </div>
 
-            {/* Courses Grid amélioré */}
+           
+           
             <div className="relative">
-              {/* Background decorative elements */}
+              
+              
               <div className="absolute inset-0 -z-10">
                 <div className="absolute top-1/4 right-10 w-32 h-32 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full opacity-20 blur-2xl"></div>
                 <div className="absolute bottom-1/4 left-10 w-40 h-40 bg-gradient-to-r from-purple-200 to-blue-200 rounded-full opacity-20 blur-2xl"></div>
               </div>
 
-              {/* Grid responsive amélioré */}
+             
               <div 
                 dir="rtl" 
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 md:gap-8 justify-items-center relative z-10"
