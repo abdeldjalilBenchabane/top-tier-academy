@@ -4,13 +4,18 @@ import { verifyToken, requireRole } from '../middleware/auth.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 const router = express.Router();
+
+// Get current directory
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = '../public/uploads/slides';
+    const uploadDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'slides');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -25,20 +30,46 @@ const storage = multer.diskStorage({
 const upload = multer({ 
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 50 * 1024 * 1024 // 50MB limit for videos
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|mp4|webm|mov/;
+    console.log('File upload attempt:', {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    });
+    
+    const allowedTypes = /jpeg|jpg|png|gif|webp|mp4|webm|mov|avi|m4v|3gp/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
     
-    if (mimetype && extname) {
+    // More permissive for video files
+    const isVideo = /video\//.test(file.mimetype) || /\.(mp4|webm|mov|avi|m4v|3gp)$/i.test(file.originalname);
+    const isImage = /image\//.test(file.mimetype) || /\.(jpeg|jpg|png|gif|webp)$/i.test(file.originalname);
+    
+    if (isVideo || isImage) {
       return cb(null, true);
     } else {
+      console.log('File rejected:', file.originalname, file.mimetype);
       cb(new Error('Only image and video files are allowed!'));
     }
   }
 });
+
+// Error handling middleware for multer
+const handleUploadError = (error, req, res, next) => {
+  console.error('Upload error:', error);
+  
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'File too large. Maximum size is 50MB.' });
+    }
+    return res.status(400).json({ error: error.message });
+  } else if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  next();
+};
 
 // Get all slides (admin only)
 router.get('/', verifyToken, requireRole(['admin']), async (req, res) => {
@@ -114,7 +145,15 @@ router.get('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
 });
 
 // Create new slide
-router.post('/', verifyToken, requireRole(['admin']), upload.single('media'), async (req, res) => {
+router.post('/', verifyToken, requireRole(['admin']), (req, res, next) => {
+  upload.single('media')(req, res, (err) => {
+    if (err) {
+      console.error('Multer error:', err);
+      return handleUploadError(err, req, res, next);
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     console.log('Received slide data:', req.body); // Debug log
     console.log('Received file:', req.file); // Debug log
@@ -203,7 +242,15 @@ router.post('/', verifyToken, requireRole(['admin']), upload.single('media'), as
 });
 
 // Update slide
-router.put('/:id', verifyToken, requireRole(['admin']), upload.single('media'), async (req, res) => {
+router.put('/:id', verifyToken, requireRole(['admin']), (req, res, next) => {
+  upload.single('media')(req, res, (err) => {
+    if (err) {
+      console.error('Multer error:', err);
+      return handleUploadError(err, req, res, next);
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -235,6 +282,21 @@ router.put('/:id', verifyToken, requireRole(['admin']), upload.single('media'), 
     let videoUrl = existingSlide.video_url;
     
     if (req.file) {
+      // Delete old file if it exists
+      const oldFilePath = existingSlide.image_url || existingSlide.video_url;
+      if (oldFilePath) {
+        const oldFullPath = path.join(__dirname, '..', '..', 'public', oldFilePath);
+        try {
+          if (fs.existsSync(oldFullPath)) {
+            fs.unlinkSync(oldFullPath);
+            console.log(`Old file deleted: ${oldFullPath}`);
+          }
+        } catch (fileError) {
+          console.error('Error deleting old file:', fileError);
+          // Continue with new file upload even if old file deletion fails
+        }
+      }
+      
       const fileUrl = `/uploads/slides/${req.file.filename}`;
       if (mediaType === 'image') {
         imageUrl = fileUrl;
@@ -320,7 +382,25 @@ router.delete('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
       return res.status(404).json({ error: 'Slide not found' });
     }
 
-    // Delete slide (cascade will handle related records)
+    // Delete the actual file from uploads folder
+    if (slide.image_url || slide.video_url) {
+      const filePath = slide.image_url || slide.video_url;
+      const fullPath = path.join(__dirname, '..', '..', 'public', filePath);
+      
+      try {
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+          console.log(`File deleted: ${fullPath}`);
+        } else {
+          console.log(`File not found: ${fullPath}`);
+        }
+      } catch (fileError) {
+        console.error('Error deleting file:', fileError);
+        // Continue with database deletion even if file deletion fails
+      }
+    }
+
+    // Delete slide from database (cascade will handle related records)
     await query('DELETE FROM enhanced_slides WHERE id = $1', [id]);
 
     res.json({ message: 'Slide deleted successfully' });
@@ -404,40 +484,51 @@ router.post('/:id/click', async (req, res) => {
   }
 });
 
+// Bulk reorder slides
+router.post('/reorder', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { slides } = req.body;
+    
+    if (!Array.isArray(slides)) {
+      return res.status(400).json({ error: 'Slides array is required' });
+    }
+
+    // Update each slide's order
+    for (const slide of slides) {
+      if (slide.id && typeof slide.order === 'number') {
+        await query(`
+          UPDATE enhanced_slides 
+          SET "order" = $1 
+          WHERE id = $2
+        `, [slide.order, slide.id]);
+      }
+    }
+
+    res.json({ message: 'Slides reordered successfully' });
+  } catch (error) {
+    console.error('Error reordering slides:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get slide analytics
 router.get('/:id/analytics', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
     const { period = '7d' } = req.query;
 
-    let dateFilter = '';
-    let params = [id];
-
-    switch (period) {
-      case '24h':
-        dateFilter = 'AND created_at >= CURRENT_TIMESTAMP - INTERVAL \'24 hours\'';
-        break;
-      case '7d':
-        dateFilter = 'AND created_at >= CURRENT_TIMESTAMP - INTERVAL \'7 days\'';
-        break;
-      case '30d':
-        dateFilter = 'AND created_at >= CURRENT_TIMESTAMP - INTERVAL \'30 days\'';
-        break;
-      case '90d':
-        dateFilter = 'AND created_at >= CURRENT_TIMESTAMP - INTERVAL \'90 days\'';
-        break;
-    }
-
+    // Get analytics data
     const analytics = await getRows(`
       SELECT 
+        DATE(created_at) as date,
         action_type,
-        COUNT(*) as count,
-        DATE(created_at) as date
+        COUNT(*) as count
       FROM slide_analytics 
-      WHERE slide_id = $1 ${dateFilter}
-      GROUP BY action_type, DATE(created_at)
-      ORDER BY date DESC, action_type
-    `, params);
+      WHERE slide_id = $1 
+        AND created_at >= NOW() - INTERVAL '${period}'
+      GROUP BY DATE(created_at), action_type
+      ORDER BY date DESC
+    `, [id]);
 
     res.json({ analytics });
   } catch (error) {

@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FileUpload } from '@/components/ui/file-upload';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { Plus, Edit, Trash2, Eye, EyeOff, Image, Video, Calendar, Users, TrendingUp, Settings } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, Image, Video, Calendar, Users, TrendingUp, Settings, ArrowUp, ArrowDown, Play, Pause } from 'lucide-react';
 import { HomeSlide } from '@/types';
 import { slidesAPI } from '@/services/api';
 import { toast } from '@/lib/toast';
@@ -21,8 +21,38 @@ const EnhancedHomepageSlides = () => {
   const [slides, setSlides] = useState<HomeSlide[]>([]);
   const [editingSlide, setEditingSlide] = useState<HomeSlide | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [previewSlide, setPreviewSlide] = useState<HomeSlide | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [analytics, setAnalytics] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Transform snake_case to camelCase
+  const transformSlideData = (slide: any): HomeSlide => {
+    return {
+      id: slide.id,
+      title: slide.title,
+      description: slide.description,
+      imageUrl: slide.image_url,
+      videoUrl: slide.video_url,
+      mediaType: slide.media_type,
+      order: slide.order,
+      isActive: slide.is_active,
+      duration: slide.duration,
+      startDate: slide.start_date,
+      endDate: slide.end_date,
+      targetAudience: slide.target_audience_roles || ['student'],
+      ctaText: slide.cta_text,
+      ctaLink: slide.cta_link,
+      overlayColor: slide.overlay_color,
+      overlayOpacity: slide.overlay_opacity,
+      transition: slide.transition,
+      altText: slide.alt_text,
+      views: slide.views,
+      clicks: slide.clicks,
+      createdAt: slide.created_at,
+      updatedAt: slide.updated_at,
+    };
+  };
 
   // Load slides from API
   useEffect(() => {
@@ -33,7 +63,8 @@ const EnhancedHomepageSlides = () => {
     try {
       setIsLoading(true);
       const response = await slidesAPI.getAll();
-      setSlides(response.slides || []);
+      const transformedSlides = (response.slides || []).map(transformSlideData);
+      setSlides(transformedSlides);
     } catch (error) {
       console.error('Error loading slides:', error);
       toast.error('Failed to load slides');
@@ -47,12 +78,22 @@ const EnhancedHomepageSlides = () => {
       if (editingSlide) {
         // Update existing slide
         const response = await slidesAPI.update(editingSlide.id, slideData);
-        setSlides(slides.map(s => s.id === editingSlide.id ? response.slide : s));
+        const transformedSlide = transformSlideData(response.slide);
+        
+        // If order was changed, reorder all slides
+        if (slideData.order !== undefined && slideData.order !== editingSlide.order) {
+          console.log('Order changed, reordering all slides');
+          await reorderAllSlides(editingSlide.id, slideData.order);
+        } else {
+          setSlides(slides.map(s => s.id === editingSlide.id ? transformedSlide : s));
+        }
+        
         toast.success('Slide updated successfully');
       } else {
         // Create new slide
         const response = await slidesAPI.create(slideData);
-        setSlides([...slides, response.slide]);
+        const transformedSlide = transformSlideData(response.slide);
+        setSlides([...slides, transformedSlide]);
         toast.success('Slide created successfully');
       }
       
@@ -61,6 +102,41 @@ const EnhancedHomepageSlides = () => {
     } catch (error) {
       console.error('Error saving slide:', error);
       toast.error('Failed to save slide');
+    }
+  };
+
+  const reorderAllSlides = async (changedSlideId: string, newOrder: number) => {
+    try {
+      // Create a copy of slides array
+      const slidesCopy = [...slides];
+      
+      // Find the slide being modified
+      const slideIndex = slidesCopy.findIndex(s => s.id === changedSlideId);
+      if (slideIndex === -1) return;
+      
+      // Remove the slide from its current position
+      const [movedSlide] = slidesCopy.splice(slideIndex, 1);
+      
+      // Insert the slide at the new position
+      const insertIndex = Math.min(newOrder - 1, slidesCopy.length);
+      slidesCopy.splice(insertIndex, 0, movedSlide);
+      
+      // Update order numbers sequentially
+      const reorderedSlides = slidesCopy.map((slide, index) => ({
+        id: slide.id,
+        order: index + 1
+      }));
+      
+      // Use bulk reorder to update all slides
+      await slidesAPI.reorder(reorderedSlides);
+      
+      // Reload slides to get updated data
+      await loadSlides();
+      
+      toast.success('Slide order updated and all slides reordered');
+    } catch (error) {
+      console.error('Error reordering slides:', error);
+      toast.error('Failed to reorder slides');
     }
   };
 
@@ -81,12 +157,65 @@ const EnhancedHomepageSlides = () => {
       if (!slide) return;
       
       const response = await slidesAPI.update(id, { isActive: !slide.isActive });
-      setSlides(slides.map(s => s.id === id ? response.slide : s));
-      toast.success(`Slide ${response.slide.isActive ? 'activated' : 'deactivated'} successfully`);
+      const transformedSlide = transformSlideData(response.slide);
+      setSlides(slides.map(s => s.id === id ? transformedSlide : s));
+      toast.success(`Slide ${transformedSlide.isActive ? 'activated' : 'deactivated'} successfully`);
     } catch (error) {
       console.error('Error toggling slide status:', error);
       toast.error('Failed to update slide status');
     }
+  };
+
+  const moveSlide = async (id: string, direction: 'up' | 'down') => {
+    try {
+      const currentIndex = slides.findIndex(s => s.id === id);
+      if (currentIndex === -1) return;
+
+      const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      if (newIndex < 0 || newIndex >= slides.length) return;
+
+      // Create new order array with sequential numbers
+      const reorderedSlides = [...slides];
+      const temp = reorderedSlides[currentIndex];
+      reorderedSlides[currentIndex] = reorderedSlides[newIndex];
+      reorderedSlides[newIndex] = temp;
+
+      // Update order numbers sequentially
+      const updatedSlides = reorderedSlides.map((slide, index) => ({
+        id: slide.id,
+        order: index + 1
+      }));
+
+      // Use bulk reorder to update all slides
+      await slidesAPI.reorder(updatedSlides);
+      await loadSlides();
+      toast.success('Slide order updated successfully');
+    } catch (error) {
+      console.error('Error moving slide:', error);
+      toast.error('Failed to update slide order');
+    }
+  };
+
+  const bulkReorder = async () => {
+    try {
+      // Create a new order array with sequential numbers
+      const reorderedSlides = slides.map((slide, index) => ({
+        id: slide.id,
+        order: index + 1
+      }));
+
+      await slidesAPI.reorder(reorderedSlides);
+      await loadSlides();
+      toast.success('Slides reordered successfully');
+    } catch (error) {
+      console.error('Error reordering slides:', error);
+      toast.error('Failed to reorder slides');
+    }
+  };
+
+  const openPreview = (slide: HomeSlide) => {
+    setPreviewSlide(slide);
+    setIsPreviewOpen(true);
   };
 
   return (
@@ -96,17 +225,23 @@ const EnhancedHomepageSlides = () => {
           <h2 className="text-2xl font-bold">Enhanced Homepage Slides</h2>
           <p className="text-gray-600">Manage your homepage slides with advanced features</p>
         </div>
-        <Button onClick={() => {
-          setEditingSlide(null);
-          setIsDialogOpen(true);
-        }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Slide
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={bulkReorder}>
+            <Settings className="h-4 w-4 mr-2" />
+            Reorder All
+          </Button>
+          <Button onClick={() => {
+            setEditingSlide(null);
+            setIsDialogOpen(true);
+          }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Slide
+          </Button>
+        </div>
       </div>
 
       {/* Analytics Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -148,6 +283,18 @@ const EnhancedHomepageSlides = () => {
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Settings className="h-5 w-5 text-orange-600" />
+              <div>
+                <p className="text-sm text-gray-600">Total Slides</p>
+                <p className="text-2xl font-bold">{slides.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Slides Table */}
@@ -160,6 +307,8 @@ const EnhancedHomepageSlides = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Order</TableHead>
+                <TableHead>Preview</TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
@@ -169,8 +318,68 @@ const EnhancedHomepageSlides = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {slides.map((slide) => (
+              {slides.map((slide, index) => (
                 <TableRow key={slide.id}>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-medium">{slide.order || index + 1}</span>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={index === 0}
+                          onClick={() => moveSlide(slide.id, 'up')}
+                        >
+                          <ArrowUp className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={index === slides.length - 1}
+                          onClick={() => moveSlide(slide.id, 'down')}
+                        >
+                          <ArrowDown className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div 
+                      className="w-16 h-12 rounded overflow-hidden bg-gray-100 relative cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => openPreview(slide)}
+                      title="Click to preview"
+                    >
+                      {slide.mediaType === 'video' ? (
+                        slide.videoUrl ? (
+                          <div className="relative w-full h-full">
+                            <video
+                              src={`http://localhost:5001${slide.videoUrl}`}
+                              className="w-full h-full object-cover"
+                              muted
+                              preload="metadata"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+                              <Play className="h-4 w-4 text-white" />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                            <Video className="h-6 w-6 text-gray-500" />
+                          </div>
+                        )
+                      ) : slide.imageUrl ? (
+                        <img
+                          src={`http://localhost:5001${slide.imageUrl}`}
+                          alt={slide.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                          <Image className="h-6 w-6 text-gray-500" />
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="font-medium">{slide.title}</TableCell>
                   <TableCell>
                     <Badge variant="outline">
@@ -194,9 +403,18 @@ const EnhancedHomepageSlides = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => toggleSlideStatus(slide.id)}
+                        onClick={() => openPreview(slide)}
+                        title="Preview"
                       >
-                        {slide.isActive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleSlideStatus(slide.id)}
+                        title={slide.isActive ? 'Deactivate' : 'Activate'}
+                      >
+                        {slide.isActive ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                       </Button>
                       <Button
                         variant="ghost"
@@ -205,6 +423,7 @@ const EnhancedHomepageSlides = () => {
                           setEditingSlide(slide);
                           setIsDialogOpen(true);
                         }}
+                        title="Edit"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -212,6 +431,7 @@ const EnhancedHomepageSlides = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteSlide(slide.id)}
+                        title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -224,23 +444,16 @@ const EnhancedHomepageSlides = () => {
         </CardContent>
       </Card>
 
-      {/* Add/Edit Dialog */}
+      {/* Slide Form Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {editingSlide ? 'Edit Slide' : 'Add New Slide'}
-            </DialogTitle>
+            <DialogTitle>{editingSlide ? 'Edit Slide' : 'Create New Slide'}</DialogTitle>
             <DialogDescription>
-              Configure your homepage slide settings
+              {editingSlide ? 'Update the slide information and media.' : 'Add a new slide to your homepage.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto pr-2">
-            <SlideForm
-              slide={editingSlide}
-              onSave={handleSaveSlide}
-            />
-          </div>
+          <SlideForm slide={editingSlide} onSave={handleSaveSlide} />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
@@ -249,6 +462,72 @@ const EnhancedHomepageSlides = () => {
               {editingSlide ? 'Update' : 'Create'} Slide
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Slide Preview Dialog */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Slide Preview</DialogTitle>
+            <DialogDescription>
+              Preview how this slide will appear on the homepage
+            </DialogDescription>
+          </DialogHeader>
+          {previewSlide && (
+            <div className="space-y-4">
+              <div className="relative w-full bg-gray-900 rounded-lg overflow-hidden">
+                {previewSlide.mediaType === 'video' ? (
+                  <video
+                    src={`http://localhost:5001${previewSlide.videoUrl}`}
+                    controls
+                    autoPlay
+                    muted
+                    loop
+                    className="w-full object-cover"
+                    style={{ maxHeight: '70vh' }}
+                  >
+                    <source src={`http://localhost:5001${previewSlide.videoUrl}`} type="video/mp4" />
+                    <source src={`http://localhost:5001${previewSlide.videoUrl}`} type="video/webm" />
+                    <source src={`http://localhost:5001${previewSlide.videoUrl}`} type="video/ogg" />
+                    Your browser does not support the video tag.
+                  </video>
+                ) : (
+                  <img
+                    src={`http://localhost:5001${previewSlide.imageUrl}`}
+                    alt={previewSlide.title}
+                    className="w-full object-contain"
+                    style={{ maxHeight: '70vh' }}
+                  />
+                )}
+                <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end pointer-events-none">
+                  <div className="p-6 text-white">
+                    <h3 className="text-2xl font-bold mb-2">{previewSlide.title}</h3>
+                    <p className="text-lg mb-4">{previewSlide.description}</p>
+                    {previewSlide.ctaText && (
+                      <Button variant="secondary" className="pointer-events-auto">
+                        {previewSlide.ctaText}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <strong>Media Type:</strong> {previewSlide.mediaType}
+                </div>
+                <div>
+                  <strong>Status:</strong> {previewSlide.isActive ? 'Active' : 'Inactive'}
+                </div>
+                <div>
+                  <strong>Order:</strong> {previewSlide.order || 'Not set'}
+                </div>
+                <div>
+                  <strong>Views:</strong> {previewSlide.views || 0}
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
@@ -269,11 +548,10 @@ const SlideForm = ({ slide, onSave }: SlideFormProps) => {
     videoUrl: slide?.videoUrl || '',
     mediaType: slide?.mediaType || 'image',
     isActive: slide?.isActive !== undefined ? slide.isActive : true,
+    order: slide?.order || 0,
     ctaText: slide?.ctaText || '',
     ctaLink: slide?.ctaLink || '',
-    targetAudience: slide?.targetAudience || ['student'],
-    transition: slide?.transition || 'fade',
-    altText: slide?.altText || ''
+    transition: slide?.transition || 'fade'
   });
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -315,11 +593,10 @@ const SlideForm = ({ slide, onSave }: SlideFormProps) => {
       description: formData.description,
       mediaType: formData.mediaType,
       isActive: formData.isActive,
+      order: formData.order,
       ctaText: formData.ctaText,
       ctaLink: formData.ctaLink,
-      targetAudience: formData.targetAudience,
       transition: formData.transition,
-      altText: formData.altText,
       media: selectedFile, // Include the selected file
     };
     
@@ -328,13 +605,13 @@ const SlideForm = ({ slide, onSave }: SlideFormProps) => {
 
   const getAcceptedFileTypes = () => {
     return formData.mediaType === 'video' 
-      ? 'video/mp4,video/webm,video/ogg' 
+      ? 'video/mp4,video/webm,video/ogg,video/avi' 
       : 'image/jpeg,image/jpg,image/png,image/gif,image/webp';
   };
 
   return (
     <form id="slide-form" onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div>
           <Label htmlFor="title">Title</Label>
           <Input
@@ -359,6 +636,17 @@ const SlideForm = ({ slide, onSave }: SlideFormProps) => {
             </SelectContent>
           </Select>
         </div>
+        <div>
+          <Label htmlFor="order">Order</Label>
+          <Input
+            id="order"
+            type="number"
+            min="0"
+            value={formData.order}
+            onChange={(e) => setFormData({...formData, order: parseInt(e.target.value) || 0})}
+            placeholder="0"
+          />
+        </div>
       </div>
 
       <div>
@@ -378,16 +666,6 @@ const SlideForm = ({ slide, onSave }: SlideFormProps) => {
         mediaType={formData.mediaType}
         label={`Upload ${formData.mediaType === 'video' ? 'Video' : 'Image'}`}
       />
-
-      <div>
-        <Label htmlFor="altText">Alt Text</Label>
-        <Input
-          id="altText"
-          value={formData.altText}
-          onChange={(e) => setFormData({...formData, altText: e.target.value})}
-          placeholder="Describe the image/video for accessibility"
-        />
-      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
@@ -417,24 +695,6 @@ const SlideForm = ({ slide, onSave }: SlideFormProps) => {
           onCheckedChange={(checked) => setFormData({...formData, isActive: checked})}
         />
         <Label htmlFor="isActive">Active</Label>
-      </div>
-
-      <div>
-        <Label htmlFor="targetAudience">Target Audience</Label>
-        <Select 
-          value={formData.targetAudience?.[0] || 'student'} 
-          onValueChange={(value) => setFormData({...formData, targetAudience: [value]})}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="student">Student</SelectItem>
-            <SelectItem value="teacher">Teacher</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="parent">Parent</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
     </form>
   );

@@ -207,6 +207,12 @@ export const slidesAPI = {
   // Delete slide
   delete: (id) => apiRequest(`/slides/${id}`, { method: 'DELETE' }),
   
+  // Bulk reorder slides
+  reorder: (slides) => apiRequest('/slides/reorder', {
+    method: 'POST',
+    body: JSON.stringify({ slides }),
+  }),
+  
   // Track slide view
   trackView: (id, userAgent) => apiRequest(`/slides/${id}/view`, {
     method: 'POST',
