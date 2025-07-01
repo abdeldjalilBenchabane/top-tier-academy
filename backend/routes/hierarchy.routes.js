@@ -486,5 +486,229 @@ router.delete('/materials/:id', verifyToken, requireRole(['admin']), async (req,
   }
 });
 
+// ===== LANGUAGES =====
+
+// GET /api/languages → list all languages
+router.get('/languages', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const languages = await getRows('SELECT * FROM languages ORDER BY name');
+    res.json(languages);
+  } catch (error) {
+    console.error('Error fetching languages:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/languages → create new language
+router.post('/languages', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { name, code, flag, is_active } = req.body;
+    
+    if (!name || !code) {
+      return res.status(400).json({ error: 'Language name and code are required' });
+    }
+    
+    // Check if language already exists
+    const existingLanguage = await getRow('SELECT id FROM languages WHERE name = $1 OR code = $2', [name, code]);
+    if (existingLanguage) {
+      return res.status(400).json({ error: 'Language with this name or code already exists' });
+    }
+    
+    const result = await query(
+      'INSERT INTO languages (name, code, flag, is_active) VALUES ($1, $2, $3, $4) RETURNING *',
+      [name, code, flag || null, is_active !== false]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating language:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/languages/:id → update language
+router.put('/languages/:id', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, code, flag, is_active } = req.body;
+    
+    // Check if language exists
+    const existingLanguage = await getRow('SELECT id FROM languages WHERE id = $1', [id]);
+    if (!existingLanguage) {
+      return res.status(404).json({ error: 'Language not found' });
+    }
+    
+    // Check if name or code conflicts
+    if (name || code) {
+      const conflict = await getRow(
+        'SELECT id FROM languages WHERE (name = $1 OR code = $2) AND id != $3', 
+        [name || existingLanguage.name, code || existingLanguage.code, id]
+      );
+      if (conflict) {
+        return res.status(400).json({ error: 'Language with this name or code already exists' });
+      }
+    }
+    
+    const result = await query(
+      'UPDATE languages SET name = COALESCE($1, name), code = COALESCE($2, code), flag = $3, is_active = COALESCE($4, is_active) WHERE id = $5 RETURNING *',
+      [name, code, flag, is_active, id]
+    );
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating language:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/languages/:id → delete language
+router.delete('/languages/:id', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if language exists
+    const existingLanguage = await getRow('SELECT id FROM languages WHERE id = $1', [id]);
+    if (!existingLanguage) {
+      return res.status(404).json({ error: 'Language not found' });
+    }
+    
+    await query('DELETE FROM languages WHERE id = $1', [id]);
+    
+    res.json({ message: 'Language deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting language:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ===== LANGUAGE LEVELS =====
+
+// GET /api/language-levels → list all language levels
+router.get('/language-levels', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const levels = await getRows(`
+      SELECT ll.*, l.name as language_name, l.code as language_code 
+      FROM language_levels ll 
+      LEFT JOIN languages l ON ll.language_id = l.id 
+      ORDER BY l.name, ll."order", ll.name
+    `);
+    res.json(levels);
+  } catch (error) {
+    console.error('Error fetching language levels:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/languages/:languageId/levels → list levels for a specific language
+router.get('/languages/:languageId/levels', verifyToken, requireRole(['admin']), async (req, res) => {
+  const { languageId } = req.params;
+  try {
+    const levels = await getRows(
+      'SELECT * FROM language_levels WHERE language_id = $1 ORDER BY "order", name',
+      [languageId]
+    );
+    res.json(levels);
+  } catch (error) {
+    console.error('Error fetching language levels:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/language-levels → create new language level
+router.post('/language-levels', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { name, description, language_id, order, is_active } = req.body;
+    
+    if (!name || !description || !language_id) {
+      return res.status(400).json({ error: 'Level name, description, and language are required' });
+    }
+    
+    // Check if language exists
+    const language = await getRow('SELECT id FROM languages WHERE id = $1', [language_id]);
+    if (!language) {
+      return res.status(400).json({ error: 'Language not found' });
+    }
+    
+    // Check if level already exists in this language
+    const existingLevel = await getRow('SELECT id FROM language_levels WHERE name = $1 AND language_id = $2', [name, language_id]);
+    if (existingLevel) {
+      return res.status(400).json({ error: 'Level with this name already exists in this language' });
+    }
+    
+    const result = await query(
+      'INSERT INTO language_levels (name, description, language_id, "order", is_active) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [name, description, language_id, order || 1, is_active !== false]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating language level:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/language-levels/:id → update language level
+router.put('/language-levels/:id', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, language_id, order, is_active } = req.body;
+    
+    // Check if level exists
+    const existingLevel = await getRow('SELECT id FROM language_levels WHERE id = $1', [id]);
+    if (!existingLevel) {
+      return res.status(404).json({ error: 'Language level not found' });
+    }
+    
+    // Check if language exists if language_id is being changed
+    if (language_id) {
+      const language = await getRow('SELECT id FROM languages WHERE id = $1', [language_id]);
+      if (!language) {
+        return res.status(400).json({ error: 'Language not found' });
+      }
+    }
+    
+    // Check if name conflicts
+    if (name) {
+      const nameConflict = await getRow(
+        'SELECT id FROM language_levels WHERE name = $1 AND language_id = $2 AND id != $3', 
+        [name, language_id || existingLevel.language_id, id]
+      );
+      if (nameConflict) {
+        return res.status(400).json({ error: 'Level with this name already exists in this language' });
+      }
+    }
+    
+    const result = await query(
+      'UPDATE language_levels SET name = COALESCE($1, name), description = COALESCE($2, description), language_id = COALESCE($3, language_id), "order" = COALESCE($4, "order"), is_active = COALESCE($5, is_active) WHERE id = $6 RETURNING *',
+      [name, description, language_id, order, is_active, id]
+    );
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating language level:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/language-levels/:id → delete language level
+router.delete('/language-levels/:id', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if level exists
+    const existingLevel = await getRow('SELECT id FROM language_levels WHERE id = $1', [id]);
+    if (!existingLevel) {
+      return res.status(404).json({ error: 'Language level not found' });
+    }
+    
+    await query('DELETE FROM language_levels WHERE id = $1', [id]);
+    
+    res.json({ message: 'Language level deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting language level:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
     

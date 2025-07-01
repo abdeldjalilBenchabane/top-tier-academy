@@ -60,6 +60,9 @@ cp .env.example .env
 # ⚠️ IMPORTANT: Run the slides migration script first
 node migrate-slides.js
 
+# ⚠️ IMPORTANT: Run the languages migration script
+node migrate-languages.js
+
 # Initialize database
 npm run init-db
 
@@ -94,13 +97,17 @@ cd backend
 # 1. First, run the slides migration script
 node migrate-slides.js
 
-# 2. Then initialize the database
+# 2. Run the languages migration script
+node migrate-languages.js
+
+# 3. Then initialize the database
 npm run init-db
 ```
 
 This will:
 - Create the enhanced slides tables and relationships
 - Set up slides analytics and target audience tables
+- Create the language and language level tables
 - Create the necessary tables (users, courses, etc.)
 - Insert sample data
 - Set up proper permissions
@@ -110,6 +117,8 @@ The following new tables have been added:
 - `enhanced_slides` - Main slides table
 - `slide_target_audience` - Target audience relationships
 - `slide_analytics` - View and click tracking
+- `languages` - Language management table
+- `language_levels` - Language proficiency levels (A1, B2, C1, etc.)
 
 ## 🎠 Slides System
 
@@ -140,6 +149,47 @@ npm install recharts lucide-react
 - **Supported Formats**: Images (JPEG, PNG, GIF, WebP) and Videos (MP4, WebM, MOV)
 - **Storage**: Files saved in `backend/uploads/slides/`
 - **Access**: Files served via `/uploads/slides/` endpoint
+
+## 🌍 Language Structure System
+
+### Language Management
+- **Location**: `/admin/structure` (Languages section)
+- **Features**:
+  - Add and manage languages (English, Arabic, French, etc.)
+  - Set language codes (ISO 639-1 format)
+  - Upload flag images for visual identification
+  - Enable/disable languages
+
+### Language Levels Management
+- **CEFR Levels**: A1, A2, B1, B2, C1, C2 proficiency levels
+- **Custom Levels**: Support for custom level names (e.g., Arabic: مبتدئ, متوسط, متقدم)
+- **Ordering**: Sort levels by difficulty/progression
+- **Descriptions**: Detailed descriptions for each level
+- **Active/Inactive**: Enable or disable specific levels
+
+### Sample Data
+The system comes with pre-configured languages and levels:
+- **English**: A1-C2 CEFR levels
+- **Arabic**: مبتدئ, متوسط, متقدم levels
+- **French**: A1-C2 CEFR levels
+- **Spanish**: Available for configuration
+- **German**: Available for configuration
+
+### API Endpoints
+```
+# Language Management
+GET /api/languages - Get all languages
+POST /api/languages - Create new language
+PUT /api/languages/:id - Update language
+DELETE /api/languages/:id - Delete language
+
+# Language Levels Management
+GET /api/language-levels - Get all language levels
+GET /api/languages/:languageId/levels - Get levels for specific language
+POST /api/language-levels - Create new language level
+PUT /api/language-levels/:id - Update language level
+DELETE /api/language-levels/:id - Delete language level
+```
 
 ## 🔐 Authentication System
 
@@ -200,6 +250,14 @@ TTH_Lastone/
 │   │   ├── TTHFanCard.jsx                # Fixed DOM nesting issues
 │   │   └── navigation/
 │   │       └── Navbar.tsx                # English navigation
+│   │   
+│   ├── components/forms/
+│   │   ├── LevelForm.tsx                 # Educational level form
+│   │   ├── YearForm.tsx                  # Year form
+│   │   ├── SpecialityForm.tsx            # Speciality form
+│   │   ├── MaterialForm.tsx              # Material form
+│   │   ├── LanguageForm.tsx              # Language form
+│   │   └── LanguageLevelForm.tsx         # Language level form
 │   ├── components/admin/
 │   │   └── EnhancedHomepageSlides.tsx    # Admin slides management
 │   ├── contexts/
@@ -235,6 +293,7 @@ npm run preview      # Preview production build
 npm run dev          # Start backend server
 npm run init-db      # Initialize database
 node migrate-slides.js # Run slides migration (IMPORTANT!)
+node migrate-languages.js # Run languages migration (IMPORTANT!)
 ```
 
 ## 🔧 Configuration
@@ -282,16 +341,21 @@ npm start
 - ✅ **Enhanced Admin Interface**: Complete slides management UI
 - ✅ **Hero-Style Layout**: Slides match original hero design
 - ✅ **Arabic RTL Support**: Full right-to-left support for slides
+- ✅ **Added Language Structure System**: Complete language and level management
+- ✅ **CEFR Level Support**: A1-C2 proficiency levels with custom naming
+- ✅ **Multi-language Support**: English, Arabic, French, Spanish, German
+- ✅ **Flag Integration**: Visual language identification with flag images
 
 ### For Team Members
 ⚠️ **IMPORTANT**: After pulling the latest changes, you must run:
-```bash
+   ```bash
 cd backend
 node migrate-slides.js
+node migrate-languages.js
 npm run init-db
 ```
 
-This ensures your database has the new slides tables and relationships.
+This ensures your database has the new slides and language tables and relationships.
 
 ## 🤝 Contributing
 

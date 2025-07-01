@@ -37,6 +37,27 @@ CREATE TABLE materials (
     price NUMERIC(10,2)
 );
 
+-- LANGUAGES
+CREATE TABLE languages (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    code VARCHAR(10) NOT NULL UNIQUE,
+    flag VARCHAR(255),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- LANGUAGE LEVELS
+CREATE TABLE language_levels (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    description TEXT NOT NULL,
+    language_id INTEGER REFERENCES languages(id) ON DELETE CASCADE,
+    "order" INTEGER DEFAULT 1,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- COURSES
 CREATE TABLE courses (
     id SERIAL PRIMARY KEY,
@@ -222,8 +243,6 @@ CREATE TABLE enhanced_slides (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-
-
 -- SLIDE ANALYTICS (for tracking views and clicks)
 CREATE TABLE slide_analytics (
     id SERIAL PRIMARY KEY,
@@ -249,6 +268,13 @@ CREATE INDEX idx_enhanced_slides_created_at ON enhanced_slides(created_at);
 CREATE INDEX idx_slide_analytics_slide_id ON slide_analytics(slide_id);
 CREATE INDEX idx_slide_analytics_created_at ON slide_analytics(created_at);
 CREATE INDEX idx_slide_target_audience_slide_id ON slide_target_audience(slide_id);
+
+-- Language indexes
+CREATE INDEX idx_languages_active ON languages(is_active);
+CREATE INDEX idx_languages_code ON languages(code);
+CREATE INDEX idx_language_levels_language_id ON language_levels(language_id);
+CREATE INDEX idx_language_levels_order ON language_levels("order");
+CREATE INDEX idx_language_levels_active ON language_levels(is_active);
 
 -- Function to update the updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

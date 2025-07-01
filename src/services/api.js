@@ -331,6 +331,49 @@ export const structureAPI = {
     body: JSON.stringify(materialData),
   }),
   deleteMaterial: (id) => apiRequest(`/materials/${id}`, { method: 'DELETE' }),
+  
+  // Languages
+  getLanguages: async () => {
+    const data = await apiRequest('/languages');
+    return data.map(language => ({
+      id: language.id,
+      name: language.name,
+      code: language.code,
+      flag: language.flag,
+      isActive: language.is_active
+    }));
+  },
+  createLanguage: (languageData) => apiRequest('/languages', {
+    method: 'POST',
+    body: JSON.stringify(languageData),
+  }),
+  updateLanguage: (id, languageData) => apiRequest(`/languages/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(languageData),
+  }),
+  deleteLanguage: (id) => apiRequest(`/languages/${id}`, { method: 'DELETE' }),
+  
+  // Language Levels
+  getLanguageLevels: async (languageId) => {
+    const data = await (languageId ? apiRequest(`/languages/${languageId}/levels`) : apiRequest('/language-levels'));
+    return data.map(level => ({
+      id: level.id,
+      name: level.name,
+      description: level.description,
+      languageId: level.language_id,
+      order: level.order,
+      isActive: level.is_active
+    }));
+  },
+  createLanguageLevel: (levelData) => apiRequest('/language-levels', {
+    method: 'POST',
+    body: JSON.stringify(levelData),
+  }),
+  updateLanguageLevel: (id, levelData) => apiRequest(`/language-levels/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(levelData),
+  }),
+  deleteLanguageLevel: (id) => apiRequest(`/language-levels/${id}`, { method: 'DELETE' }),
 };
 
 export { getAuthToken, setAuthToken, removeAuthToken }; 

@@ -1,4 +1,3 @@
-
 // Define all our types for the application
 
 export type User = {
@@ -30,6 +29,23 @@ export type Material = {
   name: string;
   specialityId: string;
   price?: number;
+};
+
+export type Language = {
+  id: string;
+  name: string;
+  code: string; // e.g., 'en', 'ar', 'fr'
+  flag?: string; // URL to flag image
+  isActive: boolean;
+};
+
+export type LanguageLevel = {
+  id: string;
+  name: string; // e.g., 'A1', 'B2', 'C1'
+  description: string;
+  languageId: string;
+  order: number; // For sorting levels
+  isActive: boolean;
 };
 
 export type ContentBlock = {
