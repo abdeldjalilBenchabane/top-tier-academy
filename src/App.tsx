@@ -16,10 +16,12 @@ import TTHStudentDashboard from './Pages/TTHStudentDashboard';
 import TTHCourses from './Pages/TTHCourses';
 import TTHLanguages from './Pages/TTHLanguages';
 import TTHLiveClasses from './Pages/TTHLiveClasses';
+import Streaming from './Pages/Streaming';
 import TTHSession from './Pages/TTHSession';
 import TTHPrivateClasses from './Pages/TTHPrivateClasses';
 import TTHTeacherProfile from './Pages/TTHTeacherProfile';
 import TTHDashboardStudent from './Pages/TTHDashboaedStudent'
+
 // Schoolhouse Layouts & Pages
 import AppLayout from './components/layouts/AppLayout';
 import Login from './Pages/Login';
@@ -77,11 +79,13 @@ const App: React.FC = () => {
               <Route path="/TTHCourses" element={<TTHCourses />} />
               <Route path="/TTHLanguages" element={<TTHLanguages />} />
               <Route path="/TTHLiveClasses" element={<TTHLiveClasses />} />
+              <Route path="/streaming/:id" element={<Streaming />} />
               <Route path="/TTHSession" element={<TTHSession />} />
               <Route path="/TTHPrivateClasses" element={<TTHPrivateClasses />} />
               <Route path="/TTHTeacherProfile" element={<TTHTeacherProfile />} />
               <Route path="/coursesList/courses/:id" element={<TTHCourseDetail />} />
               <Route path="/TTHDashboardStudent" element={<TTHDashboardStudent/>}/>
+
 
               {/* Schoolhouse public */}
               <Route path="/schoolhouse/login" element={<Login />} />

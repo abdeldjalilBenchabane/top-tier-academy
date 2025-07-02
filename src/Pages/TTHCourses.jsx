@@ -58,7 +58,7 @@ export default function Courses() {
         {/* Courses Section */}
         <section className="py-12 md:py-16">
           <div className="container mx-auto px-4">
-            {/* Section Title amélioré */}
+          
             <div className="text-center mb-12">
               <div className="inline-block">
                 <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold font-rowdies mb-4 relative">
@@ -103,7 +103,7 @@ export default function Courses() {
                 ))}
               </div>
 
-              {/* Call to Action si pas de cours */}
+             
               {courseData.length === 0 && (
                 <div className="text-center py-16">
                   <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
@@ -117,7 +117,7 @@ export default function Courses() {
               )}
             </div>
 
-            {/* Load More Button */}
+         
             {courseData.length > 0 && (
               <div className="text-center mt-12">
                 <button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">

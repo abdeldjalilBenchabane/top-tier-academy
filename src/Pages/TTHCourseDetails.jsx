@@ -165,7 +165,7 @@ export default function CourseDetail() {
             <Navbar />
             <div className="border-b border-blue-100" /> {/* Thin divider line between Navbar and hero section */}
             {/* Hero Section */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-16 shadow-lg rounded-b-3xl">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-16 shadow-lg ">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center gap-10">
                     {/* Video Preview */}
                     <div className="w-full lg:w-1/2 order-2 lg:order-1 mt-8 lg:mt-0">
@@ -225,9 +225,9 @@ export default function CourseDetail() {
                     {/* Main Content */}
                     <div className="lg:col-span-2">
                         {/* Tabs */}
-                        <div className="bg-white rounded-3xl shadow-lg mb-8 border border-blue-100">
-                            <div className="border-b border-blue-100 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-t-3xl">
-                                <nav className="flex space-x-8 px-8">
+                        <div className="bg-white rounded-xl  shadow-lg mb-8 border border-blue-100">
+                            <div className="border-b border-purple-100 bg-gradient-to-r from-purple-50 to-purple-50 rounded-t-3xl">
+                                <nav className="flex  px-8">
                                     {[
                                         { id: "overview", label: "نظرة عامة" },
                                         { id: "curriculum", label: "المنهج" },
@@ -236,9 +236,9 @@ export default function CourseDetail() {
                                         <button
                                             key={tab.id}
                                             onClick={() => setActiveTab(tab.id)}
-                                            className={`py-5 px-2 border-b-4 font-bold text-base transition-all duration-200 ${activeTab === tab.id
-                                                ? "border-cyan-500 text-cyan-700 bg-cyan-50 rounded-t-2xl shadow"
-                                                : "border-transparent text-blue-400 hover:text-cyan-700 hover:border-cyan-200"
+                                            className={`py-5 ml-9 px-2 border-b-4 font-bold text-base transition-all duration-200 ${activeTab === tab.id
+                                                ? "border-purple-500 text-purple-700 bg-purple-50 rounded-t-2xl shadow"
+                                                : "border-transparent text-purple-400 hover:text-purple-700 hover:border-purple-200"
                                                 }`}
                                         >
                                             {tab.label}
@@ -258,7 +258,7 @@ export default function CourseDetail() {
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                 {course.learningObjectives?.map((objective, index) => (
                                                     <div key={index} className="flex items-start gap-3">
-                                                        <CheckCircle className="text-green-500 mt-0.5 flex-shrink-0" size={18} />
+                                                        <CheckCircle className="text-cyan-500 mt-0.5 flex-shrink-0" size={18} />
                                                         <span className="text-gray-700">{objective}</span>
                                                     </div>
                                                 ))}
@@ -268,7 +268,7 @@ export default function CourseDetail() {
                                         {/* Prerequisites */}
                                         <div>
                                             <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                                <BookOpen className="text-orange-600" size={24} />
+                                                <BookOpen className="text-purple-400" size={24} />
                                                 المتطلبات المسبقة
                                             </h3>
                                             <ul className="space-y-2">
@@ -316,16 +316,16 @@ export default function CourseDetail() {
                                 {activeTab === "reviews" && (
                                     <div className="space-y-6">
                                         <div className="flex items-center justify-between">
-                                            <h3 className="text-xl font-bold text-gray-900">تقييمات الطلاب</h3>
+                                            <h3 className="text-xl font-bold text-blue-900">تقييمات الطلاب</h3>
                                             <div className="flex items-center gap-2">
                                                 <Star className="text-yellow-400 fill-current" size={20} />
                                                 <span className="font-bold text-lg">{course.rating}</span>
-                                                <span className="text-gray-600">({course.students} تقييم)</span>
+                                                <span className="text-gray-400">({course.students} تقييم)</span>
                                             </div>
                                         </div>
 
                                         {/* Add Review Form */}
-                                        <form onSubmit={handleReviewSubmit} className="bg-blue-50 rounded-xl p-4 mb-6 shadow flex flex-col gap-4">
+                                        <form onSubmit={handleReviewSubmit} className="bg-gray-100 rounded-xl p-4 mb-6 shadow flex flex-col gap-4">
                                             <div className="flex flex-col md:flex-row gap-4">
                                                 <input
                                                     type="text"
@@ -344,7 +344,7 @@ export default function CourseDetail() {
                                                             onClick={() => handleRatingChange(i + 1)}
                                                             className="focus:outline-none"
                                                         >
-                                                            <Star size={22} className={i < newReview.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'} />
+                                                          
                                                         </button>
                                                     ))}
                                                 </div>
@@ -360,7 +360,7 @@ export default function CourseDetail() {
                                             <div className="flex justify-end">
                                                 <button
                                                     type="submit"
-                                                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-2 px-6 rounded-lg shadow transition"
+                                                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-normal py-2   px-6 rounded-sm shadow transition"
                                                 >
                                                     أضف تقييمك
                                                 </button>
@@ -376,7 +376,7 @@ export default function CourseDetail() {
                                                                 {review.name.charAt(0)}
                                                             </div>
                                                             <div>
-                                                                <p className="font-semibold text-gray-900">{review.name}</p>
+                                                                <p className="font-semibold text-blue-900">{review.name}</p>
                                                                 <div className="flex items-center gap-1">
                                                                     {Array.from({ length: review.rating }).map((_, i) => (
                                                                         <Star key={i} className="text-yellow-400 fill-current" size={14} />
@@ -384,7 +384,7 @@ export default function CourseDetail() {
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <span className="text-sm text-gray-500">{review.date}</span>
+                                                        <span className="text-sm text-gray-400">{review.date}</span>
                                                     </div>
                                                     <p className="text-gray-700 pr-13">{review.comment}</p>
                                                 </div>
@@ -404,17 +404,17 @@ export default function CourseDetail() {
                                 <div className="space-y-4">
                                     <div className="flex items-center pt-4  gap-3">
                                         {course.pdfUrl && (
-                                            <Button className="flex-1 flex justify-center items-center bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold shadow hover:from-blue-700 hover:to-purple-700 transition">
+                                            <Button className="flex-1 flex justify-center items-center bg-blue-600 text-white font-normal shadow hover:bg-blue-700 transition">
                                                 <a href={course.pdfUrl} download target="_blank" rel="noopener noreferrer">
-                                                    <FileText size={18} className="absolute mr-[-1.5rem]" />
+                                                    <FileText size={18} className="absolute mr-[-1rem]" />
                                                     ملخص الدرس PDF
                                                 </a>
                                             </Button>
                                         )}
                                         {course.exoUrl && (
-                                            <Button variant="outline" className="flex-1" asChild>
+                                            <Button variant="outline" className="flex-1 text-blue-900 hover:bg-gray-50" asChild>
                                                 <a href={course.exoUrl} download target="_blank" rel="noopener noreferrer">
-                                                    <Download size={18} className="absolute mr-[-1.5rem]" />
+                                                    <Download size={18} className="absolute mr-[-8.35rem]" />
                                                      حلول سلسلة تمارين
                                                 </a>
                                             </Button>
