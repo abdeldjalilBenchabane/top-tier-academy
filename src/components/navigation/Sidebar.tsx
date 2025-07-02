@@ -1,16 +1,17 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  BookOpen, 
-  Layers, 
-  FileText, 
-  Settings, 
-  Clock, 
+import {
+  BookOpen,
+  Layers,
+  FileText,
+  Settings,
+  Clock,
   Home,
   Users,
   Image,
   Video,
+  
   HelpCircle,
   BarChart
 } from 'lucide-react';
@@ -49,10 +50,9 @@ const Sidebar = () => {
             key={link.path}
             to={link.path}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                isActive
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100'
+              `flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-md transition-colors ${isActive
+                ? 'bg-blue-100 text-blue-700'
+                : 'text-gray-600 hover:bg-gray-100'
               }`
             }
           >

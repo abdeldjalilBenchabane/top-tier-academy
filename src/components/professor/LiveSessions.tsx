@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,16 +9,19 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { api } from '@/lib/api';
 import { LiveSession } from '@/types';
 import { toast } from '@/lib/toast';
-import { Plus, Video, Calendar, Clock, Play } from 'lucide-react';
+import { Plus, Video, Calendar, Clock, Play, Bell } from 'lucide-react';
 import StatusControl from '@/components/live-sessions/StatusControl';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface LiveSessionsProps {
   professorId: string;
 }
 
 const LiveSessions = ({ professorId }: LiveSessionsProps) => {
+  const { user } = useAuth();
   const [sessions, setSessions] = useState<LiveSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -28,10 +30,17 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
     scheduledAt: '',
     duration: 60,
     meetingUrl: '',
+    presenter: user?.name || '',
+    price: 0,
+    currency: 'DZD',
+
+    thumbnail: '',
+    isPaid: false,
   });
 
   useEffect(() => {
     fetchSessions();
+    fetchNotifications();
   }, [professorId]);
 
   const fetchSessions = async () => {
@@ -46,18 +55,32 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
     }
   };
 
+  const fetchNotifications = async () => {
+    try {
+      const data = await api.getNotifications();
+      // Only show notifications related to this professor and live sessions
+      setNotifications(data.filter((n: any) => n.sessionId && n.message && n.message.toLowerCase().includes('live session')));
+    } catch (error) {
+      setNotifications([]);
+    }
+  };
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const now = new Date().toISOString();
-      await api.createLiveSession({
+      const payload = {
         ...formData,
+        start_time: formData.scheduledAt,
         professorId,
         status: 'scheduled',
         createdAt: now,
         updatedAt: now,
-      });
+      };
+      delete payload.scheduledAt;
+      await api.createLiveSession(payload);
       toast.success('Live session scheduled successfully');
       await fetchSessions();
       resetForm();
@@ -87,6 +110,12 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
       scheduledAt: '',
       duration: 60,
       meetingUrl: '',
+      presenter: user?.name || '',
+      price: 0,
+      currency: 'DZD',
+
+      thumbnail: '',
+      isPaid: false,
     });
   };
 
@@ -105,8 +134,19 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
     const scheduledTime = new Date(session.scheduledAt);
     const timeDiff = scheduledTime.getTime() - now.getTime();
     const minutesUntilStart = timeDiff / (1000 * 60);
-    
+
     return session.status === 'scheduled' && minutesUntilStart <= 15;
+  };
+
+  // Helper to get status badge
+  const getApprovalStatusBadge = (session: any) => {
+    if (session.is_rejected) {
+      return <Badge className="bg-red-500 text-white">Rejected</Badge>;
+    }
+    if (session.is_approved) {
+      return <Badge className="bg-green-500 text-white">Approved</Badge>;
+    }
+    return <Badge className="bg-yellow-500 text-black">Pending Approval</Badge>;
   };
 
   if (isLoading) {
@@ -115,12 +155,13 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
 
   return (
     <div className="space-y-6">
+    
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">Live Sessions</h2>
           <p className="text-gray-600">Schedule and manage your live teaching sessions</p>
         </div>
-        
+
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={resetForm}>
@@ -135,7 +176,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                 Create a new live teaching session for your students.
               </DialogDescription>
             </DialogHeader>
-            
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="title">Session Title</Label>
@@ -147,7 +188,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                   required
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
@@ -159,7 +200,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                   required
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="scheduledAt">Scheduled Date & Time</Label>
@@ -171,7 +212,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                     required
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="duration">Duration (minutes)</Label>
                   <Input
@@ -185,7 +226,52 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                   />
                 </div>
               </div>
-              
+              {/* <div className="space-y-2">
+                <Label htmlFor="presenter">Presenter Name</Label>
+                <Input
+                  id="presenter"
+                  value={formData.presenter}
+                  onChange={(e) => setFormData({ ...formData, presenter: e.target.value })}
+                  placeholder="Prof. John Doe"
+                  required
+                />
+              </div> */}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    min="0"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="currency">Currency</Label>
+                  <Input
+                    id="currency"
+                    value={formData.currency}
+                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                  />
+                </div>
+              </div>
+
+
+
+              <div className="space-y-2">
+                <Label htmlFor="thumbnail">Thumbnail URL</Label>
+                <Input
+                  id="thumbnail"
+                  type="url"
+                  value={formData.thumbnail}
+                  onChange={(e) => setFormData({ ...formData, thumbnail: e.target.value })}
+                  placeholder="https://example.com/image.jpg"
+                />
+              </div>
+
+
               <div className="space-y-2">
                 <Label htmlFor="meetingUrl">Meeting URL (optional)</Label>
                 <Input
@@ -195,7 +281,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                   placeholder="https://zoom.us/j/..."
                 />
               </div>
-              
+
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancel
@@ -230,8 +316,9 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <CardTitle className="text-lg">{session.title}</CardTitle>
+                      {getApprovalStatusBadge(session)}
                       <Badge variant={getStatusColor(session.status)}>
-                        {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                        {session.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : 'Unknown'}
                       </Badge>
                     </div>
                     <CardDescription className="mt-1">
@@ -257,19 +344,19 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                   </div>
                 </div>
               </CardHeader>
-              
+
               <CardContent>
                 <div className="flex items-center gap-4 text-sm text-gray-600">
                   <div className="flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
-                    {new Date(session.scheduledAt).toLocaleDateString()}
+                    {new Date(session.start_time || session.scheduledAt).toLocaleDateString()}
                   </div>
                   <div className="flex items-center gap-1">
                     <Clock className="h-4 w-4" />
-                    {new Date(session.scheduledAt).toLocaleTimeString()} ({session.duration} min)
+                    {new Date(session.start_time || session.scheduledAt).toLocaleTimeString()} ({session.duration} min)
                   </div>
                 </div>
-                
+
                 {session.meetingUrl && (
                   <div className="mt-2">
                     <a
@@ -282,7 +369,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                     </a>
                   </div>
                 )}
-                
+
                 {session.status === 'scheduled' && !canStartSession(session) && (
                   <div className="mt-2 text-sm text-gray-500">
                     Session can be started 15 minutes before scheduled time

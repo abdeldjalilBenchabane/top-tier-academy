@@ -1,101 +1,54 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, Plus, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import LiveCard from '@/components/LiveCard';
 import NavBar from '@/components/NavBar';
 import Footer from '@/components/TTHFooter';
+import { api } from '@/lib/api';
+
 const TTHLiveClasses = () => {
+  console.log('TTHLiveClasses mounted');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [liveEvents, setLiveEvents] = useState([]);
 
-  const liveEvents = [
-    {
-      id: '1',
-      title: 'ورشة تطوير البرمجيات المتقدمة',
-      presenter: 'أحمد محمد علي',
-      date: '2024-07-15',
-      time: '20:00',
-      price: 2000,
-      currency: 'DA',
-      expectedViewers: 500,
-      thumbnail: '',
-      status: 'live' as const,
-      isPaid: true,
-      description: 'تعلم أحدث تقنيات تطوير البرمجيات والممارسات الأفضل في البرمجة مع خبراء المجال'
-    },
-    {
-      id: '2',
-      title: 'دورة التسويق الرقمي الشاملة',
-      presenter: 'فاطمة عبدالله',
-      date: '2024-07-16',
-      time: '18:00',
-      price: 2000,
-      currency: 'DA',
-      expectedViewers: 800,
-      thumbnail: '',
-      status: 'upcoming' as const,
-      isPaid: false,
-      description: 'استراتيجيات التسويق الرقمي الحديثة وكيفية بناء حملات تسويقية ناجحة عبر المنصات المختلفة'
-    },
-    {
-      id: '3',
-      title: 'أساسيات التصميم الجرافيكي',
-      presenter: 'خالد سعد',
-      date: '2024-07-17',
-      time: '19:30',
-      price: 39.99,
-      currency: 'USD',
-      expectedViewers: 300,
-      thumbnail: '',
-      status: 'upcoming' as const,
-      isPaid: true,
-      description: 'تعلم أساسيات التصميم الجرافيكي واستخدام الأدوات المختلفة لإنشاء تصاميم احترافية'
-    },
-    {
-      id: '4',
-      title: 'ريادة الأعمال في العصر الرقمي',
-      presenter: 'سارة محمود',
-      date: '2024-07-14',
-      time: '17:00',
-      price: 99.99,
-      currency: 'USD',
-      expectedViewers: 1200,
-      thumbnail: '',
-      status: 'ended' as const,
-      isPaid: false,
-      description: 'كيفية بناء مشروع ناجح في العصر الرقمي والاستفادة من التقنيات الحديثة في ريادة الأعمال'
-    },
-    {
-      id: '5',
-      title: 'تطوير تطبيقات الجوال',
-      presenter: 'عمر يوسف',
-      date: '2024-07-18',
-      time: '21:00',
-      price: 89.99,
-      currency: 'USD',
-      expectedViewers: 600,
-      thumbnail: '',
-      status: 'upcoming' as const,
-      isPaid: false,
-      description: 'تعلم تطوير تطبيقات الجوال للأندرويد والآيفون باستخدام أحدث التقنيات والأدوات'
-    },
-    {
-      id: '6',
-      title: 'الذكاء الاصطناعي وتطبيقاته',
-      presenter: 'ليلى أحمد',
-      date: '2024-07-19',
-      time: '16:00',
-      price: 129.99,
-      currency: 'USD',
-      expectedViewers: 900,
-      thumbnail: '',
-      status: 'live' as const,
-      isPaid: false,
-      description: 'مقدمة شاملة عن الذكاء الاصطناعي وتطبيقاته العملية في مختلف المجالات'
-    }
-  ];
+  useEffect(() => {
+    const fetchSessions = async () => {
+      try {
+        const data = await api.get('/live-sessions');
+        console.log('Réponse API /live-sessions:', data);
+        setLiveEvents(
+          data.map((session) => {
+            const start = new Date(session.start_time);
+            const now = new Date();
+            let status = 'upcoming';
+            if (session.is_ended) status = 'ended';
+            else if (now >= start) status = 'live';
+            return {
+              id: session.id,
+              title: session.title,
+              presenter: session.professor_name || session.professorId || 'أستاذ مباشر',
+              date: session.start_time ? start.toLocaleDateString('ar-EG') : '',
+              time: session.start_time ? start.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '',
+              price: session.price,
+              currency: session.currency || 'DA',
+              expectedViewers: session.expected_viewers || 0,
+              thumbnail: session.thumbnail || '',
+              status,
+              isPaid: session.is_paid || false,
+              description: session.description || '',
+            };
+          })
+        );
+      } catch (err) {
+        setLiveEvents([]);
+      }
+    };
+    fetchSessions();
+  }, []);
+
+  console.log('liveEvents:', liveEvents);
 
   const filteredEvents = liveEvents.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -224,8 +177,8 @@ const TTHLiveClasses = () => {
           )}
         </div>
       </div>
-      <div className='mt-[1px]'> 
-      <Footer/>
+      <div className='mt-[1px]'>
+        <Footer />
       </div>
     </div>
   );

@@ -43,7 +43,7 @@ import ProfessorSettings from './Pages/professor/Settings';
 import UserManagement from './components/admin/UserManagement';
 import HomepageSlides from './components/admin/HomepageSlides';
 import EnhancedHomepageSlides from './components/admin/EnhancedHomepageSlides';
-import LiveSessionsOverview from './components/admin/LiveSessionsOverview';
+import LiveSessionApprovals from './Pages/admin/LiveSessionApprovals';
 import QuizManagement from './components/admin/QuizManagement';
 // Professor components
 import QuizCreation from './components/professor/QuizCreation';
@@ -84,7 +84,7 @@ const App: React.FC = () => {
               <Route path="/TTHPrivateClasses" element={<TTHPrivateClasses />} />
               <Route path="/TTHTeacherProfile" element={<TTHTeacherProfile />} />
               <Route path="/coursesList/courses/:id" element={<TTHCourseDetail />} />
-              <Route path="/TTHDashboardStudent" element={<TTHDashboardStudent/>}/>
+              <Route path="/TTHDashboardStudent" element={<TTHDashboardStudent />} />
 
 
               {/* Schoolhouse public */}
@@ -102,7 +102,7 @@ const App: React.FC = () => {
                 <Route path="users" element={<UserManagement />} />
                 <Route path="slides" element={<HomepageSlides />} />
                 <Route path="enhanced-slides" element={<EnhancedHomepageSlides />} />
-                <Route path="live-sessions" element={<LiveSessionsOverview />} />
+                <Route path="live-sessions" element={<LiveSessionApprovals />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
 

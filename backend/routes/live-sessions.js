@@ -1,6 +1,6 @@
 import express from 'express';
 import pool from '../db.js';
-import { verifyToken, requireProfessor, requireStudent } from '../middleware/auth.js';
+import { verifyToken, requireProfessor, requireStudent, requireRole } from '../middleware/auth.js';
 import AgoraToken from 'agora-access-token';
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;
@@ -11,6 +11,7 @@ const router = express.Router();
 router.post('/professors/:professorId/live-sessions', verifyToken, requireProfessor, async (req, res) => {
     const { title, start_time, duration, price } = req.body;
     const professor_id = req.user.id;
+    const professor_name = req.user.name || req.user.email || `ID ${professor_id}`;
 
     if (parseInt(req.params.professorId, 10) !== professor_id) {
         return res.status(403).json({ error: "Forbidden: You can only create sessions for yourself." });
@@ -25,9 +26,34 @@ router.post('/professors/:professorId/live-sessions', verifyToken, requireProfes
             'INSERT INTO live_sessions (professor_id, title, start_time, duration, price) VALUES ($1, $2, $3, $4, $5) RETURNING *',
             [professor_id, title, start_time, duration, price]
         );
-        res.status(201).json(result.rows[0]);
+        const session = result.rows[0];
+
+        // Notify all admins
+        const adminsRes = await pool.query('SELECT id FROM users WHERE role = $1', ['admin']);
+        const notificationMessage = `Prof. ${professor_name} scheduled a new session: \"${title}\"`;
+        for (const admin of adminsRes.rows) {
+            await pool.query(
+                'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
+                [admin.id, notificationMessage]
+            );
+        }
+
+        res.status(201).json(session);
     } catch (error) {
         console.error('Error creating live session:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// GET /api/live-sessions/pending → liste toutes les sessions en attente d'approbation (admin)
+router.get('/live-sessions/pending', verifyToken, requireRole(['admin']), async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT * FROM live_sessions WHERE is_approved = FALSE AND is_rejected = FALSE ORDER BY start_time ASC'
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching pending live sessions:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -35,7 +61,14 @@ router.post('/professors/:professorId/live-sessions', verifyToken, requireProfes
 // GET /api/live-sessions → liste toutes les sessions publiques
 router.get('/live-sessions', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM live_sessions WHERE start_time >= NOW() ORDER BY start_time ASC');
+        let result;
+        if (req.query.all === 'true') {
+            result = await pool.query('SELECT * FROM live_sessions ORDER BY start_time DESC');
+        } else {
+            result = await pool.query(
+                'SELECT * FROM live_sessions WHERE start_time >= NOW() AND is_approved = TRUE ORDER BY start_time ASC'
+            );
+        }
         res.json(result.rows);
     } catch (error) {
         console.error('Error fetching live sessions:', error);
@@ -43,7 +76,7 @@ router.get('/live-sessions', async (req, res) => {
     }
 });
 
-// GET /api/live-sessions/:sessionId → récupère les détails d’une session
+// GET /api/live-sessions/:sessionId → récupère les détails d'une session
 router.get('/live-sessions/:sessionId', async (req, res) => {
     const { sessionId } = req.params;
     try {
@@ -94,7 +127,7 @@ router.post('/live-sessions/:sessionId/purchase', verifyToken, requireStudent, a
     }
 });
 
-// GET /api/live-sessions/:sessionId/access?student_id=… → vérifie si l’étudiant peut accéder
+// GET /api/live-sessions/:sessionId/access?student_id=… → vérifie si l'étudiant peut accéder
 router.get('/live-sessions/:sessionId/access', verifyToken, async (req, res) => {
     const { sessionId } = req.params;
     const { student_id } = req.query;
@@ -166,5 +199,73 @@ router.get('/rtcToken', (req, res) => {
     res.json({ token, uid });
 });
 
+// PATCH /api/live-sessions/:id/approve
+router.patch('/live-sessions/:id/approve', verifyToken, requireRole(['admin']), async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await pool.query(
+            'UPDATE live_sessions SET is_approved = TRUE, is_rejected = FALSE WHERE id = $1 RETURNING *',
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+        const session = result.rows[0];
+        // Notify professor
+        await pool.query(
+            'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
+            [session.professor_id, `Your live session "${session.title}" has been approved by the admin.`]
+        );
+        res.json({ message: 'Session approved', session });
+    } catch (error) {
+        console.error('Error approving session:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// PATCH /api/live-sessions/:id/reject
+router.patch('/live-sessions/:id/reject', verifyToken, requireRole(['admin']), async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await pool.query(
+            'UPDATE live_sessions SET is_approved = FALSE, is_rejected = TRUE WHERE id = $1 RETURNING *',
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+        const session = result.rows[0];
+        // Notify professor
+        await pool.query(
+            'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
+            [session.professor_id, `Your live session "${session.title}" has been rejected by the admin.`]
+        );
+        res.json({ message: 'Session rejected', session });
+    } catch (error) {
+        console.error('Error rejecting session:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// GET /api/professors/:professorId/live-sessions → liste les sessions d'un prof
+router.get('/professors/:professorId/live-sessions', verifyToken, requireProfessor, async (req, res) => {
+    const professor_id = parseInt(req.params.professorId, 10);
+
+    // Autoriser aussi l'admin à voir toutes les sessions d'un prof
+    if (req.user.role !== 'admin' && req.user.id !== professor_id) {
+        return res.status(403).json({ error: "Forbidden: You can only view your own sessions." });
+    }
+
+    try {
+        const result = await pool.query(
+            'SELECT * FROM live_sessions WHERE professor_id = $1 ORDER BY start_time DESC',
+            [professor_id]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching professor live sessions:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 export default router;

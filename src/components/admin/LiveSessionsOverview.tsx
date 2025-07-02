@@ -40,7 +40,7 @@ const LiveSessionsOverview = () => {
   const fetchData = async () => {
     try {
       const [sessionsData, usersData, notificationsData] = await Promise.all([
-        api.getLiveSessions(),
+        api.get('/live-sessions?all=true'),
         api.getUsers(),
         api.getNotifications()
       ]);

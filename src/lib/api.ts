@@ -1,4 +1,5 @@
 import { User, Level, Year, Speciality, Material, Course, PendingCourse, ContentBlock, HomeSlide, LiveSession, Quiz, QuizQuestion, PendingQuiz, QuizAttempt, QuizAnswer, QuizResults } from '@/types';
+import { getAuthToken } from '@/services/api';
 
 // Mock data (replace with actual API calls later)
 let mockData = {
@@ -341,7 +342,7 @@ export const api = {
     await delay(500);
     const userIndex = mockData.users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error('User not found');
-    
+
     mockData.users[userIndex] = { ...mockData.users[userIndex], ...updates };
     return mockData.users[userIndex];
   },
@@ -356,8 +357,8 @@ export const api = {
   },
   createHomeSlide: async (slide: Omit<HomeSlide, 'id'>): Promise<HomeSlide> => {
     await delay(500);
-    const newSlide: HomeSlide = { 
-      id: String(Date.now()), 
+    const newSlide: HomeSlide = {
+      id: String(Date.now()),
       ...slide,
       views: 0,
       clicks: 0,
@@ -371,9 +372,9 @@ export const api = {
     await delay(500);
     const slideIndex = mockData.homeSlides.findIndex(s => s.id === slideId);
     if (slideIndex === -1) throw new Error('Slide not found');
-    
-    mockData.homeSlides[slideIndex] = { 
-      ...mockData.homeSlides[slideIndex], 
+
+    mockData.homeSlides[slideIndex] = {
+      ...mockData.homeSlides[slideIndex],
       ...updates,
       updatedAt: new Date().toISOString()
     };
@@ -384,48 +385,46 @@ export const api = {
     mockData.homeSlides = mockData.homeSlides.filter(s => s.id !== slideId);
   },
 
-  getLiveSessions: async (professorId?: string): Promise<LiveSession[]> => {
-    await delay(500);
-    if (professorId) {
-      return mockData.liveSessions.filter(session => session.professorId === professorId);
-    }
-    return mockData.liveSessions;
+  getLiveSessions: async (professorId) => {
+    const res = await fetch(`/api/professors/${professorId}/live-sessions`, {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch live sessions');
+    return await res.json();
   },
   createLiveSession: async (session: Omit<LiveSession, 'id'>): Promise<LiveSession> => {
-    await delay(500);
-    const newSession: LiveSession = { id: String(Date.now()), ...session };
-    mockData.liveSessions.push(newSession);
-    
-    const professor = mockData.users.find(u => u.id === session.professorId);
-    const notification = {
-      id: String(Date.now() + Math.random()),
-      type: 'live_session_scheduled' as const,
-      message: `${professor?.name || 'A professor'} has scheduled a new live session: "${session.title}"`,
-      createdAt: new Date().toISOString(),
-      read: false,
-      sessionId: newSession.id,
-    };
-    mockData.notifications.push(notification);
-    
-    return newSession;
+    const res = await fetch(`/api/professors/${session.professorId}/live-sessions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      body: JSON.stringify(session),
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to create live session');
+    return await res.json();
   },
   updateLiveSession: async (sessionId: string, updates: Partial<LiveSession>): Promise<LiveSession> => {
     await delay(500);
     const sessionIndex = mockData.liveSessions.findIndex(s => s.id === sessionId);
     if (sessionIndex === -1) throw new Error('Session not found');
-    
-    mockData.liveSessions[sessionIndex] = { 
-      ...mockData.liveSessions[sessionIndex], 
+
+    mockData.liveSessions[sessionIndex] = {
+      ...mockData.liveSessions[sessionIndex],
       ...updates,
       updatedAt: new Date().toISOString()
     };
-    
+
     // Create notification for status changes
     if (updates.status) {
       const session = mockData.liveSessions[sessionIndex];
       const professor = mockData.users.find(u => u.id === session.professorId);
       let message = '';
-      
+
       switch (updates.status) {
         case 'live':
           message = `Live session "${session.title}" by ${professor?.name || 'a professor'} has started`;
@@ -440,7 +439,7 @@ export const api = {
           message = `Live session "${session.title}" by ${professor?.name || 'a professor'} has been paused`;
           break;
       }
-      
+
       if (message) {
         const notification = {
           id: String(Date.now() + Math.random()),
@@ -453,7 +452,7 @@ export const api = {
         mockData.notifications.push(notification);
       }
     }
-    
+
     return mockData.liveSessions[sessionIndex];
   },
   updateLiveSessionStatus: async (sessionId: string, status: LiveSession['status']): Promise<LiveSession> => {
@@ -463,14 +462,14 @@ export const api = {
     await delay(500);
     const session = mockData.liveSessions.find(s => s.id === sessionId);
     if (!session) throw new Error('Session not found');
-    
+
     // Mark session as saved/archived
-    await api.updateLiveSession(sessionId, { 
+    await api.updateLiveSession(sessionId, {
       status: 'ended',
       recordingUrl: session.recordingUrl || `https://recordings.example.com/session-${sessionId}`,
-      isRecorded: true 
+      isRecorded: true
     });
-    
+
     const professor = mockData.users.find(u => u.id === session.professorId);
     const notification = {
       id: String(Date.now() + Math.random()),
@@ -555,7 +554,7 @@ export const api = {
     if (course) {
       return course;
     }
-    
+
     const pendingCourse = mockData.pendingCourses.find(course => course.id === courseId);
     if (pendingCourse && pendingCourse.status === 'approved') {
       return {
@@ -570,7 +569,7 @@ export const api = {
         price: pendingCourse.price
       };
     }
-    
+
     return null;
   },
   getPendingCourseById: async (courseId: string): Promise<PendingCourse | null> => {
@@ -581,11 +580,11 @@ export const api = {
   getProfessorById: async (professorId: string): Promise<User | null> => {
     await delay(500);
     const professor = mockData.users.find(user => user.id === professorId && user.role === 'professor');
-    
+
     if (professorId && !professor) {
       console.warn(`Professor with ID ${professorId} not found`);
     }
-    
+
     return professor || null;
   },
   createCourse: async (course: Omit<Course, 'id' | 'createdAt' | 'sections' | 'createdBy' | 'approvedAt' | 'materialId'>, courseData: { sections: Array<{ title: string, blocks: Array<Omit<ContentBlock, 'id'>> }> }): Promise<Course> => {
@@ -616,7 +615,7 @@ export const api = {
   },
   submitCourse: async (courseData: { title: string, description: string, sections: any[], createdBy: string }): Promise<void> => {
     await delay(500);
-    
+
     const newCourse: PendingCourse = {
       id: String(Date.now()),
       title: courseData.title,
@@ -638,7 +637,7 @@ export const api = {
       createdAt: new Date().toISOString(),
       status: 'pending',
     };
-    
+
     mockData.pendingCourses.push(newCourse);
   },
   getPendingCourses: async (): Promise<PendingCourse[]> => {
@@ -647,12 +646,12 @@ export const api = {
   },
   updateCourseStatus: async (courseId: string, status: PendingCourse['status'], reviewedBy?: string): Promise<void> => {
     await delay(500);
-    
+
     const pendingCourse = mockData.pendingCourses.find(course => course.id === courseId);
     if (!pendingCourse) {
       throw new Error('Course not found');
     }
-    
+
     pendingCourse.status = status;
     if (reviewedBy) {
       pendingCourse.reviewedBy = reviewedBy;
@@ -660,18 +659,18 @@ export const api = {
   },
   approveCourse: async (courseId: string, materialId: string, price?: number): Promise<void> => {
     await delay(500);
-    
+
     const pendingCourse = mockData.pendingCourses.find(course => course.id === courseId);
     if (!pendingCourse) {
       throw new Error('Course not found');
     }
-    
+
     const professorExists = mockData.users.some(user => user.id === pendingCourse.createdBy);
     if (!professorExists) {
       console.warn(`Professor with ID ${pendingCourse.createdBy} not found for course ${courseId}`);
       pendingCourse.createdBy = mockData.users.find(user => user.role === 'professor')?.id || '1';
     }
-    
+
     const approvedCourse: Course = {
       id: courseId,
       materialId: materialId,
@@ -683,19 +682,19 @@ export const api = {
       approvedAt: new Date().toISOString(),
       price: price
     };
-    
+
     mockData.courses.push(approvedCourse);
-    
+
     pendingCourse.status = 'approved';
     pendingCourse.approvedAt = new Date().toISOString();
     pendingCourse.materialId = materialId;
     pendingCourse.price = price;
-    
+
     return;
   },
   rejectCourse: async (courseId: string, reason: string): Promise<void> => {
     await delay(500);
-    
+
     const pendingCourse = mockData.pendingCourses.find(course => course.id === courseId);
     if (!pendingCourse) {
       throw new Error('Course not found');
@@ -705,18 +704,18 @@ export const api = {
     pendingCourse.rejectionReason = reason;
     pendingCourse.rejectedAt = new Date().toISOString();
   },
-  
+
   // Quiz management methods
   getQuizzes: async (): Promise<Quiz[]> => {
     await delay(500);
     return mockData.quizzes;
   },
-  
+
   getPendingQuizzes: async (): Promise<PendingQuiz[]> => {
     await delay(500);
     return mockData.pendingQuizzes;
   },
-  
+
   submitQuiz: async (quizData: {
     title: string;
     description: string;
@@ -727,7 +726,7 @@ export const api = {
     createdBy: string;
   }): Promise<void> => {
     await delay(500);
-    
+
     const newQuiz: PendingQuiz = {
       id: String(Date.now()),
       title: quizData.title,
@@ -740,18 +739,18 @@ export const api = {
       maxAttempts: quizData.maxAttempts,
       status: 'pending'
     };
-    
+
     mockData.pendingQuizzes.push(newQuiz);
   },
-  
+
   approveQuiz: async (quizId: string, materialId: string): Promise<void> => {
     await delay(500);
-    
+
     const pendingQuiz = mockData.pendingQuizzes.find(quiz => quiz.id === quizId);
     if (!pendingQuiz) {
       throw new Error('Quiz not found');
     }
-    
+
     const approvedQuiz: Quiz & { materialId?: string } = {
       id: quizId,
       materialId: materialId,
@@ -765,17 +764,17 @@ export const api = {
       maxAttempts: pendingQuiz.maxAttempts,
       isActive: true
     };
-    
+
     mockData.quizzes.push(approvedQuiz);
-    
+
     pendingQuiz.status = 'approved';
     pendingQuiz.approvedAt = new Date().toISOString();
     pendingQuiz.materialId = materialId;
   },
-  
+
   rejectQuiz: async (quizId: string, reason: string): Promise<void> => {
     await delay(500);
-    
+
     const pendingQuiz = mockData.pendingQuizzes.find(quiz => quiz.id === quizId);
     if (!pendingQuiz) {
       throw new Error('Quiz not found');
@@ -789,23 +788,23 @@ export const api = {
   // Quiz results methods
   getQuizResults: async (professorId: string): Promise<QuizResults[]> => {
     await delay(500);
-    
+
     // Get all quizzes created by the professor
     const professorQuizzes = [...mockData.quizzes, ...mockData.pendingQuizzes.filter(q => q.status === 'approved')]
       .filter(quiz => quiz.createdBy === professorId);
-    
+
     const results: QuizResults[] = [];
-    
+
     for (const quiz of professorQuizzes) {
       const attempts = mockData.quizAttempts.filter(attempt => attempt.quizId === quiz.id);
-      
+
       if (attempts.length > 0) {
         const totalAttempts = attempts.length;
         const averageScore = attempts.reduce((sum, attempt) => sum + attempt.score, 0) / totalAttempts;
         const passedAttempts = attempts.filter(attempt => attempt.passed).length;
         const passRate = (passedAttempts / totalAttempts) * 100;
         const averageTimeSpent = attempts.reduce((sum, attempt) => sum + attempt.timeSpent, 0) / totalAttempts;
-        
+
         results.push({
           quiz: quiz as Quiz,
           attempts,
@@ -816,28 +815,28 @@ export const api = {
         });
       }
     }
-    
+
     return results;
   },
-  
+
   getQuizResultsById: async (quizId: string): Promise<QuizResults | null> => {
     await delay(500);
-    
+
     const quiz = [...mockData.quizzes, ...mockData.pendingQuizzes.filter(q => q.status === 'approved')]
       .find(q => q.id === quizId);
-    
+
     if (!quiz) return null;
-    
+
     const attempts = mockData.quizAttempts.filter(attempt => attempt.quizId === quizId);
-    
+
     if (attempts.length === 0) return null;
-    
+
     const totalAttempts = attempts.length;
     const averageScore = attempts.reduce((sum, attempt) => sum + attempt.score, 0) / totalAttempts;
     const passedAttempts = attempts.filter(attempt => attempt.passed).length;
     const passRate = (passedAttempts / totalAttempts) * 100;
     const averageTimeSpent = attempts.reduce((sum, attempt) => sum + attempt.timeSpent, 0) / totalAttempts;
-    
+
     return {
       quiz: quiz as Quiz,
       attempts,
@@ -846,5 +845,30 @@ export const api = {
       passRate,
       averageTimeSpent
     };
-  }
+  },
+
+  get: async (url: string) => {
+    const res = await fetch(`/api${url.startsWith('/') ? url : '/' + url}`, {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch ' + url);
+    return await res.json();
+  },
+
+  patch: async (url, body = {}) => {
+    const res = await fetch(`/api${url.startsWith('/') ? url : '/' + url}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      body: JSON.stringify(body),
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to patch ' + url);
+    return await res.json();
+  },
 };

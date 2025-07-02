@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,7 +17,7 @@ interface StatusControlProps {
 
 const StatusControl = ({ session, onStatusUpdate, userRole, isOwner = false }: StatusControlProps) => {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [selectedStatus, setSelectedStatus] = React.useState<LiveSession['status']>(session.status);
+  const [selectedStatus, setSelectedStatus] = React.useState<LiveSession['status']>(session.status || 'scheduled');
   const [showPathSelector, setShowPathSelector] = React.useState(false);
 
   const handleStatusChange = async (newStatus: LiveSession['status']) => {
@@ -88,14 +87,14 @@ const StatusControl = ({ session, onStatusUpdate, userRole, isOwner = false }: S
             <SelectValue>
               <div className="flex items-center gap-2">
                 {getStatusIcon(selectedStatus)}
-                <span className="capitalize">{selectedStatus.replace('_', ' ')}</span>
+                <span className="capitalize">{selectedStatus ? selectedStatus.replace('_', ' ') : 'Unknown'}</span>
               </div>
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {statusOptions.map((option) => (
-              <SelectItem 
-                key={option.value} 
+              <SelectItem
+                key={option.value}
                 value={option.value}
                 disabled={option.disabled}
               >
@@ -124,7 +123,7 @@ const StatusControl = ({ session, onStatusUpdate, userRole, isOwner = false }: S
                 Choose where to place "{session.title}" in the educational structure.
               </DialogDescription>
             </DialogHeader>
-            
+
             {showPathSelector ? (
               <PathSelectorForSession
                 session={session}
