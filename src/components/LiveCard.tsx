@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar, Clock, Users, Play, Lock, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,8 +41,8 @@ const LiveCard: React.FC<LiveCardProps> = ({
     // Simulate payment process
     setTimeout(() => {
       setIsProcessingPayment(false);
-      // In real implementation, this would update the isPaid status
       alert('تم الدفع بنجاح! يمكنك الآن الوصول إلى البث المباشر.');
+      navigate(`/streaming/${id}`);
     }, 2000);
   };
 
@@ -110,8 +109,8 @@ const LiveCard: React.FC<LiveCardProps> = ({
     }
 
     return (
-      <Button 
-        onClick={handlePayment} 
+      <Button
+        onClick={handlePayment}
         disabled={isProcessingPayment}
         className="w-full bg-purple-600 hover:bg-purple-700"
       >
@@ -151,7 +150,7 @@ const LiveCard: React.FC<LiveCardProps> = ({
         <h3 className="font-bold text-xl text-white mb-2 line-clamp-2 leading-tight">
           {title}
         </h3>
-        
+
         <p className="text-purple-300 font-medium mb-3">
           مقدم من: {presenter}
         </p>

@@ -409,51 +409,17 @@ export const api = {
     return await res.json();
   },
   updateLiveSession: async (sessionId: string, updates: Partial<LiveSession>): Promise<LiveSession> => {
-    await delay(500);
-    const sessionIndex = mockData.liveSessions.findIndex(s => s.id === sessionId);
-    if (sessionIndex === -1) throw new Error('Session not found');
-
-    mockData.liveSessions[sessionIndex] = {
-      ...mockData.liveSessions[sessionIndex],
-      ...updates,
-      updatedAt: new Date().toISOString()
-    };
-
-    // Create notification for status changes
-    if (updates.status) {
-      const session = mockData.liveSessions[sessionIndex];
-      const professor = mockData.users.find(u => u.id === session.professorId);
-      let message = '';
-
-      switch (updates.status) {
-        case 'live':
-          message = `Live session "${session.title}" by ${professor?.name || 'a professor'} has started`;
-          break;
-        case 'ended':
-          message = `Live session "${session.title}" by ${professor?.name || 'a professor'} has ended`;
-          break;
-        case 'cancelled':
-          message = `Live session "${session.title}" by ${professor?.name || 'a professor'} has been cancelled`;
-          break;
-        case 'paused':
-          message = `Live session "${session.title}" by ${professor?.name || 'a professor'} has been paused`;
-          break;
-      }
-
-      if (message) {
-        const notification = {
-          id: String(Date.now() + Math.random()),
-          type: 'live_session_started' as const,
-          message,
-          createdAt: new Date().toISOString(),
-          read: false,
-          sessionId: session.id,
-        };
-        mockData.notifications.push(notification);
-      }
-    }
-
-    return mockData.liveSessions[sessionIndex];
+    const token = localStorage.getItem('token');
+    const res = await fetch(`/api/live-sessions/${sessionId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update session');
+    return res.json();
   },
   updateLiveSessionStatus: async (sessionId: string, status: LiveSession['status']): Promise<LiveSession> => {
     return api.updateLiveSession(sessionId, { status });
@@ -869,6 +835,17 @@ export const api = {
       credentials: 'include'
     });
     if (!res.ok) throw new Error('Failed to patch ' + url);
+    return await res.json();
+  },
+
+  getLiveSession: async (sessionId: string): Promise<LiveSession> => {
+    const res = await fetch(`/api/live-sessions/${sessionId}`, {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch live session');
     return await res.json();
   },
 };

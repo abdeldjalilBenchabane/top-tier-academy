@@ -19,27 +19,32 @@ const TTHLiveClasses = () => {
         const data = await api.get('/live-sessions');
         console.log('Réponse API /live-sessions:', data);
         setLiveEvents(
-          data.map((session) => {
-            const start = new Date(session.start_time);
-            const now = new Date();
-            let status = 'upcoming';
-            if (session.is_ended) status = 'ended';
-            else if (now >= start) status = 'live';
-            return {
-              id: session.id,
-              title: session.title,
-              presenter: session.professor_name || session.professorId || 'أستاذ مباشر',
-              date: session.start_time ? start.toLocaleDateString('ar-EG') : '',
-              time: session.start_time ? start.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '',
-              price: session.price,
-              currency: session.currency || 'DA',
-              expectedViewers: session.expected_viewers || 0,
-              thumbnail: session.thumbnail || '',
-              status,
-              isPaid: session.is_paid || false,
-              description: session.description || '',
-            };
-          })
+          data
+            .filter(session => session.status !== 'cancelled')
+            .map((session) => {
+              let status = session.status;
+              if (!status) {
+                const start = new Date(session.start_time);
+                const now = new Date();
+                if (session.is_ended) status = 'ended';
+                else if (now >= start) status = 'live';
+                else status = 'upcoming';
+              }
+              return {
+                id: session.id,
+                title: session.title,
+                presenter: session.professor_name || session.professorId || 'أستاذ مباشر',
+                date: session.start_time ? new Date(session.start_time).toLocaleDateString('fr-FR') : '',
+                time: session.start_time ? new Date(session.start_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '',
+                price: session.price,
+                currency: session.currency || 'DA',
+                expectedViewers: session.expected_viewers || 0,
+                thumbnail: session.thumbnail || '',
+                status,
+                isPaid: session.is_paid || false,
+                description: session.description || '',
+              };
+            })
         );
       } catch (err) {
         setLiveEvents([]);

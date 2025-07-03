@@ -12,6 +12,7 @@ import { toast } from '@/lib/toast';
 import { Plus, Video, Calendar, Clock, Play, Bell } from 'lucide-react';
 import StatusControl from '@/components/live-sessions/StatusControl';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface LiveSessionsProps {
   professorId: string;
@@ -19,6 +20,7 @@ interface LiveSessionsProps {
 
 const LiveSessions = ({ professorId }: LiveSessionsProps) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState<LiveSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -95,7 +97,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
     try {
       await api.updateLiveSessionStatus(sessionId, 'live');
       toast.success('Live session started successfully');
-      await fetchSessions();
+      navigate(`/streaming/${sessionId}`);
     } catch (error) {
       console.error('Failed to start live session:', error);
       toast.error('Failed to start live session');
@@ -130,12 +132,14 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
   };
 
   const canStartSession = (session: LiveSession) => {
-    const now = new Date();
-    const scheduledTime = new Date(session.scheduledAt);
-    const timeDiff = scheduledTime.getTime() - now.getTime();
-    const minutesUntilStart = timeDiff / (1000 * 60);
+    // const now = new Date();
+    // const scheduledTime = new Date(session.scheduledAt);
+    // const timeDiff = scheduledTime.getTime() - now.getTime();
+    // const minutesUntilStart = timeDiff / (1000 * 60);
 
-    return session.status === 'scheduled' && minutesUntilStart <= 15;
+    // return session.status === 'scheduled' && minutesUntilStart <= 15;
+
+    return session.status === 'scheduled';
   };
 
   // Helper to get status badge
@@ -155,7 +159,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
 
   return (
     <div className="space-y-6">
-    
+
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">Live Sessions</h2>

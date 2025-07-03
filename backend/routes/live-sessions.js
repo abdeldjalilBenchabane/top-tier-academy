@@ -168,11 +168,11 @@ router.get('/live-sessions/:sessionId/access', verifyToken, async (req, res) => 
 });
 
 // GET /rtcToken?channel=:channelName&uid=:uid → génère un token Agora
-router.get('/rtcToken', (req, res) => {
+router.get('/rtcToken', verifyToken, (req, res) => {
     const appID = process.env.AGORA_APP_ID;
     const appCertificate = process.env.AGORA_APP_CERTIFICATE;
     const channel = req.query.channel;
-    const uid = req.query.uid ? Number(req.query.uid) : 0;
+    const uid = req.query.uid;
     const role = RtcRole.SUBSCRIBER;
     const expireTime = 3600; // 1 hour
     const currentTime = Math.floor(Date.now() / 1000);
@@ -187,16 +187,35 @@ router.get('/rtcToken', (req, res) => {
         return res.status(400).json({ error: 'Channel name is required' });
     }
 
+    // Vérifie la validité de l'UID
+    const safeUid = uid && typeof uid === 'string'
+        ? uid.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64)
+        : '';
+    if (!safeUid) {
+        return res.status(400).json({ error: 'Invalid or missing UID' });
+    }
+
+    // Si l'utilisateur n'est pas admin, il ne peut générer un token que pour son propre UID
+    if (req.user.role !== 'admin') {
+        const userUid = String(req.user.id).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+        if (safeUid !== userUid) {
+            return res.status(403).json({ error: 'Forbidden: UID mismatch' });
+        }
+    }
+
+    // (Optionnel) Vérifie que le channel correspond à une session autorisée pour cet utilisateur
+    // ...
+
     const token = RtcTokenBuilder.buildTokenWithUid(
         appID,
         appCertificate,
         channel,
-        uid,
+        Number(safeUid), // Agora accepte aussi les UIDs string, mais Number() pour compatibilité
         role,
         privilegeExpiredTs
     );
 
-    res.json({ token, uid });
+    res.json({ token, uid: safeUid });
 });
 
 // PATCH /api/live-sessions/:id/approve
@@ -264,6 +283,30 @@ router.get('/professors/:professorId/live-sessions', verifyToken, requireProfess
         res.json(result.rows);
     } catch (error) {
         console.error('Error fetching professor live sessions:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// PATCH /api/live-sessions/:sessionId → met à jour le statut (ou autres champs) d'une session
+router.patch('/live-sessions/:sessionId', verifyToken, requireProfessor, async (req, res) => {
+    const { sessionId } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+        return res.status(400).json({ error: 'Missing required field: status' });
+    }
+
+    try {
+        const result = await pool.query(
+            'UPDATE live_sessions SET status = $1 WHERE id = $2 RETURNING *',
+            [status, sessionId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Live session not found' });
+        }
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error updating live session status:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
