@@ -5,6 +5,8 @@ export type User = {
   name: string;
   email: string;
   role: 'admin' | 'professor' | 'student';
+  agoraUid?: string;
+  agoraRtmToken?: string;
 };
 
 export type Level = {

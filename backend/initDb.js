@@ -13,7 +13,7 @@ const schema = fs.readFileSync(schemaPath, 'utf8');
 async function initializeDatabase() {
   try {
     console.log('Initializing database...');
-
+    
     // Split the schema into individual statements
     const statements = schema
       .split(';')
@@ -29,10 +29,10 @@ async function initializeDatabase() {
     }
 
     console.log('Database initialized successfully!');
-
+    
     // Insert some sample data
     await insertSampleData();
-
+    
   } catch (error) {
     console.error('Error initializing database:', error);
     throw error;
@@ -102,28 +102,5 @@ async function insertSampleData() {
   }
 }
 
-async function ensureTestSession() {
-  // Cherche un professeur existant
-  const profRes = await pool.query("SELECT id FROM users WHERE role = 'professor' LIMIT 1");
-  if (profRes.rows.length === 0) {
-    console.log('Aucun professeur trouvé, session test non créée.');
-    return;
-  }
-  const professorId = profRes.rows[0].id;
-
-  const { rows } = await pool.query('SELECT id FROM live_sessions WHERE id = $1', [5]);
-  if (rows.length === 0) {
-    await pool.query(
-      `INSERT INTO live_sessions (id, professor_id, title, start_time, duration, price, status, is_approved)
-       VALUES ($1, $2, $3, NOW() + INTERVAL '10 minutes', $4, $5, $6, $7)`,
-      [5, professorId, 'Session Test Agora', 60, 0, 'scheduled', true]
-    );
-    console.log('Session test créée avec le professeur id =', professorId);
-  } else {
-    console.log('Session test déjà présente.');
-  }
-}
-
 // Run the initialization
-initializeDatabase().catch(console.error);
-ensureTestSession(); 
+initializeDatabase().catch(console.error); 

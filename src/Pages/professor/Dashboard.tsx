@@ -84,11 +84,17 @@ const ProfessorDashboard = () => {
         </TabsContent>
         
         <TabsContent value="live-sessions">
-          <LiveSessions professorId={user?.id || '1'} />
+          {user?.role === 'professor' && user?.id ? (
+            <LiveSessions professorId={user.id} />
+          ) : (
+            <div className="text-red-500">You must be logged in as a professor to view live sessions.</div>
+          )}
         </TabsContent>
         
         <TabsContent value="quiz-results">
-          <QuizResults professorId={user?.id || '1'} />
+          {user?.role === 'professor' && user?.id ? (
+            <QuizResults professorId={user.id} />
+          ) : null}
         </TabsContent>
       </Tabs>
     </div>
