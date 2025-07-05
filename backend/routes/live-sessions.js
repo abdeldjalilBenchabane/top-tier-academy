@@ -75,27 +75,27 @@ router.get('/live-sessions', async (req, res) => {
                 'SELECT * FROM live_sessions WHERE is_approved = TRUE ORDER BY start_time DESC'
             );
         }
-        
+
         // If user is authenticated, check their purchase status for each session
         if (req.headers.authorization) {
             try {
                 const token = req.headers.authorization.replace('Bearer ', '');
                 const decoded = jwt.verify(token, process.env.JWT_SECRET);
                 const userId = decoded.id;
-                
+
                 // Get all purchases for this user
                 const purchaseResult = await pool.query(
                     'SELECT session_id FROM purchases WHERE student_id = $1',
                     [userId]
                 );
                 const purchasedSessionIds = purchaseResult.rows.map(row => row.session_id);
-                
+
                 // Add is_paid field to each session
                 const sessionsWithPurchaseInfo = result.rows.map(session => ({
                     ...session,
                     is_paid: purchasedSessionIds.includes(session.id)
                 }));
-                
+
                 res.json(sessionsWithPurchaseInfo);
             } catch (jwtError) {
                 // If JWT verification fails, return sessions without purchase info
@@ -200,10 +200,10 @@ router.get('/rtcToken', verifyToken, (req, res) => {
     const appCertificate = process.env.AGORA_APP_CERTIFICATE;
     const channel = req.query.channel;
     const uid = req.query.uid;
-    
+
     // Determine role based on user type
     const role = req.user.role === 'professor' ? RtcRole.PUBLISHER : RtcRole.SUBSCRIBER;
-    
+
     const expireTime = 3600; // 1 hour
     const currentTime = Math.floor(Date.now() / 1000);
     const privilegeExpiredTs = currentTime + expireTime;
@@ -250,7 +250,7 @@ router.get('/rtcToken', verifyToken, (req, res) => {
 
         console.log('[DEBUG] Token generated successfully for UID:', numericUid);
         console.log('[DEBUG] Token length:', token.length);
-        
+
         res.json({ token, uid: numericUid });
     } catch (error) {
         console.error('[DEBUG] Token generation error:', error);

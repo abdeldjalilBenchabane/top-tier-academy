@@ -18,6 +18,7 @@ import { fileURLToPath } from 'url';
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 
+const roomUsers = {};
 
 // app.use('/api', hierarchyRoutes);
 dotenv.config();
@@ -85,25 +86,66 @@ io.on('connection', (socket) => {
   // Join a chat room (live session)
   socket.on('join-room', (roomId, userData) => {
     socket.join(roomId);
-    console.log(`User ${userData.name} joined room ${roomId}`);
-    
-    // Store user data in socket for later use
     socket.userData = userData;
     socket.roomId = roomId;
-    
-    // Notify others in the room
+
+    console.log(`User ${userData.name} (${userData.role}) joined room ${roomId}`);
+
+    // Remove any existing socket for this user (in case of reconnection)
+    const roomSockets = io.sockets.adapter.rooms.get(roomId);
+    if (roomSockets) {
+      for (const socketId of roomSockets) {
+        const existingSocket = io.sockets.sockets.get(socketId);
+        if (existingSocket && existingSocket.userData && existingSocket.userData.id === userData.id && existingSocket.id !== socket.id) {
+          console.log(`[DEBUG] Removing duplicate user ${userData.name} (${existingSocket.id})`);
+          existingSocket.leave(roomId);
+          existingSocket.to(roomId).emit('user-left', {
+            id: existingSocket.id,
+            userId: existingSocket.userData.id,
+            name: existingSocket.userData.name || 'مستخدم'
+          });
+        }
+      }
+    }
+
+    // Notify others in the room about the new user
     socket.to(roomId).emit('user-joined', {
       id: socket.id,
+      userId: userData.id,
       name: userData.name,
       role: userData.role,
       avatar_url: userData.avatar_url
     });
+
+    // Get all users in this room and send the list to the new user
+    const updatedRoomSockets = io.sockets.adapter.rooms.get(roomId);
+    if (updatedRoomSockets) {
+      const participants = Array.from(updatedRoomSockets).map(socketId => {
+        const userSocket = io.sockets.sockets.get(socketId);
+        if (userSocket && userSocket.userData) {
+          return {
+            id: userSocket.id,
+            userId: userSocket.userData.id,
+            name: userSocket.userData.name,
+            role: userSocket.userData.role,
+            avatar_url: userSocket.userData.avatar_url
+          };
+        }
+        return null;
+      }).filter(Boolean);
+
+      console.log(`[DEBUG] Sending participants list to ${userData.name}:`, participants);
+      socket.emit('participants-list', participants);
+
+      // Also send updated list to all other users in the room
+      socket.to(roomId).emit('participants-list', participants);
+    }
   });
 
   // Handle chat messages
   socket.on('send-message', (roomId, messageData) => {
     console.log('Message received in room', roomId, ':', messageData);
-    
+
     // Broadcast message to all users in the room
     io.to(roomId).emit('new-message', {
       id: socket.id,
@@ -126,15 +168,70 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('chat-toggled', enabled);
   });
 
+  // Handle individual student mic control
+  socket.on('toggle-student-mic', (roomId, data) => {
+    console.log('Student mic toggle in room', roomId, ':', data);
+
+    // Find the target student's socket by userId
+    const roomSockets = io.sockets.adapter.rooms.get(roomId);
+    if (roomSockets) {
+      for (const socketId of roomSockets) {
+        const targetSocket = io.sockets.sockets.get(socketId);
+        if (targetSocket && targetSocket.userData && targetSocket.userData.id === data.studentId) {
+          console.log(`[DEBUG] Found target student socket: ${socketId} for userId: ${data.studentId}`);
+          // Send the signal to the specific student
+          targetSocket.emit('student-mic-toggled', {
+            studentId: data.studentId,
+            studentName: data.studentName,
+            muted: data.muted,
+            timestamp: new Date().toISOString()
+          });
+          break;
+        }
+      }
+    }
+
+    // Also broadcast to all users in the room for UI updates
+    io.to(roomId).emit('student-mic-toggled', {
+      studentId: data.studentId,
+      studentName: data.studentName,
+      muted: data.muted,
+      timestamp: new Date().toISOString()
+    });
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
-    
+
     // Notify all rooms this user was in
-    if (socket.roomId) {
+    if (socket.roomId && socket.userData) {
+      console.log(`User ${socket.userData.name} left room ${socket.roomId}`);
       socket.to(socket.roomId).emit('user-left', {
         id: socket.id,
-        name: socket.userData?.name || 'مستخدم'
+        userId: socket.userData.id,
+        name: socket.userData.name || 'مستخدم'
       });
+
+      // Also send updated participants list to remaining users
+      const roomSockets = io.sockets.adapter.rooms.get(socket.roomId);
+      if (roomSockets) {
+        const participants = Array.from(roomSockets).map(socketId => {
+          const userSocket = io.sockets.sockets.get(socketId);
+          if (userSocket && userSocket.userData) {
+            return {
+              id: userSocket.id,
+              userId: userSocket.userData.id,
+              name: userSocket.userData.name,
+              role: userSocket.userData.role,
+              avatar_url: userSocket.userData.avatar_url
+            };
+          }
+          return null;
+        }).filter(Boolean);
+
+        console.log(`Sending updated participants list after disconnect:`, participants);
+        io.to(socket.roomId).emit('participants-list', participants);
+      }
     }
   });
 });

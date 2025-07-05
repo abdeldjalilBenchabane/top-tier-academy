@@ -39,6 +39,8 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     // Socket.IO for chat
     const [socket, setSocket] = useState<Socket | null>(null);
 
+    const [studentMuteStates, setStudentMuteStates] = useState<{ [key: string]: boolean }>({});
+
     // Generate a stable UID that doesn't change on re-renders
     const stableUid = useMemo(() => {
         const userBase = parseInt(String(user.id).replace(/\D/g, '')) % 1000;
@@ -138,13 +140,14 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
             setParticipants(prev => {
                 const currentUser = {
                     id: newSocket.id,
+                    userId: user.id,
                     name: user.name || 'مستخدم',
                     role: user.role,
                     avatar_url: user.avatar_url
                 };
                 
-                // Check if user already exists
-                if (prev.find(p => p.id === currentUser.id)) return prev;
+                // Check if user already exists using userId as unique identifier
+                if (prev.find(p => p.userId === currentUser.userId)) return prev;
                 return [...prev, currentUser];
             });
         });
@@ -162,7 +165,8 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
             name: user.name || 'مستخدم',
             role: user.role,
             id: user.id,
-            avatar_url: user.avatar_url
+            avatar_url: user.avatar_url,
+            socketId: newSocket.id
         });
 
         // Listen for new messages
@@ -179,10 +183,24 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         newSocket.on('user-joined', (userData) => {
             console.log('[DEBUG] User joined via Socket.IO:', userData);
             setParticipants(prev => {
-                if (prev.find(p => p.id === userData.id)) return prev;
-                return [...prev, { id: userData.id, name: userData.name, role: userData.role, avatar_url: userData.avatar_url }];
+                // Use userId as unique identifier to prevent duplicates
+                if (prev.find(p => p.userId === userData.userId)) return prev;
+                return [...prev, {
+                    id: userData.id,
+                    userId: userData.userId,
+                    name: userData.name,
+                    role: userData.role,
+                    avatar_url: userData.avatar_url
+                }];
             });
             setViewerCount(prev => prev + 1);
+        });
+
+        // Listen for participants list (sent when joining)
+        newSocket.on('participants-list', (participantsList) => {
+            console.log('[DEBUG] Received participants list:', participantsList);
+            setParticipants(participantsList);
+            setViewerCount(participantsList.length);
         });
 
         // Listen for user left
@@ -206,6 +224,31 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         newSocket.on('chat-toggled', (enabled) => {
             console.log('[DEBUG] Chat toggled by professor:', enabled);
             setChatEnabled(enabled);
+        });
+
+        // Listen for individual student mic control
+        newSocket.on('student-mic-toggled', (data) => {
+            console.log('[DEBUG] Student mic toggle signal received:', data, 'current socket.id:', newSocket.id);
+
+            // Update local state for visual feedback
+            setStudentMuteStates(prev => {
+                const newState = {
+                    ...prev,
+                    [data.studentId]: data.muted
+                };
+                console.log('[DEBUG] Updated studentMuteStates:', {
+                    oldState: prev,
+                    newState: newState,
+                    studentId: data.studentId,
+                    newMutedState: data.muted
+                });
+                return newState;
+            });
+
+            // If this is for the current user, log the action
+            if (data.studentId === newSocket.id) {
+                console.log(`[DEBUG] My mic was ${data.muted ? 'muted' : 'unmuted'} by professor`);
+            }
         });
 
         return () => {
@@ -342,7 +385,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     console.log('[DEBUG] Re-render, messages.length:', messages.length);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white">
+        <div dir='rtl' className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-700 to-purple-700 text-white">
             {debugPanel}
             
             {/* Header */}
@@ -364,16 +407,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                         </div>
                     </div>
                     
-                    <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20">
-                            <Users className="w-4 h-4 mr-2" />
-                            المشاركون
-                        </Button>
-                        <Button size="sm" variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20">
-                            <Share2 className="w-4 h-4 mr-2" />
-                            مشاركة
-                        </Button>
-                    </div>
+                 
                 </div>
             </div>
 
@@ -394,6 +428,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                             uid={agoraUid || 0}
                                             role={isProfessor ? 'host' : 'audience'}
                                             studentsMuted={studentsMuted}
+                                            socket={socket}
                                             onError={(err) => {
                                                 console.error('[DEBUG] AgoraVideoPlayer error:', err);
                                                 setAgoraError('فشل الاتصال بالبث المباشر. يرجى المحاولة لاحقاً.');
@@ -444,22 +479,13 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                         <h1 className="text-2xl font-bold mb-2">{session.title}</h1>
                         <p className="text-gray-300 mb-4">مقدم من: {session.presenter}</p>
                         <p className="text-gray-400 leading-relaxed">{session.description}</p>
-                        <div className="flex items-center gap-4 mt-6">
-                            <Button className="bg-red-500 hover:bg-red-600 flex items-center gap-2">
-                                <Heart className="w-4 h-4" />
-                                إعجاب ({session.likes})
-                            </Button>
-                            <Button variant="outline" className="border-white/20 bg-white/15 text-white hover:bg-white/10 flex  items-center gap-2">
-                                <Share2 className="w-4 h-4" />
-                                مشاركة
-                            </Button>
-                        </div>
+                       
                     </div>
                 </div>
 
                 {/* Chat Sidebar */}
                 <ChatSidebar
-                    key={`chat-${messages.length}`} // 🔥 clé dynamique
+                    key={`chat-${messages.length}`}
                     messages={messages}
                     input={input}
                     setInput={setInput}
@@ -487,9 +513,14 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        {participants.map((participant) => (
-                            <div 
-                                key={participant.id} 
+                        {participants.map((participant) => {
+                            const isCurrentUser = participant.userId === user?.id;
+                            const isStudent = participant.role === 'student';
+                            const isMuted = studentMuteStates[participant.userId] !== undefined ? studentMuteStates[participant.userId] : true;
+                            const canProfToggle = isProfessor && isStudent;
+                            return (
+                                <div
+                                    key={participant.userId}
                                 className="relative group cursor-pointer"
                                 title={participant.name}
                             >
@@ -507,35 +538,74 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                             <span>{participant.name ? participant.name.charAt(0).toUpperCase() : 'م'}</span>
                                         )}
                                     </div>
-                                    
                                     {/* Online Status Indicator */}
                                     <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
                                         <div className="w-2 h-2 bg-white rounded-full"></div>
                                     </div>
-                                    
                                     {/* Hover Effect */}
                                     <div className="absolute inset-0 rounded-full bg-green-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                                 </div>
-                                
-                                {/* Name */}
-                                <div className="text-center mt-2">
-                                    <p className="text-white text-sm font-medium truncate">
+                                    {/* Name + Mic Icon */}
+                                    <div className="text-center mt-2 flex items-center justify-center gap-1">
+                                        <p className="text-white text-sm font-medium truncate mb-0">
                                         {participant.name || 'مستخدم'}
                                     </p>
+                                        {isStudent && (
+                                            <span
+                                                className={`inline-flex items-center justify-center w-5 h-5 rounded-full ${canProfToggle ? 'cursor-pointer hover:scale-110 hover:opacity-80 transition-all duration-200' : 'cursor-default'} ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}
+                                                title={
+                                                    canProfToggle ? (isMuted ? 'إلغاء كتم الطالب' : 'كتم الطالب') :
+                                                        isMuted ? 'مكتوم' : 'ميكروفون نشط'
+                                                }
+                                                onClick={() => {
+                                                    console.log('[DEBUG] Mic icon clicked!', {
+                                                        isProfessor,
+                                                        isStudent,
+                                                        isMuted,
+                                                        canProfToggle,
+                                                        participantId: participant.userId,
+                                                        participantName: participant.name,
+                                                        socketId: socket?.id,
+                                                        hasSocket: !!socket,
+                                                        currentMuteState: studentMuteStates[participant.userId]
+                                                    });
+
+                                                    if (canProfToggle) {
+                                                        // Le prof peut mute/unmute l'élève
+                                                        console.log('[DEBUG] Professor toggling student mic:', !isMuted);
+                                                        if (socket) {
+                                                            const signalData = {
+                                                                studentId: participant.userId,
+                                                                studentName: participant.name,
+                                                                muted: !isMuted
+                                                            };
+                                                            console.log('[DEBUG] Sending signal:', signalData);
+                                                            socket.emit('toggle-student-mic', id, signalData);
+                                                        } else {
+                                                            console.error('[DEBUG] No socket available!');
+                                                        }
+                                                    } else {
+                                                        console.log('[DEBUG] Cannot toggle - not a professor or not a student');
+                                                    }
+                                                }}
+                                            >
+                                                {isMuted ? <MicOff className="w-3 h-3 text-white" /> : <Mic className="w-3 h-3 text-white" />}
+                                            </span>
+                                        )}
+                                    </div>
                                     {participant.role && (
                                         <p className="text-gray-400 text-xs">
                                             {participant.role === 'professor' ? 'أستاذ' : 'طالب'}
                                         </p>
                                     )}
-                                </div>
-                                
                                 {/* Hover Tooltip */}
                                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-black/80 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
                                     {participant.name || 'مستخدم'}
                                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black/80"></div>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
                 
