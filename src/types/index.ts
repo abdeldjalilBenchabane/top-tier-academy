@@ -5,6 +5,9 @@ export type User = {
   name: string;
   email: string;
   role: 'admin' | 'professor' | 'student';
+  pointsBalance?: number;
+  agoraUid?: string;
+  agoraRtmToken?: string;
 };
 
 export type Level = {
@@ -218,4 +221,40 @@ export type SlideAnalytics = {
 export type BulkOperation = {
   action: 'activate' | 'deactivate' | 'delete' | 'duplicate';
   slideIds: string[];
+};
+
+// Points System Types
+export type PointPackage = {
+  id: string;
+  name: string;
+  points: number;
+  price: number;
+  currency: string;
+  isActive: boolean;
+};
+
+export type PointTransaction = {
+  id: string;
+  userId: string;
+  packageId?: string;
+  transactionType: 'purchase' | 'spend' | 'refund' | 'bonus';
+  points: number;
+  amount?: number;
+  currency: string;
+  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  paymentReference?: string;
+  metadata?: any;
+  createdAt: string;
+};
+
+export type PurchaseRequest = {
+  packageId: string;
+  amount: number;
+  currency: string;
+  successUrl: string;
+  metadata: {
+    userName: string;
+    userEmail: string;
+    pointId: string;
+  };
 };

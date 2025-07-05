@@ -140,6 +140,46 @@ export const coursesAPI = {
   getMaterials: () => apiRequest('/courses/materials/list'),
 };
 
+// Points API calls
+export const pointsAPI = {
+  // Get user points balance
+  getBalance: () => apiRequest('/points/balance'),
+  
+  // Update user points balance
+  updateBalance: (points) => apiRequest('/points/balance', {
+    method: 'PUT',
+    body: JSON.stringify({ points }),
+  }),
+  
+  // Get available point packages
+  getPackages: () => apiRequest('/points/packages'),
+  
+  // Get user transaction history
+  getTransactions: (page = 1, limit = 10) => 
+    apiRequest(`/points/transactions?page=${page}&limit=${limit}`),
+  
+  // Create purchase transaction
+  createPurchase: (purchaseData) => apiRequest('/points/purchase', {
+    method: 'POST',
+    body: JSON.stringify(purchaseData),
+  }),
+  
+  // Get transaction by ID
+  getTransaction: (id) => apiRequest(`/points/transaction/${id}`),
+};
+
+// Payments API calls
+export const paymentsAPI = {
+  // Create Chargily checkout
+  createCheckout: (checkoutData) => apiRequest('/payments/create-checkout', {
+    method: 'POST',
+    body: JSON.stringify(checkoutData),
+  }),
+  
+  // Get transaction status
+  getTransactionStatus: (id) => apiRequest(`/payments/transaction/${id}`),
+};
+
 // Slides API calls
 export const slidesAPI = {
   // Get all slides (admin only)

@@ -3,6 +3,7 @@ import { Calendar, Clock, Users, Play, Lock, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
+import { api } from '@/lib/api';
 
 interface LiveCardProps {
   id: string;
@@ -38,16 +39,32 @@ const LiveCard: React.FC<LiveCardProps> = ({
 
   const handlePayment = async () => {
     setIsProcessingPayment(true);
-    // Simulate payment process
-    setTimeout(() => {
+    try {
+      await api.purchaseLiveSession(id, price);
       setIsProcessingPayment(false);
       alert('تم الدفع بنجاح! يمكنك الآن الوصول إلى البث المباشر.');
       navigate(`/streaming/${id}`);
-    }, 2000);
+    } catch (err: any) {
+      setIsProcessingPayment(false);
+      
+      // Handle specific error cases
+      if (err.message && err.message.includes('409')) {
+        // User has already purchased this session
+        alert('لقد قمت بشراء هذه الجلسة مسبقاً. يمكنك الآن الوصول إلى البث المباشر.');
+        navigate(`/streaming/${id}`);
+      } else if (err.message && err.message.includes('400')) {
+        alert('خطأ في مبلغ الدفع. يرجى التحقق من المبلغ والمحاولة مرة أخرى.');
+      } else if (err.message && err.message.includes('404')) {
+        alert('الجلسة غير موجودة أو تم حذفها.');
+      } else {
+        alert('حدث خطأ أثناء الدفع. يرجى المحاولة مرة أخرى.');
+      }
+    }
   };
 
   const handleAccessLive = () => {
-    if (status === 'live' && isPaid) {
+    if (isPaid) {
+      // Allow access anytime after purchase
       navigate(`/streaming/${id}`);
     } else if (status === 'upcoming') {
       alert('البث لم يبدأ بعد. سيتم إشعارك عند بدء البث.');
@@ -91,21 +108,12 @@ const LiveCard: React.FC<LiveCardProps> = ({
     }
 
     if (isPaid) {
-      if (status === 'live') {
         return (
           <Button onClick={handleAccessLive} className="w-full bg-cyan-500 hover:bg-cyan-600">
             <Play className="w-4 h-4 ml-2" />
             دخول البث المباشر
           </Button>
         );
-      } else {
-        return (
-          <Button disabled className="w-full bg-cyan-500">
-            <CheckCircle className="w-4 h-4 ml-2" />
-            تم الدفع - في انتظار البث
-          </Button>
-        );
-      }
     }
 
     return (

@@ -3,6 +3,7 @@ import { query, getRow } from '../db.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { verifyToken } from '../middleware/auth.js';
+import AgoraToken from 'agora-access-token';
 
 const router = express.Router();
 
@@ -16,6 +17,26 @@ const generateToken = (user) => {
     },
     process.env.JWT_SECRET || '***REMOVED***',
     { expiresIn: '7d' }
+  );
+};
+
+// Helper to generate Agora RTM token
+const generateAgoraRtmToken = (uid) => {
+  const appID = process.env.AGORA_APP_ID;
+  const appCertificate = process.env.AGORA_APP_CERTIFICATE;
+  if (!appID || !appCertificate) return null;
+  const expireTime = 3600; // 1 hour
+  const currentTime = Math.floor(Date.now() / 1000);
+  const privilegeExpiredTs = currentTime + expireTime;
+  // Sanitize UID for Agora
+  const safeUid = String(uid).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+  if (!safeUid) return null;
+  return AgoraToken.RtmTokenBuilder.buildToken(
+    appID,
+    appCertificate,
+    safeUid,
+    AgoraToken.RtmRole.Rtm_User,
+    privilegeExpiredTs
   );
 };
 
@@ -50,11 +71,18 @@ router.post('/login', async (req, res) => {
 
     // Remove password from response
     const { password_hash, ...userWithoutPassword } = user;
+    // Ensure id is a string
+    userWithoutPassword.id = String(userWithoutPassword.id);
+    // Sanitize for Agora
+    const agoraUid = String(userWithoutPassword.id).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+    const agoraRtmToken = generateAgoraRtmToken(agoraUid);
 
     res.json({
       message: 'Login successful',
       user: userWithoutPassword,
-      token
+      token,
+      agoraUid,
+      agoraRtmToken
     });
 
   } catch (error) {
@@ -109,6 +137,11 @@ router.post('/register', async (req, res) => {
     console.log('User inserted into database:', result.rows[0]);
 
     const newUser = result.rows[0];
+    // Ensure id is a string
+    newUser.id = String(newUser.id);
+    // Sanitize for Agora
+    const agoraUid = String(newUser.id).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+    const agoraRtmToken = generateAgoraRtmToken(agoraUid);
 
     // Generate JWT token
     const token = generateToken(newUser);
@@ -117,7 +150,9 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       message: 'Registration successful',
       user: newUser,
-      token
+      token,
+      agoraUid,
+      agoraRtmToken
     });
 
   } catch (error) {
@@ -138,7 +173,13 @@ router.get('/me', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ user });
+    // Ensure id is a string
+    user.id = String(user.id);
+    // Sanitize for Agora
+    const agoraUid = String(user.id).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+    const agoraRtmToken = generateAgoraRtmToken(agoraUid);
+
+    res.json({ user, agoraUid, agoraRtmToken });
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ error: 'Internal server error' });

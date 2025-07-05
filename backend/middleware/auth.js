@@ -47,4 +47,6 @@ export const requireRole = (roles) => (req, res, next) => {
     return res.status(403).json({ error: 'Forbidden: insufficient role' });
   }
   next();
-}; 
+};
+
+export default verifyToken; 

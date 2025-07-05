@@ -31,18 +31,18 @@ const TTHLiveClasses = () => {
                 else status = 'upcoming';
               }
               return {
-                id: session.id,
-                title: session.title,
-                presenter: session.professor_name || session.professorId || 'أستاذ مباشر',
+                id: session.id?.toString() || '',
+                title: session.title || '',
+                presenter: session.professor_name || session.professor_id?.toString() || 'أستاذ مباشر',
                 date: session.start_time ? new Date(session.start_time).toLocaleDateString('fr-FR') : '',
                 time: session.start_time ? new Date(session.start_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '',
-                price: session.price,
-                currency: session.currency || 'DA',
-                expectedViewers: session.expected_viewers || 0,
-                thumbnail: session.thumbnail || '',
+                price: session.price !== undefined && session.price !== null ? session.price : 0,
+                currency: session.currency ? session.currency : 'DA',
+                expectedViewers: session.expected_viewers ? session.expected_viewers : 0,
+                thumbnail: session.thumbnail ? session.thumbnail : '',
                 status,
-                isPaid: session.is_paid || false,
-                description: session.description || '',
+                isPaid: session.is_paid ? session.is_paid : false,
+                description: session.description ? session.description : '',
               };
             })
         );

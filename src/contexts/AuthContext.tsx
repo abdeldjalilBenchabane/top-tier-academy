@@ -33,7 +33,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (token) {
       authAPI.getCurrentUser()
         .then((response) => {
-          setUser(response.user);
+          // Attach agoraUid/agoraRtmToken to user object
+          setUser({ ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken });
+          console.log('[DEBUG] AuthContext setUser (getCurrentUser):', { ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken });
         })
         .catch((error) => {
           console.error('Token validation failed:', error);
@@ -52,9 +54,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     try {
       const response = await authAPI.login(email, password);
-      setUser(response.user);
+      setUser({ ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken });
+      console.log('[DEBUG] AuthContext setUser (login):', { ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken });
       setIsLoading(false);
-      return response.user;
+      return { ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken };
     } catch (error) {
       setIsLoading(false);
       throw error;
@@ -66,9 +69,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     try {
       const response = await authAPI.register(userData);
-      setUser(response.user);
+      setUser({ ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken });
       setIsLoading(false);
-      return response.user;
+      return { ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken };
     } catch (error) {
       console.error('AuthContext: Registration error:', error);
       setIsLoading(false);

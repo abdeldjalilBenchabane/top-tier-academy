@@ -7,6 +7,8 @@ import courseRoutes from './routes/courses.js';
 import authRoutes from './routes/auth.js';
 import liveSessionRoutes from './routes/live-sessions.js';
 import slidesRoutes from './routes/slides.js';
+import pointsRoutes from './routes/points.js';
+import paymentsRoutes from './routes/payments.js';
 import AgoraToken from 'agora-access-token';
 import hierarchyRoutes from './routes/hierarchy.routes.js';
 import path from 'path';
@@ -62,6 +64,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/slides', slidesRoutes);
+app.use('/api/points', pointsRoutes);
+app.use('/api/payments', paymentsRoutes);
 app.use('/api', liveSessionRoutes);
 app.use('/api', hierarchyRoutes);
 

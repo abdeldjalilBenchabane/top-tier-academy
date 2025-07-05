@@ -1,6 +1,9 @@
 import { User, Level, Year, Speciality, Material, Course, PendingCourse, ContentBlock, HomeSlide, LiveSession, Quiz, QuizQuestion, PendingQuiz, QuizAttempt, QuizAnswer, QuizResults } from '@/types';
 import { getAuthToken } from '@/services/api';
 
+// Configurable API base URL
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin + '/api' : '/api');
+
 // Mock data (replace with actual API calls later)
 let mockData = {
   users: [
@@ -396,6 +399,7 @@ export const api = {
     return await res.json();
   },
   createLiveSession: async (session: Omit<LiveSession, 'id'>): Promise<LiveSession> => {
+    console.log('[DEBUG] API createLiveSession called with:', session);
     const res = await fetch(`/api/professors/${session.professorId}/live-sessions`, {
       method: 'POST',
       headers: {
@@ -405,8 +409,16 @@ export const api = {
       body: JSON.stringify(session),
       credentials: 'include'
     });
-    if (!res.ok) throw new Error('Failed to create live session');
-    return await res.json();
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('[DEBUG] API Error Response:', res.status, errorText);
+      throw new Error(`Failed to create live session: ${res.status} ${errorText}`);
+    }
+
+    const result = await res.json();
+    console.log('[DEBUG] API createLiveSession success:', result);
+    return result;
   },
   updateLiveSession: async (sessionId: string, updates: Partial<LiveSession>): Promise<LiveSession> => {
     const token = localStorage.getItem('token');
@@ -846,6 +858,47 @@ export const api = {
       credentials: 'include'
     });
     if (!res.ok) throw new Error('Failed to fetch live session');
+    return await res.json();
+  },
+
+  purchaseLiveSession: async (sessionId: string, amountPaid: number) => {
+    const res = await fetch(`/api/live-sessions/${sessionId}/purchase`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      body: JSON.stringify({ amount_paid: amountPaid }),
+      credentials: 'include'
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      const errorMessage = errorData.error || `HTTP ${res.status}: ${res.statusText}`;
+      const error = new Error(errorMessage);
+      (error as any).status = res.status;
+      throw error;
+    }
+
+    return await res.json();
+  },
+
+  checkLiveSessionAccess: async (sessionId: string, studentId: string) => {
+    const res = await fetch(`/api/live-sessions/${sessionId}/access?student_id=${studentId}`, {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      const errorMessage = errorData.error || `HTTP ${res.status}: ${res.statusText}`;
+      const error = new Error(errorMessage);
+      (error as any).status = res.status;
+      throw error;
+    }
+
     return await res.json();
   },
 };

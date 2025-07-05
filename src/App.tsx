@@ -21,6 +21,9 @@ import TTHSession from './Pages/TTHSession';
 import TTHPrivateClasses from './Pages/TTHPrivateClasses';
 import TTHTeacherProfile from './Pages/TTHTeacherProfile';
 import TTHDashboardStudent from './Pages/TTHDashboaedStudent'
+import PointsPurchase from './Pages/PointsPurchase';
+import PointsSuccess from './Pages/PointsSuccess';
+import PointsFailure from './Pages/PointsFailure';
 
 // Schoolhouse Layouts & Pages
 import AppLayout from './components/layouts/AppLayout';
@@ -83,8 +86,11 @@ const App: React.FC = () => {
               <Route path="/TTHSession" element={<TTHSession />} />
               <Route path="/TTHPrivateClasses" element={<TTHPrivateClasses />} />
               <Route path="/TTHTeacherProfile" element={<TTHTeacherProfile />} />
-              <Route path="/coursesList/courses/:id" element={<TTHCourseDetail />} />
-              <Route path="/TTHDashboardStudent" element={<TTHDashboardStudent />} />
+                              <Route path="/coursesList/courses/:id" element={<TTHCourseDetail />} />
+                <Route path="/TTHDashboardStudent" element={<TTHDashboardStudent />} />
+                <Route path="/points" element={<PointsPurchase />} />
+                <Route path="/points/success" element={<PointsSuccess />} />
+                <Route path="/points/failure" element={<PointsFailure />} />
 
 
               {/* Schoolhouse public */}

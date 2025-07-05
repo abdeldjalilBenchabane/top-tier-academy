@@ -20,6 +20,7 @@ interface LiveSessionsProps {
 
 const LiveSessions = ({ professorId }: LiveSessionsProps) => {
   const { user } = useAuth();
+  console.log('[DEBUG] user:', user);
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<LiveSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,11 +42,13 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
   });
 
   useEffect(() => {
+    if (!professorId) return;
     fetchSessions();
     fetchNotifications();
   }, [professorId]);
 
   const fetchSessions = async () => {
+    if (!professorId) return;
     try {
       const data = await api.getLiveSessions(professorId);
       setSessions(data);
@@ -70,19 +73,26 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!professorId) {
+      toast.error('Professor ID is missing. Please log in again.');
+      return;
+    }
+    // Validate required fields
+    if (!formData.title || !formData.scheduledAt || !formData.duration || formData.price === undefined || formData.price === null || formData.price === "") {
+      toast.error('Please fill in all required fields: title, scheduled date, duration, and price.');
+      return;
+    }
 
     try {
-      const now = new Date().toISOString();
+      // Only send the required fields to the backend
       const payload = {
-        ...formData,
+        title: formData.title,
         start_time: formData.scheduledAt,
-        professorId,
-        status: 'scheduled',
-        createdAt: now,
-        updatedAt: now,
+        duration: formData.duration,
+        price: formData.price,
       };
-      delete payload.scheduledAt;
-      await api.createLiveSession(payload);
+      console.log('[DEBUG] Creating live session with payload:', payload);
+      await api.createLiveSession({ ...payload, professorId });
       toast.success('Live session scheduled successfully');
       await fetchSessions();
       resetForm();
