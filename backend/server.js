@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import pool from './db.js';
 import userRoutes from './routes/users.js';
 import courseRoutes from './routes/courses.js';
@@ -20,6 +22,13 @@ const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 dotenv.config();
 
 const app = express();
+const server = createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 const PORT = process.env.PORT || 5001;
 
 // Get current directory
@@ -68,6 +77,67 @@ app.use('/api/payments', paymentsRoutes);
 app.use('/api', liveSessionRoutes);
 app.use('/api', hierarchyRoutes);
 
+// Socket.IO chat functionality
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  // Join a chat room (live session)
+  socket.on('join-room', (roomId, userData) => {
+    socket.join(roomId);
+    console.log(`User ${userData.name} joined room ${roomId}`);
+    
+    // Store user data in socket for later use
+    socket.userData = userData;
+    socket.roomId = roomId;
+    
+    // Notify others in the room
+    socket.to(roomId).emit('user-joined', {
+      id: socket.id,
+      name: userData.name,
+      role: userData.role,
+      avatar_url: userData.avatar_url
+    });
+  });
+
+  // Handle chat messages
+  socket.on('send-message', (roomId, messageData) => {
+    console.log('Message received in room', roomId, ':', messageData);
+    
+    // Broadcast message to all users in the room
+    io.to(roomId).emit('new-message', {
+      id: socket.id,
+      sender: messageData.sender,
+      text: messageData.text,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  // Handle professor controls
+  socket.on('mute-all', (roomId) => {
+    socket.to(roomId).emit('students-muted');
+  });
+
+  socket.on('unmute-all', (roomId) => {
+    socket.to(roomId).emit('students-unmuted');
+  });
+
+  socket.on('toggle-chat', (roomId, enabled) => {
+    io.to(roomId).emit('chat-toggled', enabled);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+    
+    // Notify all rooms this user was in
+    if (socket.roomId) {
+      socket.to(socket.roomId).emit('user-left', {
+        id: socket.id,
+        name: socket.userData?.name || 'مستخدم'
+      });
+    }
+  });
+});
+
 // Vérification de la DB au démarrage
 pool.query('SELECT NOW()', (err, result) => {
   if (err) {
@@ -77,7 +147,7 @@ pool.query('SELECT NOW()', (err, result) => {
   }
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`DB → ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
 });

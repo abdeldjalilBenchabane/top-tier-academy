@@ -5,19 +5,18 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import AgoraVideoPlayer from '@/components/AgoraVideoPlayer';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { RTMClient } from 'agora-rtm-sdk';
+import { io, Socket } from 'socket.io-client';
 import { api } from '@/lib/api';
 import ChatSidebar from './ChatSidebar';
 
 // Placeholder for future Agora integration
 // import AgoraRTC from 'agora-rtc-sdk-ng';
 
-// TODO: Remplace par import { AGORA_APP_ID } from '@/config';
-
-const AGORA_APP_ID = 'e8a09e60ab1548d4b0f18a0cd440f8b7';
+// Environment variables for Agora
+const AGORA_APP_ID = import.meta.env.VITE_AGORA_APP_ID || 'e8a09e60ab1548d4b0f18a0cd440f8b7';
+const AGORA_APP_CERTIFICATE = import.meta.env.VITE_AGORA_APP_CERTIFICATE;
 
 const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navigate: any }) => {
-
 
     const [session, setSession] = useState<any>(null);
     const [loadingSession, setLoadingSession] = useState(true);
@@ -26,9 +25,6 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     const [input, setInput] = useState('');
     const chatEndRef = useRef(null);
     const [studentsMuted, setStudentsMuted] = useState(true);
-    const [rtmClient, setRtmClient] = useState<any>(null);
-    const [rtmChannel, setRtmChannel] = useState<any>(null);
-    const [rtmError, setRtmError] = useState<string | null>(null);
     const [agoraToken, setAgoraToken] = useState<string | null>(null);
     const [agoraError, setAgoraError] = useState<string | null>(null);
     const [agoraUid, setAgoraUid] = useState<number | null>(null);
@@ -39,6 +35,9 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     const [isPaused, setIsPaused] = useState(false);
     const [accessChecked, setAccessChecked] = useState(false);
     const [canAccess, setCanAccess] = useState(true);
+    
+    // Socket.IO for chat
+    const [socket, setSocket] = useState<Socket | null>(null);
 
     // Generate a stable UID that doesn't change on re-renders
     const stableUid = useMemo(() => {
@@ -48,8 +47,6 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         const numericUid = (userBase + sessionBase + randomPart) % 10000;
         return numericUid;
     }, [user.id, id]);
-
-
 
     useEffect(() => {
         const fetchSession = async () => {
@@ -89,7 +86,6 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
             console.log('[DEBUG] Frontend requesting token with null UID (Agora will assign)');
             console.log('[DEBUG] Request URL:', `/api/rtcToken?channel=${id}&uid=${stableUid}`);
 
-
             try {
                 const res = await fetch(`/api/rtcToken?channel=${id}&uid=${stableUid}`,
                     {
@@ -118,7 +114,6 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         fetchToken();
     }, [id, user?.id, stableUid, agoraToken]); // Removed agoraToken from dependencies
 
-
     useEffect(() => {
         console.log('[DEBUG] user at mount:', user);
         if (user) {
@@ -126,124 +121,114 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         }
     }, [user]);
 
+    // Initialize Socket.IO for chat
     useEffect(() => {
-        // Defensive check for user.id
-        if (!user?.id || typeof user.id !== 'string' || user.id.trim() === '' || user.id === 'undefined') {
-            console.error('[DEBUG] RTM: user.id is missing or invalid:', user?.id, typeof user?.id);
-            setRtmError('Cannot join live: Invalid user ID. Please log out and log in again.');
-            return;
-        }
-        if (!id || !agoraToken) return;
-        if (!user.agoraRtmToken) {
-            setRtmError('Cannot join live: Missing Agora RTM token. Please refresh or re-login.');
-            console.error('RTM: Missing user.agoraRtmToken:', user.agoraRtmToken);
-            return;
-        }
-        let client: any = null;
-        let mounted = true;
+        if (!user?.id || !id) return;
 
-        const initRTM = async () => {
-            let safeUid = user.agoraUid || (user.id ? String(user.id).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) : undefined);
-            if (!safeUid) {
-                safeUid = Math.random().toString(36).substring(2, 10);
-                console.warn('Invalid user.id for Agora RTM, using fallback UID:', safeUid);
-            }
-            console.log('[DEBUG] Agora RTM safeUid:', safeUid, 'user.id:', user.id, typeof user.id);
-            if (!safeUid) {
-                setRtmError('Cannot join live: Invalid user ID after sanitization.');
-                console.error('UID Agora RTM vide ou invalide, RTM non initialisé');
-                return;
-            }
-            try {
-                // Création du client RTM v2
-                client = new RTMClient(AGORA_APP_ID, safeUid);
-                await client.login({ token: user.agoraRtmToken });
-                await client.join({ channelId: id });
-                if (mounted) {
-                    setRtmClient(client);
-                    setRtmChannel(id); // On stocke juste l'id du channel
-                }
-                // Récupérer les membres du channel
-                const members = await client.getChannelMembers({ channelId: id });
-                setViewerCount(members.length);
-                setParticipants(members.map((m: any) => ({ id: m })));
-                // Ecoute des messages
-                client.on('channelMessage', (evt: any) => {
-                    // evt.channelId, evt.message, evt.senderId
-                    let parsed = null;
-                    try {
-                        parsed = JSON.parse(evt.message.text);
-                    } catch (e) {
-                        setMessages((prev) => [
-                            ...prev,
-                            {
-                                sender: evt.senderId === safeUid ? (user.name || 'Vous') : evt.senderId,
-                                color: evt.senderId === safeUid ? 'text-green-300' : 'text-blue-300',
-                                text: evt.message.text || ''
-                            }
-                        ]);
-                        return;
-                    }
-                    if (!parsed || typeof parsed !== 'object') return;
-                    if (parsed.type === 'MUTE_ALL') setStudentsMuted(true);
-                    else if (parsed.type === 'UNMUTE_ALL') setStudentsMuted(false);
-                    else if (parsed.type === 'CHAT_ENABLED') setChatEnabled(!!parsed.value);
-                    else if (parsed.type === 'CHAT' && typeof parsed.text === 'string') {
-                        setMessages((prev) => [
-                            ...prev,
-                            {
-                                sender: typeof parsed.sender === 'string' ? parsed.sender : (evt.senderId === safeUid ? (user.name || 'Vous') : evt.senderId),
-                                color: evt.senderId === safeUid ? 'text-green-300' : 'text-blue-300',
-                                text: parsed.text
-                            }
-                        ]);
-                    } else if (parsed.type === 'JOIN' && parsed.id && parsed.name) {
-                        setParticipants((prev) => {
-                            const exists = prev.find((p) => p.id === parsed.id);
-                            if (exists && exists.name === parsed.name) return prev;
-                            if (exists) {
-                                return prev.map((p) => p.id === parsed.id ? { ...p, name: parsed.name } : p);
-                            }
-                            return [...prev, { id: parsed.id, name: parsed.name }];
-                        });
-                    }
-                });
+        console.log('[DEBUG] Initializing Socket.IO for chat');
+        
+        const newSocket = io('http://localhost:5001');
+        setSocket(newSocket);
 
-                // Ecoute des membres
-                client.on('memberJoined', async (evt: any) => {
-                    const members = await client.getChannelMembers({ channelId: id });
-                    setViewerCount(members.length);
-                    setParticipants((prev) => {
-                        if (prev.find((p) => p.id === evt.userId)) return prev;
-                        return [...prev, { id: evt.userId }];
-                    });
-                });
-                client.on('memberLeft', async (evt: any) => {
-                    const members = await client.getChannelMembers({ channelId: id });
-                    setViewerCount(members.length);
-                    setParticipants((prev) => prev.filter((p) => p.id !== evt.userId));
-                });
-            } catch (err) {
-                setRtmError('RTM: Agora RTM login/join error: ' + (err && err.message ? err.message : err));
-                console.error('RTM: Agora RTM login/join error:', err);
-            }
-        };
-        initRTM();
+        // Connection event handlers
+        newSocket.on('connect', () => {
+            console.log('[DEBUG] Socket.IO connected successfully');
+            
+            // Add current user to participants list
+            setParticipants(prev => {
+                const currentUser = {
+                    id: newSocket.id,
+                    name: user.name || 'مستخدم',
+                    role: user.role,
+                    avatar_url: user.avatar_url
+                };
+                
+                // Check if user already exists
+                if (prev.find(p => p.id === currentUser.id)) return prev;
+                return [...prev, currentUser];
+            });
+        });
+
+        newSocket.on('connect_error', (error) => {
+            console.error('[DEBUG] Socket.IO connection error:', error);
+        });
+
+        newSocket.on('disconnect', (reason) => {
+            console.log('[DEBUG] Socket.IO disconnected:', reason);
+        });
+
+        // Join the chat room
+        newSocket.emit('join-room', id, {
+            name: user.name || 'مستخدم',
+            role: user.role,
+            id: user.id,
+            avatar_url: user.avatar_url
+        });
+
+        // Listen for new messages
+        newSocket.on('new-message', (messageData) => {
+            console.log('[DEBUG] Socket.IO message received:', messageData);
+            setMessages(prev => [...prev, {
+                sender: messageData.sender,
+                color: messageData.id === newSocket.id ? 'text-green-300' : 'text-blue-300',
+                text: messageData.text
+            }]);
+        });
+
+        // Listen for user joined
+        newSocket.on('user-joined', (userData) => {
+            console.log('[DEBUG] User joined via Socket.IO:', userData);
+            setParticipants(prev => {
+                if (prev.find(p => p.id === userData.id)) return prev;
+                return [...prev, { id: userData.id, name: userData.name, role: userData.role, avatar_url: userData.avatar_url }];
+            });
+            setViewerCount(prev => prev + 1);
+        });
+
+        // Listen for user left
+        newSocket.on('user-left', (userData) => {
+            console.log('[DEBUG] User left via Socket.IO:', userData);
+            setParticipants(prev => prev.filter(p => p.id !== userData.id));
+            setViewerCount(prev => Math.max(0, prev - 1));
+        });
+
+        // Listen for professor controls
+        newSocket.on('students-muted', () => {
+            console.log('[DEBUG] Students muted by professor');
+            setStudentsMuted(true);
+        });
+
+        newSocket.on('students-unmuted', () => {
+            console.log('[DEBUG] Students unmuted by professor');
+            setStudentsMuted(false);
+        });
+
+        newSocket.on('chat-toggled', (enabled) => {
+            console.log('[DEBUG] Chat toggled by professor:', enabled);
+            setChatEnabled(enabled);
+        });
 
         return () => {
-            mounted = false;
-            if (client) client.logout();
+            console.log('[DEBUG] Cleaning up Socket.IO connection');
+            newSocket.disconnect();
         };
-    }, [user?.id, id, user.agoraRtmToken]);
+    }, [user?.id, id]);
+
     useEffect(() => {
         console.log('[DEBUG] Re-render, messages.length:', messages.length);
         console.log('[DEBUG] Messages:', messages);
     }, [messages]);
 
-
-    // Envoi message RTM
+    // Send message function (Socket.IO only)
     const handleSend = () => {
-        if (!input.trim() || !rtmClient || !rtmChannel) return;
+        if (!input.trim() || !socket) {
+            console.log('[DEBUG] Cannot send message:', { 
+                hasInput: !!input.trim(), 
+                hasSocket: !!socket,
+                input: input 
+            });
+            return;
+        }
 
         const message = {
             type: 'CHAT',
@@ -251,68 +236,46 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
             sender: user?.name || 'مستخدم'
         };
 
-        console.log('[DEBUG] Adding message to state:', {
+        console.log('[DEBUG] Sending message via Socket.IO:', {
+            sender: message.sender,
+            text: message.text,
+            roomId: id,
+            socketId: socket.id
+        });
+
+        // Send via Socket.IO
+        socket.emit('send-message', id, {
             sender: message.sender,
             text: message.text
         });
 
-        setMessages(prev => {
-            const updated = [...prev, {
-                sender: message.sender,
-                color: 'text-green-300',
-                text: message.text
-            }];
-            console.log('[DEBUG] Messages after local update:', updated);
-            return updated;
-        });
-
-        // 👇 Force React à se réveiller (déclenche un render léger)
-        setInput(prev => prev + ' ');
-
-
-
-        rtmClient.sendMessageToChannel({
-            channelId: rtmChannel,
-            message: { text: JSON.stringify(message) }
-        });
-
-
-        if (user?.name) {
-            rtmClient.sendMessageToChannel({
-                channelId: rtmChannel,
-                message: {
-                    text: JSON.stringify({ type: 'JOIN', id: user.id, name: user.name })
-                }
-            });
-        }
-
-
         setInput('');
     };
 
-    // Professor controls
+    // Professor controls (Socket.IO only)
     const handleMuteAll = () => {
         setStudentsMuted(true);
-        if (rtmClient && rtmChannel) {
-            rtmClient.sendMessageToChannel({ channelId: rtmChannel, message: { text: JSON.stringify({ type: 'MUTE_ALL' }) } });
+        if (socket) {
+            socket.emit('mute-all', id);
         }
     };
+    
     const handleUnmuteAll = () => {
         setStudentsMuted(false);
-        if (rtmClient && rtmChannel) {
-            rtmClient.sendMessageToChannel({ channelId: rtmChannel, message: { text: JSON.stringify({ type: 'UNMUTE_ALL' }) } });
+        if (socket) {
+            socket.emit('unmute-all', id);
         }
     };
+    
     const handleToggleChat = () => {
         setChatEnabled((v) => {
             const newValue = !v;
-            if (rtmClient && rtmChannel) {
-                rtmClient.sendMessageToChannel({ channelId: rtmChannel, message: { text: JSON.stringify({ type: 'CHAT_ENABLED', value: newValue }) } });
+            if (socket) {
+                socket.emit('toggle-chat', id, newValue);
             }
             return newValue;
         });
     };
-
 
     useEffect(() => {
         const checkAccess = async () => {
@@ -361,12 +324,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     const handlePause = () => setIsPaused((v) => !v);
 
     // Debug panel for development
-    const debugPanel = process.env.NODE_ENV === 'development' ? (
-        <div style={{ background: '#222', color: '#fff', padding: 10, margin: 10 }}>
-            <div>Logged in user: {JSON.stringify(user)}</div>
-            <div>Token: {localStorage.getItem('token')}</div>
-        </div>
-    ) : null;
+    const debugPanel = null; // Removed debug panel to hide sensitive information
 
     if (loadingSession) {
         return <div className="py-8 text-center text-white">Chargement de la session...</div>;
@@ -384,42 +342,48 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     console.log('[DEBUG] Re-render, messages.length:', messages.length);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-blue-800 text-white" dir="rtl">
-
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white">
+            {debugPanel}
             
             {/* Header */}
-            <div className="bg-black/20 backdrop-blur-sm border-b border-white/10 p-4">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Button
-                        variant="ghost"
-                        onClick={() => navigate('/')}
-                        className="text-white hover:bg-white/10 flex items-center gap-2"
-                    >
-                        <ArrowLeft className="w-5 h-5" />
-                        العودة إلى الرئيسية
-                    </Button>
+            <div className="bg-black/20 backdrop-blur-sm border-b border-white/10">
+                <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 bg-red-500 px-3 py-1 rounded-full text-sm font-semibold animate-pulse">
-                            <div className="w-2 h-2 bg-white rounded-full"></div>
-                            مباشر
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(-1)}
+                            className="text-white hover:bg-white/10"
+                        >
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            العودة
+                        </Button>
+                        <div>
+                            <h1 className="text-lg font-semibold">{session.title}</h1>
+                            <p className="text-sm text-gray-300">مشاهدون: {viewerCount}</p>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-300">
-                            <Users className="w-4 h-4" />
-                            <span>{viewerCount.toLocaleString()} مشاهد</span>
-                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20">
+                            <Users className="w-4 h-4 mr-2" />
+                            المشاركون
+                        </Button>
+                        <Button size="sm" variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20">
+                            <Share2 className="w-4 h-4 mr-2" />
+                            مشاركة
+                        </Button>
                     </div>
                 </div>
             </div>
 
+            {/* Main Content */}
             <div className="max-w-7xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-4 gap-6">
                 {/* Video Player (Agora placeholder) */}
                 <div className="lg:col-span-3">
                     <div className="bg-black rounded-xl overflow-hidden shadow-2xl relative">
                         <div id="agora-video-container" className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 relative flex items-center justify-center">
                             {/* Zone vidéo Agora */}
-                            {rtmError && (
-                                <div className="text-red-400 text-center py-8">{rtmError}</div>
-                            )}
                             {agoraToken ? (
                                 <>
                                     <ErrorBoundary>
@@ -440,22 +404,25 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                     {agoraError && (
                                         <div className="text-red-400 text-center py-4">{agoraError}</div>
                                     )}
-
-                                    {/* Contrôles vidéo */}
-                                    <div className="absolute bottom-4 right-4 flex gap-2 z-20">
-                                        <Button size="icon" variant="secondary" onClick={handleFullScreen} title="Plein écran">
-                                            <Fullscreen className="w-5 h-5" />
-                                        </Button>
-                                        <Button size="icon" variant="secondary" onClick={handlePause} title={isPaused ? 'Reprendre' : 'Pause'}>
-                                            {isPaused ? <PlayIcon className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
-                                        </Button>
-                                    </div>
                                 </>
                             ) : (
-                                <div className="text-white/80">Chargement de la vidéo...</div>
+                                <div className="text-center py-8">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                                    <p>جاري الاتصال بالبث المباشر...</p>
+                                </div>
                             )}
 
-                            {/* Prof controls overlay */}
+                            {/* Video Controls */}
+                            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
+                                <Button size="sm" variant="secondary" className="bg-black/50 hover:bg-black/70 text-white border-0" onClick={handlePause}>
+                                    {isPaused ? <PlayIcon className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                                </Button>
+                                <Button size="sm" variant="secondary" className="bg-black/50 hover:bg-black/70 text-white border-0" onClick={handleFullScreen}>
+                                    <Fullscreen className="w-4 h-4" />
+                                </Button>
+                            </div>
+
+                            {/* Professor Controls */}
                             {isProfessor && (
                                 <div className="absolute top-4 left-4 flex gap-2 z-10">
                                     <Button size="sm" variant="secondary" className="bg-black/50 hover:bg-black/70 text-white border-0" onClick={handleMuteAll}>
@@ -473,7 +440,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                     </div>
 
                     {/* Video Info */}
-                    <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-xl p-6">
+                    <div className="mt-6">
                         <h1 className="text-2xl font-bold mb-2">{session.title}</h1>
                         <p className="text-gray-300 mb-4">مقدم من: {session.presenter}</p>
                         <p className="text-gray-400 leading-relaxed">{session.description}</p>
@@ -504,20 +471,85 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
             </div>
 
-            {/* Participants list for professor */}
-            {isProfessor && (
-                <div className="bg-white/10 rounded-xl p-4 mt-6">
-                    <h3 className="font-bold mb-2 text-white">المشاركون</h3>
-                    <ul>
-                        {participants.map((p) => (
-                            <li key={p.id} className="flex items-center justify-between mb-2">
-                                <span className="text-white">{p.name || p.id}</span>
-                            </li>
+            {/* Interactive Participants List */}
+            <div className="bg-white/10 rounded-xl p-4 mt-6">
+                <h3 className="font-bold mb-4 text-white flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    المشاركون ({participants.length})
+                </h3>
+                
+                {participants.length === 0 ? (
+                    <div className="text-center py-8">
+                        <div className="w-16 h-16 bg-white/10 rounded-full mx-auto mb-3 flex items-center justify-center">
+                            <Users className="w-8 h-8 text-gray-400" />
+                        </div>
+                        <p className="text-gray-400 text-sm">لا يوجد مشاركون بعد</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                        {participants.map((participant) => (
+                            <div 
+                                key={participant.id} 
+                                className="relative group cursor-pointer"
+                                title={participant.name}
+                            >
+                                {/* Avatar Circle */}
+                                <div className="relative w-16 h-16 mx-auto">
+                                    {/* Profile Picture or Initial */}
+                                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg border-2 border-white/20 group-hover:border-green-400 transition-all duration-200">
+                                        {participant.avatar_url ? (
+                                            <img 
+                                                src={participant.avatar_url} 
+                                                alt={participant.name}
+                                                className="w-full h-full rounded-full object-cover"
+                                            />
+                                        ) : (
+                                            <span>{participant.name ? participant.name.charAt(0).toUpperCase() : 'م'}</span>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Online Status Indicator */}
+                                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                                    </div>
+                                    
+                                    {/* Hover Effect */}
+                                    <div className="absolute inset-0 rounded-full bg-green-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                                </div>
+                                
+                                {/* Name */}
+                                <div className="text-center mt-2">
+                                    <p className="text-white text-sm font-medium truncate">
+                                        {participant.name || 'مستخدم'}
+                                    </p>
+                                    {participant.role && (
+                                        <p className="text-gray-400 text-xs">
+                                            {participant.role === 'professor' ? 'أستاذ' : 'طالب'}
+                                        </p>
+                                    )}
+                                </div>
+                                
+                                {/* Hover Tooltip */}
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-black/80 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                    {participant.name || 'مستخدم'}
+                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black/80"></div>
+                                </div>
+                            </div>
                         ))}
-                    </ul>
+                    </div>
+                )}
+                
+                {/* Participants Summary */}
+                <div className="mt-4 pt-4 border-t border-white/10">
+                    <div className="flex justify-between text-sm text-gray-300">
+                        <span>إجمالي المشاركين: {participants.length}</span>
+                        <span className="flex items-center gap-1">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            متصلون الآن
+                        </span>
+                    </div>
                 </div>
-            )}
-
+            </div>
 
         </div>
     );
