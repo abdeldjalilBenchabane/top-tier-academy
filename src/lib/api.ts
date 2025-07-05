@@ -409,13 +409,13 @@ export const api = {
       body: JSON.stringify(session),
       credentials: 'include'
     });
-    
+
     if (!res.ok) {
       const errorText = await res.text();
       console.error('[DEBUG] API Error Response:', res.status, errorText);
       throw new Error(`Failed to create live session: ${res.status} ${errorText}`);
     }
-    
+
     const result = await res.json();
     console.log('[DEBUG] API createLiveSession success:', result);
     return result;
@@ -871,7 +871,7 @@ export const api = {
       body: JSON.stringify({ amount_paid: amountPaid }),
       credentials: 'include'
     });
-    
+
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
       const errorMessage = errorData.error || `HTTP ${res.status}: ${res.statusText}`;
@@ -879,7 +879,7 @@ export const api = {
       (error as any).status = res.status;
       throw error;
     }
-    
+
     return await res.json();
   },
 
@@ -890,7 +890,7 @@ export const api = {
       },
       credentials: 'include'
     });
-    
+
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
       const errorMessage = errorData.error || `HTTP ${res.status}: ${res.statusText}`;
@@ -898,7 +898,7 @@ export const api = {
       (error as any).status = res.status;
       throw error;
     }
-    
+
     return await res.json();
   },
 };
