@@ -318,9 +318,9 @@ const UserManagement = () => {
                       <UserIcon className="h-6 w-6 text-gray-400" />
                     </div>
                   )}
-                  <div>
-                    <CardTitle className="text-lg">{user.name}</CardTitle>
-                    <CardDescription>{user.email}</CardDescription>
+                <div>
+                  <CardTitle className="text-lg">{user.name}</CardTitle>
+                  <CardDescription>{user.email}</CardDescription>
                   </div>
                 </div>
                 <Badge className={getRoleBadgeColor(user.role)}>

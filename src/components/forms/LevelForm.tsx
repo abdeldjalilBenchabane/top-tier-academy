@@ -32,7 +32,7 @@ const LevelForm = ({ onSuccess, onCancel, level, isEditing = false }: LevelFormP
         toast.success('Level updated successfully');
       } else {
         await structureAPI.createLevel({ name });
-        toast.success('Level created successfully');
+      toast.success('Level created successfully');
       }
       
       setName('');

@@ -91,8 +91,8 @@ The backend API will be available at `http://localhost:5001`
    ```
 
 ### Database Initialization (Updated Process)
-```bash
-cd backend
+   ```bash
+   cd backend
 
 # 1. First, run the slides migration script
 node migrate-slides.js

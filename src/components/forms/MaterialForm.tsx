@@ -86,7 +86,7 @@ const MaterialForm = ({
           price: priceValue, 
           speciality_id: specialityId 
         });
-        toast.success('Material created successfully');
+      toast.success('Material created successfully');
       }
       
       setName('');

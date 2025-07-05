@@ -456,10 +456,10 @@ const Structure = () => {
               <Globe className="mr-2 h-4 w-4" />
               Add Language
             </Button>
-            <Button onClick={() => setShowForm('level')}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Level
-            </Button>
+          <Button onClick={() => setShowForm('level')}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Level
+          </Button>
           </div>
         }
       />
@@ -495,21 +495,21 @@ const Structure = () => {
                     </AccordionTrigger>
                     <AccordionContent>
                       {levels.length > 0 ? (
-                        <Accordion 
-                          type="multiple" 
-                          value={selectedAccordion}
-                          onValueChange={setSelectedAccordion}
-                          className="w-full"
-                        >
-                          {levels.map(level => (
-                            <AccordionItem key={level.id} value={level.id}>
+                <Accordion 
+                  type="multiple" 
+                  value={selectedAccordion}
+                  onValueChange={setSelectedAccordion}
+                  className="w-full"
+                >
+                  {levels.map(level => (
+                    <AccordionItem key={level.id} value={level.id}>
                               <div className="flex items-center justify-between">
-                                <AccordionTrigger
-                                  onClick={() => handleLevelClick(level)}
+                      <AccordionTrigger
+                        onClick={() => handleLevelClick(level)}
                                   className={`flex-1 ${currentLevel?.id === level.id ? 'font-medium text-blue-600' : ''}`}
-                                >
-                                  {level.name}
-                                </AccordionTrigger>
+                      >
+                        {level.name}
+                      </AccordionTrigger>
                                 <div className="flex items-center gap-1 pr-4">
                                   <Button
                                     variant="ghost"
@@ -529,24 +529,24 @@ const Structure = () => {
                                   </Button>
                                 </div>
                               </div>
-                              <AccordionContent>
-                                <div className="pl-4 border-l border-gray-200">
-                                  {getYearsForLevel(level.id).length > 0 ? (
-                                    <Accordion 
-                                      type="multiple" 
-                                      value={selectedAccordion}
-                                      onValueChange={setSelectedAccordion}
-                                      className="w-full"
-                                    >
-                                      {getYearsForLevel(level.id).map(year => (
-                                        <AccordionItem key={year.id} value={year.id}>
+                      <AccordionContent>
+                        <div className="pl-4 border-l border-gray-200">
+                          {getYearsForLevel(level.id).length > 0 ? (
+                            <Accordion 
+                              type="multiple" 
+                              value={selectedAccordion}
+                              onValueChange={setSelectedAccordion}
+                              className="w-full"
+                            >
+                              {getYearsForLevel(level.id).map(year => (
+                                <AccordionItem key={year.id} value={year.id}>
                                           <div className="flex items-center justify-between">
-                                            <AccordionTrigger
-                                              onClick={() => handleYearClick(year)}
+                                  <AccordionTrigger
+                                    onClick={() => handleYearClick(year)}
                                               className={`flex-1 ${currentYear?.id === year.id ? 'font-medium text-blue-600' : ''}`}
-                                            >
-                                              {year.name}
-                                            </AccordionTrigger>
+                                  >
+                                    {year.name}
+                                  </AccordionTrigger>
                                             <div className="flex items-center gap-1 pr-4">
                                               <Button
                                                 variant="ghost"
@@ -566,22 +566,22 @@ const Structure = () => {
                                               </Button>
                                             </div>
                                           </div>
-                                          <AccordionContent>
-                                            <div className="pl-4 border-l border-gray-200">
-                                              {getSpecialitiesForYear(year.id).length > 0 ? (
-                                                <ul className="space-y-1">
-                                                  {getSpecialitiesForYear(year.id).map(speciality => (
-                                                    <li key={speciality.id}>
+                                  <AccordionContent>
+                                    <div className="pl-4 border-l border-gray-200">
+                                      {getSpecialitiesForYear(year.id).length > 0 ? (
+                                        <ul className="space-y-1">
+                                          {getSpecialitiesForYear(year.id).map(speciality => (
+                                            <li key={speciality.id}>
                                                       <div className="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-50">
                                                         <div
-                                                          onClick={() => handleSpecialityClick(speciality)}
+                                                onClick={() => handleSpecialityClick(speciality)}
                                                           className={`text-left text-sm flex-1 cursor-pointer ${
-                                                            currentSpeciality?.id === speciality.id
+                                                  currentSpeciality?.id === speciality.id
                                                               ? 'font-medium text-blue-600'
                                                               : ''
-                                                          }`}
-                                                        >
-                                                          {speciality.name}
+                                                }`}
+                                              >
+                                                {speciality.name}
                                                         </div>
                                                         <div className="flex items-center gap-1">
                                                           <Button
@@ -602,28 +602,28 @@ const Structure = () => {
                                                           </Button>
                                                         </div>
                                                       </div>
-                                                    </li>
-                                                  ))}
-                                                </ul>
-                                              ) : (
-                                                <p className="text-sm text-gray-500 py-1">
-                                                  No specialities defined
-                                                </p>
-                                              )}
-                                            </div>
-                                          </AccordionContent>
-                                        </AccordionItem>
-                                      ))}
-                                    </Accordion>
-                                  ) : (
-                                    <p className="text-sm text-gray-500 py-1">
-                                      No years defined
-                                    </p>
-                                  )}
-                                </div>
-                              </AccordionContent>
-                            </AccordionItem>
-                          ))}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      ) : (
+                                        <p className="text-sm text-gray-500 py-1">
+                                          No specialities defined
+                                        </p>
+                                      )}
+                                    </div>
+                                  </AccordionContent>
+                                </AccordionItem>
+                              ))}
+                            </Accordion>
+                          ) : (
+                            <p className="text-sm text-gray-500 py-1">
+                              No years defined
+                            </p>
+                          )}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
                         </Accordion>
                       ) : (
                         <p className="text-sm text-gray-500 py-1">
@@ -757,51 +757,51 @@ const Structure = () => {
               <>
                 {/* Educational Structure Details */}
                 {currentLevel && (
-                  <>
-                    <Card>
-                      <CardHeader>
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <CardTitle>{currentLevel.name}</CardTitle>
-                            <CardDescription>
-                              Level details and management
-                            </CardDescription>
-                          </div>
-                          <Button 
-                            variant="outline" 
-                            onClick={() => setShowForm('year')}
-                            size="sm"
-                          >
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Year
-                          </Button>
-                        </div>
-                      </CardHeader>
+              <>
+                <Card>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>{currentLevel.name}</CardTitle>
+                        <CardDescription>
+                          Level details and management
+                        </CardDescription>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setShowForm('year')}
+                        size="sm"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Year
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent>
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-medium">Years in {currentLevel.name}</h3>
                       
-                      <CardContent>
-                        <div className="space-y-4">
-                          <h3 className="text-sm font-medium">Years in {currentLevel.name}</h3>
-                          
-                          {getYearsForLevel(currentLevel.id).length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                              {getYearsForLevel(currentLevel.id).map(year => (
-                                <Card key={year.id} className="overflow-hidden">
-                                  <CardHeader className="p-4 pb-2">
-                                    <CardTitle className="text-base">{year.name}</CardTitle>
-                                  </CardHeader>
-                                  <CardContent className="p-4 pt-2">
-                                    <p className="text-sm text-gray-500 mb-2">
-                                      {getSpecialitiesForYear(year.id).length} specialities
-                                    </p>
-                                  </CardContent>
-                                  <CardFooter className="p-4 pt-0 flex justify-end gap-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleYearClick(year)}
-                                    >
-                                      View
-                                    </Button>
+                      {getYearsForLevel(currentLevel.id).length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {getYearsForLevel(currentLevel.id).map(year => (
+                            <Card key={year.id} className="overflow-hidden">
+                              <CardHeader className="p-4 pb-2">
+                                <CardTitle className="text-base">{year.name}</CardTitle>
+                              </CardHeader>
+                              <CardContent className="p-4 pt-2">
+                                <p className="text-sm text-gray-500 mb-2">
+                                  {getSpecialitiesForYear(year.id).length} specialities
+                                </p>
+                              </CardContent>
+                              <CardFooter className="p-4 pt-0 flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleYearClick(year)}
+                                >
+                                  View
+                                </Button>
                                     <Button
                                       variant="ghost"
                                       size="sm"
@@ -818,69 +818,69 @@ const Structure = () => {
                                     >
                                       <Trash className="h-3 w-3" />
                                     </Button>
-                                  </CardFooter>
-                                </Card>
-                              ))}
-                            </div>
-                          ) : (
-                            <EmptyState
-                              title="No Years Defined"
-                              description={`Add your first year to ${currentLevel.name}`}
-                              action={{
-                                label: "Add Year",
-                                onClick: () => setShowForm('year')
-                              }}
-                            />
-                          )}
+                              </CardFooter>
+                            </Card>
+                          ))}
                         </div>
-                      </CardContent>
-                    </Card>
+                      ) : (
+                        <EmptyState
+                          title="No Years Defined"
+                          description={`Add your first year to ${currentLevel.name}`}
+                          action={{
+                            label: "Add Year",
+                            onClick: () => setShowForm('year')
+                          }}
+                        />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {currentYear && (
+                  <Card>
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle>{currentYear.name}</CardTitle>
+                          <CardDescription>
+                            Year details and specialities
+                          </CardDescription>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setShowForm('speciality')}
+                          size="sm"
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Speciality
+                        </Button>
+                      </div>
+                    </CardHeader>
                     
-                    {currentYear && (
-                      <Card>
-                        <CardHeader>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <CardTitle>{currentYear.name}</CardTitle>
-                              <CardDescription>
-                                Year details and specialities
-                              </CardDescription>
-                            </div>
-                            <Button 
-                              variant="outline" 
-                              onClick={() => setShowForm('speciality')}
-                              size="sm"
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              Add Speciality
-                            </Button>
-                          </div>
-                        </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <h3 className="text-sm font-medium">Specialities in {currentYear.name}</h3>
                         
-                        <CardContent>
-                          <div className="space-y-4">
-                            <h3 className="text-sm font-medium">Specialities in {currentYear.name}</h3>
-                            
-                            {getSpecialitiesForYear(currentYear.id).length > 0 ? (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {getSpecialitiesForYear(currentYear.id).map(speciality => (
-                                  <Card key={speciality.id} className="overflow-hidden">
-                                    <CardHeader className="p-4 pb-2">
-                                      <CardTitle className="text-base">{speciality.name}</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="p-4 pt-2">
-                                      <p className="text-sm text-gray-500 mb-2">
-                                        {getMaterialsForSpeciality(speciality.id).length} materials
-                                      </p>
-                                    </CardContent>
-                                    <CardFooter className="p-4 pt-0 flex justify-end gap-2">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleSpecialityClick(speciality)}
-                                      >
-                                        View
-                                      </Button>
+                        {getSpecialitiesForYear(currentYear.id).length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {getSpecialitiesForYear(currentYear.id).map(speciality => (
+                              <Card key={speciality.id} className="overflow-hidden">
+                                <CardHeader className="p-4 pb-2">
+                                  <CardTitle className="text-base">{speciality.name}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4 pt-2">
+                                  <p className="text-sm text-gray-500 mb-2">
+                                    {getMaterialsForSpeciality(speciality.id).length} materials
+                                  </p>
+                                </CardContent>
+                                <CardFooter className="p-4 pt-0 flex justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleSpecialityClick(speciality)}
+                                  >
+                                    View
+                                  </Button>
                                       <Button
                                         variant="ghost"
                                         size="sm"
@@ -897,73 +897,73 @@ const Structure = () => {
                                       >
                                         <Trash className="h-3 w-3" />
                                       </Button>
-                                    </CardFooter>
-                                  </Card>
-                                ))}
-                              </div>
-                            ) : (
-                              <EmptyState
-                                title="No Specialities Defined"
-                                description={`Add your first speciality to ${currentYear.name}`}
-                                action={{
-                                  label: "Add Speciality",
-                                  onClick: () => setShowForm('speciality')
-                                }}
-                              />
-                            )}
+                                </CardFooter>
+                              </Card>
+                            ))}
                           </div>
-                        </CardContent>
-                      </Card>
-                    )}
+                        ) : (
+                          <EmptyState
+                            title="No Specialities Defined"
+                            description={`Add your first speciality to ${currentYear.name}`}
+                            action={{
+                              label: "Add Speciality",
+                              onClick: () => setShowForm('speciality')
+                            }}
+                          />
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {currentSpeciality && (
+                  <Card>
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle>{currentSpeciality.name}</CardTitle>
+                          <CardDescription>
+                            Speciality details and materials
+                          </CardDescription>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setShowForm('material')}
+                          size="sm"
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Material
+                        </Button>
+                      </div>
+                    </CardHeader>
                     
-                    {currentSpeciality && (
-                      <Card>
-                        <CardHeader>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <CardTitle>{currentSpeciality.name}</CardTitle>
-                              <CardDescription>
-                                Speciality details and materials
-                              </CardDescription>
-                            </div>
-                            <Button 
-                              variant="outline" 
-                              onClick={() => setShowForm('material')}
-                              size="sm"
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              Add Material
-                            </Button>
-                          </div>
-                        </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <h3 className="text-sm font-medium">Materials in {currentSpeciality.name}</h3>
                         
-                        <CardContent>
-                          <div className="space-y-4">
-                            <h3 className="text-sm font-medium">Materials in {currentSpeciality.name}</h3>
-                            
-                            {getMaterialsForSpeciality(currentSpeciality.id).length > 0 ? (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {getMaterialsForSpeciality(currentSpeciality.id).map(material => (
-                                  <Card key={material.id} className="overflow-hidden">
-                                    <CardHeader className="p-4 pb-2">
-                                      <CardTitle className="text-base">{material.name}</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="p-4 pt-2">
-                                      <div className="flex items-center text-sm text-gray-500">
-                                        <BookOpen className="h-4 w-4 mr-1" />
-                                        <span>0 courses</span>
-                                      </div>
-                                    </CardContent>
-                                    <CardFooter className="p-4 pt-0 flex justify-end gap-2">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                          navigate(`/admin/courses?materialId=${material.id}`);
-                                        }}
-                                      >
-                                        View Courses
-                                      </Button>
+                        {getMaterialsForSpeciality(currentSpeciality.id).length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {getMaterialsForSpeciality(currentSpeciality.id).map(material => (
+                              <Card key={material.id} className="overflow-hidden">
+                                <CardHeader className="p-4 pb-2">
+                                  <CardTitle className="text-base">{material.name}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4 pt-2">
+                                  <div className="flex items-center text-sm text-gray-500">
+                                    <BookOpen className="h-4 w-4 mr-1" />
+                                    <span>0 courses</span>
+                                  </div>
+                                </CardContent>
+                                <CardFooter className="p-4 pt-0 flex justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      navigate(`/admin/courses?materialId=${material.id}`);
+                                    }}
+                                  >
+                                    View Courses
+                                  </Button>
                                       <Button
                                         variant="ghost"
                                         size="sm"
@@ -980,17 +980,17 @@ const Structure = () => {
                                       >
                                         <Trash className="h-3 w-3" />
                                       </Button>
-                                    </CardFooter>
-                                  </Card>
-                                ))}
-                              </div>
-                            ) : (
-                              <EmptyState
-                                title="No Materials Defined"
-                                description={`Add your first material to ${currentSpeciality.name}`}
-                                action={{
-                                  label: "Add Material",
-                                  onClick: () => setShowForm('material')
+                                </CardFooter>
+                              </Card>
+                            ))}
+                          </div>
+                        ) : (
+                          <EmptyState
+                            title="No Materials Defined"
+                            description={`Add your first material to ${currentSpeciality.name}`}
+                            action={{
+                              label: "Add Material",
+                              onClick: () => setShowForm('material')
                                 }}
                               />
                             )}

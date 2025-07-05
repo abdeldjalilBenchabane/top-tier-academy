@@ -71,7 +71,7 @@ const SpecialityForm = ({
         toast.success('Speciality updated successfully');
       } else {
         await structureAPI.createSpeciality({ name, year_id: yearId });
-        toast.success('Speciality created successfully');
+      toast.success('Speciality created successfully');
       }
       
       setName('');

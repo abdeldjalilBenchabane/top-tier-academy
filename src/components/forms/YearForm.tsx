@@ -71,7 +71,7 @@ const YearForm = ({
         toast.success('Year updated successfully');
       } else {
         await structureAPI.createYear({ name, level_id: levelId });
-        toast.success('Year created successfully');
+      toast.success('Year created successfully');
       }
       
       setName('');

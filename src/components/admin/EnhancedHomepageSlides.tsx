@@ -75,7 +75,7 @@ const EnhancedHomepageSlides = () => {
 
   const handleSaveSlide = async (slideData: Partial<HomeSlide>) => {
     try {
-      if (editingSlide) {
+    if (editingSlide) {
         // Update existing slide
         const response = await slidesAPI.update(editingSlide.id, slideData);
         const transformedSlide = transformSlideData(response.slide);
@@ -89,16 +89,16 @@ const EnhancedHomepageSlides = () => {
         }
         
         toast.success('Slide updated successfully');
-      } else {
+    } else {
         // Create new slide
         const response = await slidesAPI.create(slideData);
         const transformedSlide = transformSlideData(response.slide);
         setSlides([...slides, transformedSlide]);
         toast.success('Slide created successfully');
-      }
-      
-      setEditingSlide(null);
-      setIsDialogOpen(false);
+    }
+
+    setEditingSlide(null);
+    setIsDialogOpen(false);
     } catch (error) {
       console.error('Error saving slide:', error);
       toast.error('Failed to save slide');
@@ -143,7 +143,7 @@ const EnhancedHomepageSlides = () => {
   const handleDeleteSlide = async (id: string) => {
     try {
       await slidesAPI.delete(id);
-      setSlides(slides.filter(s => s.id !== id));
+    setSlides(slides.filter(s => s.id !== id));
       toast.success('Slide deleted successfully');
     } catch (error) {
       console.error('Error deleting slide:', error);
@@ -230,13 +230,13 @@ const EnhancedHomepageSlides = () => {
             <Settings className="h-4 w-4 mr-2" />
             Reorder All
           </Button>
-          <Button onClick={() => {
-            setEditingSlide(null);
-            setIsDialogOpen(true);
-          }}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Slide
-          </Button>
+        <Button onClick={() => {
+          setEditingSlide(null);
+          setIsDialogOpen(true);
+        }}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Slide
+        </Button>
         </div>
       </div>
 
