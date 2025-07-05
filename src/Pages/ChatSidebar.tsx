@@ -44,12 +44,20 @@ const ChatSidebar: React.FC<Props> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-3 mb-4">
-                {messages.map((msg, idx) => (
-                    <div key={idx} className="bg-white/5 rounded-lg p-3">
-                        <div className={`font-medium text-sm ${msg.color}`}>{msg.sender}</div>
-                        <div className="text-sm text-gray-300">{msg.text}</div>
+                {messages.length === 0 ? (
+                    <div className="text-center text-gray-400 py-8">
+                        <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p>لا توجد رسائل بعد</p>
+                        <p className="text-xs">ابدأ المحادثة!</p>
                     </div>
-                ))}
+                ) : (
+                    messages.map((msg, idx) => (
+                        <div key={idx} className="bg-white/5 rounded-lg p-3">
+                            <div className={`font-medium text-sm ${msg.color}`}>{msg.sender}</div>
+                            <div className="text-sm text-gray-300">{msg.text}</div>
+                        </div>
+                    ))
+                )}
                 <div ref={chatEndRef}></div>
             </div>
 
@@ -67,7 +75,7 @@ const ChatSidebar: React.FC<Props> = ({
                     size="sm"
                     className="bg-purple-600 hover:bg-purple-700"
                     onClick={handleSend}
-                    disabled={!chatEnabled}
+                    disabled={!chatEnabled || !input.trim()}
                 >
                     إرسال
                 </Button>
