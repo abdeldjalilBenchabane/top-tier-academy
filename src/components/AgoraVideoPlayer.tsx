@@ -185,7 +185,7 @@ const AgoraVideoPlayer: React.FC<AgoraVideoPlayerProps & { onError?: (err: any) 
             console.log('[DEBUG] Successfully joined channel');
             
             // Only create and publish local tracks for host (teacher)
-            if (role === 'host') {
+                if (role === 'host') {
                 try {
                     console.log('[DEBUG] Creating local tracks for host...');
                     // Create Agora tracks directly (no need for getUserMedia first)
@@ -198,8 +198,8 @@ const AgoraVideoPlayer: React.FC<AgoraVideoPlayerProps & { onError?: (err: any) 
                         console.log('[DEBUG] Playing local video track...');
                         localVideoTrackRef.current.play(videoRef.current);
                         console.log('[DEBUG] Video track should now be visible');
-                    }
-                } catch (err) {
+                }
+            } catch (err) {
                     console.error('[DEBUG] Error creating local tracks:', err);
                     if (err.name === 'NotAllowedError') {
                         setError('Camera or microphone access denied. Please allow permissions and refresh.');
@@ -272,16 +272,16 @@ const AgoraVideoPlayer: React.FC<AgoraVideoPlayerProps & { onError?: (err: any) 
                 <div className="text-center">
                     <div className="text-red-400 mb-4">{error}</div>
                     {role === 'host' && (
-                        <button 
-                            onClick={() => {
-                                setError(null);
-                                isInitializedRef.current = false;
-                                init();
-                            }}
-                            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 mr-2"
-                        >
-                            إعادة المحاولة
-                        </button>
+                    <button 
+                        onClick={() => {
+                            setError(null);
+                            isInitializedRef.current = false;
+                            init();
+                        }}
+                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 mr-2"
+                    >
+                        إعادة المحاولة
+                    </button>
                     )}
                     {role === 'host' && (
                         <button 

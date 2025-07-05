@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   FaBars, FaTimes, FaGlobe, FaBook, FaVideo, FaUserLock,
-  FaHistory, FaUser, FaSignOutAlt, FaCog
+  FaHistory, FaUser, FaSignOutAlt, FaCog, FaCoins
 } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { pointsAPI } from '@/services/api';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [userPoints, setUserPoints] = useState(0);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
@@ -26,6 +28,33 @@ const Navbar = () => {
     if (!name) return '?';
     return name.charAt(0).toUpperCase();
   };
+
+  // Fetch user points on component mount
+  useEffect(() => {
+    const fetchUserPoints = async () => {
+      if (user) {
+        try {
+          const response = await pointsAPI.getBalance();
+          setUserPoints(response.balance || 0);
+        } catch (error) {
+          console.error('Error fetching user points:', error);
+        }
+      }
+    };
+
+    fetchUserPoints();
+  }, [user]);
+
+  // Listen for points updates from payment success
+  useEffect(() => {
+    const handlePointsUpdate = (event) => {
+      const { points } = event.detail;
+      setUserPoints(prev => prev + points);
+    };
+
+    window.addEventListener('pointsUpdated', handlePointsUpdate);
+    return () => window.removeEventListener('pointsUpdated', handlePointsUpdate);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -72,16 +101,23 @@ const Navbar = () => {
           {/* Auth zone */}
           <div className="flex items-center gap-3 whitespace-nowrap">
             {user ? (
-              <div className="relative" ref={dropdownRef}>
-                <button onClick={toggleDropdown}
-                  className="flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-full p-2 transition-all duration-200">
-                  <div className="w-8 h-8 bg-white text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
-                    {getInitials(user.name)}
-                  </div>
-                  <span className="hidden custom:block text-sm font-medium hover:text-white/90">
-                    {user.name}
-                  </span>
-                </button>
+              <>
+                {/* Points/Money Icon */}
+                <Link to="/points" className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 rounded-full px-3 py-2 transition-all duration-200 text-white font-medium">
+                  <FaCoins className="w-4 h-4" />
+                  <span className="hidden custom:block text-sm">{userPoints.toLocaleString()} دج</span>
+                </Link>
+                
+                <div className="relative" ref={dropdownRef}>
+                  <button onClick={toggleDropdown}
+                    className="flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-full p-2 transition-all duration-200">
+                    <div className="w-8 h-8 bg-white text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
+                      {getInitials(user.name)}
+                    </div>
+                    <span className="hidden custom:block text-sm font-medium hover:text-white/90">
+                      {user.name}
+                    </span>
+                  </button>
 
                 {/* Dropdown */}
                 {isDropdownOpen && (
@@ -105,6 +141,7 @@ const Navbar = () => {
                   </div>
                 )}
               </div>
+              </>
             ) : (
               <>
                 <Link to="/login" className="hover:text-blue-200 transition hover:underline">تسجيل الدخول</Link>
@@ -146,6 +183,12 @@ const Navbar = () => {
             <div className="mt-4 pt-4 border-t border-blue-500 px-4 space-y-3">
               {user ? (
                 <>
+                  {/* Points in mobile menu */}
+                  <Link to="/points" className="flex items-center gap-2 py-2 px-4 rounded hover:bg-white/20 transition" onClick={() => setIsMenuOpen(false)}>
+                    <FaCoins className="w-4 h-4 text-yellow-400" />
+                    <span className="text-sm">{userPoints.toLocaleString()} دج - شراء النقاط</span>
+                  </Link>
+                  
                   <div className="flex items-center gap-3 py-2 px-4">
                     <div className="w-8 h-8 bg-white text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
                       {getInitials(user.name)}
