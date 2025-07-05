@@ -118,7 +118,7 @@ CREATE TABLE pending_section_blocks (
     title VARCHAR(255),
     content TEXT,
     "order" INTEGER
-)
+);
 
 -- QUIZZES
 CREATE TABLE quizzes (

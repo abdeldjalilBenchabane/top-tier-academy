@@ -36,12 +36,58 @@ async function migratePoints() {
     
     const pointsSystemSQL = schemaContent.substring(pointsSystemStart);
     
-    // Split into individual statements
-    const statements = pointsSystemSQL
-      .split(';')
-      .map(stmt => stmt.trim())
-      .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'))
-      .map(stmt => stmt + ';');
+    // Split into individual statements, but handle function definitions specially
+    const statements = [];
+    const lines = pointsSystemSQL.split('\n');
+    let currentStatement = '';
+    let inFunction = false;
+    let dollarQuoteCount = 0;
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      // Skip comments and empty lines
+      if (trimmedLine.startsWith('--') || trimmedLine === '') {
+        continue;
+      }
+      
+      // Check if we're starting a function definition
+      if (trimmedLine.includes('CREATE OR REPLACE FUNCTION') || trimmedLine.includes('CREATE FUNCTION')) {
+        inFunction = true;
+        dollarQuoteCount = 0;
+      }
+      
+      // Count dollar quotes to track function body
+      if (inFunction) {
+        const dollarQuotes = trimmedLine.match(/\$\$/g);
+        if (dollarQuotes) {
+          dollarQuoteCount += dollarQuotes.length;
+        }
+      }
+      
+      currentStatement += line + '\n';
+      
+      // If we're in a function and we have an even number of dollar quotes, we've reached the end
+      if (inFunction && dollarQuoteCount > 0 && dollarQuoteCount % 2 === 0) {
+        inFunction = false;
+        if (currentStatement.trim()) {
+          statements.push(currentStatement.trim());
+        }
+        currentStatement = '';
+      }
+      // If we're not in a function and we see a semicolon, it's the end of a statement
+      else if (!inFunction && trimmedLine.endsWith(';')) {
+        if (currentStatement.trim()) {
+          statements.push(currentStatement.trim());
+        }
+        currentStatement = '';
+      }
+    }
+    
+    // Add any remaining statement
+    if (currentStatement.trim()) {
+      statements.push(currentStatement.trim());
+    }
     
     // Execute each statement
     for (let i = 0; i < statements.length; i++) {
