@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, IMicrophoneAudioTrack, ILocalVideoTrack, CameraVideoTrackInitConfig } from 'agora-rtc-sdk-ng';
 import { Button } from '@/components/ui/button';
 import { Mic, MicOff } from 'lucide-react';
@@ -13,7 +13,20 @@ interface AgoraVideoPlayerProps {
     socket?: any;
 }
 
-const AgoraVideoPlayer: React.FC<AgoraVideoPlayerProps & { onError?: (err: any) => void }> = ({
+export interface AgoraVideoPlayerRef {
+    toggleLocalMic: () => void;
+    toggleLocalCamera: () => void;
+    startScreenShare: () => Promise<void>;
+    stopScreenShare: () => Promise<void>;
+    isLocalMicMuted: boolean;
+    isLocalCameraEnabled: boolean;
+    isScreenSharing: boolean;
+    cameraDevices: { deviceId: string, label: string }[];
+    selectedDeviceId: string;
+    setSelectedDeviceId: (deviceId: string) => Promise<void>;
+}
+
+const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps & { onError?: (err: any) => void }>(({
     appId,
     channel,
     token,
@@ -22,7 +35,7 @@ const AgoraVideoPlayer: React.FC<AgoraVideoPlayerProps & { onError?: (err: any) 
     studentsMuted,
     socket,
     onError
-}) => {
+}, ref) => {
     const videoRef = useRef<HTMLDivElement>(null);
     const clientRef = useRef<IAgoraRTCClient | null>(null);
     const localAudioTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
@@ -40,6 +53,7 @@ const AgoraVideoPlayer: React.FC<AgoraVideoPlayerProps & { onError?: (err: any) 
     const [cameraDevices, setCameraDevices] = useState<{ deviceId: string, label: string }[]>([]);
     const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
     const [isLocalMicMuted, setIsLocalMicMuted] = useState(false);
+    const [isLocalCameraEnabled, setIsLocalCameraEnabled] = useState(true);
 
     const cleanup = useCallback(async () => {
         if (cleanupInProgressRef.current) {
@@ -245,6 +259,11 @@ const AgoraVideoPlayer: React.FC<AgoraVideoPlayerProps & { onError?: (err: any) 
         }
     }, [clientRef, videoContainerRef]);
 
+    const changeCameraDevice = useCallback(async (deviceId: string) => {
+        setSelectedDeviceId(deviceId);
+        await createAndPublishVideoTrack(deviceId);
+    }, [createAndPublishVideoTrack]);
+
     // Fonction pour contrôler le micro local du professeur
     const toggleLocalMic = useCallback(() => {
         if (localAudioTrackRef.current) {
@@ -254,6 +273,16 @@ const AgoraVideoPlayer: React.FC<AgoraVideoPlayerProps & { onError?: (err: any) 
             console.log(`[DEBUG] Professor mic ${newMuteState ? 'muted' : 'unmuted'}`);
         }
     }, [isLocalMicMuted, localAudioTrackRef]);
+
+    // Fonction pour contrôler la caméra locale du professeur
+    const toggleLocalCamera = useCallback(() => {
+        if (localVideoTrackRef.current) {
+            const newCameraState = !isLocalCameraEnabled;
+            localVideoTrackRef.current.setEnabled(newCameraState);
+            setIsLocalCameraEnabled(newCameraState);
+            console.log(`[DEBUG] Professor camera ${newCameraState ? 'enabled' : 'disabled'}`);
+        }
+    }, [isLocalCameraEnabled, localVideoTrackRef]);
 
     useEffect(() => {
         mountedRef.current = true;
@@ -331,6 +360,19 @@ const AgoraVideoPlayer: React.FC<AgoraVideoPlayerProps & { onError?: (err: any) 
         };
     }, [socket, role]);
 
+    useImperativeHandle(ref, () => ({
+        toggleLocalMic,
+        toggleLocalCamera,
+        startScreenShare,
+        stopScreenShare,
+        isLocalMicMuted,
+        isLocalCameraEnabled,
+        isScreenSharing,
+        cameraDevices,
+        selectedDeviceId,
+        setSelectedDeviceId: changeCameraDevice
+    }));
+
     if (isConnecting) {
         return (
             <div className="flex items-center justify-center h-full min-h-[400px] bg-black rounded-lg">
@@ -385,58 +427,9 @@ const AgoraVideoPlayer: React.FC<AgoraVideoPlayerProps & { onError?: (err: any) 
                         </div>
                     </div>
                 )}
-                {role === 'host' && isConnected && (
-                    <div className="absolute top-4 right-4 z-20 flex gap-2">
-                        {/* Bouton Mute/Unmute du professeur */}
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            className={`${isLocalMicMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'} text-white border-0 shadow-lg`}
-                            onClick={toggleLocalMic}
-                            title={isLocalMicMuted ? 'إلغاء كتم الصوت' : 'كتم الصوت'}
-                        >
-                            {isLocalMicMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                        </Button>
-
-                        {/* Bouton Partage d'écran */}
-                        {isScreenSharing ? (
-                            <Button
-                                onClick={stopScreenShare}
-                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 shadow"
-                            >
-                                Arrêter le partage d'écran
-                            </Button>
-                        ) : (
-                            <Button
-                                onClick={startScreenShare}
-                                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-700 shadow"
-                            >
-                                Partager l'écran
-                            </Button>
-                        )}
-                    </div>
-                )}
-                {role === 'host' && isConnected && cameraDevices.length > 1 && (
-                    <div className="absolute top-4 left-4 z-20">
-                        <label htmlFor="camera-select" className="text-white mr-2">Caméra :</label>
-                        <select
-                            id="camera-select"
-                            value={selectedDeviceId}
-                            onChange={async (e) => {
-                                setSelectedDeviceId(e.target.value);
-                                await createAndPublishVideoTrack(e.target.value);
-                            }}
-                            className="bg-black/70 text-white rounded px-2 py-1 border border-white/20"
-                        >
-                            {cameraDevices.map(device => (
-                                <option key={device.deviceId} value={device.deviceId}>{device.label || `Camera ${device.deviceId}`}</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
             </div>
         </div>
     );
-};
+});
 
 export default AgoraVideoPlayer;

@@ -157,11 +157,17 @@ io.on('connection', (socket) => {
 
   // Handle professor controls
   socket.on('mute-all', (roomId) => {
+    console.log(`[DEBUG] Professor ${socket.userData?.name} (${socket.id}) muted all students in room ${roomId}`);
     socket.to(roomId).emit('students-muted');
+    // Also emit to the sender for immediate feedback
+    socket.emit('students-muted');
   });
 
   socket.on('unmute-all', (roomId) => {
+    console.log(`[DEBUG] Professor ${socket.userData?.name} (${socket.id}) unmuted all students in room ${roomId}`);
     socket.to(roomId).emit('students-unmuted');
+    // Also emit to the sender for immediate feedback
+    socket.emit('students-unmuted');
   });
 
   socket.on('toggle-chat', (roomId, enabled) => {
