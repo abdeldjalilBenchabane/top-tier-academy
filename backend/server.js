@@ -78,6 +78,7 @@ app.use('/api/points', pointsRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api', liveSessionRoutes);
 app.use('/api', hierarchyRoutes);
+app.use('/api/structure', hierarchyRoutes); // <-- Add this line to alias structure endpoints
 
 // Socket.IO chat functionality
 io.on('connection', (socket) => {

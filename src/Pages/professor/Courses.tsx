@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { PendingCourse } from '@/types';
@@ -9,23 +9,30 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Clock, CheckCircle, XCircle, BookOpen, Calendar, FileText, Plus } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, BookOpen, Calendar, FileText, Plus, Layers } from 'lucide-react';
 import { toast as toastLib } from '@/lib/toast';
+import PathSelector from '@/components/admin/PathSelector';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 const ProfessorCourses = () => {
   const { user } = useAuth();
-  const [pendingCourses, setPendingCourses] = useState<PendingCourse[]>([]);
+  const navigate = useNavigate();
+  const [courses, setCourses] = useState<PendingCourse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showPathSelector, setShowPathSelector] = useState(false);
+  const [selectedDraftCourse, setSelectedDraftCourse] = useState<PendingCourse | null>(null);
 
   useEffect(() => {
     const fetchCourses = async () => {
       setIsLoading(true);
       try {
-        const courses = await api.getPendingCourses();
-        
-        // In a real app, we would filter by the current user ID
-        // For our demo, we'll just show all pending courses
-        setPendingCourses(courses);
+        console.log('[ProfessorCourses] user:', user);
+        if (!user) return;
+        const res = await fetch(`/api/courses?created_by=${user.id}`);
+        const data = await res.json();
+        console.log('[ProfessorCourses] API response:', data);
+        setCourses(data);
+        console.log('[ProfessorCourses] setCourses:', data);
       } catch (error) {
         console.error('Failed to fetch courses:', error);
         toastLib.error('Failed to load course data');
@@ -33,7 +40,6 @@ const ProfessorCourses = () => {
         setIsLoading(false);
       }
     };
-
     fetchCourses();
   }, [user]);
 
@@ -54,8 +60,9 @@ const ProfessorCourses = () => {
     );
   }
 
-  const pendingCount = pendingCourses.filter(c => c.status === 'pending').length;
-  const rejectedCount = pendingCourses.filter(c => c.status === 'rejected').length;
+  const pendingCount = courses.filter(c => c.status === 'pending').length;
+  const rejectedCount = courses.filter(c => c.status === 'rejected').length;
+  const draftCount = courses.filter(c => c.status === 'draft').length;
 
   return (
     <div className="space-y-6">
@@ -72,7 +79,7 @@ const ProfessorCourses = () => {
         }
       />
       
-      {pendingCourses.length === 0 ? (
+      {courses.length === 0 ? (
         <EmptyState
           title="No Courses Yet"
           description="You haven't created any courses yet. Get started by creating your first course."
@@ -83,8 +90,16 @@ const ProfessorCourses = () => {
           }}
         />
       ) : (
-        <Tabs defaultValue="pending">
+        <Tabs defaultValue={draftCount > 0 ? 'drafts' : 'pending'}>
           <TabsList className="mb-4">
+            <TabsTrigger value="drafts">
+              Drafts
+              {draftCount > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {draftCount}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="pending">
               Pending
               {pendingCount > 0 && (
@@ -106,10 +121,54 @@ const ProfessorCourses = () => {
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="pending" className="mt-0">
-            {pendingCourses.filter(c => c.status === 'pending').length > 0 ? (
+          <TabsContent value="drafts" className="mt-0">
+            {draftCount > 0 ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {pendingCourses
+                {courses
+                  .filter(course => course.status === 'draft')
+                  .map(course => (
+                    <Card key={course.id} className="overflow-hidden">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-lg line-clamp-1">{course.title}</CardTitle>
+                          <Badge variant="outline" className="bg-gray-100 text-gray-700">Draft</Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pb-2">
+                        <p className="text-sm text-gray-600 line-clamp-2 mb-2">
+                          {course.description}
+                        </p>
+                        <div className="flex items-center text-xs text-gray-500">
+                          <Calendar className="h-3.5 w-3.5 mr-1" />
+                          <span>Created: {formatDate(course.created_at)}</span>
+                        </div>
+                      </CardContent>
+                      <CardFooter className="pt-0 flex flex-col gap-2">
+                        <Button variant="outline" className="w-full flex items-center justify-center" onClick={() => navigate(`/professor/courses/${course.id}`)}>
+                          <FileText className="h-4 w-4 mr-2" />
+                          Finish & Edit
+                        </Button>
+                        <Button variant="default" className="w-full flex items-center justify-center" onClick={() => { setSelectedDraftCourse(course); setShowPathSelector(true); }}>
+                          <Layers className="h-4 w-4 mr-2" />
+                          Choose Path
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No Drafts"
+                description="You don't have any draft courses."
+                icon={<BookOpen className="h-12 w-12 text-gray-400" />}
+              />
+            )}
+          </TabsContent>
+          
+          <TabsContent value="pending" className="mt-0">
+            {courses.filter(c => c.status === 'pending').length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {courses
                   .filter(course => course.status === 'pending')
                   .map(course => (
                     <Card key={course.id} className="overflow-hidden">
@@ -134,9 +193,9 @@ const ProfessorCourses = () => {
                       </CardContent>
                       
                       <CardFooter className="pt-0">
-                        <Button variant="outline" className="w-full flex items-center justify-center">
+                        <Button variant="outline" className="w-full flex items-center justify-center" onClick={() => navigate(`/professor/courses/${course.id}`)}>
                           <FileText className="h-4 w-4 mr-2" />
-                          View Details
+                          View/Edit
                         </Button>
                       </CardFooter>
                     </Card>
@@ -152,9 +211,9 @@ const ProfessorCourses = () => {
           </TabsContent>
           
           <TabsContent value="rejected" className="mt-0">
-            {pendingCourses.filter(c => c.status === 'rejected').length > 0 ? (
+            {courses.filter(c => c.status === 'rejected').length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {pendingCourses
+                {courses
                   .filter(course => course.status === 'rejected')
                   .map(course => (
                     <Card key={course.id} className="overflow-hidden">
@@ -179,9 +238,9 @@ const ProfessorCourses = () => {
                       </CardContent>
                       
                       <CardFooter className="pt-0 flex gap-2">
-                        <Button variant="outline" className="flex-1 flex items-center justify-center">
+                        <Button variant="outline" className="flex-1 flex items-center justify-center" onClick={() => navigate(`/professor/courses/${course.id}`)}>
                           <FileText className="h-4 w-4 mr-2" />
-                          View
+                          View/Edit
                         </Button>
                         <Button className="flex-1 flex items-center justify-center">
                           Edit & Resubmit
@@ -208,6 +267,24 @@ const ProfessorCourses = () => {
           </TabsContent>
         </Tabs>
       )}
+      {/* PathSelector Dialog for Drafts */}
+      <Dialog open={showPathSelector} onOpenChange={setShowPathSelector}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Assign Course Path</DialogTitle>
+            <DialogDescription>
+              Select the educational structure or language path for this course. This helps students find your course in the right place.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedDraftCourse && (
+            <PathSelector
+              pendingCourse={selectedDraftCourse}
+              onSuccess={() => { setShowPathSelector(false); setSelectedDraftCourse(null); /* reload courses */ window.location.reload(); }}
+              onCancel={() => { setShowPathSelector(false); setSelectedDraftCourse(null); }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

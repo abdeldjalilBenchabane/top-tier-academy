@@ -9,8 +9,9 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import { Level, Year, Speciality, Material, PendingCourse } from '@/types';
+import { Level, Year, Speciality, Material, PendingCourse, Language, LanguageLevel } from '@/types';
 import { toast } from '@/lib/toast';
+import { DialogDescription } from '@/components/ui/dialog';
 
 interface PathSelectorProps {
   pendingCourse: PendingCourse;
@@ -34,6 +35,12 @@ const PathSelector = ({
   const [selectedYearId, setSelectedYearId] = useState<string | undefined>(undefined);
   const [selectedSpecialityId, setSelectedSpecialityId] = useState<string | undefined>(undefined);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | undefined>(undefined);
+  
+  const [rootType, setRootType] = useState<'structure' | 'language' | ''>('');
+  const [languages, setLanguages] = useState<Language[]>([]);
+  const [languageLevels, setLanguageLevels] = useState<LanguageLevel[]>([]);
+  const [selectedLanguageId, setSelectedLanguageId] = useState<string | undefined>(undefined);
+  const [selectedLanguageLevelId, setSelectedLanguageLevelId] = useState<string | undefined>(undefined);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,19 +69,26 @@ const PathSelector = ({
         try {
           const data = await api.getYears(selectedLevelId);
           setYears(data);
-          // Reset downstream selections
+        } catch (error) {
+          console.error(error);
+          toast.error('Failed to fetch years');
+        } finally {
+          // Always reset downstream selections
           setSelectedYearId(undefined);
           setSelectedSpecialityId(undefined);
           setSelectedMaterialId(undefined);
           setSpecialities([]);
           setMaterials([]);
-        } catch (error) {
-          console.error(error);
-          toast.error('Failed to fetch years');
         }
       };
-
       fetchYears();
+    } else {
+      setYears([]);
+      setSelectedYearId(undefined);
+      setSelectedSpecialityId(undefined);
+      setSelectedMaterialId(undefined);
+      setSpecialities([]);
+      setMaterials([]);
     }
   }, [selectedLevelId]);
 
@@ -85,17 +99,21 @@ const PathSelector = ({
         try {
           const data = await api.getSpecialities(selectedYearId);
           setSpecialities(data);
-          // Reset downstream selections
-          setSelectedSpecialityId(undefined);
-          setSelectedMaterialId(undefined);
-          setMaterials([]);
         } catch (error) {
           console.error(error);
           toast.error('Failed to fetch specialities');
+        } finally {
+          setSelectedSpecialityId(undefined);
+          setSelectedMaterialId(undefined);
+          setMaterials([]);
         }
       };
-
       fetchSpecialities();
+    } else {
+      setSpecialities([]);
+      setSelectedSpecialityId(undefined);
+      setSelectedMaterialId(undefined);
+      setMaterials([]);
     }
   }, [selectedYearId]);
 
@@ -106,35 +124,91 @@ const PathSelector = ({
         try {
           const data = await api.getMaterials(selectedSpecialityId);
           setMaterials(data);
-          // Reset material selection
-          setSelectedMaterialId(undefined);
         } catch (error) {
           console.error(error);
           toast.error('Failed to fetch materials');
+        } finally {
+          setSelectedMaterialId(undefined);
         }
       };
-
       fetchMaterials();
+    } else {
+      setMaterials([]);
+      setSelectedMaterialId(undefined);
     }
   }, [selectedSpecialityId]);
 
-  const handleApprove = async () => {
-    if (!selectedMaterialId) {
-      toast.error('Please select a complete path for the course');
-      return;
+  // Load languages if rootType is 'language'
+  useEffect(() => {
+    if (rootType === 'language') {
+      const fetchLanguages = async () => {
+        try {
+          const data = await api.getLanguages();
+          setLanguages(data);
+        } catch (error) {
+          toast.error('Failed to fetch languages');
+        }
+      };
+      fetchLanguages();
+    } else {
+      setLanguages([]);
+      setSelectedLanguageId(undefined);
+      setLanguageLevels([]);
+      setSelectedLanguageLevelId(undefined);
     }
-    
-    setIsSubmitting(true);
-    
-    try {
-      await api.approveCourse(pendingCourse.id, selectedMaterialId);
-      toast.success('Course approved and assigned successfully');
-      onSuccess();
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to approve course');
-    } finally {
-      setIsSubmitting(false);
+  }, [rootType]);
+
+  // Load language levels when language is selected
+  useEffect(() => {
+    if (rootType === 'language' && selectedLanguageId) {
+      const fetchLevels = async () => {
+        try {
+          const data = await api.getLanguageLevels(selectedLanguageId);
+          setLanguageLevels(data);
+        } catch (error) {
+          toast.error('Failed to fetch language levels');
+        } finally {
+          setSelectedLanguageLevelId(undefined);
+        }
+      };
+      fetchLevels();
+    } else {
+      setLanguageLevels([]);
+      setSelectedLanguageLevelId(undefined);
+    }
+  }, [rootType, selectedLanguageId]);
+
+  const handleApprove = async () => {
+    if (rootType === 'structure') {
+      if (!selectedMaterialId) {
+        toast.error('Please select a complete path for the course');
+        return;
+      }
+      setIsSubmitting(true);
+      try {
+        await api.approveCourse(pendingCourse.id, selectedMaterialId);
+        toast.success('Course approved and assigned successfully');
+        onSuccess();
+      } catch (error) {
+        toast.error('Failed to approve course');
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else if (rootType === 'language') {
+      if (!selectedLanguageLevelId) {
+        toast.error('Please select a language and level');
+        return;
+      }
+      setIsSubmitting(true);
+      try {
+        await api.approveCourseLanguage(pendingCourse.id, selectedLanguageLevelId);
+        toast.success('Course approved and assigned successfully');
+        onSuccess();
+      } catch (error) {
+        toast.error('Failed to approve course');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -164,88 +238,146 @@ const PathSelector = ({
       <div className="space-y-4">
         <h3 className="text-lg font-medium">Select Path for Course</h3>
         <p className="text-sm text-gray-500">
-          Choose where to place "{pendingCourse.title}" in the education hierarchy.
+          Choose where to place "{pendingCourse.title}" in the education hierarchy or languages.
         </p>
         
         <div className="space-y-4">
-          {/* Level Select */}
+          {/* Root Type Select */}
           <div>
-            <Select
-              value={selectedLevelId}
-              onValueChange={setSelectedLevelId}
-            >
+            <Select value={rootType} onValueChange={setRootType}>
               <SelectTrigger>
-                <SelectValue placeholder="Select Level" />
+                <SelectValue placeholder="Select Root Type" />
               </SelectTrigger>
               <SelectContent>
-                {levels.map((level) => (
-                  <SelectItem key={level.id} value={level.id}>
-                    {level.name}
-                  </SelectItem>
-                ))}
+                <SelectItem value="structure">Educational Structure</SelectItem>
+                <SelectItem value="language">Languages</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          
-          {/* Year Select (disabled until level is selected) */}
-          <div>
-            <Select
-              value={selectedYearId}
-              onValueChange={setSelectedYearId}
-              disabled={!selectedLevelId || years.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={selectedLevelId ? "Select Year" : "Select Level First"} />
-              </SelectTrigger>
-              <SelectContent>
-                {years.map((year) => (
-                  <SelectItem key={year.id} value={year.id}>
-                    {year.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {/* Speciality Select (disabled until year is selected) */}
-          <div>
-            <Select
-              value={selectedSpecialityId}
-              onValueChange={setSelectedSpecialityId}
-              disabled={!selectedYearId || specialities.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={selectedYearId ? "Select Speciality" : "Select Year First"} />
-              </SelectTrigger>
-              <SelectContent>
-                {specialities.map((speciality) => (
-                  <SelectItem key={speciality.id} value={speciality.id}>
-                    {speciality.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {/* Material Select (disabled until speciality is selected) */}
-          <div>
-            <Select
-              value={selectedMaterialId}
-              onValueChange={setSelectedMaterialId}
-              disabled={!selectedSpecialityId || materials.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={selectedSpecialityId ? "Select Material" : "Select Speciality First"} />
-              </SelectTrigger>
-              <SelectContent>
-                {materials.map((material) => (
-                  <SelectItem key={material.id} value={material.id}>
-                    {material.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Educational Structure Path */}
+          {rootType === 'structure' && (
+            <>
+              {/* Level Select */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Level</label>
+                <Select value={selectedLevelId} onValueChange={setSelectedLevelId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {levels.map((level) => (
+                      <SelectItem key={level.id} value={level.id}>{level.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {levels.length === 0 && (
+                  <div className="text-xs text-red-500 mt-1">No levels available. Please ask the admin to create a level.</div>
+                )}
+              </div>
+              {/* Year Select */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
+                <Select value={selectedYearId} onValueChange={setSelectedYearId} disabled={!selectedLevelId || years.length === 0}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={selectedLevelId ? "Select Year" : "Select Level First"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {years.map((year) => (
+                      <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedLevelId && years.length === 0 && (
+                  <div className="text-xs text-red-500 mt-1">No years available for the selected level.</div>
+                )}
+              </div>
+              {/* Speciality Select */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Speciality</label>
+                <Select
+                  value={selectedSpecialityId}
+                  onValueChange={setSelectedSpecialityId}
+                  disabled={!selectedYearId || specialities.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={selectedYearId ? "Select Speciality" : "Select Year First"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {specialities.map((speciality) => (
+                      <SelectItem key={speciality.id} value={speciality.id}>{speciality.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedYearId && specialities.length === 0 && (
+                  <div className="text-xs text-red-500 mt-1">No specialities available for the selected year.</div>
+                )}
+              </div>
+              {/* Material Select */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Material</label>
+                <Select
+                  value={selectedMaterialId}
+                  onValueChange={setSelectedMaterialId}
+                  disabled={!selectedSpecialityId || materials.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={selectedSpecialityId ? "Select Material" : "Select Speciality First"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {materials.map((material) => (
+                      <SelectItem key={material.id} value={material.id}>{material.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedSpecialityId && materials.length === 0 && (
+                  <div className="text-xs text-red-500 mt-1">No materials available for the selected speciality.</div>
+                )}
+              </div>
+            </>
+          )}
+          {/* Language Path */}
+          {rootType === 'language' && (
+            <>
+              {/* Language Select */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Language</label>
+                <Select value={selectedLanguageId} onValueChange={setSelectedLanguageId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {languages.map((lang) => (
+                      <SelectItem key={lang.id} value={lang.id}>{lang.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {languages.length === 0 && (
+                  <div className="text-xs text-red-500 mt-1">No languages available. Please ask the admin to create a language.</div>
+                )}
+              </div>
+              {/* Language Level Select */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Language Level</label>
+                <Select
+                  value={selectedLanguageLevelId}
+                  onValueChange={setSelectedLanguageLevelId}
+                  disabled={!selectedLanguageId || languageLevels.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={selectedLanguageId ? "Select Level" : "Select Language First"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {languageLevels.map((lvl) => (
+                      <SelectItem key={lvl.id} value={lvl.id}>{lvl.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedLanguageId && languageLevels.length === 0 && (
+                  <div className="text-xs text-red-500 mt-1">No levels available for the selected language.</div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
       
@@ -270,7 +402,7 @@ const PathSelector = ({
         <Button 
           type="button" 
           onClick={handleApprove} 
-          disabled={!selectedMaterialId || isSubmitting}
+          disabled={isSubmitting}
         >
           Approve & Assign
         </Button>

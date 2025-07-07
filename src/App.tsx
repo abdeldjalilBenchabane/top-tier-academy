@@ -37,11 +37,13 @@ import AdminPending from './Pages/admin/Pending';
 import AdminCourses from './Pages/admin/Courses';
 import AdminCourseDetails from './Pages/admin/CourseDetails';
 import AdminSettings from './Pages/admin/Settings';
+import CourseFilesPage from './Pages/admin/CourseFiles';
 // Professor
 import ProfessorDashboard from './Pages/professor/Dashboard';
 import ProfessorCourses from './Pages/professor/Courses';
 import ProfessorCreate from './Pages/professor/Create';
 import ProfessorSettings from './Pages/professor/Settings';
+import ProfessorCourseDetails from './Pages/professor/CourseDetails';
 // Admin components
 import UserManagement from './components/admin/UserManagement';
 import HomepageSlides from './components/admin/HomepageSlides';
@@ -104,6 +106,7 @@ const App: React.FC = () => {
                 <Route path="pending" element={<AdminPending />} />
                 <Route path="courses" element={<AdminCourses />} />
                 <Route path="courses/:courseId" element={<AdminCourseDetails />} />
+                <Route path="course-files" element={<CourseFilesPage />} />
                 <Route path="quizzes" element={<QuizManagement />} />
                 <Route path="users" element={<UserManagement />} />
                 <Route path="slides" element={<HomepageSlides />} />
@@ -116,6 +119,7 @@ const App: React.FC = () => {
               <Route path="/professor/*" element={<AppLayout />}>
                 <Route path="dashboard" element={<ProfessorDashboard />} />
                 <Route path="courses" element={<ProfessorCourses />} />
+                <Route path="courses/:id" element={<ProfessorCourseDetails />} />
                 <Route path="create" element={<ProfessorCreate />} />
                 <Route path="quiz" element={<QuizCreation />} />
                 <Route path="results" element={<QuizResults professorId="1" />} />

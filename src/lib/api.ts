@@ -1,4 +1,4 @@
-import { User, Level, Year, Speciality, Material, Course, PendingCourse, ContentBlock, HomeSlide, LiveSession, Quiz, QuizQuestion, PendingQuiz, QuizAttempt, QuizAnswer, QuizResults } from '@/types';
+import { User, Level, Year, Speciality, Material, Course, PendingCourse, ContentBlock, HomeSlide, LiveSession, Quiz, QuizQuestion, PendingQuiz, QuizAttempt, QuizAnswer, QuizResults, LanguageLevel } from '@/types';
 import { getAuthToken } from '@/services/api';
 
 // Configurable API base URL
@@ -473,8 +473,14 @@ export const api = {
   },
 
   getLevels: async (): Promise<Level[]> => {
-    await delay(500);
-    return mockData.levels;
+    const res = await fetch('/api/structure/levels', {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch levels');
+    return await res.json();
   },
   createLevel: async (level: Omit<Level, 'id'>): Promise<Level> => {
     await delay(500);
@@ -483,11 +489,15 @@ export const api = {
     return newLevel;
   },
   getYears: async (levelId?: string): Promise<Year[]> => {
-    await delay(500);
-    if (levelId) {
-      return mockData.years.filter(year => year.levelId === levelId);
-    }
-    return mockData.years;
+    if (!levelId) throw new Error('levelId is required');
+    const res = await fetch(`/api/structure/levels/${levelId}/years`, {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch years');
+    return await res.json();
   },
   createYear: async (year: Omit<Year, 'id'>): Promise<Year> => {
     await delay(500);
@@ -495,12 +505,26 @@ export const api = {
     mockData.years.push(newYear);
     return newYear;
   },
+  getAllYears: async (): Promise<Year[]> => {
+    const res = await fetch('/api/years', {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch years');
+    return await res.json();
+  },
   getSpecialities: async (yearId?: string): Promise<Speciality[]> => {
-    await delay(500);
-    if (yearId) {
-      return mockData.specialities.filter(speciality => speciality.yearId === yearId);
-    }
-    return mockData.specialities;
+    if (!yearId) throw new Error('yearId is required');
+    const res = await fetch(`/api/structure/years/${yearId}/specialities`, {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch specialities');
+    return await res.json();
   },
   createSpeciality: async (speciality: Omit<Speciality, 'id'>): Promise<Speciality> => {
     await delay(500);
@@ -508,12 +532,26 @@ export const api = {
     mockData.specialities.push(newSpeciality);
     return newSpeciality;
   },
+  getAllSpecialities: async (): Promise<Speciality[]> => {
+    const res = await fetch('/api/specialities', {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch specialities');
+    return await res.json();
+  },
   getMaterials: async (specialityId?: string): Promise<Material[]> => {
-    await delay(500);
-    if (specialityId) {
-      return mockData.materials.filter(material => material.specialityId === specialityId);
-    }
-    return mockData.materials;
+    if (!specialityId) throw new Error('specialityId is required');
+    const res = await fetch(`/api/structure/specialities/${specialityId}/materials`, {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch materials');
+    return await res.json();
   },
   createMaterial: async (material: Omit<Material, 'id'>): Promise<Material> => {
     await delay(500);
@@ -521,10 +559,26 @@ export const api = {
     mockData.materials.push(newMaterial);
     return newMaterial;
   },
+  getAllMaterials: async (): Promise<Material[]> => {
+    const res = await fetch('/api/materials', {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch materials');
+    return await res.json();
+  },
 
   getCourses: async (): Promise<Course[]> => {
-    await delay(500);
-    return mockData.courses;
+    const res = await fetch('/api/courses?status=approved', {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch courses');
+    return await res.json();
   },
   getCourseById: async (courseId: string): Promise<Course | null> => {
     await delay(500);
@@ -618,9 +672,15 @@ export const api = {
 
     mockData.pendingCourses.push(newCourse);
   },
-  getPendingCourses: async (): Promise<PendingCourse[]> => {
-    await delay(500);
-    return mockData.pendingCourses;
+  getPendingCourses: async (): Promise<Course[]> => {
+    const res = await fetch('/api/courses?status=pending', {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch pending courses');
+    return await res.json();
   },
   updateCourseStatus: async (courseId: string, status: PendingCourse['status'], reviewedBy?: string): Promise<void> => {
     await delay(500);
@@ -636,38 +696,35 @@ export const api = {
     }
   },
   approveCourse: async (courseId: string, materialId: string, price?: number): Promise<void> => {
-    await delay(500);
-
-    const pendingCourse = mockData.pendingCourses.find(course => course.id === courseId);
-    if (!pendingCourse) {
-      throw new Error('Course not found');
+    const res = await fetch(`/api/courses/${courseId}/path`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      body: JSON.stringify({ material_id: materialId }),
+      credentials: 'include'
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to approve course');
     }
-
-    const professorExists = mockData.users.some(user => user.id === pendingCourse.createdBy);
-    if (!professorExists) {
-      console.warn(`Professor with ID ${pendingCourse.createdBy} not found for course ${courseId}`);
-      pendingCourse.createdBy = mockData.users.find(user => user.role === 'professor')?.id || '1';
+    return;
+  },
+  approveCourseLanguage: async (courseId: string, languageLevelId: string): Promise<void> => {
+    const res = await fetch(`/api/courses/${courseId}/language-path`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      body: JSON.stringify({ language_level_id: languageLevelId }),
+      credentials: 'include'
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to approve course (language)');
     }
-
-    const approvedCourse: Course = {
-      id: courseId,
-      materialId: materialId,
-      title: pendingCourse.title,
-      description: pendingCourse.description,
-      sections: pendingCourse.sections,
-      createdBy: pendingCourse.createdBy,
-      createdAt: pendingCourse.createdAt,
-      approvedAt: new Date().toISOString(),
-      price: price
-    };
-
-    mockData.courses.push(approvedCourse);
-
-    pendingCourse.status = 'approved';
-    pendingCourse.approvedAt = new Date().toISOString();
-    pendingCourse.materialId = materialId;
-    pendingCourse.price = price;
-
     return;
   },
   rejectCourse: async (courseId: string, reason: string): Promise<void> => {
@@ -681,6 +738,31 @@ export const api = {
     pendingCourse.status = 'rejected';
     pendingCourse.rejectionReason = reason;
     pendingCourse.rejectedAt = new Date().toISOString();
+  },
+  approveCourseAdmin: async (courseId: string): Promise<any> => {
+    const res = await fetch(`/api/courses/${courseId}/approve`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to approve course');
+    return await res.json();
+  },
+  rejectCourseAdmin: async (courseId: string, reason?: string): Promise<any> => {
+    const res = await fetch(`/api/courses/${courseId}/reject`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      body: JSON.stringify({ reason }),
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to reject course');
+    return await res.json();
   },
 
   // Quiz management methods
@@ -899,6 +981,27 @@ export const api = {
       throw error;
     }
 
+    return await res.json();
+  },
+  getLanguages: async (): Promise<Language[]> => {
+    const res = await fetch('/api/structure/languages', {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch languages');
+    return await res.json();
+  },
+  getLanguageLevels: async (languageId: string): Promise<LanguageLevel[]> => {
+    if (!languageId) throw new Error('languageId is required');
+    const res = await fetch(`/api/structure/languages/${languageId}/levels`, {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch language levels');
     return await res.json();
   },
 };

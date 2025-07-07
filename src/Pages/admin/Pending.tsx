@@ -18,8 +18,10 @@ import { Badge } from '@/components/ui/badge';
 import { Inbox, User, Calendar, CheckCircle, XCircle } from 'lucide-react';
 import PathSelector from '@/components/admin/PathSelector';
 import { toast } from '@/lib/toast';
+import { useNavigate } from 'react-router-dom';
 
 const PendingPage = () => {
+  const navigate = useNavigate();
   const [pendingCourses, setPendingCourses] = useState<PendingCourse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState<PendingCourse | null>(null);
@@ -132,12 +134,33 @@ const PendingPage = () => {
                       
                       <CardFooter className="flex justify-end gap-2">
                         <Button 
-                          onClick={() => {
-                            setSelectedCourse(course);
-                            setShowPathSelector(true);
+                          variant="destructive"
+                          onClick={async () => {
+                            const reason = window.prompt('Enter rejection reason (optional):') || '';
+                            try {
+                              await api.rejectCourseAdmin(course.id, reason);
+                              toast.success('Course rejected');
+                              fetchPendingCourses();
+                            } catch (err) {
+                              toast.error('Failed to reject course');
+                            }
                           }}
                         >
-                          Review & Assign
+                          Reject
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              await api.approveCourseAdmin(course.id);
+                              toast.success('Course approved');
+                              navigate('/admin/courses');
+                            } catch (err) {
+                              toast.error('Failed to approve course');
+                            }
+                          }}
+                        >
+                          Approve
                         </Button>
                       </CardFooter>
                     </Card>
@@ -194,23 +217,6 @@ const PendingPage = () => {
         </Tabs>
       )}
       
-      {selectedCourse && (
-        <Dialog 
-          open={showPathSelector} 
-          onOpenChange={(open) => !open && setShowPathSelector(false)}
-        >
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Assign Course Path</DialogTitle>
-            </DialogHeader>
-            <PathSelector 
-              pendingCourse={selectedCourse}
-              onSuccess={handleApprovalSuccess}
-              onCancel={() => setShowPathSelector(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 };

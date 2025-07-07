@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { api } from '@/lib/api';
-import { Course, Level, Year, Speciality, Material } from '@/types';
+import { Course, Level, Year, Speciality, Material, Language } from '@/types';
 import PageHeader from '@/components/common/PageHeader';
 import EmptyState from '@/components/common/EmptyState';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,22 +37,26 @@ const CoursesPage = () => {
   const [selectedLevel, setSelectedLevel] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedSpeciality, setSelectedSpeciality] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState('');
   
   const [currentLevel, setCurrentLevel] = useState<Level | null>(null);
   const [currentYear, setCurrentYear] = useState<Year | null>(null);
   const [currentSpeciality, setCurrentSpeciality] = useState<Speciality | null>(null);
   const [currentMaterial, setCurrentMaterial] = useState<Material | null>(null);
+  const [currentLanguage, setCurrentLanguage] = useState<Language | null>(null);
+  const [languages, setLanguages] = useState<Language[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const [coursesData, levelsData, yearsData, specialitiesData, materialsData] = await Promise.all([
+        const [coursesData, levelsData, yearsData, specialitiesData, materialsData, languagesData] = await Promise.all([
           api.getCourses(),
           api.getLevels(),
-          api.getYears(),
-          api.getSpecialities(),
-          api.getMaterials()
+          api.getAllYears(), // changed from api.getYears()
+          api.getAllSpecialities(), // changed from api.getSpecialities()
+          api.getAllMaterials(), // changed from api.getMaterials()
+          api.getLanguages(), // fetch all languages
         ]);
         
         setCourses(coursesData);
@@ -60,6 +64,7 @@ const CoursesPage = () => {
         setYears(yearsData);
         setSpecialities(specialitiesData);
         setMaterials(materialsData);
+        setLanguages(languagesData);
         
         const materialIdFromUrl = searchParams.get('materialId');
         if (materialIdFromUrl) {
@@ -155,7 +160,7 @@ const CoursesPage = () => {
           course.description.toLowerCase().includes(term)
       );
     }
-    
+
     setFilteredCourses(filtered);
   }, [
     courses, 
@@ -242,6 +247,10 @@ const CoursesPage = () => {
       });
     }
     
+    if (currentLanguage) {
+      crumbs.push({ name: currentLanguage.name, href: `/admin/courses?language=${currentLanguage.id}` });
+    }
+    
     return crumbs;
   };
 
@@ -251,10 +260,12 @@ const CoursesPage = () => {
     setSelectedYear('');
     setSelectedSpeciality('');
     setSelectedMaterialId('');
+    setSelectedLanguage('');
     setCurrentLevel(null);
     setCurrentYear(null);
     setCurrentSpeciality(null);
     setCurrentMaterial(null);
+    setCurrentLanguage(null);
   };
 
   if (isLoading) {
@@ -305,6 +316,24 @@ const CoursesPage = () => {
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {/* Language Filter */}
+                <Select
+                  value={selectedLanguage}
+                  onValueChange={(value) => setSelectedLanguage(value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Languages</SelectItem>
+                    {languages.map((lang) => (
+                      <SelectItem key={lang.id} value={lang.id}>
+                        {lang.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
                 <Select
                   value={selectedLevel}
                   onValueChange={(value) => {
@@ -440,6 +469,7 @@ const CoursesPage = () => {
                           </Badge>
                         </div>
                       )}
+                      
                       
                       <div className="flex items-center text-xs text-gray-500 mt-1">
                         <Calendar className="h-3.5 w-3.5 mr-1" />

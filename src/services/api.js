@@ -138,6 +138,27 @@ export const coursesAPI = {
   }),
   delete: (id) => apiRequest(`/courses/${id}`, { method: 'DELETE' }),
   getMaterials: () => apiRequest('/courses/materials/list'),
+  
+  // Create course with file uploads
+  submitCourseWithFiles: (formData) => {
+    return fetch(`${API_BASE_URL}/courses`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+      body: formData,
+    }).then(response => {
+      if (!response.ok) {
+        return response.json().then(errorData => {
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        });
+      }
+      return response.json();
+    });
+  },
+  
+  // Admin endpoint to scan course files
+  scanFiles: () => apiRequest('/courses/admin/scan-files'),
 };
 
 // Points API calls

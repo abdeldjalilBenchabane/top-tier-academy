@@ -1,27 +1,119 @@
 import express from 'express';
 import { query, getRow, getRows } from '../db.js';
+import { verifyToken, requireRole } from '../middleware/auth.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import pool from '../db.js';
 
 const router = express.Router();
 
-// Get all courses
+// Get current directory
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Configure multer for course file uploads
+const courseStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    let uploadDir;
+    if (file.fieldname === 'cover') {
+      uploadDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'courses', 'covers');
+    } else {
+      uploadDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'courses', 'content');
+    }
+    
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const courseUpload = multer({
+  storage: courseStorage,
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    console.log('Course file upload attempt:', {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    });
+    
+    // Allow images for covers
+    if (file.fieldname === 'cover') {
+      const allowedImageTypes = /jpeg|jpg|png|gif|webp/;
+      const extname = allowedImageTypes.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = allowedImageTypes.test(file.mimetype);
+      
+      if (extname && mimetype) {
+        return cb(null, true);
+      } else {
+        return cb(new Error('Only image files (jpeg, jpg, png, gif, webp) are allowed for covers!'));
+      }
+    }
+    
+    // Allow various file types for content
+    const allowedContentTypes = /jpeg|jpg|png|gif|webp|pdf|doc|docx|ppt|pptx|xls|xlsx|txt|mp4|webm|mov|avi|m4v|3gp|mp3|wav|zip|rar/;
+    const extname = allowedContentTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedContentTypes.test(file.mimetype) || /application\//.test(file.mimetype);
+    
+    if (extname || mimetype) {
+      return cb(null, true);
+    } else {
+      return cb(new Error('File type not allowed for course content!'));
+    }
+  }
+});
+
+// Error handling middleware for multer
+const handleUploadError = (error, req, res, next) => {
+  console.error('Upload error:', error);
+  
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'File too large. Maximum size is 50MB.' });
+    }
+    return res.status(400).json({ error: error.message });
+  } else if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  next();
+};
+
+// Get all courses (optionally filter by created_by)
 router.get('/', async (req, res) => {
   try {
-    const courses = await getRows(`
+    const { created_by, status } = req.query;
+    let queryStr = `
       SELECT 
-        c.id, 
-        c.title, 
-        c.description, 
-        c.price, 
-        c.is_published, 
-        c.created_at,
-        c.approved_at,
-        u.name as created_by_name,
-        m.name as material_name
+        c.id, c.title, c.description, c.price, c.is_published, c.created_at,
+        c.approved_at, c.created_by, c.status, u.name as created_by_name,
+        m.name as material_name, cc.cover as cover_url
       FROM courses c
       LEFT JOIN users u ON c.created_by = u.id
       LEFT JOIN materials m ON c.material_id = m.id
-      ORDER BY c.created_at DESC
-    `);
+      LEFT JOIN course_covers cc ON c.id = cc.course_id
+      WHERE 1=1
+    `;
+    const params = [];
+    if (created_by) {
+      params.push(created_by);
+      queryStr += ` AND c.created_by = $${params.length}`;
+    }
+    if (status) {
+      params.push(status);
+      queryStr += ` AND c.status = $${params.length}`;
+    }
+    queryStr += ' ORDER BY c.created_at DESC';
+    const courses = await getRows(queryStr, params);
     res.json(courses);
   } catch (error) {
     console.error('Error fetching courses:', error);
@@ -45,10 +137,12 @@ router.get('/:id', async (req, res) => {
         c.created_at,
         c.approved_at,
         u.name as created_by_name,
-        m.name as material_name
+        m.name as material_name,
+        cc.cover as cover_url
       FROM courses c
       LEFT JOIN users u ON c.created_by = u.id
       LEFT JOIN materials m ON c.material_id = m.id
+      LEFT JOIN course_covers cc ON c.id = cc.course_id
       WHERE c.id = $1
     `, [courseId]);
     
@@ -72,6 +166,20 @@ router.get('/:id', async (req, res) => {
         WHERE section_id = $1
         ORDER BY "order"
       `, [section.id]);
+      
+      // Get files for each block
+      for (let block of blocks) {
+        if (block.type !== 'text') {
+          const files = await getRows(`
+            SELECT id, file_name, file_path, file_type, file_size, original_name
+            FROM course_files
+            WHERE block_id = $1
+            ORDER BY created_at
+          `, [block.id]);
+          block.files = files;
+        }
+      }
+      
       section.blocks = blocks;
     }
     
@@ -83,39 +191,178 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create new course
-router.post('/', async (req, res) => {
+// Create new course with file uploads
+router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
+  // Use multer.any() to accept all files (cover and content blocks)
+  courseUpload.any()(req, res, (err) => {
+    if (err) {
+      return handleUploadError(err, req, res, next);
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
-    const { title, description, material_id, created_by, price } = req.body;
-    
+    const { title, description, material_id, price, sections } = req.body;
+    const created_by = req.user.id;
+    // Set status: 'draft' if no material_id, else 'pending'
+    const status = material_id ? 'pending' : 'draft';
     // Validate required fields
     if (!title || !description) {
       return res.status(400).json({ error: 'Title and description are required' });
     }
-    
-    // Insert new course
-    const result = await query(
-      'INSERT INTO courses (title, description, material_id, created_by, price) VALUES ($1, $2, $3, $4, $5) RETURNING id, title, description, price, created_at',
-      [title, description, material_id, created_by, price]
-    );
-    
-    res.status(201).json(result.rows[0]);
+    // Start transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Insert new course
+      const courseResult = await client.query(
+        'INSERT INTO courses (title, description, material_id, created_by, price, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+        [title, description, material_id || null, created_by, price, status]
+      );
+      const courseId = courseResult.rows[0].id;
+      // Handle cover upload
+      if (req.files && req.files.length > 0) {
+        const coverFile = req.files.find(f => f.fieldname === 'cover');
+        if (coverFile) {
+          const coverUrl = `/uploads/courses/covers/${coverFile.filename}`;
+          await client.query(
+            'INSERT INTO course_covers (course_id, cover) VALUES ($1, $2)',
+            [courseId, coverUrl]
+          );
+        }
+      }
+      // Handle sections and content files
+      if (sections && Array.isArray(JSON.parse(sections))) {
+        const sectionsData = JSON.parse(sections);
+        for (let i = 0; i < sectionsData.length; i++) {
+          const section = sectionsData[i];
+          // Insert section
+          const sectionResult = await client.query(
+            'INSERT INTO course_sections (course_id, title, "order") VALUES ($1, $2, $3) RETURNING id',
+            [courseId, section.title, i + 1]
+          );
+          const sectionId = sectionResult.rows[0].id;
+          // Insert blocks
+          if (section.blocks && Array.isArray(section.blocks)) {
+            for (let j = 0; j < section.blocks.length; j++) {
+              const block = section.blocks[j];
+              let contentValue = block.type === 'text' ? block.content || '' : '';
+              const blockResult = await client.query(
+                'INSERT INTO section_blocks (section_id, type, title, content, "order") VALUES ($1, $2, $3, $4, $5) RETURNING id',
+                [sectionId, block.type, block.title || null, contentValue, j + 1]
+              );
+              const blockId = blockResult.rows[0].id;
+              // Handle content files for this block (image, pdf, video)
+              if (block.type !== 'text' && req.files && req.files.length > 0) {
+                // The frontend sends files as content_{blockId}
+                const fileField = `content_${block.id}`;
+                const file = req.files.find(f => f.fieldname === fileField);
+                if (file) {
+                  const fileUrl = `/uploads/courses/content/${file.filename}`;
+                  await client.query(
+                    'INSERT INTO course_files (course_id, section_id, block_id, file_name, file_path, file_type, file_size, original_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                    [courseId, sectionId, blockId, file.filename, fileUrl, file.mimetype, file.size, file.originalname]
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+      await client.query('COMMIT');
+      // Get the created course with all details
+      const createdCourse = await getRow(`
+        SELECT 
+          c.id, 
+          c.title, 
+          c.description, 
+          c.price, 
+          c.is_published, 
+          c.created_at,
+          c.status,
+          cc.cover as cover_url
+        FROM courses c
+        LEFT JOIN course_covers cc ON c.id = cc.course_id
+        WHERE c.id = $1
+      `, [courseId]);
+      res.status(201).json(createdCourse);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error('Error creating course:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
+// Add endpoint to update course path (material_id) and set status to 'pending'
+router.put('/:id/approve', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    // Check if course exists
+    const course = await getRow('SELECT * FROM courses WHERE id = $1', [courseId]);
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    // Approve the course
+    const result = await query(
+      'UPDATE courses SET status = $1, approved_at = NOW() WHERE id = $2 RETURNING *',
+      ['approved', courseId]
+    );
+    // Optionally: notify the professor (not implemented here)
+    res.json({ message: 'Course approved', course: result.rows[0] });
+  } catch (error) {
+    console.error('Error approving course:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add endpoint to update course language path (language_level_id) and set status to 'pending'
+router.put('/:id/language-path', verifyToken, requireRole(['professor']), async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    const { language_level_id } = req.body;
+    if (!language_level_id) {
+      return res.status(400).json({ error: 'language_level_id is required' });
+    }
+    // Only allow the professor who created the course to update it
+    const course = await getRow('SELECT id, created_by FROM courses WHERE id = $1', [courseId]);
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    if (course.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'You can only update your own courses' });
+    }
+    // Update language_level_id and set status to 'pending'
+    const result = await query(
+      'UPDATE courses SET language_level_id = $1, status = $2 WHERE id = $3 RETURNING *',
+      [language_level_id, 'pending', courseId]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating course language path:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Update course
-router.put('/:id', async (req, res) => {
+router.put('/:id', verifyToken, requireRole(['professor', 'admin']), async (req, res) => {
   try {
     const { title, description, material_id, price, is_published } = req.body;
     const courseId = req.params.id;
     
     // Check if course exists
-    const existingCourse = await getRow('SELECT id FROM courses WHERE id = $1', [courseId]);
+    const existingCourse = await getRow('SELECT id, created_by FROM courses WHERE id = $1', [courseId]);
     if (!existingCourse) {
       return res.status(404).json({ error: 'Course not found' });
+    }
+    
+    // Check permissions
+    if (req.user.role === 'professor' && existingCourse.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'You can only update your own courses' });
     }
     
     // Update course
@@ -132,17 +379,22 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete course
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (req, res) => {
   try {
     const courseId = req.params.id;
     
     // Check if course exists
-    const existingCourse = await getRow('SELECT id FROM courses WHERE id = $1', [courseId]);
+    const existingCourse = await getRow('SELECT id, created_by FROM courses WHERE id = $1', [courseId]);
     if (!existingCourse) {
       return res.status(404).json({ error: 'Course not found' });
     }
     
-    // Delete course (this will cascade delete sections and blocks)
+    // Check permissions
+    if (req.user.role === 'professor' && existingCourse.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'You can only delete your own courses' });
+    }
+    
+    // Delete course (this will cascade delete sections, blocks, covers, and files)
     await query('DELETE FROM courses WHERE id = $1', [courseId]);
     
     res.json({ message: 'Course deleted successfully' });
@@ -172,6 +424,69 @@ router.get('/materials/list', async (req, res) => {
     res.json(materials);
   } catch (error) {
     console.error('Error fetching materials:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin endpoint to scan course files and folders
+router.get('/admin/scan-files', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const coursesDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'courses');
+    const coversDir = path.join(coursesDir, 'covers');
+    const contentDir = path.join(coursesDir, 'content');
+    
+    const scanDirectory = (dir) => {
+      if (!fs.existsSync(dir)) {
+        return [];
+      }
+      
+      const items = [];
+      const files = fs.readdirSync(dir);
+      
+      for (const file of files) {
+        const filePath = path.join(dir, file);
+        const stat = fs.statSync(filePath);
+        
+        if (stat.isDirectory()) {
+          items.push({
+            name: file,
+            type: 'directory',
+            path: filePath,
+            size: null,
+            modified: stat.mtime
+          });
+        } else {
+          items.push({
+            name: file,
+            type: 'file',
+            path: filePath,
+            size: stat.size,
+            modified: stat.mtime
+          });
+        }
+      }
+      
+      return items;
+    };
+    
+    const result = {
+      covers: scanDirectory(coversDir),
+      content: scanDirectory(contentDir),
+      totalCovers: 0,
+      totalContentFiles: 0,
+      totalSize: 0
+    };
+    
+    // Calculate totals
+    result.totalCovers = result.covers.filter(item => item.type === 'file').length;
+    result.totalContentFiles = result.content.filter(item => item.type === 'file').length;
+    result.totalSize = [...result.covers, ...result.content]
+      .filter(item => item.type === 'file')
+      .reduce((sum, item) => sum + (item.size || 0), 0);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error scanning course files:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -11,7 +11,7 @@ import {
   Users,
   Image,
   Video,
-  
+  FolderOpen,
   HelpCircle,
   BarChart
 } from 'lucide-react';
@@ -23,6 +23,7 @@ const Sidebar = () => {
     { name: 'Dashboard', path: '/admin/dashboard', icon: <Home className="h-5 w-5" /> },
     { name: 'Education Structure', path: '/admin/structure', icon: <Layers className="h-5 w-5" /> },
     { name: 'Courses', path: '/admin/courses', icon: <BookOpen className="h-5 w-5" /> },
+    { name: 'Course Files', path: '/admin/course-files', icon: <FolderOpen className="h-5 w-5" /> },
     { name: 'Pending Approvals', path: '/admin/pending', icon: <Clock className="h-5 w-5" /> },
     { name: 'Quiz Management', path: '/admin/quizzes', icon: <HelpCircle className="h-5 w-5" /> },
     { name: 'Live Sessions', path: '/admin/live-sessions', icon: <Video className="h-5 w-5" /> },

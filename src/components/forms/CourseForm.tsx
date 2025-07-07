@@ -18,6 +18,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { ContentBlock, Section } from '@/types';
 import { toast } from '@/lib/toast';
+import { coursesAPI } from '@/services/api';
 
 interface CourseFormProps {
   onSuccess?: () => void;
@@ -37,7 +38,9 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<{[key: string]: File}>({});
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const fileInputRefs = useRef<{[key: string]: HTMLInputElement | null}>({});
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
 
   const addSection = () => {
     setSections([
@@ -148,6 +151,14 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
     }
   };
 
+  const handleCoverUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      setCoverFile(file);
+    }
+  };
+
   const createFileBlob = (file: File): string => {
     return URL.createObjectURL(file);
   };
@@ -178,53 +189,42 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
         throw new Error('User not authenticated');
       }
       
-      // Process each section to handle file uploads
-      const processedSections = validSections.map(section => {
-        const processedBlocks = section.blocks.map(block => {
-          // For non-text blocks, ensure we have the file
-          if (block.type !== 'text' && block.content && uploadedFiles[block.id]) {
-            // In a real app, you would upload the file to a server here
-            // For now, we're storing file info in the content field
-            const file = uploadedFiles[block.id];
-            return {
-              ...block,
-              // Store reference to the file with name for display
-              content: `${block.id}_${file.name}`,
-              fileType: file.type,
-              fileSize: file.size
-            };
-          }
-          return block;
-        });
-        
-        return {
-          ...section,
-          blocks: processedBlocks
-        };
-      });
+      // Create FormData for file upload
+      const formData = new FormData();
       
-      const courseData = {
-        title,
-        description,
-        sections: processedSections,
-        createdBy: user.id
-      };
+      // Add basic course data
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('sections', JSON.stringify(validSections));
       
-      // Upload files to local storage (simulated)
+      // Add cover file if selected
+      if (coverFile) {
+        formData.append('cover', coverFile);
+      }
+      
+      // Add content files
       Object.entries(uploadedFiles).forEach(([blockId, file]) => {
-        const fileBlob = URL.createObjectURL(file);
-        // In a real application, you would upload to a server
-        // For now, we'll save to localStorage for demo purposes
-        localStorage.setItem(`${blockId}_${file.name}`, fileBlob);
+        formData.append(`content_${blockId}`, file);
       });
       
-      await api.submitCourse(courseData);
+      // Debug: log FormData keys
+      for (let pair of formData.entries()) {
+        console.log('[CourseForm] FormData:', pair[0], pair[1]);
+      }
+      
+      // Submit course with files
+      await coursesAPI.submitCourseWithFiles(formData);
       toast.success('Course submitted for review');
       
+      // Reset form
       setTitle('');
       setDescription('');
       setSections([{ id: `section_${Date.now()}`, title: '', blocks: [] }]);
       setUploadedFiles({});
+      setCoverFile(null);
+      if (coverInputRef.current) {
+        coverInputRef.current.value = '';
+      }
       
       onSuccess?.();
     } catch (error) {
@@ -361,6 +361,59 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
             required
           />
         </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="course-cover">Course Cover Image (Optional)</Label>
+          <Input
+            ref={coverInputRef}
+            id="course-cover"
+            type="file"
+            accept="image/*"
+            onChange={handleCoverUpload}
+            className="flex-1"
+          />
+          
+          {coverFile && (
+            <div className="p-3 bg-gray-50 rounded-md border">
+              <div className="flex items-center gap-2">
+                <div className="relative h-16 w-16 border rounded overflow-hidden">
+                  <img 
+                    src={createFileBlob(coverFile)} 
+                    alt="Cover Preview" 
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{coverFile.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {(coverFile.size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+                
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => {
+                    setCoverFile(null);
+                    if (coverInputRef.current) {
+                      coverInputRef.current.value = '';
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Remove the Course Path / Material (Optional) select and related logic */}
+        {/* Remove materialId state, setMaterialId, and all references to materialId */}
+        {/* Remove the Select component for path/material */}
+        {/* Remove logic in handleSubmit that appends material_id to FormData */}
       </div>
       
       <div className="space-y-4">

@@ -7,7 +7,7 @@ const router = express.Router();
 // ===== LEVELS =====
 
 // GET /api/levels → list all levels
-router.get('/levels', verifyToken, requireRole(['admin']), async (req, res) => {
+router.get('/levels', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
   try {
     const levels = await getRows('SELECT * FROM levels ORDER BY name');
     res.json(levels);
@@ -99,7 +99,7 @@ router.delete('/levels/:id', verifyToken, requireRole(['admin']), async (req, re
 // ===== YEARS =====
 
 // GET /api/years → list all years
-router.get('/years', verifyToken, requireRole(['admin']), async (req, res) => {
+router.get('/years', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
   try {
     const years = await getRows(`
       SELECT y.*, l.name as level_name 
@@ -115,7 +115,7 @@ router.get('/years', verifyToken, requireRole(['admin']), async (req, res) => {
 });
 
 // GET /api/levels/:levelId/years → list years for a specific level
-router.get('/levels/:levelId/years', verifyToken, requireRole(['admin']), async (req, res) => {
+router.get('/levels/:levelId/years', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
   const { levelId } = req.params;
   try {
     const years = await getRows(
@@ -228,7 +228,7 @@ router.delete('/years/:id', verifyToken, requireRole(['admin']), async (req, res
 // ===== SPECIALITIES =====
 
 // GET /api/specialities → list all specialities
-router.get('/specialities', verifyToken, requireRole(['admin']), async (req, res) => {
+router.get('/specialities', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
   try {
     const specialities = await getRows(`
       SELECT s.*, y.name as year_name, l.name as level_name 
@@ -245,7 +245,7 @@ router.get('/specialities', verifyToken, requireRole(['admin']), async (req, res
 });
 
 // GET /api/years/:yearId/specialities → list specialities for a specific year
-router.get('/years/:yearId/specialities', verifyToken, requireRole(['admin']), async (req, res) => {
+router.get('/years/:yearId/specialities', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
   const { yearId } = req.params;
   try {
     const specialities = await getRows(
@@ -358,7 +358,7 @@ router.delete('/specialities/:id', verifyToken, requireRole(['admin']), async (r
 // ===== MATERIALS =====
 
 // GET /api/materials → list all materials
-router.get('/materials', verifyToken, requireRole(['admin']), async (req, res) => {
+router.get('/materials', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
   try {
     const materials = await getRows(`
       SELECT m.*, s.name as speciality_name, y.name as year_name, l.name as level_name 
@@ -376,7 +376,7 @@ router.get('/materials', verifyToken, requireRole(['admin']), async (req, res) =
 });
 
 // GET /api/specialities/:specialityId/materials → list materials for a specific speciality
-router.get('/specialities/:specialityId/materials', verifyToken, requireRole(['admin']), async (req, res) => {
+router.get('/specialities/:specialityId/materials', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
   const { specialityId } = req.params;
   try {
     const materials = await getRows(
@@ -489,7 +489,7 @@ router.delete('/materials/:id', verifyToken, requireRole(['admin']), async (req,
 // ===== LANGUAGES =====
 
 // GET /api/languages → list all languages
-router.get('/languages', verifyToken, requireRole(['admin']), async (req, res) => {
+router.get('/languages', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
   try {
     const languages = await getRows('SELECT * FROM languages ORDER BY name');
     res.json(languages);
@@ -584,7 +584,7 @@ router.delete('/languages/:id', verifyToken, requireRole(['admin']), async (req,
 // ===== LANGUAGE LEVELS =====
 
 // GET /api/language-levels → list all language levels
-router.get('/language-levels', verifyToken, requireRole(['admin']), async (req, res) => {
+router.get('/language-levels', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
   try {
     const levels = await getRows(`
       SELECT ll.*, l.name as language_name, l.code as language_code 
@@ -600,7 +600,7 @@ router.get('/language-levels', verifyToken, requireRole(['admin']), async (req, 
 });
 
 // GET /api/languages/:languageId/levels → list levels for a specific language
-router.get('/languages/:languageId/levels', verifyToken, requireRole(['admin']), async (req, res) => {
+router.get('/languages/:languageId/levels', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
   const { languageId } = req.params;
   try {
     const levels = await getRows(
