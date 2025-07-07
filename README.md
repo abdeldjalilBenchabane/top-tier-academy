@@ -394,6 +394,10 @@ To add the new `language_level_id` column, run the migration script:
 ```bash
 node add_language_level_id_to_courses.js
 ```
+To add the `course_covers` table (for course cover images), run:
+```bash
+node add_course_cover_table.js
+```
 
 ---
 
