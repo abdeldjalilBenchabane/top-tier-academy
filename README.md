@@ -357,6 +357,46 @@ npm run init-db
 
 This ensures your database has the new slides and language tables and relationships.
 
+## 🆕 Course Approval & Path Assignment Workflow (2024 Update)
+
+### Database Changes
+- Added `language_level_id` column to the `courses` table (migration required).
+- Courses now support both material-based and language-based paths.
+- Backend `/api/courses` endpoint supports filtering by `status` and `created_by`.
+
+### Professor Flow
+- Professors can assign a path (material or language level) to their course.
+- Professors use a cascading PathSelector to choose Level → Year → Speciality → Material or Language → Level.
+- Professors submit courses for approval; only pending courses are sent to admin.
+
+### Admin Flow
+- Admins see real pending courses at `/admin/pending`.
+- Admins can approve or reject courses (with reason) but cannot assign paths.
+- Approved courses appear in `/admin/courses`.
+- The admin UI uses styled Approve/Reject buttons and robust error handling.
+
+### New/Updated Endpoints
+- `PUT /api/courses/:id/path` (professor assigns material path)
+- `PUT /api/courses/:id/language-path` (professor assigns language path)
+- `PUT /api/courses/:id/approve` (admin approves course)
+- `PUT /api/courses/:id/reject` (admin rejects course)
+- `GET /api/courses?status=pending` (admin fetches pending courses)
+- `GET /api/courses?status=approved` (admin fetches approved courses)
+
+### Frontend Improvements
+- PathSelector uses cascading selects and fetches only relevant children.
+- All API calls include Authorization headers for proper role-based access.
+- Admin and professor flows are fully separated in the UI.
+- Improved error handling and accessibility for all course management pages.
+
+### Migration
+To add the new `language_level_id` column, run the migration script:
+```bash
+node add_language_level_id_to_courses.js
+```
+
+---
+
 ## 🤝 Contributing
 
 1. Fork the repository
