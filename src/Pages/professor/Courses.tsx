@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 const ProfessorCourses = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [courses, setCourses] = useState<PendingCourse[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showPathSelector, setShowPathSelector] = useState(false);
   const [selectedDraftCourse, setSelectedDraftCourse] = useState<PendingCourse | null>(null);
@@ -63,6 +63,7 @@ const ProfessorCourses = () => {
   const pendingCount = courses.filter(c => c.status === 'pending').length;
   const rejectedCount = courses.filter(c => c.status === 'rejected').length;
   const draftCount = courses.filter(c => c.status === 'draft').length;
+  const approvedCount = courses.filter(c => c.status === 'approved').length;
 
   return (
     <div className="space-y-6">
@@ -118,6 +119,11 @@ const ProfessorCourses = () => {
             </TabsTrigger>
             <TabsTrigger value="approved">
               Approved
+              {approvedCount > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {approvedCount}
+                </Badge>
+              )}
             </TabsTrigger>
           </TabsList>
           
@@ -140,7 +146,7 @@ const ProfessorCourses = () => {
                         </p>
                         <div className="flex items-center text-xs text-gray-500">
                           <Calendar className="h-3.5 w-3.5 mr-1" />
-                          <span>Created: {formatDate(course.created_at)}</span>
+                          <span>Created: {formatDate(course.createdAt)}</span>
                         </div>
                       </CardContent>
                       <CardFooter className="pt-0 flex flex-col gap-2">
@@ -211,7 +217,7 @@ const ProfessorCourses = () => {
           </TabsContent>
           
           <TabsContent value="rejected" className="mt-0">
-            {courses.filter(c => c.status === 'rejected').length > 0 ? (
+            {rejectedCount > 0 ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {courses
                   .filter(course => course.status === 'rejected')
@@ -226,7 +232,6 @@ const ProfessorCourses = () => {
                           </Badge>
                         </div>
                       </CardHeader>
-                      
                       <CardContent className="pb-2">
                         <p className="text-sm text-gray-600 line-clamp-2 mb-2">
                           {course.description}
@@ -236,7 +241,6 @@ const ProfessorCourses = () => {
                           <span>Rejected: {formatDate(course.rejectedAt || '')}</span>
                         </div>
                       </CardContent>
-                      
                       <CardFooter className="pt-0 flex gap-2">
                         <Button variant="outline" className="flex-1 flex items-center justify-center" onClick={() => navigate(`/professor/courses/${course.id}`)}>
                           <FileText className="h-4 w-4 mr-2" />
@@ -253,17 +257,52 @@ const ProfessorCourses = () => {
               <EmptyState
                 title="No Rejected Courses"
                 description="You don't have any rejected courses."
-                icon={<XCircle className="h-12 w-12 text-gray-400" />}
+                icon={<XCircle className="h-12 w-12 text-red-400" />}
               />
             )}
           </TabsContent>
           
           <TabsContent value="approved" className="mt-0">
-            <EmptyState
-              title="No Approved Courses"
-              description="You don't have any approved courses yet."
-              icon={<CheckCircle className="h-12 w-12 text-gray-400" />}
-            />
+            {courses.filter(c => c.status === 'approved').length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {courses
+                  .filter(course => course.status === 'approved')
+                  .map(course => (
+                    <Card key={course.id} className="overflow-hidden">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-lg line-clamp-1">{course.title}</CardTitle>
+                          <Badge variant="outline" className="bg-green-50">
+                            <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
+                            <span className="text-green-700">Approved</span>
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pb-2">
+                        <p className="text-sm text-gray-600 line-clamp-2 mb-2">
+                          {course.description}
+                        </p>
+                        <div className="flex items-center text-xs text-gray-500">
+                          <Calendar className="h-3.5 w-3.5 mr-1" />
+                          <span>Approved: {formatDate(course.approvedAt || '')}</span>
+                        </div>
+                      </CardContent>
+                      <CardFooter className="pt-0">
+                        <Button variant="outline" className="w-full flex items-center justify-center" onClick={() => navigate(`/professor/courses/${course.id}`)}>
+                          <FileText className="h-4 w-4 mr-2" />
+                          View
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No Approved Courses"
+                description="You don't have any approved courses yet."
+                icon={<CheckCircle className="h-12 w-12 text-gray-400" />}
+              />
+            )}
           </TabsContent>
         </Tabs>
       )}

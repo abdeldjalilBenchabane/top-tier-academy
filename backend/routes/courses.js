@@ -125,7 +125,6 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const courseId = req.params.id;
-    
     // Get course details
     const course = await getRow(`
       SELECT 
@@ -134,22 +133,29 @@ router.get('/:id', async (req, res) => {
         c.description, 
         c.price, 
         c.is_published, 
-        c.created_at,
-        c.approved_at,
+        c.created_at AS "createdAt",
+        c.approved_at AS "approvedAt",
+        c.created_by AS "createdBy",
+        c.material_id AS "materialId",
+        c.status,
         u.name as created_by_name,
         m.name as material_name,
+        m.speciality_id AS "specialityId",
+        s.year_id AS "yearId",
+        y.level_id AS "levelId",
         cc.cover as cover_url
       FROM courses c
       LEFT JOIN users u ON c.created_by = u.id
       LEFT JOIN materials m ON c.material_id = m.id
+      LEFT JOIN specialities s ON m.speciality_id = s.id
+      LEFT JOIN years y ON s.year_id = y.id
+      LEFT JOIN levels l ON y.level_id = l.id
       LEFT JOIN course_covers cc ON c.id = cc.course_id
       WHERE c.id = $1
     `, [courseId]);
-    
     if (!course) {
       return res.status(404).json({ error: 'Course not found' });
     }
-    
     // Get course sections
     const sections = await getRows(`
       SELECT id, title, "order"
@@ -157,7 +163,6 @@ router.get('/:id', async (req, res) => {
       WHERE course_id = $1
       ORDER BY "order"
     `, [courseId]);
-    
     // Get blocks for each section
     for (let section of sections) {
       const blocks = await getRows(`
@@ -166,7 +171,6 @@ router.get('/:id', async (req, res) => {
         WHERE section_id = $1
         ORDER BY "order"
       `, [section.id]);
-      
       // Get files for each block
       for (let block of blocks) {
         if (block.type !== 'text') {
@@ -177,12 +181,14 @@ router.get('/:id', async (req, res) => {
             ORDER BY created_at
           `, [block.id]);
           block.files = files;
+          if (files && files.length > 0) {
+            block.fileUrl = files[0].file_path;
+            block.content = files[0].file_path; // for frontend compatibility
+          }
         }
       }
-      
       section.blocks = blocks;
     }
-    
     course.sections = sections;
     res.json(course);
   } catch (error) {

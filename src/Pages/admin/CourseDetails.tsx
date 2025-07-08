@@ -37,17 +37,13 @@ const CourseDetailsPage = () => {
   useEffect(() => {
     const loadCourseData = async () => {
       if (!courseId) return;
-      
       setIsLoading(true);
       setIsLoadingProfessor(true);
-      
       try {
-        // Check if it's a regular course
+        // Always fetch from backend
         const courseData = await api.getCourseById(courseId);
-        
         if (courseData) {
           setCourse(courseData);
-          
           // Load professor data for approved course
           if (courseData.createdBy) {
             try {
@@ -62,83 +58,36 @@ const CourseDetailsPage = () => {
           } else {
             setIsLoadingProfessor(false);
           }
-          
           // Load course path data (material, speciality, year, level)
           if (courseData.materialId) {
-            const materialsData = await api.getMaterials();
+            const materialsData = await api.getAllMaterials();
             const materialData = materialsData.find(m => m.id === courseData.materialId);
             setMaterial(materialData || null);
-            
-            if (materialData) {
-              const specialitiesData = await api.getSpecialities();
-              const specialityData = specialitiesData.find(s => s.id === materialData.specialityId);
+            let specialityData = null;
+            if (courseData.specialityId) {
+              const specialitiesData = await api.getAllSpecialities();
+              specialityData = specialitiesData.find(s => s.id === courseData.specialityId);
               setSpeciality(specialityData || null);
-              
-              if (specialityData) {
-                const yearsData = await api.getYears();
-                const yearData = yearsData.find(y => y.id === specialityData.yearId);
-                setYear(yearData || null);
-                
-                if (yearData) {
-                  const levelsData = await api.getLevels();
-                  const levelData = levelsData.find(l => l.id === yearData.levelId);
-                  setLevel(levelData || null);
-                }
-              }
+            }
+            if (courseData.yearId) {
+              const yearsData = await api.getAllYears();
+              const yearData = yearsData.find(y => y.id === courseData.yearId);
+              setYear(yearData || null);
+            } else if (specialityData && specialityData.yearId) {
+              const yearsData = await api.getAllYears();
+              const yearData = yearsData.find(y => y.id === specialityData.yearId);
+              setYear(yearData || null);
+            }
+            if (courseData.levelId) {
+              const levelsData = await api.getLevels();
+              const levelData = levelsData.find(l => l.id === courseData.levelId);
+              setLevel(levelData || null);
             }
           }
         } else {
-          // If not found as regular course, check pending courses
-          const pendingCourseData = await api.getPendingCourseById(courseId);
-          
-          if (pendingCourseData) {
-            setPendingCourse(pendingCourseData);
-            setCourse(pendingCourseData as Course);
-            
-            // Load professor data for pending course
-            if (pendingCourseData.createdBy) {
-              try {
-                const professorData = await api.getProfessorById(pendingCourseData.createdBy);
-                setProfessor(professorData);
-              } catch (err) {
-                console.error('Failed to load professor for pending course:', err);
-              } finally {
-                setIsLoadingProfessor(false);
-              }
-            } else {
-              setIsLoadingProfessor(false);
-            }
-            
-            // Load material data if available
-            if (pendingCourseData.materialId) {
-              const materialsData = await api.getMaterials();
-              const materialData = materialsData.find(m => m.id === pendingCourseData.materialId);
-              setMaterial(materialData || null);
-              
-              if (materialData) {
-                const specialitiesData = await api.getSpecialities();
-                const specialityData = specialitiesData.find(s => s.id === materialData.specialityId);
-                setSpeciality(specialityData || null);
-                
-                if (specialityData) {
-                  const yearsData = await api.getYears();
-                  const yearData = yearsData.find(y => y.id === specialityData.yearId);
-                  setYear(yearData || null);
-                  
-                  if (yearData) {
-                    const levelsData = await api.getLevels();
-                    const levelData = levelsData.find(l => l.id === yearData.levelId);
-                    setLevel(levelData || null);
-                  }
-                }
-              }
-            }
-          } else {
-            // Neither found as regular nor pending course
-            toast.error('Course not found');
-            navigate('/admin/courses');
-            return;
-          }
+          toast.error('Course not found');
+          navigate('/admin/courses');
+          return;
         }
       } catch (error) {
         console.error('Failed to load course data:', error);
@@ -147,7 +96,6 @@ const CourseDetailsPage = () => {
         setIsLoading(false);
       }
     };
-    
     loadCourseData();
   }, [courseId, navigate]);
 
@@ -317,7 +265,13 @@ const CourseDetailsPage = () => {
                 <div className="flex flex-wrap gap-1 mt-1">
                   <Badge variant="outline" className="text-xs flex items-center">
                     <Layers className="h-3 w-3 mr-1" />
-                    {level?.name || 'Level'} &gt; {year?.name || 'Year'} &gt; {speciality?.name || 'Speciality'} &gt; {material?.name || 'Material'}
+                    {level && <>{level.name}</>}
+                    {level && year && <>&nbsp;&gt;&nbsp;</>}
+                    {year && <>{year.name}</>}
+                    {year && speciality && <>&nbsp;&gt;&nbsp;</>}
+                    {speciality && <>{speciality.name}</>}
+                    {speciality && material && <>&nbsp;&gt;&nbsp;</>}
+                    {material && <>{material.name}</>}
                   </Badge>
                 </div>
               </div>
@@ -417,15 +371,15 @@ const CourseDetailsPage = () => {
                                 
                                 {block.type === 'image' && (
                                   <div className="border rounded-md p-4">
-                                    {isFileReference(block.content) && getStoredFile(block.content) ? (
+                                    {block.fileUrl ? (
                                       <div className="flex flex-col items-center">
                                         <img 
-                                          src={getStoredFile(block.content)} 
-                                          alt={getFilenameFromReference(block.content)}
+                                          src={block.fileUrl} 
+                                          alt={block.title || 'Course image'}
                                           className="max-w-full max-h-[400px] rounded-md object-contain"
                                         />
                                         <p className="text-sm text-gray-500 mt-2">
-                                          {getFilenameFromReference(block.content)}
+                                          {block.title || 'Image'}
                                         </p>
                                       </div>
                                     ) : (
@@ -434,14 +388,8 @@ const CourseDetailsPage = () => {
                                           <ImageIcon className="h-6 w-6 text-gray-400" />
                                         </div>
                                         <p className="text-sm text-gray-500">
-                                          {isFileReference(block.content) 
-                                            ? `Image: ${getFilenameFromReference(block.content)} (not available)`
-                                            : `Image: ${block.content}`}
+                                          Image not available
                                         </p>
-                                        <Button variant="outline" size="sm" className="flex items-center gap-1">
-                                          <Download className="h-4 w-4" />
-                                          Download
-                                        </Button>
                                       </div>
                                     )}
                                   </div>
@@ -449,15 +397,15 @@ const CourseDetailsPage = () => {
                                 
                                 {block.type === 'video' && (
                                   <div className="border rounded-md p-4">
-                                    {isFileReference(block.content) && getStoredFile(block.content) ? (
+                                    {block.fileUrl ? (
                                       <div className="flex flex-col items-center">
                                         <video 
-                                          src={getStoredFile(block.content)} 
+                                          src={block.fileUrl} 
                                           controls
                                           className="max-w-full max-h-[400px] rounded-md"
                                         />
                                         <p className="text-sm text-gray-500 mt-2">
-                                          {getFilenameFromReference(block.content)}
+                                          {block.title || 'Video'}
                                         </p>
                                       </div>
                                     ) : (
@@ -466,14 +414,8 @@ const CourseDetailsPage = () => {
                                           <Video className="h-6 w-6 text-gray-400" />
                                         </div>
                                         <p className="text-sm text-gray-500">
-                                          {isFileReference(block.content) 
-                                            ? `Video: ${getFilenameFromReference(block.content)} (not available)`
-                                            : `Video: ${block.content}`}
+                                          Video not available
                                         </p>
-                                        <Button variant="outline" size="sm" className="flex items-center gap-1">
-                                          <Download className="h-4 w-4" />
-                                          Download
-                                        </Button>
                                       </div>
                                     )}
                                   </div>
@@ -481,21 +423,21 @@ const CourseDetailsPage = () => {
                                 
                                 {block.type === 'pdf' && (
                                   <div className="border rounded-md p-4">
-                                    {isFileReference(block.content) && getStoredFile(block.content) ? (
+                                    {block.fileUrl ? (
                                       <div className="flex flex-col items-center">
                                         <object
-                                          data={getStoredFile(block.content)}
+                                          data={block.fileUrl}
                                           type="application/pdf"
                                           width="100%"
                                           height="500px"
                                           className="rounded-md border"
                                         >
                                           <p>Your browser does not support PDFs. 
-                                            <a href={getStoredFile(block.content)} download={getFilenameFromReference(block.content)}>Download the PDF</a>
+                                            <a href={block.fileUrl} download={block.title || 'PDF'}>Download the PDF</a>
                                           </p>
                                         </object>
                                         <p className="text-sm text-gray-500 mt-2">
-                                          {getFilenameFromReference(block.content)}
+                                          {block.title || 'PDF'}
                                         </p>
                                       </div>
                                     ) : (
@@ -504,14 +446,8 @@ const CourseDetailsPage = () => {
                                           <FileText className="h-6 w-6 text-gray-400" />
                                         </div>
                                         <p className="text-sm text-gray-500">
-                                          {isFileReference(block.content) 
-                                            ? `PDF: ${getFilenameFromReference(block.content)} (not available)`
-                                            : `PDF: ${block.content}`}
+                                          PDF not available
                                         </p>
-                                        <Button variant="outline" size="sm" className="flex items-center gap-1">
-                                          <Download className="h-4 w-4" />
-                                          Download
-                                        </Button>
                                       </div>
                                     )}
                                   </div>

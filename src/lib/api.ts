@@ -581,28 +581,17 @@ export const api = {
     return await res.json();
   },
   getCourseById: async (courseId: string): Promise<Course | null> => {
-    await delay(500);
-    const course = mockData.courses.find(course => course.id === courseId);
-    if (course) {
-      return course;
+    const res = await fetch(`/api/courses/${courseId}`, {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) {
+      if (res.status === 404) return null;
+      throw new Error('Failed to fetch course');
     }
-
-    const pendingCourse = mockData.pendingCourses.find(course => course.id === courseId);
-    if (pendingCourse && pendingCourse.status === 'approved') {
-      return {
-        id: pendingCourse.id,
-        materialId: pendingCourse.materialId,
-        title: pendingCourse.title,
-        description: pendingCourse.description,
-        sections: pendingCourse.sections,
-        createdBy: pendingCourse.createdBy,
-        createdAt: pendingCourse.createdAt,
-        approvedAt: pendingCourse.approvedAt,
-        price: pendingCourse.price
-      };
-    }
-
-    return null;
+    return await res.json();
   },
   getPendingCourseById: async (courseId: string): Promise<PendingCourse | null> => {
     await delay(500);
@@ -610,14 +599,19 @@ export const api = {
     return pendingCourse || null;
   },
   getProfessorById: async (professorId: string): Promise<User | null> => {
-    await delay(500);
-    const professor = mockData.users.find(user => user.id === professorId && user.role === 'professor');
-
-    if (professorId && !professor) {
-      console.warn(`Professor with ID ${professorId} not found`);
+    const res = await fetch(`/api/users/${professorId}`, {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) {
+      if (res.status === 404) return null;
+      throw new Error('Failed to fetch professor');
     }
-
-    return professor || null;
+    const user = await res.json();
+    if (user.role !== 'professor') return null;
+    return user;
   },
   createCourse: async (course: Omit<Course, 'id' | 'createdAt' | 'sections' | 'createdBy' | 'approvedAt' | 'materialId'>, courseData: { sections: Array<{ title: string, blocks: Array<Omit<ContentBlock, 'id'>> }> }): Promise<Course> => {
     await delay(500);
