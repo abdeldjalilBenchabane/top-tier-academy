@@ -354,6 +354,45 @@ router.put('/:id/language-path', verifyToken, requireRole(['professor']), async 
   }
 });
 
+// Add endpoint to update course cover (admin only)
+router.put('/:id/cover', verifyToken, requireRole(['admin']), courseUpload.single('cover'), async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    // Check if course exists
+    const course = await getRow('SELECT * FROM courses WHERE id = $1', [courseId]);
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    // Get old cover if exists
+    const oldCover = await getRow('SELECT cover FROM course_covers WHERE course_id = $1', [courseId]);
+    // Handle new cover upload
+    if (!req.file) {
+      return res.status(400).json({ error: 'No cover file uploaded' });
+    }
+    const coverUrl = `/uploads/courses/covers/${req.file.filename}`;
+    // Delete old cover file if exists
+    if (oldCover && oldCover.cover) {
+      const oldCoverPath = path.join(__dirname, '..', '..', 'public', oldCover.cover);
+      try {
+        if (fs.existsSync(oldCoverPath)) {
+          fs.unlinkSync(oldCoverPath);
+        }
+      } catch (err) {
+        console.error('Error deleting old cover:', err);
+      }
+      // Update cover row
+      await query('UPDATE course_covers SET cover = $1 WHERE course_id = $2', [coverUrl, courseId]);
+    } else {
+      // Insert new cover row
+      await query('INSERT INTO course_covers (course_id, cover) VALUES ($1, $2) ON CONFLICT (course_id) DO UPDATE SET cover = EXCLUDED.cover', [courseId, coverUrl]);
+    }
+    res.json({ cover_url: coverUrl });
+  } catch (error) {
+    console.error('Error updating course cover:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Update course
 router.put('/:id', verifyToken, requireRole(['professor', 'admin']), async (req, res) => {
   try {
@@ -388,24 +427,160 @@ router.put('/:id', verifyToken, requireRole(['professor', 'admin']), async (req,
 router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (req, res) => {
   try {
     const courseId = req.params.id;
-    
-    // Check if course exists
-    const existingCourse = await getRow('SELECT id, created_by FROM courses WHERE id = $1', [courseId]);
-    if (!existingCourse) {
-      return res.status(404).json({ error: 'Course not found' });
+    // Get all sections in the course
+    const sections = await getRows('SELECT id FROM course_sections WHERE course_id = $1', [courseId]);
+    for (const section of sections) {
+      const blocks = await getRows('SELECT id FROM section_blocks WHERE section_id = $1', [section.id]);
+      for (const block of blocks) {
+        await deleteBlockFiles(block.id);
+      }
     }
-    
-    // Check permissions
-    if (req.user.role === 'professor' && existingCourse.created_by !== req.user.id) {
-      return res.status(403).json({ error: 'You can only delete your own courses' });
-    }
-    
-    // Delete course (this will cascade delete sections, blocks, covers, and files)
+    // Now delete course (this will cascade delete sections, blocks, covers, and files in DB)
     await query('DELETE FROM courses WHERE id = $1', [courseId]);
-    
     res.json({ message: 'Course deleted successfully' });
   } catch (error) {
     console.error('Error deleting course:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete a block and its file (if any)
+router.delete('/blocks/:blockId', verifyToken, requireRole(['professor', 'admin']), async (req, res) => {
+  try {
+    const blockId = req.params.blockId;
+    // Always treat blockId as string
+    const block = await getRow('SELECT type FROM section_blocks WHERE id = $1', [blockId]);
+    if (!block) return res.status(200).json({ message: 'Block already deleted', blockId });
+    if (block.type !== 'text') {
+      const files = await getRows('SELECT file_path FROM course_files WHERE block_id = $1', [blockId]);
+      for (const file of files) {
+        const filePath = path.join(__dirname, '..', '..', 'public', file.file_path);
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        } catch (err) {
+          console.error('Error deleting file:', err);
+        }
+      }
+      // Delete file records
+      await query('DELETE FROM course_files WHERE block_id = $1', [blockId]);
+    }
+    // Delete the block
+    await query('DELETE FROM section_blocks WHERE id = $1', [blockId]);
+    res.json({ message: 'Block deleted', blockId });
+  } catch (error) {
+    console.error('Error deleting block:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Helper to delete files for a block
+async function deleteBlockFiles(blockId) {
+  const files = await getRows('SELECT file_path FROM course_files WHERE block_id = $1', [blockId]);
+  for (const file of files) {
+    const filePath = path.join(__dirname, '..', '..', 'public', file.file_path);
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (err) {
+      console.error('Error deleting file:', err);
+    }
+  }
+  await query('DELETE FROM course_files WHERE block_id = $1', [blockId]);
+}
+
+// Create a new section
+router.post('/sections', verifyToken, requireRole(['professor', 'admin']), async (req, res) => {
+  try {
+    const { course_id, title, order } = req.body;
+    if (!course_id || !title) return res.status(400).json({ error: 'course_id and title are required' });
+    const result = await query(
+      'INSERT INTO course_sections (course_id, title, "order") VALUES ($1, $2, $3) RETURNING *',
+      [course_id, title, order || 1]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating section:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update a section's title
+router.put('/sections/:sectionId', verifyToken, requireRole(['professor', 'admin']), async (req, res) => {
+  try {
+    const sectionId = req.params.sectionId;
+    const { title } = req.body;
+    if (!title) return res.status(400).json({ error: 'title is required' });
+    const result = await query('UPDATE course_sections SET title = $1 WHERE id = $2 RETURNING *', [title, sectionId]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating section:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update section delete endpoint
+router.delete('/sections/:sectionId', verifyToken, requireRole(['professor', 'admin']), async (req, res) => {
+  try {
+    const sectionId = req.params.sectionId;
+    // Get all blocks in the section
+    const blocks = await getRows('SELECT id FROM section_blocks WHERE section_id = $1', [sectionId]);
+    for (const block of blocks) {
+      await deleteBlockFiles(block.id);
+    }
+    await query('DELETE FROM section_blocks WHERE section_id = $1', [sectionId]);
+    await query('DELETE FROM course_sections WHERE id = $1', [sectionId]);
+    res.json({ message: 'Section and its blocks deleted', sectionId });
+  } catch (error) {
+    console.error('Error deleting section:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update a block's title/content
+router.put('/blocks/:blockId', verifyToken, requireRole(['professor', 'admin']), async (req, res) => {
+  try {
+    const blockId = req.params.blockId;
+    const { title, content } = req.body;
+    const result = await query('UPDATE section_blocks SET title = $1, content = $2 WHERE id = $3 RETURNING *', [title, content, blockId]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating block:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create a new block in a section
+router.post('/blocks', verifyToken, requireRole(['professor', 'admin']), courseUpload.single('file'), async (req, res) => {
+  try {
+    const { section_id, type, title, content } = req.body;
+    if (!section_id || !type) return res.status(400).json({ error: 'section_id and type are required' });
+    // Insert block
+    const blockResult = await query(
+      'INSERT INTO section_blocks (section_id, type, title, content, "order") VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [section_id, type, title || null, type === 'text' ? content : '', 1]
+    );
+    const block = blockResult.rows[0];
+    let fileInfo = null;
+    if (type !== 'text' && req.file) {
+      const fileUrl = `/uploads/courses/content/${req.file.filename}`;
+      await query(
+        'INSERT INTO course_files (section_id, block_id, file_name, file_path, file_type, file_size, original_name) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [section_id, block.id, req.file.filename, fileUrl, req.file.mimetype, req.file.size, req.file.originalname]
+      );
+      fileInfo = {
+        file_name: req.file.filename,
+        file_path: fileUrl,
+        file_type: req.file.mimetype,
+        file_size: req.file.size,
+        original_name: req.file.originalname
+      };
+    }
+    res.status(201).json({ ...block, files: fileInfo ? [fileInfo] : [] });
+  } catch (error) {
+    console.error('Error creating block:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

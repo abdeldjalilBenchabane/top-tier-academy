@@ -33,6 +33,12 @@ const CourseDetailsPage = () => {
   const [level, setLevel] = useState<Level | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingProfessor, setIsLoadingProfessor] = useState(true);
+  // Add state for cover upload
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
+  // Add state for image reload attempts
+  const [coverReloadKey, setCoverReloadKey] = useState(0);
 
   useEffect(() => {
     const loadCourseData = async () => {
@@ -173,6 +179,30 @@ const CourseDetailsPage = () => {
     return parts.slice(1).join('_');
   };
 
+  // Handler for cover change
+  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    setCoverFile(file);
+    setIsUploadingCover(true);
+    // Show local preview
+    const previewUrl = URL.createObjectURL(file);
+    setCoverPreviewUrl(previewUrl);
+    try {
+      if (!course) throw new Error('No course loaded');
+      const newCoverUrl = await api.uploadCourseCover(course.id, file);
+      setCourse({ ...course, cover_url: `${newCoverUrl}?t=${Date.now()}` });
+      setCoverPreviewUrl(null); // Switch to server image
+      setCoverReloadKey(prev => prev + 1); // Force <img> reload
+      toast.success('Course cover updated!');
+    } catch (err) {
+      console.error('Failed to upload cover:', err);
+      toast.error('Failed to upload course cover');
+    } finally {
+      setIsUploadingCover(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -292,6 +322,46 @@ const CourseDetailsPage = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Course Cover Card */}
+          {(coverPreviewUrl || course.cover_url) && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Course Cover</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <img
+                  key={(coverPreviewUrl || course.cover_url) + '-' + coverReloadKey}
+                  src={coverPreviewUrl || course.cover_url}
+                  alt="Course Cover"
+                  className="w-full h-auto rounded-md object-cover border mb-2"
+                  style={{ maxHeight: 300 }}
+                  onError={() => {
+                    // If the server is slow to serve the new file, retry after 1s
+                    if (!coverPreviewUrl) {
+                      setTimeout(() => setCoverReloadKey(k => k + 1), 1000);
+                    }
+                  }}
+                />
+                <input
+                  type="file"
+                  accept="image/*"
+                  id="cover-upload-input"
+                  style={{ display: 'none' }}
+                  onChange={handleCoverChange}
+                  disabled={isUploadingCover}
+                />
+                <Button
+                  variant="outline"
+                  className="w-full mt-2"
+                  onClick={() => document.getElementById('cover-upload-input')?.click()}
+                  disabled={isUploadingCover}
+                >
+                  {isUploadingCover ? 'Uploading...' : 'Change Cover'}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
         
         <div className="lg:col-span-2">

@@ -65,6 +65,9 @@ const ProfessorCourses = () => {
   const draftCount = courses.filter(c => c.status === 'draft').length;
   const approvedCount = courses.filter(c => c.status === 'approved').length;
 
+  // Add a fallback image URL for courses without a cover
+  const fallbackCover = '/default-course-cover.png'; // Place a default image in public folder
+
   return (
     <div className="space-y-6">
       <PageHeader 
@@ -135,8 +138,25 @@ const ProfessorCourses = () => {
                   .map(course => (
                     <Card key={course.id} className="overflow-hidden">
                       <CardHeader className="pb-2">
+                        {course.cover_url && (
+                          <img
+                            src={course.cover_url}
+                            alt="Course Cover"
+                            className="w-full h-28 object-cover rounded-t-md mb-2 border"
+                            style={{ minHeight: '7rem', background: '#f3f4f6' }}
+                            onError={e => { (e.target as HTMLImageElement).src = fallbackCover; }}
+                          />
+                        )}
+                        {!course.cover_url && (
+                          <img
+                            src={fallbackCover}
+                            alt="Default Course Cover"
+                            className="w-full h-28 object-cover rounded-t-md mb-2 border"
+                            style={{ minHeight: '7rem', background: '#f3f4f6' }}
+                          />
+                        )}
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg line-clamp-1">{course.title}</CardTitle>
+                          <CardTitle className="text-lg line-clamp-2" title={course.title}>{course.title}</CardTitle>
                           <Badge variant="outline" className="bg-gray-100 text-gray-700">Draft</Badge>
                         </div>
                       </CardHeader>
@@ -179,8 +199,25 @@ const ProfessorCourses = () => {
                   .map(course => (
                     <Card key={course.id} className="overflow-hidden">
                       <CardHeader className="pb-2">
+                        {course.cover_url && (
+                          <img
+                            src={course.cover_url}
+                            alt="Course Cover"
+                            className="w-full h-28 object-cover rounded-t-md mb-2 border"
+                            style={{ minHeight: '7rem', background: '#f3f4f6' }}
+                            onError={e => { (e.target as HTMLImageElement).src = fallbackCover; }}
+                          />
+                        )}
+                        {!course.cover_url && (
+                          <img
+                            src={fallbackCover}
+                            alt="Default Course Cover"
+                            className="w-full h-28 object-cover rounded-t-md mb-2 border"
+                            style={{ minHeight: '7rem', background: '#f3f4f6' }}
+                          />
+                        )}
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg line-clamp-1">{course.title}</CardTitle>
+                          <CardTitle className="text-lg line-clamp-2" title={course.title}>{course.title}</CardTitle>
                           <Badge variant="outline" className="bg-yellow-50">
                             <Clock className="h-3 w-3 mr-1 text-yellow-500" />
                             <span className="text-yellow-700">Pending</span>
@@ -224,8 +261,25 @@ const ProfessorCourses = () => {
                   .map(course => (
                     <Card key={course.id} className="overflow-hidden">
                       <CardHeader className="pb-2">
+                        {course.cover_url && (
+                          <img
+                            src={course.cover_url}
+                            alt="Course Cover"
+                            className="w-full h-28 object-cover rounded-t-md mb-2 border"
+                            style={{ minHeight: '7rem', background: '#f3f4f6' }}
+                            onError={e => { (e.target as HTMLImageElement).src = fallbackCover; }}
+                          />
+                        )}
+                        {!course.cover_url && (
+                          <img
+                            src={fallbackCover}
+                            alt="Default Course Cover"
+                            className="w-full h-28 object-cover rounded-t-md mb-2 border"
+                            style={{ minHeight: '7rem', background: '#f3f4f6' }}
+                          />
+                        )}
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg line-clamp-1">{course.title}</CardTitle>
+                          <CardTitle className="text-lg line-clamp-2" title={course.title}>{course.title}</CardTitle>
                           <Badge variant="outline" className="bg-red-50">
                             <XCircle className="h-3 w-3 mr-1 text-red-500" />
                             <span className="text-red-700">Rejected</span>
@@ -270,8 +324,25 @@ const ProfessorCourses = () => {
                   .map(course => (
                     <Card key={course.id} className="overflow-hidden">
                       <CardHeader className="pb-2">
+                        {course.cover_url && (
+                          <img
+                            src={course.cover_url}
+                            alt="Course Cover"
+                            className="w-full h-28 object-cover rounded-t-md mb-2 border"
+                            style={{ minHeight: '7rem', background: '#f3f4f6' }}
+                            onError={e => { (e.target as HTMLImageElement).src = fallbackCover; }}
+                          />
+                        )}
+                        {!course.cover_url && (
+                          <img
+                            src={fallbackCover}
+                            alt="Default Course Cover"
+                            className="w-full h-28 object-cover rounded-t-md mb-2 border"
+                            style={{ minHeight: '7rem', background: '#f3f4f6' }}
+                          />
+                        )}
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg line-clamp-1">{course.title}</CardTitle>
+                          <CardTitle className="text-lg line-clamp-2" title={course.title}>{course.title}</CardTitle>
                           <Badge variant="outline" className="bg-green-50">
                             <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
                             <span className="text-green-700">Approved</span>

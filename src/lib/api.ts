@@ -998,4 +998,27 @@ export const api = {
     if (!res.ok) throw new Error('Failed to fetch language levels');
     return await res.json();
   },
+  /**
+   * Upload a new cover image for a course (admin only)
+   * @param courseId
+   * @param file
+   * @returns new cover_url
+   */
+  uploadCourseCover: async (courseId: string, file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('cover', file);
+    const res = await fetch(`/api/courses/${courseId}/cover`, {
+      method: 'PUT',
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include',
+      body: formData
+    });
+    if (!res.ok) {
+      throw new Error('Failed to upload course cover');
+    }
+    const data = await res.json();
+    return data.cover_url;
+  },
 };

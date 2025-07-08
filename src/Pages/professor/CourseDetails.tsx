@@ -7,12 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash2, Edit } from 'lucide-react';
 import PathSelector from '@/components/admin/PathSelector';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Book, Layers, Calendar, FileText, Video, Image as ImageIcon, BookOpen, Download } from 'lucide-react';
+import { toast as toastLib } from '@/lib/toast';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 const ProfessorCourseDetails = () => {
   const { id } = useParams();
@@ -36,6 +38,22 @@ const ProfessorCourseDetails = () => {
   };
   // Add a reloadFlag state to trigger useEffect
   const [reloadFlag, setReloadFlag] = useState(false);
+  // Restore dialog state
+  const [showSectionDialog, setShowSectionDialog] = useState(false);
+  const [sectionDialogMode, setSectionDialogMode] = useState<'add' | 'edit'>('add');
+  const [sectionDialogTitle, setSectionDialogTitle] = useState('');
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [showBlockDialog, setShowBlockDialog] = useState(false);
+  const [blockDialogTitle, setBlockDialogTitle] = useState('');
+  const [blockDialogContent, setBlockDialogContent] = useState('');
+  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
+  const [showAddBlockDialog, setShowAddBlockDialog] = useState(false);
+  const [addBlockSectionId, setAddBlockSectionId] = useState<string | null>(null);
+  const [addBlockType, setAddBlockType] = useState('text');
+  const [addBlockTitle, setAddBlockTitle] = useState('');
+  const [addBlockContent, setAddBlockContent] = useState('');
+  const [addBlockFile, setAddBlockFile] = useState<File | null>(null);
+  // Remove localSections state and all inline editing handlers
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -55,6 +73,12 @@ const ProfessorCourseDetails = () => {
     };
     fetchCourse();
   }, [id, reloadFlag]);
+
+  useEffect(() => {
+    if (course) {
+      // setLocalSections(course.sections || []); // This line is removed
+    }
+  }, [course]);
 
   const handleDeleteCourse = async () => {
     if (!window.confirm('Are you sure you want to delete this course?')) return;
@@ -82,9 +106,167 @@ const ProfessorCourseDetails = () => {
       });
       if (!res.ok) throw new Error('Failed to update course');
       setEditMode(false);
-      // Optionally refetch course
+      // Update local course state with new title/description
+      setCourse((prev: any) => prev ? { ...prev, title, description } : prev);
     } catch (err) {
       setError('Failed to update course');
+    }
+  };
+
+  // Add block icon helper
+  const getBlockIcon = (type: string) => {
+    switch (type) {
+      case 'text':
+        return <FileText className="h-4 w-4" />;
+      case 'video':
+        return <Video className="h-4 w-4" />;
+      case 'image':
+        return <ImageIcon className="h-4 w-4" />;
+      case 'pdf':
+        return <BookOpen className="h-4 w-4" />;
+      default:
+        return <FileText className="h-4 w-4" />;
+    }
+  };
+
+  // Section handlers
+  const handleAddSection = async (title: string) => {
+    if (!title.trim()) return toastLib.error('Section title required');
+    try {
+      const res = await fetch('/api/courses/sections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ course_id: course.id, title, order: course.sections.length + 1 })
+      });
+      if (!res.ok) throw new Error('Failed to add section');
+      const newSection = await res.json();
+      setCourse((prev: any) => ({ ...prev, sections: [...prev.sections, { ...newSection, blocks: [] }] }));
+      toastLib.success('Section added');
+    } catch (err) {
+      toastLib.error('Failed to add section');
+    }
+  };
+
+  const handleEditSection = async (sectionId: string, title: string) => {
+    if (!title.trim()) return toastLib.error('Section title required');
+    try {
+      const res = await fetch(`/api/courses/sections/${sectionId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ title })
+      });
+      if (!res.ok) throw new Error('Failed to update section');
+      const updatedSection = await res.json();
+      setCourse((prev: any) => ({
+        ...prev,
+        sections: prev.sections.map((s: any) => s.id === sectionId ? { ...s, title: updatedSection.title } : s)
+      }));
+      toastLib.success('Section updated');
+    } catch (err) {
+      toastLib.error('Failed to update section');
+    }
+  };
+
+  const handleDeleteSection = async (sectionId: string) => {
+    if (!window.confirm('Are you sure you want to delete this section and all its blocks?')) return;
+    try {
+      const res = await fetch(`/api/courses/sections/${sectionId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+      });
+      if (!res.ok) throw new Error('Failed to delete section');
+      setCourse((prev: any) => ({ ...prev, sections: prev.sections.filter((s: any) => s.id !== sectionId) }));
+      toastLib.success('Section deleted');
+    } catch (err) {
+      toastLib.error('Failed to delete section');
+    }
+  };
+
+  // Block handlers
+  const handleAddBlock = async (sectionId: string, type: string, title: string, content: string, file: File | null) => {
+    if (!title.trim() && type !== 'text') return toastLib.error('Block title required');
+    try {
+      const formData = new FormData();
+      formData.append('section_id', sectionId);
+      formData.append('type', type);
+      formData.append('title', title);
+      if (type === 'text') {
+        formData.append('content', content);
+      } else if (file) {
+        formData.append('file', file);
+      }
+      const res = await fetch('/api/courses/blocks', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: formData
+      });
+      if (!res.ok) throw new Error('Failed to add block');
+      const newBlock = await res.json();
+      setCourse((prev: any) => ({
+        ...prev,
+        sections: prev.sections.map((s: any) =>
+          s.id === sectionId ? { ...s, blocks: [...s.blocks, newBlock] } : s
+        )
+      }));
+      toastLib.success('Block added');
+    } catch (err) {
+      toastLib.error('Failed to add block');
+    }
+  };
+
+  const handleEditBlock = async (blockId: string, title: string, content: string) => {
+    if (!title.trim()) return toastLib.error('Block title required');
+    try {
+      const res = await fetch(`/api/courses/blocks/${blockId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ title, content })
+      });
+      if (!res.ok) throw new Error('Failed to update block');
+      const updatedBlock = await res.json();
+      setCourse((prev: any) => ({
+        ...prev,
+        sections: prev.sections.map((section: any) => ({
+          ...section,
+          blocks: section.blocks.map((block: any) => block.id === blockId ? { ...block, title: updatedBlock.title, content: updatedBlock.content } : block)
+        }))
+      }));
+      toastLib.success('Block updated');
+    } catch (err) {
+      toastLib.error('Failed to update block');
+    }
+  };
+
+  const handleDeleteBlock = async (blockId: string) => {
+    if (!window.confirm('Are you sure you want to delete this block?')) return;
+    try {
+      const res = await fetch(`/api/courses/blocks/${blockId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+      });
+      if (!res.ok) throw new Error('Failed to delete block');
+      setCourse((prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          sections: prev.sections.map((section: any) => ({
+            ...section,
+            blocks: section.blocks.filter((block: any) => block.id !== blockId)
+          }))
+        };
+      });
+      toastLib.success('Block deleted');
+    } catch (err) {
+      toastLib.error('Failed to delete block');
     }
   };
 
@@ -120,49 +302,179 @@ const ProfessorCourseDetails = () => {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Sections</CardTitle>
+        <CardHeader className="pb-2 shadow-md bg-slate-50 rounded-t">
+          <CardTitle className="text-lg flex items-center">
+            <BookOpen className="h-5 w-5 mr-2 text-blue-600" />
+            Course Content
+          </CardTitle>
+          <div className="text-sm text-gray-500">
+            {course.sections.length} section{course.sections.length !== 1 ? 's' : ''}
+          </div>
         </CardHeader>
         <CardContent>
-          {course.sections && course.sections.length > 0 ? (
-            course.sections.map(section => (
-              <div key={section.id} className="mb-6 border-b pb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-semibold">{section.title}</h3>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline"><Edit className="h-4 w-4" /></Button>
-                    <Button size="sm" variant="destructive"><Trash2 className="h-4 w-4" /></Button>
-                  </div>
-                </div>
-                {section.blocks && section.blocks.length > 0 ? (
-                  section.blocks.map(block => (
-                    <div key={block.id} className="ml-4 mb-2 p-2 border rounded">
-                      <div className="flex justify-between items-center">
-                        <span className="capitalize font-medium">{block.type}</span>
+          <Tabs defaultValue="content" className="w-full">
+            <TabsList className="w-full grid grid-cols-2">
+              <TabsTrigger value="content">Content Structure</TabsTrigger>
+              <TabsTrigger value="preview">Preview Content</TabsTrigger>
+            </TabsList>
+            <TabsContent value="content" className="mt-4">
+              <ScrollArea className="h-[calc(100vh-22rem)] pr-4">
+                <div className="space-y-8">
+                  {course.sections.map((section, sectionIndex) => (
+                    <div key={section.id} className="space-y-3 bg-white rounded-lg shadow p-4 border">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-md font-semibold">
+                          {sectionIndex + 1}. {section.title}
+                        </h3>
                         <div className="flex gap-2">
-                          <Button size="sm" variant="outline"><Edit className="h-4 w-4" /></Button>
-                          <Button size="sm" variant="destructive"><Trash2 className="h-4 w-4" /></Button>
-                        </div>
+                          <Button size="sm" variant="outline" onClick={() => { setShowSectionDialog(true); setSectionDialogMode('edit'); setSectionDialogTitle(section.title); setEditingSectionId(section.id); }}><Edit className="h-4 w-4" /></Button>
+                          <Button size="sm" variant="destructive" onClick={() => handleDeleteSection(section.id)}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
                       </div>
-                      <div className="mt-1">
-                        {block.type === 'text' ? (
-                          <div>{block.content}</div>
-                        ) : block.type === 'image' ? (
-                          <img src={block.files && block.files[0]?.file_path} alt="Block" className="max-w-xs rounded" />
-                        ) : block.type === 'pdf' ? (
-                          <a href={block.files && block.files[0]?.file_path} target="_blank" rel="noopener noreferrer">View PDF</a>
-                        ) : block.type === 'video' ? (
-                          <video src={block.files && block.files[0]?.file_path} controls className="max-w-xs" />
-                        ) : null}
+                      <div className="ml-6 space-y-2">
+                        {section.blocks.map((block, blockIndex) => (
+                          <div key={block.id} className="flex items-start space-x-2 p-2 hover:bg-slate-50 rounded-md border bg-slate-50">
+                            <div className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-blue-600">
+                              {getBlockIcon(block.type)}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium">
+                                {sectionIndex + 1}.{blockIndex + 1} {block.title || `${block.type.charAt(0).toUpperCase() + block.type.slice(1)} Content`}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {block.type.charAt(0).toUpperCase() + block.type.slice(1)}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" onClick={() => { setShowBlockDialog(true); setEditingBlockId(block.id); setBlockDialogTitle(block.title); setBlockDialogContent(block.content); }}><Edit className="h-4 w-4" /></Button>
+                              <Button size="sm" variant="destructive" onClick={() => handleDeleteBlock(block.id)}><Trash2 className="h-4 w-4" /></Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <Button size="sm" className="mt-2" variant="secondary" onClick={() => { setShowAddBlockDialog(true); setAddBlockSectionId(section.id); setAddBlockType('text'); setAddBlockTitle(''); setAddBlockContent(''); setAddBlockFile(null); }}>
+                        <Plus className="h-4 w-4 mr-1" /> Add Block
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button className="mt-4" variant="secondary" onClick={() => { setShowSectionDialog(true); setSectionDialogMode('add'); setSectionDialogTitle(''); }}>
+                  <Plus className="h-4 w-4 mr-1" /> Add Section
+                </Button>
+              </ScrollArea>
+            </TabsContent>
+            <TabsContent value="preview" className="mt-4">
+              <div className="flex justify-end mb-2">
+                <Button size="sm" variant="outline" onClick={reloadCourse}>
+                  Refresh
+                </Button>
+              </div>
+              <ScrollArea className="h-[calc(100vh-22rem)] pr-4">
+                <div className="space-y-8">
+                  {course.sections.map((section) => (
+                    <div key={section.id} className="space-y-4">
+                      <h2 className="text-xl font-bold border-b pb-2">{section.title}</h2>
+                      <div className="space-y-6">
+                        {section.blocks.map((block) => (
+                          <div key={block.id} className="space-y-2">
+                            {block.title && (
+                              <h3 className="text-lg font-semibold">{block.title}</h3>
+                            )}
+                            {block.type === 'text' && (
+                              <div className="prose max-w-none">
+                                <p>{block.content}</p>
+                              </div>
+                            )}
+                            {block.type === 'image' && (
+                              <div className="border rounded-md p-4">
+                                {block.fileUrl ? (
+                                  <div className="flex flex-col items-center">
+                                    <img 
+                                      src={block.fileUrl} 
+                                      alt={block.title || 'Course image'}
+                                      className="max-w-full max-h-[400px] rounded-md object-contain"
+                                    />
+                                    <p className="text-sm text-gray-500 mt-2">
+                                      {block.title || 'Image'}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center space-y-2 p-6">
+                                    <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
+                                      <ImageIcon className="h-6 w-6 text-gray-400" />
+                                    </div>
+                                    <p className="text-sm text-gray-500">
+                                      Image not available
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {block.type === 'video' && (
+                              <div className="border rounded-md p-4">
+                                {block.fileUrl ? (
+                                  <div className="flex flex-col items-center">
+                                    <video 
+                                      src={block.fileUrl} 
+                                      controls
+                                      className="max-w-full max-h-[400px] rounded-md"
+                                    />
+                                    <p className="text-sm text-gray-500 mt-2">
+                                      {block.title || 'Video'}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center space-y-2 p-6">
+                                    <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
+                                      <Video className="h-6 w-6 text-gray-400" />
+                                    </div>
+                                    <p className="text-sm text-gray-500">
+                                      Video not available
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {block.type === 'pdf' && (
+                              <div className="border rounded-md p-4">
+                                {block.fileUrl ? (
+                                  <div className="flex flex-col items-center">
+                                    <object
+                                      data={block.fileUrl}
+                                      type="application/pdf"
+                                      width="100%"
+                                      height="500px"
+                                      className="rounded-md border"
+                                    >
+                                      <p>Your browser does not support PDFs. 
+                                        <a href={block.fileUrl} download={block.title || 'PDF'}>Download the PDF</a>
+                                      </p>
+                                    </object>
+                                    <p className="text-sm text-gray-500 mt-2">
+                                      {block.title || 'PDF'}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center space-y-2 p-6">
+                                    <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
+                                      <FileText className="h-6 w-6 text-gray-400" />
+                                    </div>
+                                    <p className="text-sm text-gray-500">
+                                      PDF not available
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))
-                ) : <div className="text-gray-500">No content blocks</div>}
-                <Button size="sm" className="mt-2"><Plus className="h-4 w-4 mr-1" /> Add Block</Button>
-              </div>
-            ))
-          ) : <div className="text-gray-500">No sections</div>}
-          <Button className="mt-4"><Plus className="h-4 w-4 mr-1" /> Add Section</Button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
@@ -183,6 +495,141 @@ const ProfessorCourseDetails = () => {
             onSuccess={() => { setShowPathSelector(false); reloadCourse(); }}
             onCancel={() => setShowPathSelector(false)}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Section Dialog */}
+      <Dialog open={showSectionDialog} onOpenChange={setShowSectionDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{sectionDialogMode === 'add' ? 'Add New Section' : 'Edit Section'}</DialogTitle>
+            <DialogDescription>
+              {sectionDialogMode === 'add' ? 'Enter a title for your new section.' : 'Edit the section title.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              value={sectionDialogTitle}
+              onChange={e => setSectionDialogTitle(e.target.value)}
+              placeholder="Section Title"
+            />
+            <Button onClick={async () => {
+              if (sectionDialogMode === 'add') {
+                await handleAddSection(sectionDialogTitle);
+              } else {
+                if (editingSectionId) {
+                  await handleEditSection(editingSectionId, sectionDialogTitle);
+                }
+              }
+              setShowSectionDialog(false);
+            }}>
+              {sectionDialogMode === 'add' ? 'Add Section' : 'Save Section'}
+            </Button>
+            <Button variant="outline" onClick={() => setShowSectionDialog(false)}>Cancel</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Block Dialog */}
+      <Dialog open={showAddBlockDialog} onOpenChange={setShowAddBlockDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Block to Section</DialogTitle>
+            <DialogDescription>
+              Fill in the block details. For non-text blocks, upload a file.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              value={addBlockTitle}
+              onChange={e => setAddBlockTitle(e.target.value)}
+              placeholder="Block Title"
+            />
+            <Select value={addBlockType} onValueChange={setAddBlockType}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select Block Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="text">Text</SelectItem>
+                <SelectItem value="image">Image</SelectItem>
+                <SelectItem value="video">Video</SelectItem>
+                <SelectItem value="pdf">PDF</SelectItem>
+              </SelectContent>
+            </Select>
+            {addBlockType === 'text' && (
+              <Textarea
+                value={addBlockContent}
+                onChange={e => setAddBlockContent(e.target.value)}
+                placeholder="Block Content"
+              />
+            )}
+            {addBlockType === 'image' && (
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={e => setAddBlockFile(e.target.files?.[0] || null)}
+              />
+            )}
+            {addBlockType === 'video' && (
+              <Input
+                type="file"
+                accept="video/*"
+                onChange={e => setAddBlockFile(e.target.files?.[0] || null)}
+              />
+            )}
+            {addBlockType === 'pdf' && (
+              <Input
+                type="file"
+                accept="application/pdf"
+                onChange={e => setAddBlockFile(e.target.files?.[0] || null)}
+              />
+            )}
+            <Button onClick={async () => {
+              if (addBlockSectionId) {
+                await handleAddBlock(addBlockSectionId, addBlockType, addBlockTitle, addBlockContent, addBlockFile);
+              }
+              setShowAddBlockDialog(false);
+            }}>
+              Add Block
+            </Button>
+            
+            <Button variant="outline" onClick={() => setShowAddBlockDialog(false)}>Cancel</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Block Dialog */}
+      <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Block</DialogTitle>
+            <DialogDescription>
+              Edit the block title and content.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              value={blockDialogTitle}
+              onChange={e => setBlockDialogTitle(e.target.value)}
+              placeholder="Block Title"
+            />
+            <Textarea
+              value={blockDialogContent}
+              onChange={e => setBlockDialogContent(e.target.value)}
+              placeholder="Block Content"
+            />
+            
+            <Button onClick={async () => {
+              if (editingBlockId) {
+                await handleEditBlock(editingBlockId, blockDialogTitle, blockDialogContent);
+              }
+              setShowBlockDialog(false);
+            }}>
+              Save Block
+            </Button>
+            <Button variant="outline" onClick={() => setShowBlockDialog(false)}>Cancel</Button>
+          </div>
+          
         </DialogContent>
       </Dialog>
     </div>
