@@ -21,27 +21,57 @@ const ProfessorCourses = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showPathSelector, setShowPathSelector] = useState(false);
   const [selectedDraftCourse, setSelectedDraftCourse] = useState<PendingCourse | null>(null);
+  const [activeTab, setActiveTab] = useState('drafts');
+
+  const fetchCourses = async () => {
+    setIsLoading(true);
+    try {
+      console.log('[ProfessorCourses] user:', user);
+      if (!user) return;
+      const res = await fetch(`/api/courses?created_by=${user.id}`);
+      const data = await res.json();
+      console.log('[ProfessorCourses] API response:', data);
+      setCourses(data);
+      console.log('[ProfessorCourses] setCourses:', data);
+    } catch (error) {
+      console.error('Failed to fetch courses:', error);
+      toastLib.error('Failed to load course data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchCourses = async () => {
-      setIsLoading(true);
-      try {
-        console.log('[ProfessorCourses] user:', user);
-        if (!user) return;
-        const res = await fetch(`/api/courses?created_by=${user.id}`);
-        const data = await res.json();
-        console.log('[ProfessorCourses] API response:', data);
-        setCourses(data);
-        console.log('[ProfessorCourses] setCourses:', data);
-      } catch (error) {
-        console.error('Failed to fetch courses:', error);
-        toastLib.error('Failed to load course data');
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchCourses();
   }, [user]);
+
+  // Set initial active tab based on course counts
+  useEffect(() => {
+    if (courses.length > 0) {
+      const draftCount = courses.filter(c => c.status === 'draft').length;
+      const pendingCount = courses.filter(c => c.status === 'pending').length;
+      
+      if (draftCount > 0) {
+        setActiveTab('drafts');
+      } else if (pendingCount > 0) {
+        setActiveTab('pending');
+      } else if (courses.filter(c => c.status === 'rejected').length > 0) {
+        setActiveTab('rejected');
+      } else if (courses.filter(c => c.status === 'approved').length > 0) {
+        setActiveTab('approved');
+      }
+    }
+  }, [courses]);
+
+  // Update active tab when course status changes
+  useEffect(() => {
+    const draftCount = courses.filter(c => c.status === 'draft').length;
+    const pendingCount = courses.filter(c => c.status === 'pending').length;
+    
+    if (activeTab === 'drafts' && draftCount === 0 && pendingCount > 0) {
+      setActiveTab('pending');
+    }
+  }, [courses, activeTab]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -94,7 +124,7 @@ const ProfessorCourses = () => {
           }}
         />
       ) : (
-        <Tabs defaultValue={draftCount > 0 ? 'drafts' : 'pending'}>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
             <TabsTrigger value="drafts">
               Drafts
@@ -389,7 +419,13 @@ const ProfessorCourses = () => {
           {selectedDraftCourse && (
             <PathSelector
               pendingCourse={selectedDraftCourse}
-              onSuccess={() => { setShowPathSelector(false); setSelectedDraftCourse(null); /* reload courses */ window.location.reload(); }}
+              onSuccess={() => { 
+                setShowPathSelector(false); 
+                setSelectedDraftCourse(null); 
+                fetchCourses(); 
+                setActiveTab('pending');
+                toastLib.success('Course path assigned successfully! Course is now pending admin approval.');
+              }}
               onCancel={() => { setShowPathSelector(false); setSelectedDraftCourse(null); }}
             />
           )}

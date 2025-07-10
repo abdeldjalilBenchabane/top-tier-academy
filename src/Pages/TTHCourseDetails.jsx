@@ -1,107 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Play, Download, FileText, Star, Clock, Globe, CheckCircle, BookOpen, Award } from "lucide-react";
+import { Play, Download, FileText, Star, Clock, Globe, CheckCircle, BookOpen, Award, Users, Calendar, Eye, X, Image as ImageIcon, Video as VideoIcon, FileText as FileTextIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
-
-// import { VideoCard } from "../components/VideoCard";
-// SECTION À REMPLACER
-const fakeVideos = [
-    {
-        id: 1,
-        title: "دروس الجمع والطرح",
-        level: "primaire",
-        subject: "math",
-        thumbnail: "/placeholder.svg",
-        description: "شرح مفصل لجميع عمليات الجمع والطرح مع أمثلة تطبيقية مبسطة. هذا الدرس سيساعدك على فهم أساسيات الرياضيات بطريقة سهلة ومفهومة.",
-        videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4",
-        pdfUrl: "/sample-lesson.pdf",
-        exoUrl: "/sample-exo.pdf",
-        instructor: "أ. محمد الأحمد",
-        duration: "45 دقيقة",
-        students: "1,234",
-        rating: 4.8,
-        language: "العربية",
-        learningObjectives: [
-            "فهم مبادئ الجمع والطرح الأساسية",
-            "حل مسائل الجمع والطرح بثقة",
-            "تطبيق العمليات الحسابية في الحياة اليومية",
-            "استخدام الأدوات المساعدة في الحساب"
-        ],
-        prerequisites: [
-            "معرفة الأرقام من 1 إلى 100",
-            "القدرة على القراءة والكتابة",
-            "لا حاجة لخبرة سابقة في الرياضيات"
-        ],
-        curriculum: [
-            {
-                title: "مقدمة في الأرقام",
-                duration: "10 دقائق",
-                lessons: ["التعرف على الأرقام", "كتابة الأرقام", "قراءة الأرقام"]
-            },
-            {
-                title: "عمليات الجمع",
-                duration: "20 دقيقة",
-                lessons: ["مفهوم الجمع", "جمع الأرقام الصغيرة", "جمع الأرقام الكبيرة", "تمارين عملية"]
-            },
-            {
-                title: "عمليات الطرح",
-                duration: "15 دقيقة",
-                lessons: ["مفهوم الطرح", "طرح الأرقام الصغيرة", "طرح الأرقام الكبيرة", "حل المشاكل"]
-            }
-        ],
-        reviews: [
-            {
-                name: "أم سارة",
-                rating: 5,
-                comment: "درس ممتاز! ابنتي تحسنت كثيراً في الرياضيات بعد مشاهدة هذا الدرس.",
-                date: "منذ أسبوعين"
-            },
-            {
-                name: "أحمد علي",
-                rating: 4,
-                comment: "شرح واضح ومفهوم. أنصح به لجميع الطلاب.",
-                date: "منذ شهر"
-            },
-            {
-                name: "فاطمة محمد",
-                rating: 5,
-                comment: "المدرس يشرح بطريقة سهلة ومبسطة. شكراً لكم.",
-                date: "منذ 3 أسابيع"
-            }
-        ]
-    },
-
-];
-
-// SECTION À REMPLACER
-const relatedCourses = [
-    {
-        id: 4,
-        title: "الضرب والقسمة للمبتدئين",
-        level: "primaire",
-        subject: "math",
-        thumbnail: "/placeholder.svg",
-        instructor: "أ. ليلى أحمد",
-        duration: "50 دقيقة",
-        students: "890",
-        rating: 4.7
-    },
-    {
-        id: 5,
-        title: "العلوم الحاسوبية",
-        level: "college",
-        subject: "science",
-        thumbnail: "/placeholder.svg",
-        instructor: "أ. سارة محمد",
-        duration: "75 دقيقة",
-        students: "1,234",
-        rating: 4.9
-    }
-];
-
 
 const levelLabels = {
     "primaire": "ابتدائي",
@@ -123,18 +26,366 @@ export default function CourseDetail() {
     const [isVideoPlaying, setIsVideoPlaying] = useState(false);
     const [activeTab, setActiveTab] = useState("overview");
     const [newReview, setNewReview] = useState({ name: '', rating: 5, comment: '' });
-    const [reviews, setReviews] = useState(fakeVideos.find(v => v.id === 1)?.reviews || []);
+    const [reviews, setReviews] = useState([]);
+    const [course, setCourse] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [relatedCourses, setRelatedCourses] = useState([]);
+    
+    // New state for interactive curriculum
+    const [expandedSections, setExpandedSections] = useState(new Set());
+    const [selectedVideo, setSelectedVideo] = useState(null);
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [selectedPdf, setSelectedPdf] = useState(null);
+    const [showVideoModal, setShowVideoModal] = useState(false);
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [showPdfModal, setShowPdfModal] = useState(false);
+    
+    // New state for main video player
+    const [mainVideoUrl, setMainVideoUrl] = useState(null);
+    const [mainVideoTitle, setMainVideoTitle] = useState('');
+    
+    // New state for content navigation
+    const [allContent, setAllContent] = useState([]);
+    const [currentContentIndex, setCurrentContentIndex] = useState(0);
+    const [currentContent, setCurrentContent] = useState(null);
+    
+    // New state for language course prices
+    const [languageCoursePrices, setLanguageCoursePrices] = useState({});
 
-    // SECTION À REMPLACER
-    // À remplacer par un appel API (ex: fetch(`/api/courses/${id}`))
-    const course = fakeVideos.find(v => v.id === 1);
+    useEffect(() => {
+        const fetchCourseData = async () => {
+            setLoading(true);
+            try {
+                // Fetch course details
+                const courseRes = await fetch(`/api/courses/${id}`);
+                if (!courseRes.ok) {
+                    throw new Error('Course not found');
+                }
+                const courseData = await courseRes.json();
+                setCourse(courseData);
 
-    if (!course) {
+                // Prepare all content for navigation
+                const content = prepareAllContent(courseData);
+                setAllContent(content);
+                
+                // Set initial content
+                if (content.length > 0) {
+                    setCurrentContent(content[0]);
+                    setCurrentContentIndex(0);
+                    updateMainPlayer(content[0]);
+                }
+
+                // Fetch related courses from the same material path
+                if (courseData.specialityId) {
+                    // For education courses with speciality - get courses with same speciality_id
+                    console.log('Course has specialityId:', courseData.specialityId);
+                    const relatedRes = await fetch(`/api/courses?speciality_id=${courseData.specialityId}&status=approved`);
+                    if (relatedRes.ok) {
+                        const allCourses = await relatedRes.json();
+                        console.log('All courses with same speciality:', allCourses);
+                        console.log('Current course ID:', id, 'Type:', typeof id);
+                        // Filter out current course and show other education courses with same speciality
+                        const filtered = allCourses
+                            .filter(c => {
+                                const isNotCurrent = c.id !== parseInt(id);
+                                const hasSpeciality = c.speciality_id;
+                                const isNotLanguage = !c.language_level_id;
+                                console.log(`Course ${c.id}: isNotCurrent=${isNotCurrent}, hasSpeciality=${hasSpeciality}, isNotLanguage=${isNotLanguage}`);
+                                return isNotCurrent && hasSpeciality && isNotLanguage;
+                            })
+                            .slice(0, 4);
+                        console.log('Filtered courses:', filtered);
+                        setRelatedCourses(filtered);
+                    }
+                } else if (courseData.materialId) {
+                    // For education courses - get courses with same material_id
+                    const relatedRes = await fetch(`/api/courses?material_id=${courseData.materialId}&status=approved`);
+                    if (relatedRes.ok) {
+                        const allCourses = await relatedRes.json();
+                        // Filter out current course and courses without material_id (language courses)
+                        const filtered = allCourses
+                            .filter(c => {
+                                const isNotCurrent = c.id !== parseInt(id);
+                                const hasMaterial = c.material_id;
+                                const isNotLanguage = !c.language_level_id;
+                                return isNotCurrent && hasMaterial && isNotLanguage;
+                            })
+                            .slice(0, 4);
+                        setRelatedCourses(filtered);
+                    }
+                } else if (courseData.language_level_id) {
+                    // For language courses - get courses with same language
+                    const relatedRes = await fetch('/api/courses?status=approved');
+                    if (relatedRes.ok) {
+                        const allCourses = await relatedRes.json();
+                        // Get all language courses with the same language
+                        const languageCourses = allCourses.filter(c => 
+                            c.id !== parseInt(id) && 
+                            c.language_level_id && 
+                            !c.material_id
+                        );
+                        
+                        // Get language levels for this course
+                        const languageLevelsRes = await fetch('/api/language-levels');
+                        if (languageLevelsRes.ok) {
+                            const allLevels = await languageLevelsRes.json();
+                            const currentLevel = allLevels.find(l => l.id === courseData.language_level_id);
+                            
+                            if (currentLevel) {
+                                // Get courses with same language but different levels
+                                const sameLanguageCourses = languageCourses.filter(c => {
+                                    const courseLevel = allLevels.find(l => l.id === c.language_level_id);
+                                    return courseLevel && courseLevel.language_id === currentLevel.language_id;
+                                });
+                                
+                                setRelatedCourses(sameLanguageCourses.slice(0, 4));
+                            } else {
+                                setRelatedCourses(languageCourses.slice(0, 4));
+                            }
+                        } else {
+                            setRelatedCourses(languageCourses.slice(0, 4));
+                        }
+                    }
+                } else {
+                    // For courses without material_id or language_level_id - show other similar courses
+                    const relatedRes = await fetch('/api/courses?status=approved');
+                    if (relatedRes.ok) {
+                        const allCourses = await relatedRes.json();
+                        // Filter out current course and show other courses without specific paths
+                        const filtered = allCourses
+                            .filter(c => c.id !== parseInt(id) && !c.material_id && !c.language_level_id)
+                            .slice(0, 4);
+                        setRelatedCourses(filtered);
+                    }
+                }
+
+                // Fetch language course prices for language courses
+                if (courseData.language_level_id || relatedCourses.some(c => c.language_level_id)) {
+                    try {
+                        const pricesRes = await fetch('/api/courses/language-course-prices');
+                        if (pricesRes.ok) {
+                            const prices = await pricesRes.json();
+                            const pricesMap = {};
+                            prices.forEach(price => {
+                                pricesMap[`${price.course_id}-${price.language_level_id}`] = price.price;
+                            });
+                            setLanguageCoursePrices(pricesMap);
+                        }
+                    } catch (err) {
+                        console.error('Failed to fetch language course prices:', err);
+                    }
+                }
+
+                // Generate mock reviews for now (in real app, these would come from API)
+                const mockReviews = [
+                    {
+                        name: "أم سارة",
+                        rating: 5,
+                        comment: "درس ممتاز! ابنتي تحسنت كثيراً في الرياضيات بعد مشاهدة هذا الدرس.",
+                        date: "منذ أسبوعين"
+                    },
+                    {
+                        name: "أحمد علي",
+                        rating: 4,
+                        comment: "شرح واضح ومفهوم. أنصح به لجميع الطلاب.",
+                        date: "منذ شهر"
+                    },
+                    {
+                        name: "فاطمة محمد",
+                        rating: 5,
+                        comment: "المدرس يشرح بطريقة سهلة ومبسطة. شكراً لكم.",
+                        date: "منذ 3 أسابيع"
+                    }
+                ];
+                setReviews(mockReviews);
+
+            } catch (err) {
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (id) {
+            fetchCourseData();
+        }
+    }, [id]);
+
+    // New functions for interactive curriculum
+    const toggleSection = (sectionIndex) => {
+        const newExpanded = new Set(expandedSections);
+        if (newExpanded.has(sectionIndex)) {
+            newExpanded.delete(sectionIndex);
+        } else {
+            newExpanded.add(sectionIndex);
+        }
+        setExpandedSections(newExpanded);
+    };
+
+    const handleVideoClick = (videoUrl, title) => {
+        // Find the content index and update navigation
+        const contentIndex = allContent.findIndex(content => 
+            content.type === 'video' && content.url === videoUrl
+        );
+        if (contentIndex !== -1) {
+            setCurrentContentIndex(contentIndex);
+            setCurrentContent(allContent[contentIndex]);
+            updateMainPlayer(allContent[contentIndex]);
+        }
+        
+        // Scroll to top to show the updated content
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleImageClick = (imageUrl, title) => {
+        setSelectedImage({ url: imageUrl, title });
+        setShowImageModal(true);
+    };
+
+    const handlePdfClick = (pdfUrl, title) => {
+        setSelectedPdf({ url: pdfUrl, title });
+        setShowPdfModal(true);
+    };
+
+    const handleDownload = (fileUrl, fileName) => {
+        const link = document.createElement('a');
+        link.href = fileUrl;
+        link.download = fileName || 'download';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const getBlockIcon = (type) => {
+        switch (type) {
+            case 'video':
+                return <VideoIcon className="text-red-500" size={16} />;
+            case 'image':
+                return <ImageIcon className="text-green-500" size={16} />;
+            case 'pdf':
+                return <FileTextIcon className="text-blue-500" size={16} />;
+            default:
+                return <FileTextIcon className="text-gray-500" size={16} />;
+        }
+    };
+
+    const getBlockTypeLabel = (type) => {
+        switch (type) {
+            case 'video':
+                return 'فيديو';
+            case 'image':
+                return 'صورة';
+            case 'pdf':
+                return 'ملف PDF';
+            case 'text':
+                return 'نص';
+            default:
+                return 'محتوى';
+        }
+    };
+
+    // Function to prepare all content for navigation
+    const prepareAllContent = (courseData) => {
+        const content = [];
+        courseData.sections?.forEach((section, sectionIndex) => {
+            section.blocks?.forEach((block, blockIndex) => {
+                if (block.type === 'video' && block.files?.length > 0) {
+                    content.push({
+                        type: 'video',
+                        url: block.files[0].file_path,
+                        title: block.title || `فيديو ${sectionIndex + 1}.${blockIndex + 1}`,
+                        sectionTitle: section.title,
+                        sectionIndex,
+                        blockIndex
+                    });
+                } else if (block.type === 'image' && block.files?.length > 0) {
+                    content.push({
+                        type: 'image',
+                        url: block.files[0].file_path,
+                        title: block.title || `صورة ${sectionIndex + 1}.${blockIndex + 1}`,
+                        sectionTitle: section.title,
+                        sectionIndex,
+                        blockIndex
+                    });
+                } else if (block.type === 'pdf' && block.files?.length > 0) {
+                    content.push({
+                        type: 'pdf',
+                        url: block.files[0].file_path,
+                        title: block.title || `ملف PDF ${sectionIndex + 1}.${blockIndex + 1}`,
+                        fileName: block.files[0].original_name,
+                        sectionTitle: section.title,
+                        sectionIndex,
+                        blockIndex
+                    });
+                } else if (block.type === 'text' && block.content) {
+                    content.push({
+                        type: 'text',
+                        content: block.content,
+                        title: block.title || `نص ${sectionIndex + 1}.${blockIndex + 1}`,
+                        sectionTitle: section.title,
+                        sectionIndex,
+                        blockIndex
+                    });
+                }
+            });
+        });
+        return content;
+    };
+
+    // Navigation functions
+    const goToNextContent = () => {
+        if (currentContentIndex < allContent.length - 1) {
+            const nextIndex = currentContentIndex + 1;
+            setCurrentContentIndex(nextIndex);
+            setCurrentContent(allContent[nextIndex]);
+            updateMainPlayer(allContent[nextIndex]);
+        }
+    };
+
+    const goToPreviousContent = () => {
+        if (currentContentIndex > 0) {
+            const prevIndex = currentContentIndex - 1;
+            setCurrentContentIndex(prevIndex);
+            setCurrentContent(allContent[prevIndex]);
+            updateMainPlayer(allContent[prevIndex]);
+        }
+    };
+
+    const updateMainPlayer = (content) => {
+        if (content.type === 'video') {
+            setMainVideoUrl(content.url);
+            setMainVideoTitle(content.title);
+            setIsVideoPlaying(true);
+        } else if (content.type === 'image') {
+            setMainVideoUrl(null);
+            setMainVideoTitle(content.title);
+        } else if (content.type === 'pdf') {
+            setMainVideoUrl(null);
+            setMainVideoTitle(content.title);
+        } else if (content.type === 'text') {
+            setMainVideoUrl(null);
+            setMainVideoTitle(content.title);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-blue-500 mx-auto mb-4"></div>
+                    <p className="text-gray-600">جاري تحميل الدرس...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error || !course) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
                 <div className="text-center">
                     <h1 className="text-2xl font-bold text-gray-900 mb-4">الدرس غير موجود</h1>
-                    <Button onClick={() => navigate("/elearning-ar")}>العودة للصفحة الرئيسية</Button>
+                    <Button onClick={() => navigate("/TTHCourses")}>العودة للصفحة الرئيسية</Button>
                 </div>
             </div>
         );
@@ -159,62 +410,163 @@ export default function CourseDetail() {
         setNewReview({ name: '', rating: 5, comment: '' });
     };
 
+    // Calculate course statistics
+    const totalLessons = course.sections?.reduce((total, section) => 
+        total + (section.blocks?.length || 0), 0) || 0;
+    const totalDuration = course.sections?.reduce((total, section) => 
+        total + (section.blocks?.length || 0) * 15, 0) || 0; // Assume 15 min per lesson
+    const rating = 4.8; // Mock rating
+    const studentsCount = "1,234"; // Mock student count
+
+    // Get first video file for preview
+    const firstVideo = course.sections?.flatMap(section => 
+        section.blocks?.filter(block => 
+            block.type === 'video' && block.files?.length > 0
+        ) || []
+    )[0];
+
+    const videoUrl = firstVideo?.files?.[0]?.file_path || null;
+
     return (
         <div dir="rtl" className="min-h-screen bg-gray-50">
             {/* Header */}
             <Navbar />
-            <div className="border-b border-blue-100" /> {/* Thin divider line between Navbar and hero section */}
+            <div className="border-b border-blue-100" />
+            
             {/* Hero Section */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-16 shadow-lg ">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-16 shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center gap-10">
                     {/* Video Preview */}
                     <div className="w-full lg:w-1/2 order-2 lg:order-1 mt-8 lg:mt-0">
-                        <div className="bg-black rounded-2xl overflow-hidden shadow-xl border-4 border-white/20">
+                        <div className="bg-black rounded-2xl overflow-hidden shadow-xl border-4 border-white/20 relative">
+                            {/* Navigation Buttons */}
+                            {allContent.length > 1 && (
+                                <>
+                                    <button
+                                        onClick={goToPreviousContent}
+                                        disabled={currentContentIndex === 0}
+                                        className={`absolute left-4 top-1/2 transform -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all ${
+                                            currentContentIndex === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110'
+                                        }`}
+                                    >
+                                        <ChevronLeft size={24} />
+                                    </button>
+                                    <button
+                                        onClick={goToNextContent}
+                                        disabled={currentContentIndex === allContent.length - 1}
+                                        className={`absolute right-4 top-1/2 transform -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all ${
+                                            currentContentIndex === allContent.length - 1 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110'
+                                        }`}
+                                    >
+                                        <ChevronRight size={24} />
+                                    </button>
+                                </>
+                            )}
+                            
                             <div className="relative aspect-video">
-                                {course.videoUrl ? (
+                                {currentContent?.type === 'video' && mainVideoUrl ? (
                                     <video
                                         controls
-                                        src={course.videoUrl}
+                                        src={mainVideoUrl}
                                         className="w-full h-full rounded-2xl"
-                                        poster={course.thumbnail}
+                                        poster={course.cover_url || "/placeholder.svg"}
                                         onPlay={() => setIsVideoPlaying(true)}
                                         onPause={() => setIsVideoPlaying(false)}
                                     >
-                                        <source src={course.videoUrl} type="video/mp4" />
+                                        <source src={mainVideoUrl} type="video/mp4" />
                                         متصفحك لا يدعم عرض الفيديو.
                                     </video>
+                                ) : currentContent?.type === 'image' ? (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-900">
+                                        <img
+                                            src={currentContent.url}
+                                            alt={currentContent.title}
+                                            className="max-w-full max-h-full object-contain rounded-2xl"
+                                        />
+                                    </div>
+                                ) : currentContent?.type === 'pdf' ? (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-900">
+                                        <div className="text-center text-white">
+                                            <FileTextIcon size={64} className="mx-auto mb-4" />
+                                            <h3 className="text-xl font-bold mb-2">{currentContent.title}</h3>
+                                            <p className="text-gray-300 mb-4">ملف PDF</p>
+                                            <button
+                                                onClick={() => handleDownload(currentContent.url, currentContent.fileName)}
+                                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 mx-auto"
+                                            >
+                                                <Download size={16} />
+                                                تحميل الملف
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : currentContent?.type === 'text' ? (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-900">
+                                        <div className="text-center text-white max-w-md mx-auto p-6">
+                                            <FileTextIcon size={64} className="mx-auto mb-4" />
+                                            <h3 className="text-xl font-bold mb-4">{currentContent.title}</h3>
+                                            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-right">
+                                                <p className="text-white leading-relaxed">{currentContent.content}</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 ) : (
                                     <div className="flex items-center justify-center h-full">
-                                        <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
+                                        <img 
+                                            src={course.cover_url || "/placeholder.svg"} 
+                                            alt={course.title} 
+                                            className="w-full h-full object-cover" 
+                                        />
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                                             <Play size={64} className="text-white" />
                                         </div>
                                     </div>
                                 )}
                             </div>
+                            
+                            {/* Content Info */}
+                            {currentContent && (
+                                <div className="bg-white/10 backdrop-blur-sm p-3 text-center">
+                                    <div className="flex items-center justify-center gap-2 mb-1">
+                                        <span className="text-xs text-blue-200 bg-blue-600/30 px-2 py-1 rounded">
+                                            {currentContent.sectionTitle}
+                                        </span>
+                                        <span className="text-xs text-gray-300">
+                                            {currentContentIndex + 1} من {allContent.length}
+                                        </span>
+                                    </div>
+                                    <p className="text-white font-medium text-sm">{currentContent.title}</p>
+                                </div>
+                            )}
                         </div>
                     </div>
+                    
                     {/* Course Info */}
                     <div className="w-full lg:w-1/2 order-1 lg:order-2">
                         <h1 className="text-5xl font-extrabold mb-4 drop-shadow-lg">{course.title}</h1>
                         <p className="text-xl text-blue-100 mb-6 font-medium drop-shadow-sm">{course.description}</p>
+                        
                         <div className="flex flex-wrap items-center gap-6 mb-6">
                             <div className="flex items-center gap-1">
                                 <Star className="text-yellow-400 fill-current" size={22} />
-                                <span className="font-bold text-lg">{course.rating}</span>
-                                <span className="text-blue-100">({course.students} طالب)</span>
+                                <span className="font-bold text-lg">{rating}</span>
+                                <span className="text-blue-100">({studentsCount} طالب)</span>
                             </div>
                             <div className="flex items-center gap-1">
                                 <Clock size={20} />
-                                <span>{course.duration}</span>
+                                <span>{Math.round(totalDuration / 60)} ساعة</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <Play size={20} />
+                                <span>{totalLessons} درس</span>
                             </div>
                             <div className="flex items-center gap-1">
                                 <Globe size={20} />
-                                <span>{course.language}</span>
+                                <span>العربية</span>
                             </div>
                         </div>
+                        
                         <p className="text-blue-100 font-semibold">
-                            من إعداد <span className="text-white font-bold">{course.instructor}</span>
+                            من إعداد <span className="text-white font-bold">{course.created_by_name}</span>
                         </p>
                     </div>
                 </div>
@@ -224,10 +576,32 @@ export default function CourseDetail() {
                 <div className="lg:grid lg:grid-cols-3 gap-10">
                     {/* Main Content */}
                     <div className="lg:col-span-2">
+                        {/* Course Statistics */}
+                        <div className="bg-white rounded-xl shadow-lg mb-8 p-6 border border-blue-100">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-blue-600">{totalLessons}</div>
+                                    <div className="text-sm text-gray-600">درس</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-purple-600">{Math.round(totalDuration / 60)}</div>
+                                    <div className="text-sm text-gray-600">ساعة</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-green-600">{rating}</div>
+                                    <div className="text-sm text-gray-600">تقييم</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-orange-600">{studentsCount}</div>
+                                    <div className="text-sm text-gray-600">طالب</div>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Tabs */}
-                        <div className="bg-white rounded-xl  shadow-lg mb-8 border border-blue-100">
+                        <div className="bg-white rounded-xl shadow-lg mb-8 border border-blue-100">
                             <div className="border-b border-purple-100 bg-gradient-to-r from-purple-50 to-purple-50 rounded-t-3xl">
-                                <nav className="flex  px-8">
+                                <nav className="flex px-8">
                                     {[
                                         { id: "overview", label: "نظرة عامة" },
                                         { id: "curriculum", label: "المنهج" },
@@ -256,10 +630,10 @@ export default function CourseDetail() {
                                                 ما ستتعلمه
                                             </h3>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                {course.learningObjectives?.map((objective, index) => (
+                                                {course.sections?.slice(0, 6).map((section, index) => (
                                                     <div key={index} className="flex items-start gap-3">
                                                         <CheckCircle className="text-cyan-500 mt-0.5 flex-shrink-0" size={18} />
-                                                        <span className="text-gray-700">{objective}</span>
+                                                        <span className="text-gray-700">{section.title}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -272,12 +646,18 @@ export default function CourseDetail() {
                                                 المتطلبات المسبقة
                                             </h3>
                                             <ul className="space-y-2">
-                                                {course.prerequisites?.map((prereq, index) => (
-                                                    <li key={index} className="flex items-start gap-3">
-                                                        <div className="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div>
-                                                        <span className="text-gray-700">{prereq}</span>
-                                                    </li>
-                                                ))}
+                                                <li className="flex items-start gap-3">
+                                                    <div className="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div>
+                                                    <span className="text-gray-700">معرفة أساسية باللغة العربية</span>
+                                                </li>
+                                                <li className="flex items-start gap-3">
+                                                    <div className="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div>
+                                                    <span className="text-gray-700">الرغبة في التعلم والتطوير</span>
+                                                </li>
+                                                <li className="flex items-start gap-3">
+                                                    <div className="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div>
+                                                    <span className="text-gray-700">لا حاجة لخبرة سابقة</span>
+                                                </li>
                                             </ul>
                                         </div>
 
@@ -292,22 +672,104 @@ export default function CourseDetail() {
                                 {activeTab === "curriculum" && (
                                     <div className="space-y-4">
                                         <h3 className="text-xl font-bold text-gray-900 mb-6">محتوى الدرس</h3>
-                                        {course.curriculum?.map((section, index) => (
-                                            <div key={index} className="border border-gray-200 rounded-lg">
-                                                <div className="bg-gray-50 px-4 py-3 flex items-center justify-between">
+                                        {course.sections?.map((section, sectionIndex) => (
+                                            <div key={sectionIndex} className="border border-gray-200 rounded-lg overflow-hidden">
+                                                <div 
+                                                    className="bg-gray-50 px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
+                                                    onClick={() => toggleSection(sectionIndex)}
+                                                >
                                                     <h4 className="font-semibold text-gray-900">{section.title}</h4>
-                                                    <span className="text-sm text-gray-600">{section.duration}</span>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-sm text-gray-600">{section.blocks?.length || 0} درس</span>
+                                                        <div className={`transform transition-transform ${expandedSections.has(sectionIndex) ? 'rotate-180' : ''}`}>
+                                                            ▼
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="p-4">
-                                                    <ul className="space-y-2">
-                                                        {section.lessons.map((lesson, lessonIndex) => (
-                                                            <li key={lessonIndex} className="flex items-center gap-3 text-gray-700">
-                                                                <Play size={16} className="text-blue-600" />
-                                                                <span>{lesson}</span>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
+                                                {expandedSections.has(sectionIndex) && (
+                                                    <div className="p-4 bg-white">
+                                                        <ul className="space-y-3">
+                                                            {section.blocks?.filter(block => block.type !== 'text').map((block, blockIndex) => {
+                                                                const fileUrl = block.files?.[0]?.file_path || block.fileUrl || block.content;
+                                                                const fileName = block.files?.[0]?.original_name || block.title || `ملف ${blockIndex + 1}`;
+                                                                
+                                                                return (
+                                                                    <li key={blockIndex} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
+                                                                        <div className="flex items-center gap-3 flex-1">
+                                                                            {getBlockIcon(block.type)}
+                                                                            <span className="text-gray-700 font-medium">{block.title || `محتوى ${blockIndex + 1}`}</span>
+                                                                            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                                                                {getBlockTypeLabel(block.type)}
+                                                                            </span>
+                                                                        </div>
+                                                                        
+                                                                        <div className="flex items-center gap-2">
+                                                                            {block.type === 'video' && fileUrl && (
+                                                                                <button
+                                                                                    onClick={() => handleVideoClick(fileUrl, block.title)}
+                                                                                    className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                                                                >
+                                                                                    <Play size={14} />
+                                                                                    مشاهدة
+                                                                                </button>
+                                                                            )}
+                                                                            
+                                                                            {block.type === 'image' && fileUrl && (
+                                                                                <button
+                                                                                    onClick={() => handleImageClick(fileUrl, block.title)}
+                                                                                    className="flex items-center gap-1 text-green-600 hover:text-green-700 text-sm font-medium"
+                                                                                >
+                                                                                    <Eye size={14} />
+                                                                                    عرض
+                                                                                </button>
+                                                                            )}
+                                                                            
+                                                                            {block.type === 'pdf' && fileUrl && (
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <button
+                                                                                        onClick={() => handlePdfClick(fileUrl, block.title)}
+                                                                                        className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                                                                    >
+                                                                                        <Eye size={14} />
+                                                                                        عرض
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => handleDownload(fileUrl, fileName)}
+                                                                                        className="flex items-center gap-1 text-green-600 hover:text-green-700 text-sm font-medium"
+                                                                                    >
+                                                                                        <Download size={14} />
+                                                                                        تحميل
+                                                                                    </button>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </li>
+                                                                );
+                                                            })}
+                                                        </ul>
+                                                        
+                                                        {/* Display text content directly */}
+                                                        {section.blocks?.map((block, blockIndex) => {
+                                                            if (block.type === 'text' && block.content) {
+                                                                return (
+                                                                    <div key={`text-${blockIndex}`} className="mt-4 p-4 bg-gray-50 rounded-lg border-r-4 border-purple-500">
+                                                                        <div className="flex items-center gap-2 mb-2">
+                                                                            <FileTextIcon className="text-purple-500" size={16} />
+                                                                            <span className="text-sm font-medium text-gray-700">{block.title || `نص ${blockIndex + 1}`}</span>
+                                                                            <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
+                                                                                نص
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="text-gray-700 leading-relaxed text-sm">
+                                                                            {block.content}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return null;
+                                                        })}
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -319,8 +781,8 @@ export default function CourseDetail() {
                                             <h3 className="text-xl font-bold text-blue-900">تقييمات الطلاب</h3>
                                             <div className="flex items-center gap-2">
                                                 <Star className="text-yellow-400 fill-current" size={20} />
-                                                <span className="font-bold text-lg">{course.rating}</span>
-                                                <span className="text-gray-400">({course.students} تقييم)</span>
+                                                <span className="font-bold text-lg">{rating}</span>
+                                                <span className="text-gray-400">({studentsCount} تقييم)</span>
                                             </div>
                                         </div>
 
@@ -344,7 +806,10 @@ export default function CourseDetail() {
                                                             onClick={() => handleRatingChange(i + 1)}
                                                             className="focus:outline-none"
                                                         >
-                                                          
+                                                            <Star 
+                                                                className={`${i < newReview.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
+                                                                size={20} 
+                                                            />
                                                         </button>
                                                     ))}
                                                 </div>
@@ -360,7 +825,7 @@ export default function CourseDetail() {
                                             <div className="flex justify-end">
                                                 <button
                                                     type="submit"
-                                                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-normal py-2   px-6 rounded-sm shadow transition"
+                                                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-normal py-2 px-6 rounded-sm shadow transition"
                                                 >
                                                     أضف تقييمك
                                                 </button>
@@ -399,26 +864,34 @@ export default function CourseDetail() {
                     {/* Sidebar */}
                     <div className="lg:col-span-1">
                         {/* Action Card */}
-                        <Card className="mb-6  top-4">
+                        <Card className="mb-6 sticky top-4">
                             <CardContent className="p-6">
                                 <div className="space-y-4">
-                                    <div className="flex items-center pt-4  gap-3">
-                                        {course.pdfUrl && (
+                                    {/* Price Display */}
+                                    {(course.price || course.material_price) && (
+                                        <div className="text-center mb-4">
+                                            <div className="text-3xl font-bold text-green-600">
+                                                {course.material_price || course.price} د.ت
+                                            </div>
+                                            <div className="text-sm text-gray-600">سعر الدرس</div>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="flex items-center pt-4 gap-3">
+                                        {course.sections?.some(section => 
+                                            section.blocks?.some(block => 
+                                                block.type === 'document' && block.files?.length > 0
+                                            )
+                                        ) && (
                                             <Button className="flex-1 flex justify-center items-center bg-blue-600 text-white font-normal shadow hover:bg-blue-700 transition">
-                                                <a href={course.pdfUrl} download target="_blank" rel="noopener noreferrer">
-                                                    <FileText size={18} className="absolute mr-[-1rem]" />
-                                                    ملخص الدرس PDF
-                                                </a>
+                                                <FileText size={18} className="absolute mr-[-1rem]" />
+                                                تحميل الملفات
                                             </Button>
                                         )}
-                                        {course.exoUrl && (
-                                            <Button variant="outline" className="flex-1 text-blue-900 hover:bg-gray-50" asChild>
-                                                <a href={course.exoUrl} download target="_blank" rel="noopener noreferrer">
-                                                    <Download size={18} className="absolute mr-[-8.35rem]" />
-                                                     حلول سلسلة تمارين
-                                                </a>
-                                            </Button>
-                                        )}
+                                        <Button variant="outline" className="flex-1 text-blue-900 hover:bg-gray-50">
+                                            <Play size={18} className="absolute mr-[-8.35rem]" />
+                                            مشاهدة الدرس
+                                        </Button>
                                     </div>
                                 </div>
                             </CardContent>
@@ -427,61 +900,174 @@ export default function CourseDetail() {
                         {/* Instructor Card */}
                         <Card className="mb-6">
                             <CardHeader>
-                                <CardTitle className="text-lg">اسأل الأستاذ</CardTitle>
+                                <CardTitle className="text-lg">المدرس</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-center gap-4 mb-4">
-                                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purpule-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
-                                        {course.instructor.charAt(course.instructor.indexOf('.') + 2)}
+                                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                                        {course.created_by_name?.charAt(0) || 'م'}
                                     </div>
                                     <div>
-                                        <h3 className="font-semibold text-gray-900 text-lg">{course.instructor}</h3>
-                                        <p className="text-gray-600">مدرس {subjectLabels[course.subject]}</p>
+                                        <h3 className="font-semibold text-gray-900 text-lg">{course.created_by_name}</h3>
+                                        <p className="text-gray-600">مدرس محترف</p>
                                     </div>
                                 </div>
-
                             </CardContent>
                         </Card>
 
                         {/* Related Courses */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">دروس مشابهة</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {relatedCourses.map((relatedCourse) => (
-                                        <div
-                                            key={relatedCourse.id}
-                                            className="flex gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                                            onClick={() => navigate(`/course/${relatedCourse.id}`)}
-                                        >
-                                            <img
-                                                src={relatedCourse.thumbnail}
-                                                alt={relatedCourse.title}
-                                                className="w-16 h-12 object-cover rounded"
-                                            />
-                                            <div className="flex-1 min-w-0">
-                                                <h4 className="font-medium text-sm text-gray-900 line-clamp-2 leading-tight">
-                                                    {relatedCourse.title}
-                                                </h4>
-                                                <p className="text-xs text-gray-600 mt-1">{relatedCourse.instructor}</p>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <div className="flex items-center gap-1">
-                                                        <Star className="text-yellow-400 fill-current" size={12} />
-                                                        <span className="text-xs font-medium">{relatedCourse.rating}</span>
+                        {relatedCourses.length > 0 && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-lg">دروس مشابهة</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-3">
+                                        {relatedCourses.map((relatedCourse) => {
+                                            const price = languageCoursePrices[`${relatedCourse.id}-${relatedCourse.language_level_id}`];
+                                            // For education courses, use material_price, for language courses use the price from language_course_prices
+                                            const displayPrice = relatedCourse.material_price || price;
+
+                                            return (
+                                                <div
+                                                    key={relatedCourse.id}
+                                                    className="flex gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-100"
+                                                    onClick={() => navigate(`/coursesList/courses/${relatedCourse.id}`)}
+                                                >
+                                                    {/* Price on the left */}
+                                                    <div className="flex-shrink-0 flex flex-col items-center justify-center min-w-[60px]">
+                                                        <div className="text-lg font-bold text-green-600">
+                                                            {displayPrice ? `${displayPrice} د.ت` : 'مجاناً'}
+                                                        </div>
+                                                        {displayPrice && (
+                                                            <div className="text-xs text-gray-500">د.ت</div>
+                                                        )}
                                                     </div>
-                                                    <span className="text-xs text-gray-500">{relatedCourse.duration}</span>
+                                                    
+                                                    {/* Course image */}
+                                                    <div className="flex-shrink-0">
+                                                        <img
+                                                            src={relatedCourse.cover_url || "/placeholder.svg"}
+                                                            alt={relatedCourse.title}
+                                                            className="w-16 h-12 object-cover rounded-lg"
+                                                        />
+                                                    </div>
+                                                    
+                                                    {/* Course info */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className="font-medium text-sm text-gray-900 line-clamp-2 leading-tight mb-1">
+                                                            {relatedCourse.title}
+                                                        </h4>
+                                                        <p className="text-xs text-gray-600 mb-2">{relatedCourse.created_by_name}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex items-center gap-1">
+                                                                <Star className="text-yellow-400 fill-current" size={12} />
+                                                                <span className="text-xs font-medium">4.8</span>
+                                                                <span className="text-xs text-gray-500">(123)</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1 text-xs text-gray-500">
+                                                                <Play size={10} />
+                                                                <span>15 درس</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
+                                            );
+                                        })}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
                     </div>
                 </div>
             </div>
+            
+            <Footer />
+
+            {/* Video Modal */}
+            {showVideoModal && selectedVideo && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                        <div className="flex items-center justify-between p-4 border-b">
+                            <h3 className="text-lg font-semibold">{selectedVideo.title}</h3>
+                            <button
+                                onClick={() => setShowVideoModal(false)}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <div className="p-4">
+                            <video
+                                controls
+                                src={selectedVideo.url}
+                                className="w-full rounded-lg"
+                                autoPlay
+                            >
+                                <source src={selectedVideo.url} type="video/mp4" />
+                                متصفحك لا يدعم عرض الفيديو.
+                            </video>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Image Modal */}
+            {showImageModal && selectedImage && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                        <div className="flex items-center justify-between p-4 border-b">
+                            <h3 className="text-lg font-semibold">{selectedImage.title}</h3>
+                            <button
+                                onClick={() => setShowImageModal(false)}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <div className="p-4">
+                            <img
+                                src={selectedImage.url}
+                                alt={selectedImage.title}
+                                className="w-full h-auto rounded-lg"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* PDF Modal */}
+            {showPdfModal && selectedPdf && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg max-w-4xl w-full h-[90vh] overflow-hidden">
+                        <div className="flex items-center justify-between p-4 border-b">
+                            <h3 className="text-lg font-semibold">{selectedPdf.title}</h3>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => handleDownload(selectedPdf.url, selectedPdf.title)}
+                                    className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                >
+                                    <Download size={16} />
+                                    تحميل
+                                </button>
+                                <button
+                                    onClick={() => setShowPdfModal(false)}
+                                    className="text-gray-500 hover:text-gray-700"
+                                >
+                                    <X size={24} />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="p-4 h-full">
+                            <iframe
+                                src={selectedPdf.url}
+                                className="w-full h-full rounded-lg"
+                                title={selectedPdf.title}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

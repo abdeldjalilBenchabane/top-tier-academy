@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 import CourseCard from "../components/ui/TTHCourseCard";
@@ -6,6 +6,45 @@ import SearchFilter from "../components/ui/TTHSearchFilter";
 import { courseData } from "../data";
 
 export default function Courses() {
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    async function fetchCourses() {
+      setLoading(true);
+      try {
+        // Fetch approved courses
+        const res = await fetch('/api/courses?status=approved');
+        let data = await res.json();
+        console.log('COURSES DATA', data);
+        // Only keep courses WITHOUT a language_level_id (education path)
+        data = data.filter(course => !course.language_level_id || course.language_level_id === null || course.language_level_id === undefined);
+        
+        // For education courses, fetch price from materials table
+        try {
+          const materialsRes = await fetch('/api/courses/materials/list');
+          if (materialsRes.ok) {
+            const materialsData = await materialsRes.json();
+            data = data.map(course => {
+              const material = materialsData.find(m => m.name === course.material_name);
+              return material ? { ...course, price: material.price } : course;
+            });
+          } else {
+            console.warn('Failed to fetch materials, continuing without prices');
+          }
+        } catch (e) {
+          console.warn('Error fetching materials:', e);
+          // Continue without prices - courses will still display
+        }
+        
+        setCourses(data);
+      } catch (e) {
+        setCourses([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchCourses();
+  }, []);
   return (
     <div dir="rtl" className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 flex flex-col">
       <Navbar />
@@ -90,7 +129,7 @@ export default function Courses() {
                 dir="rtl" 
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 md:gap-8 justify-items-center relative z-10"
               >
-                {courseData.map((course, index) => (
+                {courses.map((course, index) => (
                   <div
                     key={course.id}
                     className="w-full max-w-sm transform hover:scale-105 transition-all duration-300"
@@ -103,8 +142,7 @@ export default function Courses() {
                 ))}
               </div>
 
-             
-              {courseData.length === 0 && (
+              {courses.length === 0 && !loading && (
                 <div className="text-center py-16">
                   <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
                     <svg className="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,7 +156,7 @@ export default function Courses() {
             </div>
 
          
-            {courseData.length > 0 && (
+            {courses.length > 0 && (
               <div className="text-center mt-12">
                 <button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
                   عرض المزيد من الدروس

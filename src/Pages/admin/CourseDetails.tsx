@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
-import { Course, User, Material, Speciality, Year, Level, PendingCourse } from '@/types';
+import { Course, User, Material, Speciality, Year, Level, PendingCourse, LanguageLevel } from '@/types';
 import PageHeader from '@/components/common/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,8 @@ import Breadcrumbs from '@/components/common/Breadcrumbs';
 import { Breadcrumb } from '@/types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import AdminPathSelector from '@/components/admin/AdminPathSelector';
 
 const CourseDetailsPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
@@ -31,6 +33,8 @@ const CourseDetailsPage = () => {
   const [speciality, setSpeciality] = useState<Speciality | null>(null);
   const [year, setYear] = useState<Year | null>(null);
   const [level, setLevel] = useState<Level | null>(null);
+  const [languageLevel, setLanguageLevel] = useState<LanguageLevel | null>(null);
+  const [language, setLanguage] = useState<{ id: string; name: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingProfessor, setIsLoadingProfessor] = useState(true);
   // Add state for cover upload
@@ -39,6 +43,12 @@ const CourseDetailsPage = () => {
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   // Add state for image reload attempts
   const [coverReloadKey, setCoverReloadKey] = useState(0);
+  // Add state for AdminPathSelector
+  const [showPathSelector, setShowPathSelector] = useState(false);
+
+  // Check if course needs path assignment
+  const needsPathAssignment = course && course.status === 'approved' && 
+    !course.materialId && !course.language_level_id;
 
   useEffect(() => {
     const loadCourseData = async () => {
@@ -48,6 +58,7 @@ const CourseDetailsPage = () => {
       try {
         // Always fetch from backend
         const courseData = await api.getCourseById(courseId);
+        console.log('COURSE DATA', courseData);
         if (courseData) {
           setCourse(courseData);
           // Load professor data for approved course
@@ -89,6 +100,30 @@ const CourseDetailsPage = () => {
               const levelData = levelsData.find(l => l.id === courseData.levelId);
               setLevel(levelData || null);
             }
+          }
+          // If language_level_id, fetch and set language level and language
+          if (courseData.language_level_id) {
+            try {
+              const allLanguageLevels = await api.getAllLanguageLevels();
+              const foundLevel = allLanguageLevels.find(lvl => lvl.id === courseData.language_level_id);
+              setLanguageLevel(foundLevel || null);
+              if (foundLevel) {
+                const allLanguages = await api.getLanguages();
+                // Try both language_id and languageId for robustness
+                const langId = foundLevel.language_id || foundLevel.languageId;
+                const foundLang = allLanguages.find(lang => lang.id == langId);
+                setLanguage(foundLang ? { id: foundLang.id, name: foundLang.name } : null);
+                console.log('LANG DEBUG', { foundLevel, foundLang });
+              } else {
+                setLanguage(null);
+              }
+            } catch (err) {
+              setLanguageLevel(null);
+              setLanguage(null);
+            }
+          } else {
+            setLanguageLevel(null);
+            setLanguage(null);
           }
         } else {
           toast.error('Course not found');
@@ -223,6 +258,7 @@ const CourseDetailsPage = () => {
     );
   }
 
+  console.log('LANG DEBUG (render)', { languageLevel, language });
   return (
     <div className="space-y-6">
       <PageHeader 
@@ -293,16 +329,43 @@ const CourseDetailsPage = () => {
               <div>
                 <p className="text-sm font-medium text-gray-500">Path</p>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  <Badge variant="outline" className="text-xs flex items-center">
-                    <Layers className="h-3 w-3 mr-1" />
-                    {level && <>{level.name}</>}
-                    {level && year && <>&nbsp;&gt;&nbsp;</>}
-                    {year && <>{year.name}</>}
-                    {year && speciality && <>&nbsp;&gt;&nbsp;</>}
-                    {speciality && <>{speciality.name}</>}
-                    {speciality && material && <>&nbsp;&gt;&nbsp;</>}
-                    {material && <>{material.name}</>}
-                  </Badge>
+                  {needsPathAssignment ? (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs text-orange-600">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        No path assigned
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowPathSelector(true)}
+                        className="text-xs"
+                      >
+                        Assign Path
+                      </Button>
+                    </div>
+                  ) : (
+                    <Badge variant="outline" className="text-xs flex items-center">
+                      <Layers className="h-3 w-3 mr-1" />
+                      {languageLevel && language ? (
+                        <>{language.name} &gt; {languageLevel.name}</>
+                      ) : languageLevel && !language ? (
+                        <>Unknown Language &gt; {languageLevel.name}</>
+                      ) : !languageLevel && language ? (
+                        <>{language.name} &gt; Unknown Level</>
+                      ) : (
+                        <>
+                          {level && <>{level.name}</>}
+                          {level && year && <>&nbsp;&gt;&nbsp;</>}
+                          {year && <>{year.name}</>}
+                          {year && speciality && <>&nbsp;&gt;&nbsp;</>}
+                          {speciality && <>{speciality.name}</>}
+                          {speciality && material && <>&nbsp;&gt;&nbsp;</>}
+                          {material && <>{material.name}</>}
+                        </>
+                      )}
+                    </Badge>
+                  )}
                 </div>
               </div>
               
@@ -535,6 +598,23 @@ const CourseDetailsPage = () => {
           </Card>
         </div>
       </div>
+
+      <Dialog open={showPathSelector} onOpenChange={setShowPathSelector}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Assign Path for {course.title}</DialogTitle>
+          </DialogHeader>
+          <AdminPathSelector
+            course={course}
+            onSuccess={() => {
+              setShowPathSelector(false);
+              // Reload course data to reflect new path
+              window.location.reload();
+            }}
+            onCancel={() => setShowPathSelector(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

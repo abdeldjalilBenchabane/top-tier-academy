@@ -1,4 +1,4 @@
-import { User, Level, Year, Speciality, Material, Course, PendingCourse, ContentBlock, HomeSlide, LiveSession, Quiz, QuizQuestion, PendingQuiz, QuizAttempt, QuizAnswer, QuizResults, LanguageLevel } from '@/types';
+import { User, Level, Year, Speciality, Material, Course, PendingCourse, ContentBlock, HomeSlide, LiveSession, Quiz, QuizQuestion, PendingQuiz, QuizAttempt, QuizAnswer, QuizResults, LanguageLevel, Language } from '@/types';
 import { getAuthToken } from '@/services/api';
 
 // Configurable API base URL
@@ -690,7 +690,7 @@ export const api = {
     }
   },
   approveCourse: async (courseId: string, materialId: string, price?: number): Promise<void> => {
-    const res = await fetch(`/api/courses/${courseId}/path`, {
+    const res = await fetch(`/api/courses/${courseId}/assign-material`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -701,7 +701,7 @@ export const api = {
     });
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to approve course');
+      throw new Error(errorData.error || 'Failed to assign course path');
     }
     return;
   },
@@ -998,6 +998,16 @@ export const api = {
     if (!res.ok) throw new Error('Failed to fetch language levels');
     return await res.json();
   },
+  getAllLanguageLevels: async (): Promise<LanguageLevel[]> => {
+    const res = await fetch('/api/language-levels', {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch language levels');
+    return await res.json();
+  },
   /**
    * Upload a new cover image for a course (admin only)
    * @param courseId
@@ -1020,5 +1030,72 @@ export const api = {
     }
     const data = await res.json();
     return data.cover_url;
+  },
+  approveLanguageCourseWithPrice: async (courseId: string, languageLevelId: string, price: string) => {
+    const res = await fetch(`/api/courses/${courseId}/language-path`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      body: JSON.stringify({ language_level_id: languageLevelId }),
+      credentials: 'include'
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to assign language course path');
+    }
+    
+    // Set the price separately using the language-course-price endpoint
+    const priceRes = await fetch('/api/courses/language-course-price', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      body: JSON.stringify({ course_id: courseId, language_level_id: languageLevelId, price }),
+      credentials: 'include'
+    });
+    if (!priceRes.ok) {
+      const errorData = await priceRes.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to set language course price');
+    }
+    
+    return await priceRes.json();
+  },
+  
+  // Admin functions to assign paths to approved courses without paths
+  assignMaterialPathAdmin: async (courseId: string, materialId: string): Promise<void> => {
+    const res = await fetch(`/api/courses/${courseId}/assign-material-admin`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      body: JSON.stringify({ material_id: materialId }),
+      credentials: 'include'
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to assign material path');
+    }
+    return;
+  },
+  
+  assignLanguagePathAdmin: async (courseId: string, languageLevelId: string, price: string): Promise<void> => {
+    const res = await fetch(`/api/courses/${courseId}/assign-language-admin`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      body: JSON.stringify({ language_level_id: languageLevelId, price }),
+      credentials: 'include'
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to assign language path');
+    }
+    return;
   },
 };

@@ -138,6 +138,12 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
     if (files && files.length > 0) {
       const file = files[0];
       
+      // Check file size and show warning for large files (over 50MB)
+      const fileSizeMB = file.size / (1024 * 1024);
+      if (fileSizeMB > 50) {
+        toast.warning(`Large file detected (${fileSizeMB.toFixed(1)} MB). Upload may take longer than usual.`);
+      }
+      
       // Store the file in uploadedFiles state
       setUploadedFiles({
         ...uploadedFiles,
@@ -155,6 +161,13 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
     const files = event.target.files;
     if (files && files.length > 0) {
       const file = files[0];
+      
+      // Check file size and show warning for large files (over 10MB for covers)
+      const fileSizeMB = file.size / (1024 * 1024);
+      if (fileSizeMB > 10) {
+        toast.warning(`Large cover image detected (${fileSizeMB.toFixed(1)} MB). Consider compressing the image for better performance.`);
+      }
+      
       setCoverFile(file);
     }
   };
@@ -298,7 +311,10 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
                     <div className="flex-1">
                       <p className="text-sm font-medium">{uploadedFiles[block.id].name}</p>
                       <p className="text-xs text-gray-500">
-                        {(uploadedFiles[block.id].size / 1024).toFixed(1)} KB
+                        {(uploadedFiles[block.id].size / (1024 * 1024)).toFixed(1)} MB
+                        {(uploadedFiles[block.id].size / (1024 * 1024)) > 50 && (
+                          <span className="ml-2 text-orange-600 font-medium">⚠️ Large file</span>
+                        )}
                       </p>
                     </div>
                     
@@ -387,7 +403,10 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
                 <div className="flex-1">
                   <p className="text-sm font-medium">{coverFile.name}</p>
                   <p className="text-xs text-gray-500">
-                    {(coverFile.size / 1024).toFixed(1)} KB
+                    {(coverFile.size / (1024 * 1024)).toFixed(1)} MB
+                    {(coverFile.size / (1024 * 1024)) > 10 && (
+                      <span className="ml-2 text-orange-600 font-medium">⚠️ Large image</span>
+                    )}
                   </p>
                 </div>
                 

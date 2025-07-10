@@ -29,9 +29,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage: storage,
-  limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB limit for videos
-  },
+  // Removed file size limit - no longer restricting file size
   fileFilter: (req, file, cb) => {
     console.log('File upload attempt:', {
       originalname: file.originalname,
@@ -61,8 +59,11 @@ const handleUploadError = (error, req, res, next) => {
   console.error('Upload error:', error);
   
   if (error instanceof multer.MulterError) {
+    // No longer rejecting files based on size, just log a warning
     if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'File too large. Maximum size is 50MB.' });
+      console.warn('Large file uploaded:', error.message);
+      // Continue processing the file instead of rejecting it
+      return next();
     }
     return res.status(400).json({ error: error.message });
   } else if (error) {

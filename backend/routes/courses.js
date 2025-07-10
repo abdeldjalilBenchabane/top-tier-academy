@@ -36,9 +36,7 @@ const courseStorage = multer.diskStorage({
 
 const courseUpload = multer({
   storage: courseStorage,
-  limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB limit
-  },
+  // Removed file size limit - no longer restricting file size
   fileFilter: (req, file, cb) => {
     console.log('Course file upload attempt:', {
       fieldname: file.fieldname,
@@ -78,8 +76,11 @@ const handleUploadError = (error, req, res, next) => {
   console.error('Upload error:', error);
   
   if (error instanceof multer.MulterError) {
+    // No longer rejecting files based on size, just log a warning
     if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'File too large. Maximum size is 50MB.' });
+      console.warn('Large file uploaded:', error.message);
+      // Continue processing the file instead of rejecting it
+      return next();
     }
     return res.status(400).json({ error: error.message });
   } else if (error) {
@@ -91,12 +92,13 @@ const handleUploadError = (error, req, res, next) => {
 // Get all courses (optionally filter by created_by)
 router.get('/', async (req, res) => {
   try {
-    const { created_by, status } = req.query;
+    const { created_by, status, material_id, speciality_id } = req.query;
     let queryStr = `
       SELECT 
         c.id, c.title, c.description, c.price, c.is_published, c.created_at,
         c.approved_at, c.created_by, c.status, u.name as created_by_name,
-        m.name as material_name, cc.cover as cover_url
+        m.name as material_name, m.price as material_price, m.speciality_id as speciality_id, cc.cover as cover_url,
+        c.language_level_id, c.material_id
       FROM courses c
       LEFT JOIN users u ON c.created_by = u.id
       LEFT JOIN materials m ON c.material_id = m.id
@@ -112,12 +114,34 @@ router.get('/', async (req, res) => {
       params.push(status);
       queryStr += ` AND c.status = $${params.length}`;
     }
+    if (material_id) {
+      params.push(material_id);
+      queryStr += ` AND c.material_id = $${params.length}`;
+    }
+    if (speciality_id) {
+      params.push(speciality_id);
+      queryStr += ` AND m.speciality_id = $${params.length}`;
+    }
     queryStr += ' ORDER BY c.created_at DESC';
     const courses = await getRows(queryStr, params);
     res.json(courses);
   } catch (error) {
     console.error('Error fetching courses:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all language course prices
+router.get('/language-course-prices', async (req, res) => {
+  try {
+    console.log('Fetching language course prices...');
+    const result = await query('SELECT * FROM language_course_prices', []);
+    console.log('Language course prices fetched:', result.rows.length, 'records');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching language course prices:', error);
+    console.error('Error details:', error.message);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 
@@ -137,6 +161,7 @@ router.get('/:id', async (req, res) => {
         c.approved_at AS "approvedAt",
         c.created_by AS "createdBy",
         c.material_id AS "materialId",
+        c.language_level_id,
         c.status,
         u.name as created_by_name,
         m.name as material_name,
@@ -304,21 +329,165 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
   }
 });
 
+// Add endpoint for admins to assign material path to approved courses without path
+router.put('/:id/assign-material-admin', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    const { material_id } = req.body;
+    
+    if (!material_id) {
+      return res.status(400).json({ error: 'material_id is required' });
+    }
+    
+    // Check if course exists
+    const course = await getRow('SELECT id, status, material_id FROM courses WHERE id = $1', [courseId]);
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    
+    // Only allow assigning to approved courses that don't have a material_id
+    if (course.status !== 'approved') {
+      return res.status(400).json({ error: 'Can only assign paths to approved courses' });
+    }
+    
+    if (course.material_id) {
+      return res.status(400).json({ error: 'Course already has a material path assigned' });
+    }
+    
+    // Update course with material_id
+    const result = await query(
+      'UPDATE courses SET material_id = $1 WHERE id = $2 RETURNING *',
+      [material_id, courseId]
+    );
+    
+    res.json({ message: 'Course path assigned successfully', course: result.rows[0] });
+  } catch (error) {
+    console.error('Error assigning material path (admin):', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add endpoint for admins to assign language path to approved courses without path
+router.put('/:id/assign-language-admin', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    const { language_level_id, price } = req.body;
+    
+    if (!language_level_id) {
+      return res.status(400).json({ error: 'language_level_id is required' });
+    }
+    
+    if (!price || isNaN(Number(price)) || Number(price) < 0) {
+      return res.status(400).json({ error: 'Valid price is required for language courses' });
+    }
+    
+    // Check if course exists
+    const course = await getRow('SELECT id, status, language_level_id FROM courses WHERE id = $1', [courseId]);
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    
+    // Only allow assigning to approved courses that don't have a language_level_id
+    if (course.status !== 'approved') {
+      return res.status(400).json({ error: 'Can only assign paths to approved courses' });
+    }
+    
+    if (course.language_level_id) {
+      return res.status(400).json({ error: 'Course already has a language path assigned' });
+    }
+    
+    // Start transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Update course with language_level_id
+      await client.query(
+        'UPDATE courses SET language_level_id = $1 WHERE id = $2',
+        [language_level_id, courseId]
+      );
+      
+      // Set price for this language course
+      await client.query(
+        'INSERT INTO language_course_prices (course_id, language_level_id, price) VALUES ($1, $2, $3) ON CONFLICT (course_id, language_level_id) DO UPDATE SET price = EXCLUDED.price',
+        [courseId, language_level_id, price]
+      );
+      
+      await client.query('COMMIT');
+      
+      const result = await getRow('SELECT * FROM courses WHERE id = $1', [courseId]);
+      res.json({ message: 'Course language path and price assigned successfully', course: result });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error assigning language path (admin):', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add endpoint for professors to assign material path to their draft courses
+router.put('/:id/assign-material', verifyToken, requireRole(['professor']), async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    const { material_id } = req.body;
+    
+    if (!material_id) {
+      return res.status(400).json({ error: 'material_id is required' });
+    }
+    
+    // Check if course exists and belongs to the professor
+    const course = await getRow('SELECT id, created_by, status FROM courses WHERE id = $1', [courseId]);
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    
+    if (course.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'You can only assign paths to your own courses' });
+    }
+    
+    if (course.status !== 'draft') {
+      return res.status(400).json({ error: 'Can only assign paths to draft courses' });
+    }
+    
+    // Update course with material_id and set status to 'pending'
+    const result = await query(
+      'UPDATE courses SET material_id = $1, status = $2 WHERE id = $3 RETURNING *',
+      [material_id, 'pending', courseId]
+    );
+    
+    res.json({ message: 'Course path assigned successfully', course: result.rows[0] });
+  } catch (error) {
+    console.error('Error assigning material path:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Add endpoint to update course path (material_id) and set status to 'pending'
 router.put('/:id/approve', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
     const courseId = req.params.id;
+    
     // Check if course exists
     const course = await getRow('SELECT * FROM courses WHERE id = $1', [courseId]);
     if (!course) {
       return res.status(404).json({ error: 'Course not found' });
     }
-    // Approve the course
+    
+    // Check if course has a material_id (for education courses) or language_level_id (for language courses)
+    if (!course.material_id && !course.language_level_id) {
+      return res.status(400).json({ error: 'Course must have a material path or language path assigned before approval' });
+    }
+    
+    // Update course status to approved, preserving existing material_id and language_level_id
     const result = await query(
       'UPDATE courses SET status = $1, approved_at = NOW() WHERE id = $2 RETURNING *',
       ['approved', courseId]
     );
-    // Optionally: notify the professor (not implemented here)
+    
     res.json({ message: 'Course approved', course: result.rows[0] });
   } catch (error) {
     console.error('Error approving course:', error);
@@ -668,6 +837,30 @@ router.get('/admin/scan-files', verifyToken, requireRole(['admin']), async (req,
     res.json(result);
   } catch (error) {
     console.error('Error scanning course files:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Set price for a language course
+router.post('/language-course-price', async (req, res) => {
+  const { course_id, language_level_id, price } = req.body;
+  if (!course_id || !language_level_id || !price) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  try {
+    // Insert or update price for this course/language_level
+    await query(
+      'INSERT INTO language_course_prices (course_id, language_level_id, price) VALUES ($1, $2, $3) ON CONFLICT (course_id, language_level_id) DO UPDATE SET price = EXCLUDED.price',
+      [course_id, language_level_id, price]
+    );
+    // Update course status to pending and set language_level_id
+    await query(
+      'UPDATE courses SET status = $1, language_level_id = $2 WHERE id = $3',
+      ['pending', language_level_id, course_id]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error setting language course price:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

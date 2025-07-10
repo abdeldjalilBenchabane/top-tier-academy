@@ -31,16 +31,17 @@ const PathSelector = ({
   const [materials, setMaterials] = useState<Material[]>([]);
   
   // Selected values
-  const [selectedLevelId, setSelectedLevelId] = useState<string | undefined>(undefined);
-  const [selectedYearId, setSelectedYearId] = useState<string | undefined>(undefined);
-  const [selectedSpecialityId, setSelectedSpecialityId] = useState<string | undefined>(undefined);
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string | undefined>(undefined);
+  const [selectedLevelId, setSelectedLevelId] = useState<string>('');
+  const [selectedYearId, setSelectedYearId] = useState<string>('');
+  const [selectedSpecialityId, setSelectedSpecialityId] = useState<string>('');
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
   
   const [rootType, setRootType] = useState<'structure' | 'language' | ''>('');
   const [languages, setLanguages] = useState<Language[]>([]);
   const [languageLevels, setLanguageLevels] = useState<LanguageLevel[]>([]);
-  const [selectedLanguageId, setSelectedLanguageId] = useState<string | undefined>(undefined);
-  const [selectedLanguageLevelId, setSelectedLanguageLevelId] = useState<string | undefined>(undefined);
+  const [selectedLanguageId, setSelectedLanguageId] = useState<string>('');
+  const [selectedLanguageLevelId, setSelectedLanguageLevelId] = useState<string>('');
+  const [price, setPrice] = useState('');
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -74,9 +75,9 @@ const PathSelector = ({
           toast.error('Failed to fetch years');
         } finally {
           // Always reset downstream selections
-          setSelectedYearId(undefined);
-          setSelectedSpecialityId(undefined);
-          setSelectedMaterialId(undefined);
+          setSelectedYearId('');
+          setSelectedSpecialityId('');
+          setSelectedMaterialId('');
           setSpecialities([]);
           setMaterials([]);
         }
@@ -84,9 +85,9 @@ const PathSelector = ({
       fetchYears();
     } else {
       setYears([]);
-      setSelectedYearId(undefined);
-      setSelectedSpecialityId(undefined);
-      setSelectedMaterialId(undefined);
+      setSelectedYearId('');
+      setSelectedSpecialityId('');
+      setSelectedMaterialId('');
       setSpecialities([]);
       setMaterials([]);
     }
@@ -103,16 +104,16 @@ const PathSelector = ({
           console.error(error);
           toast.error('Failed to fetch specialities');
         } finally {
-          setSelectedSpecialityId(undefined);
-          setSelectedMaterialId(undefined);
+          setSelectedSpecialityId('');
+          setSelectedMaterialId('');
           setMaterials([]);
         }
       };
       fetchSpecialities();
     } else {
       setSpecialities([]);
-      setSelectedSpecialityId(undefined);
-      setSelectedMaterialId(undefined);
+      setSelectedSpecialityId('');
+      setSelectedMaterialId('');
       setMaterials([]);
     }
   }, [selectedYearId]);
@@ -128,13 +129,13 @@ const PathSelector = ({
           console.error(error);
           toast.error('Failed to fetch materials');
         } finally {
-          setSelectedMaterialId(undefined);
+          setSelectedMaterialId('');
         }
       };
       fetchMaterials();
     } else {
       setMaterials([]);
-      setSelectedMaterialId(undefined);
+      setSelectedMaterialId('');
     }
   }, [selectedSpecialityId]);
 
@@ -152,9 +153,9 @@ const PathSelector = ({
       fetchLanguages();
     } else {
       setLanguages([]);
-      setSelectedLanguageId(undefined);
+      setSelectedLanguageId('');
       setLanguageLevels([]);
-      setSelectedLanguageLevelId(undefined);
+      setSelectedLanguageLevelId('');
     }
   }, [rootType]);
 
@@ -168,13 +169,13 @@ const PathSelector = ({
         } catch (error) {
           toast.error('Failed to fetch language levels');
         } finally {
-          setSelectedLanguageLevelId(undefined);
+          setSelectedLanguageLevelId('');
         }
       };
       fetchLevels();
     } else {
       setLanguageLevels([]);
-      setSelectedLanguageLevelId(undefined);
+      setSelectedLanguageLevelId('');
     }
   }, [rootType, selectedLanguageId]);
 
@@ -187,10 +188,10 @@ const PathSelector = ({
       setIsSubmitting(true);
       try {
         await api.approveCourse(pendingCourse.id, selectedMaterialId);
-        toast.success('Course approved and assigned successfully');
+        toast.success('Course path assigned successfully. Course is now pending admin approval.');
         onSuccess();
       } catch (error) {
-        toast.error('Failed to approve course');
+        toast.error('Failed to assign course path');
       } finally {
         setIsSubmitting(false);
       }
@@ -199,13 +200,17 @@ const PathSelector = ({
         toast.error('Please select a language and level');
         return;
       }
+      if (!price || isNaN(Number(price)) || Number(price) < 0) {
+        toast.error('Please enter a valid price for this language course');
+        return;
+      }
       setIsSubmitting(true);
       try {
-        await api.approveCourseLanguage(pendingCourse.id, selectedLanguageLevelId);
-        toast.success('Course approved and assigned successfully');
+        await api.approveLanguageCourseWithPrice(pendingCourse.id, selectedLanguageLevelId, price);
+        toast.success('Course path and price assigned successfully. Course is now pending admin approval.');
         onSuccess();
       } catch (error) {
-        toast.error('Failed to approve course');
+        toast.error('Failed to assign course path');
       } finally {
         setIsSubmitting(false);
       }
@@ -236,9 +241,9 @@ const PathSelector = ({
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-lg font-medium">Select Path for Course</h3>
+        <h3 className="text-lg font-medium">Assign Course Path</h3>
         <p className="text-sm text-gray-500">
-          Choose where to place "{pendingCourse.title}" in the education hierarchy or languages.
+          Choose where to place "{pendingCourse.title}" in the education hierarchy or languages. This will submit your course for admin approval.
         </p>
         
         <div className="space-y-4">
@@ -260,7 +265,7 @@ const PathSelector = ({
               {/* Level Select */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Level</label>
-                <Select value={selectedLevelId} onValueChange={setSelectedLevelId}>
+                <Select value={selectedLevelId || ''} onValueChange={setSelectedLevelId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select Level" />
                   </SelectTrigger>
@@ -277,7 +282,7 @@ const PathSelector = ({
               {/* Year Select */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
-                <Select value={selectedYearId} onValueChange={setSelectedYearId} disabled={!selectedLevelId || years.length === 0}>
+                <Select value={selectedYearId || ''} onValueChange={setSelectedYearId} disabled={!selectedLevelId || years.length === 0}>
                   <SelectTrigger>
                     <SelectValue placeholder={selectedLevelId ? "Select Year" : "Select Level First"} />
                   </SelectTrigger>
@@ -295,7 +300,7 @@ const PathSelector = ({
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Speciality</label>
                 <Select
-                  value={selectedSpecialityId}
+                  value={selectedSpecialityId || ''}
                   onValueChange={setSelectedSpecialityId}
                   disabled={!selectedYearId || specialities.length === 0}
                 >
@@ -316,7 +321,7 @@ const PathSelector = ({
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Material</label>
                 <Select
-                  value={selectedMaterialId}
+                  value={selectedMaterialId || ''}
                   onValueChange={setSelectedMaterialId}
                   disabled={!selectedSpecialityId || materials.length === 0}
                 >
@@ -341,7 +346,7 @@ const PathSelector = ({
               {/* Language Select */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Language</label>
-                <Select value={selectedLanguageId} onValueChange={setSelectedLanguageId}>
+                <Select value={selectedLanguageId || ''} onValueChange={setSelectedLanguageId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select Language" />
                   </SelectTrigger>
@@ -359,7 +364,7 @@ const PathSelector = ({
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Language Level</label>
                 <Select
-                  value={selectedLanguageLevelId}
+                  value={selectedLanguageLevelId || ''}
                   onValueChange={setSelectedLanguageLevelId}
                   disabled={!selectedLanguageId || languageLevels.length === 0}
                 >
@@ -376,6 +381,21 @@ const PathSelector = ({
                   <div className="text-xs text-red-500 mt-1">No levels available for the selected language.</div>
                 )}
               </div>
+              {rootType === 'language' && selectedLanguageLevelId && (
+                <div className="space-y-2 mt-4">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Course Price (DZD)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="w-full border rounded p-2"
+                    value={price}
+                    onChange={e => setPrice(e.target.value)}
+                    placeholder="Enter price for this language course"
+                    required
+                  />
+                </div>
+              )}
             </>
           )}
         </div>
@@ -404,7 +424,7 @@ const PathSelector = ({
           onClick={handleApprove} 
           disabled={isSubmitting}
         >
-          Approve & Assign
+          Assign Path
         </Button>
       </div>
     </div>

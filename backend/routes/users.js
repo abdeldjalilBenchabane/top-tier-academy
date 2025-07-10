@@ -30,9 +30,7 @@ const avatarStorage = multer.diskStorage({
 
 const avatarUpload = multer({ 
   storage: avatarStorage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit for avatars
-  },
+  // Removed file size limit - no longer restricting file size
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif|webp/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -271,4 +269,4 @@ router.delete('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
   }
 });
 
-export default router; 
+export default router;

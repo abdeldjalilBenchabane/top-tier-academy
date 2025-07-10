@@ -11,10 +11,13 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [userPoints, setUserPoints] = useState(0);
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin, isProfessor } = useAuth();
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
   const mobileMenuRef = useRef(null);
+
+  // Check if user is a student (not admin or professor)
+  const isStudent = user && !isAdmin && !isProfessor;
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const toggleDropdown = () => setIsDropdownOpen(!isDropdownOpen);
@@ -29,10 +32,10 @@ const Navbar = () => {
     return name.charAt(0).toUpperCase();
   };
 
-  // Fetch user points on component mount
+  // Fetch user points on component mount (only for students)
   useEffect(() => {
     const fetchUserPoints = async () => {
-      if (user) {
+      if (isStudent) {
         try {
           const response = await pointsAPI.getBalance();
           setUserPoints(response.balance || 0);
@@ -43,10 +46,12 @@ const Navbar = () => {
     };
 
     fetchUserPoints();
-  }, [user]);
+  }, [isStudent]);
 
-  // Listen for points updates from payment success
+  // Listen for points updates from payment success (only for students)
   useEffect(() => {
+    if (!isStudent) return;
+
     const handlePointsUpdate = (event) => {
       const { points } = event.detail;
       setUserPoints(prev => prev + points);
@@ -54,7 +59,7 @@ const Navbar = () => {
 
     window.addEventListener('pointsUpdated', handlePointsUpdate);
     return () => window.removeEventListener('pointsUpdated', handlePointsUpdate);
-  }, []);
+  }, [isStudent]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -100,9 +105,9 @@ const Navbar = () => {
 
           {/* Auth zone */}
           <div className="flex items-center gap-3 whitespace-nowrap">
-            {user ? (
+            {user && isStudent ? (
               <>
-                {/* Points/Money Icon */}
+                {/* Points/Money Icon for Students */}
                 <Link to="/points" className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 rounded-full px-3 py-2 transition-all duration-200 text-white font-medium">
                   <FaCoins className="w-4 h-4" />
                   <span className="hidden custom:block text-sm">{userPoints.toLocaleString()} دج</span>
@@ -119,37 +124,38 @@ const Navbar = () => {
                     </span>
                   </button>
 
-                {/* Dropdown */}
-                {isDropdownOpen && (
-                  <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                    <div className="py-2">
-                      <div className="px-4 py-2 text-sm text-gray-700 border-b border-gray-100">
-                        <div className="font-medium">{user.name}</div>
-                        <div className="text-gray-500">{user.email}</div>
+                  {/* Dropdown for Students */}
+                  {isDropdownOpen && (
+                    <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                      <div className="py-2">
+                        <div className="px-4 py-2 text-sm text-gray-700 border-b border-gray-100">
+                          <div className="font-medium">{user.name}</div>
+                          <div className="text-gray-500">{user.email}</div>
+                        </div>
+                        <Link to="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onClick={() => setIsDropdownOpen(false)}>
+                          <FaUser className="w-4 h-4" /> الملف الشخصي
+                        </Link>
+                        <Link to="/settings" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onClick={() => setIsDropdownOpen(false)}>
+                          <FaCog className="w-4 h-4" /> الإعدادات
+                        </Link>
+                        <button onClick={handleLogout}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors w-full text-right">
+                          <FaSignOutAlt className="w-4 h-4" /> تسجيل الخروج
+                        </button>
                       </div>
-                      <Link to="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onClick={() => setIsDropdownOpen(false)}>
-                        <FaUser className="w-4 h-4" /> الملف الشخصي
-                      </Link>
-                      <Link to="/settings" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onClick={() => setIsDropdownOpen(false)}>
-                        <FaCog className="w-4 h-4" /> الإعدادات
-                      </Link>
-                      <button onClick={handleLogout}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors w-full text-right">
-                        <FaSignOutAlt className="w-4 h-4" /> تسجيل الخروج
-                      </button>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
               </>
-            ) : (
+            ) : !user || (!isStudent && user) ? (
               <>
+                {/* Login/Register buttons for not logged in OR for professors/admins */}
                 <Link to="/login" className="hover:text-blue-200 transition hover:underline">تسجيل الدخول</Link>
                 <Link to="/register" className="bg-white text-blue-600 px-4 py-1 rounded font-bold hover:bg-gray-100 hover:text-blue-700">
                   تلميذ جديد
                 </Link>
               </>
-            )}
+            ) : null}
           </div>
 
           {/* Mobile toggle (hidden at ≥800px) */}
@@ -181,9 +187,9 @@ const Navbar = () => {
               </Link>
             </div>
             <div className="mt-4 pt-4 border-t border-blue-500 px-4 space-y-3">
-              {user ? (
+              {user && isStudent ? (
                 <>
-                  {/* Points in mobile menu */}
+                  {/* Points in mobile menu for Students */}
                   <Link to="/points" className="flex items-center gap-2 py-2 px-4 rounded hover:bg-white/20 transition" onClick={() => setIsMenuOpen(false)}>
                     <FaCoins className="w-4 h-4 text-yellow-400" />
                     <span className="text-sm">{userPoints.toLocaleString()} دج - شراء النقاط</span>
@@ -211,8 +217,9 @@ const Navbar = () => {
                     تسجيل الخروج
                   </button>
                 </>
-              ) : (
+              ) : !user || (!isStudent && user) ? (
                 <>
+                  {/* Login/Register buttons for not logged in OR for professors/admins */}
                   <Link to="/login" className="block py-2 px-4 rounded hover:bg-white/20 transition text-center" onClick={() => setIsMenuOpen(false)}>
                     تسجيل الدخول
                   </Link>
@@ -220,7 +227,7 @@ const Navbar = () => {
                     تلميذ جديد
                   </Link>
                 </>
-              )}
+              ) : null}
             </div>
           </div>
         )}

@@ -1,12 +1,13 @@
 import React from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/navigation/Navbar';
 import Sidebar from '@/components/navigation/Sidebar';
 import { toast } from '@/lib/toast';
 
 export const AppLayout = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isAdmin, isProfessor } = useAuth();
+  const location = useLocation();
 
   // Show loading state
   if (isLoading) {
@@ -19,6 +20,21 @@ export const AppLayout = () => {
 
   // Redirect to login if not authenticated
   if (!user) {
+    return <Navigate to="/schoolhouse/login" replace />;
+  }
+
+  // Check role-based access
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const isProfessorRoute = location.pathname.startsWith('/professor');
+
+  // Redirect unauthorized users
+  if (isAdminRoute && !isAdmin) {
+    toast.error('Access denied. Admin privileges required.');
+    return <Navigate to="/schoolhouse/login" replace />;
+  }
+
+  if (isProfessorRoute && !isProfessor) {
+    toast.error('Access denied. Professor privileges required.');
     return <Navigate to="/schoolhouse/login" replace />;
   }
 
