@@ -100,7 +100,10 @@ node migrate-slides.js
 # 2. Run the languages migration script
 node migrate-languages.js
 
-# 3. Then initialize the database
+# 3. Run the language course prices migration script
+node create_language_course_prices_table.js
+
+# 4. Then initialize the database
 npm run init-db
 ```
 
@@ -108,6 +111,7 @@ This will:
 - Create the enhanced slides tables and relationships
 - Set up slides analytics and target audience tables
 - Create the language and language level tables
+- Create the language course prices table for course pricing
 - Create the necessary tables (users, courses, etc.)
 - Insert sample data
 - Set up proper permissions
@@ -189,6 +193,34 @@ GET /api/languages/:languageId/levels - Get levels for specific language
 POST /api/language-levels - Create new language level
 PUT /api/language-levels/:id - Update language level
 DELETE /api/language-levels/:id - Delete language level
+```
+
+## 💰 Language Course Pricing System
+
+### Course Pricing Management
+- **Location**: `/professor/create` (Language courses section)
+- **Features**:
+  - Set prices for language courses by level
+  - Dynamic pricing based on language and proficiency level
+  - Price validation and storage
+  - Integration with course approval workflow
+
+### Database Structure
+- **Table**: `language_course_prices`
+- **Columns**: `course_id`, `language_level_id`, `price`
+- **Relationships**: Links courses to language levels with pricing
+
+### API Endpoints
+```
+# Language Course Pricing
+GET /api/courses/language-course-prices - Get all language course prices
+POST /api/courses/language-course-price - Set price for language course
+```
+
+### Migration
+To add the language course prices table, run:
+```bash
+node create_language_course_prices_table.js
 ```
 
 ## 🔐 Authentication System
@@ -332,7 +364,7 @@ npm start
 
 ## 📝 Recent Updates
 
-### Latest Changes (v2.0)
+### Latest Changes (v2.1)
 - ✅ **Added Dynamic Slides System**: Admin-managed homepage slides
 - ✅ **File Upload Functionality**: Image and video uploads for slides
 - ✅ **Slides Analytics**: View and click tracking
@@ -345,6 +377,14 @@ npm start
 - ✅ **CEFR Level Support**: A1-C2 proficiency levels with custom naming
 - ✅ **Multi-language Support**: English, Arabic, French, Spanish, German
 - ✅ **Flag Integration**: Visual language identification with flag images
+- ✅ **Enhanced Course Management**: Speciality-based suggestions and improved filtering
+- ✅ **Language Course Pricing**: Dynamic pricing system for language courses
+- ✅ **Role-Based Navigation**: Different navbar interfaces for students, professors, and admins
+- ✅ **Interactive Course Content**: Video, image, and PDF navigation in course details
+- ✅ **Improved Course Suggestions**: Better filtering and price display for related courses
+- ✅ **Admin Path Assignment**: Admins can assign paths to approved courses without paths
+- ✅ **File Upload Improvements**: Removed size limits and added warnings
+- ✅ **Course Status Management**: Enhanced workflow for course approval and status updates
 
 ### For Team Members
 ⚠️ **IMPORTANT**: After pulling the latest changes, you must run:
@@ -352,10 +392,11 @@ npm start
 cd backend
 node migrate-slides.js
 node migrate-languages.js
+node create_language_course_prices_table.js
 npm run init-db
 ```
 
-This ensures your database has the new slides and language tables and relationships.
+This ensures your database has the new slides, language tables, and language course prices table with proper relationships.
 
 ## 🆕 Course Approval & Path Assignment Workflow (2024 Update)
 
