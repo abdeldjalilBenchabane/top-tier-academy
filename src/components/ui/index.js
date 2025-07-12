@@ -19,4 +19,5 @@ export { default as TTHStudentTable } from './TTHStudentTable.jsx';
 export { default as TTHDashboardStats } from './TTHDashboardStats.jsx';
 export * from './TTHBadge.jsx';
 export * from './TTHCard.jsx';
-export * from './TTHTextarea.jsx'; 
+export * from './TTHTextarea.jsx';
+export { UserAvatar } from './UserAvatar'; 

@@ -460,3 +460,62 @@ For support and questions:
 - Check the `DATABASE_SETUP.md` file for database issues
 - Review the authentication flow in `AuthContext.tsx`
 - Examine the API endpoints in the backend routes
+
+## 📊 Tables pour Dashboard Étudiant
+
+### student_courses
+- Suit la progression de chaque étudiant dans chaque cours.
+- Champs : `student_id`, `course_id`, `completed`, `progress`, `hours_spent`, `last_accessed`
+
+### activities
+- Historique des actions de l’étudiant (cours terminés, sessions suivies, commentaires, etc.)
+- Champs : `student_id`, `type`, `title`, `time`, `related_id`, `extra`
+
+### live_sessions
+- Sessions en direct programmées par les professeurs.
+- Champs : `professor_id`, `course_id`, `title`, `start_time`, `duration`, `price`, `is_approved`, `is_rejected`, `status`, `meeting_url`
+
+### purchases
+- Achats de sessions live par les étudiants.
+- Champs : `session_id`, `student_id`, `amount_paid`, `purchased_at`
+
+### Utilisation
+- Ces tables permettent d’alimenter dynamiquement le dashboard étudiant : stats, progression, activités récentes, etc.
+- Les endpoints créés : `/api/users/student/overview`, `/api/users/student/activities`, `/api/users/student/profile`, `/api/users/student/live-sessions`
+
+## 🎯 Dashboard Étudiant Dynamique
+
+### Fonctionnalités
+- **Statistiques en temps réel** : cours totaux, complétés, en cours, heures passées
+- **Profil dynamique** : nom, avatar, informations utilisateur réelles
+- **Activités récentes** : historique des actions de l'étudiant
+- **Sessions live** : sessions achetées et publiques avec pagination
+- **Calendrier interactif** : visualisation des sessions par date
+
+### Endpoints Backend
+```
+GET /api/users/student/overview - Statistiques du dashboard
+GET /api/users/student/activities - Activités récentes
+GET /api/users/student/profile - Informations du profil
+GET /api/users/student/live-sessions - Sessions live avec filtres
+```
+
+### Migration Base de Données
+Pour créer les tables nécessaires au dashboard étudiant :
+```bash
+cd backend
+node migrate-student-dashboard.js
+```
+
+### Structure des Données
+- **Overview** : `totalCourses`, `completedCourses`, `inProgressCourses`, `totalHours`, `upcomingLives`
+- **Activities** : `type`, `title`, `time`, `related_id`, `extra`
+- **Live Sessions** : sessions avec statut, type d'accès, prix, professeur
+- **Profile** : informations utilisateur avec avatar
+
+### Interface Utilisateur
+- **Cartes compactes** pour les sessions live
+- **Pagination** pour gérer beaucoup de sessions
+- **Filtres** : recherche, type de session, statut
+- **Calendrier** avec indicateurs visuels des sessions
+- **Responsive design** pour tous les appareils

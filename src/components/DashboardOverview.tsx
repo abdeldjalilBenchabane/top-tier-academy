@@ -61,13 +61,13 @@ const DashboardOverview = () => {
         </Card>
 
         {/* Prochaine session */}
-        <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-green-500">
+        <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-cyan-400">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">الحصة القادمة</CardTitle>
-            <Calendar className="h-4 w-4 text-green-500" />
+            <Calendar className="h-4 w-4 text-cyan-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-semibold text-green-600 mb-1">
+            <div className="text-lg font-semibold text-cyan-500 mb-1">
               {upcomingSession.title}
             </div>
             <div className="flex items-center space-x-2 space-x-reverse text-sm text-muted-foreground">

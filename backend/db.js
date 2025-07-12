@@ -13,7 +13,9 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || '***REMOVED***',
   max: 20, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-  connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
+  connectionTimeoutMillis: 10000, // Return an error after 10 seconds if connection could not be established
+  statement_timeout: 30000, // Query timeout after 30 seconds
+  query_timeout: 30000, // Query timeout after 30 seconds
 };
 
 // Create a new pool instance
@@ -39,6 +41,11 @@ export const query = async (text, params) => {
     return res;
   } catch (error) {
     console.error('Database query error:', error);
+    // If it's a connection error, try to reconnect
+    if (error.code === 'ECONNRESET' || error.code === 'ENOTFOUND' || error.message.includes('Connection terminated')) {
+      console.log('Attempting to reconnect to database...');
+      // The pool will automatically try to reconnect on the next query
+    }
     throw error;
   }
 };

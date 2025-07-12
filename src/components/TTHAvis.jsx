@@ -1,11 +1,11 @@
-import React,{ useEffect, useState } from "react"
-import { motion } from "framer-motion"
+import React, { useEffect, useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent } from "./ui/Card"
-import { Star } from "lucide-react"
+import { Star, Quote, ChevronRight, Users, Award, Heart } from "lucide-react"
 
 export default function TestimonialsSection() {
   const [visibleTestimonials, setVisibleTestimonials] = useState(3)
-
+  const [hoveredCard, setHoveredCard] = useState(null)
 
   const testimonials = [
     {
@@ -15,6 +15,8 @@ export default function TestimonialsSection() {
       role: "طالب هندسة",
       rating: 5,
       text: "هذه المنصة غيرت طريقة دراستي بشكل كامل. المحتوى ممتاز والمدرسون رائعون!",
+      course: "الهندسة الكهربائية",
+      gradient: "from-blue-500 to-purple-600"
     },
     {
       id: 2,
@@ -23,6 +25,8 @@ export default function TestimonialsSection() {
       role: "طالبة طب",
       rating: 5,
       text: "أنا سعيدة جدًا بالتقدم الذي أحرزته منذ بدأت التعلم على هذه المنصة. الدروس منظمة بشكل رائع.",
+      course: "الطب العام",
+      gradient: "from-pink-500 to-red-500"
     },
     {
       id: 3,
@@ -31,6 +35,8 @@ export default function TestimonialsSection() {
       role: "طالب علوم حاسوب",
       rating: 4,
       text: "المنصة سهلة الاستخدام والمحتوى التعليمي عالي الجودة. أوصي بها لجميع الطلاب.",
+      course: "علوم الحاسوب",
+      gradient: "from-green-500 to-teal-500"
     },
     {
       id: 4,
@@ -39,6 +45,8 @@ export default function TestimonialsSection() {
       role: "طالبة أدب",
       rating: 5,
       text: "لقد ساعدتني هذه المنصة على تحسين مهاراتي بشكل كبير. المدرسون متفاعلون ويقدمون دعمًا ممتازًا.",
+      course: "الأدب العربي",
+      gradient: "from-orange-500 to-yellow-500"
     },
     {
       id: 5,
@@ -47,6 +55,8 @@ export default function TestimonialsSection() {
       role: "طالب اقتصاد",
       rating: 4,
       text: "تجربة تعليمية فريدة من نوعها. المحتوى حديث ومواكب للتطورات في مجال تخصصي.",
+      course: "الاقتصاد والتجارة",
+      gradient: "from-indigo-500 to-blue-600"
     },
     {
       id: 6,
@@ -55,6 +65,8 @@ export default function TestimonialsSection() {
       role: "طالبة علم نفس",
       rating: 5,
       text: "أفضل منصة تعليمية جربتها حتى الآن. الشروحات واضحة والتمارين مفيدة جدًا.",
+      course: "علم النفس",
+      gradient: "from-purple-500 to-pink-500"
     },
   ]
 
@@ -72,81 +84,228 @@ export default function TestimonialsSection() {
     return () => window.removeEventListener("scroll", handleScroll)
   }, [visibleTestimonials, testimonials.length])
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.2,
+        delayChildren: 0.3
+      }
+    }
+  }
+
+  const cardVariants = {
+    hidden: { 
+      opacity: 0, 
+      y: 50,
+      scale: 0.8
+    },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: {
+        type: "spring",
+        stiffness: 100,
+        damping: 12
+      }
+    }
+  }
+
+  const floatingAnimation = {
+    y: [0, -10, 0],
+    transition: {
+      duration: 3,
+      repeat: Infinity,
+      ease: "easeInOut"
+    }
+  }
+
   return (
-    <div className="container mx-auto py-16 px-4 bg-gradient-to-b mt-6 from-white to-[#a2c4ff] dark:from-slate-950 dark:to-slate-900">
-      <div className="text-center mb-12" dir="rtl">
-        <motion.h2
-          className="text-3xl font-bold mb-4"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          آراء طلابنا
-        </motion.h2>
-        <motion.p
-          className="text-muted-foreground max-w-2xl mx-auto"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
-          استمع إلى ما يقوله طلابنا عن تجربتهم التعليمية على منصتنا
-        </motion.p>
+    <div className="relative overflow-hidden  dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 py-20 px-4">
+      
+      <div className="absolute inset-0 overflow-hidden">
+        <motion.div
+          className="absolute top-20 left-20 w-20 h-20 bg-blue-200 rounded-full opacity-20"
+          animate={floatingAnimation}
+        />
+        <motion.div
+          className="absolute top-40 right-40 w-16 h-16 bg-purple-300 rounded-full opacity-20"
+          animate={{ ...floatingAnimation, transition: { ...floatingAnimation.transition, delay: 1 } }}
+        />
+        <motion.div
+          className="absolute top-20 right-10 w-12 h-12 bg-pink-200 rounded-full opacity-20"
+          animate={{ ...floatingAnimation, transition: { ...floatingAnimation.transition, delay: 2 } }}
+        />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" dir="rtl">
-        {testimonials.slice(0, visibleTestimonials).map((testimonial, index) => (
+      <div className="container mx-auto relative z-10">
+       
+        <div className="text-center mb-16" dir="rtl">
           <motion.div
-            key={testimonial.id}
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, type: "spring", stiffness: 100 }}
+            className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mb-6"
+          >
+            <Heart className="w-8 h-8 text-white" />
+          </motion.div>
+          
+          <motion.h2
+            className="text-5xl font-bold mb-6 bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent dark:from-white dark:to-slate-300"
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+          >
+            آراء طلابنا
+          </motion.h2>
+          
+          <motion.p
+            className="text-xl text-slate-600 dark:text-slate-400 max-w-3xl mx-auto leading-relaxed"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+          >
+            استمع إلى ما يقوله طلابنا عن تجربتهم التعليمية على منصتنا
+          </motion.p>
+
+         
+          <motion.div
+            className="flex justify-center gap-8 mt-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+          >
+            <div className="flex items-center gap-2 text-slate-400 dark:text-slate-400">
+              <Users className="w-5 h-5" />
+              <span className="font-semibold">+10,000 طالب</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-400 dark:text-slate-400">
+              <Award className="w-5 h-5" />
+              <span className="font-semibold">تقييم 4.9/5</span>
+            </div>
+          </motion.div>
+        </div>
+
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          dir="rtl"
+        >
+          <AnimatePresence>
+            {testimonials.slice(0, visibleTestimonials).map((testimonial, index) => (
+              <motion.div
+                key={testimonial.id}
+                variants={cardVariants}
+                layout
+                onHoverStart={() => setHoveredCard(testimonial.id)}
+                onHoverEnd={() => setHoveredCard(null)}
+                className="relative group"
+              >
+                <Card className="h-full border-0 shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+                 
+                  <div className={`h-1 bg-gradient-to-r ${testimonial.gradient}`} />
+                  
+                  
+                  <div className="absolute top-4 left-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <Quote className="w-12 h-12 text-slate-600" />
+                  </div>
+
+                  <CardContent className="p-8 relative z-10">
+                   
+                    <div className="flex items-center mb-6">
+                      <div className={`relative w-14 h-14 rounded-full bg-gradient-to-br ${testimonial.gradient} flex items-center justify-center text-white font-bold text-lg shadow-lg`}>
+                        {testimonial.name.charAt(0)}
+                        <motion.div
+                          className="absolute inset-0 rounded-full bg-white/20"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: hoveredCard === testimonial.id ? 1 : 0 }}
+                          transition={{ duration: 0.3 }}
+                        />
+                      </div>
+                      <div className="mr-4">
+                        <p className="font-bold text-lg text-slate-800 dark:text-white">{testimonial.name}</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">{testimonial.role}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{testimonial.course}</p>
+                      </div>
+                    </div>
+
+                    {/* Rating */}
+                    <div className="flex mb-4">
+                      {[...Array(5)].map((_, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ scale: 0, rotate: -180 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          transition={{ delay: 0.1 * i, type: "spring", stiffness: 200 }}
+                        >
+                          <Star
+                            className={`h-5 w-5 ${
+                              i < testimonial.rating 
+                                ? "fill-yellow-400 text-yellow-400" 
+                                : "text-gray-300"
+                            }`}
+                          />
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    {/* Testimonial text */}
+                    <motion.p 
+                      className="text-slate-700 dark:text-slate-300 leading-relaxed text-lg"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      "{testimonial.text}"
+                    </motion.p>
+
+                    {/* Hover effect overlay */}
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-600/5 rounded-lg"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: hoveredCard === testimonial.id ? 1 : 0 }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </motion.div>
+
+        {/* Load More Button */}
+        {visibleTestimonials < testimonials.length && (
+          <motion.div
+            className="text-center mt-12"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: index * 0.1 }}
-            whileHover={{ y: -5, transition: { duration: 0.2 } }}
-            className="h-full"
+            transition={{ delay: 0.5 }}
           >
-            <Card className="h-full border-2 hover:border-primary/50 transition-all duration-300">
-              <CardContent className="p-6 flex flex-col h-full">
-                <div className="flex items-center mb-4">
-               
-                <div className="bg-gray-500 rounded-full h-10 w-10"></div>
-               
-                  <div className="mr-4">
-                    <p className="font-medium">{testimonial.name}</p>
-                    <p className="text-sm text-muted-foreground">{testimonial.role}</p>
-                  </div>
-                </div>
-                <div className="flex mb-3">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`h-4 w-4 ${
-                        i < testimonial.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-                      }`}
-                    />
-                  ))}
-                </div>
-                <p className="text-muted-foreground leading-relaxed flex-grow">{testimonial.text}</p>
-              </CardContent>
-            </Card>
+            <motion.button
+              onClick={() => setVisibleTestimonials((prev) => Math.min(prev + 3, testimonials.length))}
+              className="group relative overflow-hidden bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-full font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              dir="rtl"
+            >
+              <span className="relative z-10 flex items-center gap-2">
+                عرض المزيد من الآراء
+                <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </span>
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600"
+                initial={{ x: "100%" }}
+                whileHover={{ x: "0%" }}
+                transition={{ duration: 0.3 }}
+              />
+            </motion.button>
           </motion.div>
-        ))}
+        )}
       </div>
-
-      {visibleTestimonials < testimonials.length && (
-        <motion.div
-          className="text-center mt-10"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
-          <button
-            onClick={() => setVisibleTestimonials((prev) => Math.min(prev + 3, testimonials.length))}
-            className="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors"
-            dir="rtl"
-          >
-            عرض المزيد من الآراء
-          </button>
-        </motion.div>
-      )}
     </div>
   )
 }
