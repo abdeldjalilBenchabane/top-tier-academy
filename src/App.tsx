@@ -13,7 +13,7 @@ import TTHHome from './Pages/TTHHome';
 import TTHFormulair from './Pages/TTHFormulair';
 import TTHLogin from './Pages/TTHLogin';
 import TTHCourseDetail from './Pages/TTHCourseDetails';
-import TTHStudentDashboard from './Pages/TTHStudentDashboard';
+import TTHStudentDashboard from './Pages/TTHStudentDashboard.jsx';
 import TTHCourses from './Pages/TTHCourses';
 import TTHLanguages from './Pages/TTHLanguages';
 import TTHLiveClasses from './Pages/TTHLiveClasses';
@@ -21,7 +21,6 @@ import Streaming from './Pages/Streaming';
 import TTHSession from './Pages/TTHSession';
 import TTHPrivateClasses from './Pages/TTHPrivateClasses';
 import TTHTeacherProfile from './Pages/TTHTeacherProfile';
-import TTHDashboardStudent from './Pages/TTHDashboaedStudent'
 import PointsPurchase from './Pages/PointsPurchase';
 import PointsSuccess from './Pages/PointsSuccess';
 import PointsFailure from './Pages/PointsFailure';
@@ -92,7 +91,7 @@ const App: React.FC = () => {
                 <Route path="/TTHTeacherProfile" element={<TTHTeacherProfile />} />
                 <Route path="/profile" element={<TTHStudentDashboard />} />
                 <Route path="/coursesList/courses/:id" element={<TTHCourseDetail />} />
-                <Route path="/TTHDashboardStudent" element={<TTHDashboardStudent />} />
+                <Route path="/TTHStudentDashboard" element={<TTHStudentDashboard />} />
                 <Route path="/points" element={<PointsPurchase />} />
                 <Route path="/points/success" element={<PointsSuccess />} />
                 <Route path="/points/failure" element={<PointsFailure />} />

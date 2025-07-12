@@ -3,10 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Calendar } from './ui/TTHCal';
-import {
-  Video,
-  Clock,
-  Users,
+import { 
+  Video, 
+  Clock, 
+  Users, 
   Calendar as CalendarIcon,
   Bell,
   MapPin,
@@ -218,36 +218,36 @@ const CalendarSection = () => {
 
                   {/* Compact sessions grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {selectedDateSessions.map((session) => (
+                  {selectedDateSessions.map((session) => (
                       <div key={session.id} className="border rounded-lg p-3 hover:shadow-md transition-shadow bg-white">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex-1 min-w-0">
                             <h4 className="font-semibold text-sm mb-1 line-clamp-1">{session.title}</h4>
                             <p className="text-xs text-gray-600 mb-1 line-clamp-1">{session.course}</p>
-                          </div>
+                        </div>
                           <div className="mr-2 flex-shrink-0">
                             {getSessionBadge(session.status, session.accessType)}
-                          </div>
                         </div>
+                      </div>
 
                         <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
                           <div className="flex items-center gap-1">
                             <Users className="w-3 h-3" />
                             <span className="truncate">{session.professor}</span>
-                          </div>
+                        </div>
                           <div className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            <span>{session.time}</span>
-                          </div>
+                          <span>{session.time}</span>
+                        </div>
                           <div className="flex items-center gap-1">
                             <Video className="w-3 h-3" />
-                            <span>{session.duration}</span>
-                          </div>
+                          <span>{session.duration}</span>
+                        </div>
                           <div className="flex items-center gap-1">
                             <Users className="w-3 h-3" />
-                            <span>{session.attendees}/{session.maxAttendees}</span>
-                          </div>
+                          <span>{session.attendees}/{session.maxAttendees}</span>
                         </div>
+                      </div>
 
                         <div className="flex gap-1">
                           {session.status === 'upcoming' && session.accessType === 'purchased' && (
@@ -255,13 +255,13 @@ const CalendarSection = () => {
                               <Button size="sm" className="bg-education-blue hover:bg-education-blue/90 text-xs px-2 py-1 h-7">
                                 <Video className="w-3 h-3 ml-1" />
                                 انضم
-                              </Button>
+                            </Button>
                               <Button variant="outline" size="sm" className="text-xs px-2 py-1 h-7">
                                 <Bell className="w-3 h-3 ml-1" />
-                                تذكير
-                              </Button>
-                            </>
-                          )}
+                              تذكير
+                            </Button>
+                          </>
+                        )}
                           {session.status === 'upcoming' && session.accessType === 'public' && (
                             <Button size="sm" className="bg-green-600 hover:bg-green-700 text-xs px-2 py-1 h-7">
                               <Video className="w-3 h-3 ml-1" />
@@ -272,11 +272,11 @@ const CalendarSection = () => {
                             <Button variant="outline" size="sm" className="text-xs px-2 py-1 h-7">
                               <Video className="w-3 h-3 ml-1" />
                               تسجيل
-                            </Button>
-                          )}
-                        </div>
+                          </Button>
+                        )}
                       </div>
-                    ))}
+                    </div>
+                  ))}
                   </div>
                 </div>
               ) : (
@@ -344,37 +344,37 @@ const CalendarSection = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {currentSessions.map((session) => (
                 <div key={session.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow bg-white">
-                  <div className="flex items-start justify-between mb-2">
+                <div className="flex items-start justify-between mb-2">
                     <h4 className="font-semibold text-sm line-clamp-2">{session.title}</h4>
                     {getSessionBadge(session.status, session.accessType)}
-                  </div>
+                </div>
                   <p className="text-xs text-gray-600 mb-3 line-clamp-1">{session.course}</p>
-
+                
                   <div className="space-y-2 text-xs text-gray-600 mb-3">
-                    <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1">
                       <CalendarIcon className="w-3 h-3" />
-                      <span>{session.date}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
+                    <span>{session.date}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      <span>{session.time}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
+                    <span>{session.time}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
                       <Users className="w-3 h-3" />
                       <span>{session.professor}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Video className="w-3 h-3" />
-                      <span>{session.duration}</span>
-                    </div>
                   </div>
+                  <div className="flex items-center gap-1">
+                      <Video className="w-3 h-3" />
+                    <span>{session.duration}</span>
+                  </div>
+                </div>
 
                   <div className="flex gap-2">
                     {session.accessType === 'purchased' ? (
                       <Button size="sm" className="w-full bg-education-blue hover:bg-education-blue/90 text-xs">
                         <Bell className="w-3 h-3 ml-1" />
-                        تعيين تذكير
-                      </Button>
+                  تعيين تذكير
+                </Button>
                     ) : (
                       <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-xs">
                         <Video className="w-3 h-3 ml-1" />
@@ -382,9 +382,9 @@ const CalendarSection = () => {
                       </Button>
                     )}
                   </div>
-                </div>
-              ))}
-            </div>
+              </div>
+            ))}
+          </div>
           ) : (
             <div className="text-center py-8">
               <Video className="w-12 h-12 mx-auto text-gray-400 mb-4" />

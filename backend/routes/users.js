@@ -328,6 +328,75 @@ router.post('/me/avatar', verifyToken, avatarUpload.single('avatar'), async (req
   }
 });
 
+// Universal avatar upload endpoint (works for all roles)
+router.post('/avatar-profile', verifyToken, avatarUpload.single('avatar'), async (req, res) => {
+  try {
+    console.log('Universal avatar upload request received');
+    console.log('User:', req.user);
+    console.log('File:', req.file);
+
+    const userId = req.user.id;
+
+    // Check if user exists
+    const existingUser = await getRow('SELECT id, avatar_url, role FROM users WHERE id = $1', [userId]);
+    console.log('Existing user:', existingUser);
+
+    if (!existingUser) {
+      console.log('User not found');
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!req.file) {
+      console.log('No file uploaded');
+      return res.status(400).json({ error: 'No avatar file uploaded' });
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: 'Invalid file type. Only JPG, PNG, and WebP are allowed.' });
+    }
+
+    // Validate file size (max 5MB)
+    if (req.file.size > 5 * 1024 * 1024) {
+      return res.status(400).json({ error: 'File too large. Maximum size is 5MB.' });
+    }
+
+    // Delete old avatar if it exists
+    if (existingUser.avatar_url) {
+      const oldAvatarPath = path.join(__dirname, '..', '..', 'public', existingUser.avatar_url);
+      try {
+        if (fs.existsSync(oldAvatarPath)) {
+          fs.unlinkSync(oldAvatarPath);
+          console.log(`Old avatar deleted: ${oldAvatarPath}`);
+        }
+      } catch (fileError) {
+        console.error('Error deleting old avatar:', fileError);
+      }
+    }
+
+    // Save new avatar URL
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    await query(
+      'UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, name, email, role, avatar_url, created_at',
+      [avatarUrl, userId]
+    );
+
+    console.log('Avatar uploaded successfully (universal):', avatarUrl);
+    res.json({
+      message: 'Avatar uploaded successfully',
+      avatar_url: avatarUrl,
+      user: {
+        id: userId,
+        role: existingUser.role
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading avatar (universal):', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Delete user (admin only)
 router.delete('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
@@ -437,12 +506,17 @@ router.get('/test-role', verifyToken, async (req, res) => {
   }
 });
 
-// Get current user profile
+// Get current user profile (works for all roles)
 router.get('/me', verifyToken, async (req, res) => {
   try {
+    console.log('Get current user request - User:', req.user);
     const userId = req.user.id;
     const user = await getRow('SELECT id, name, email, role, avatar_url, created_at FROM users WHERE id = $1', [userId]);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) {
+      console.log('User not found');
+      return res.status(404).json({ error: 'User not found' });
+    }
+    console.log('Current user profile:', user);
     res.json(user);
   } catch (error) {
     console.error('Get current user error:', error);

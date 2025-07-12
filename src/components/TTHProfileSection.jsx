@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
-import { Button } from './ui/Button';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { Badge } from './ui/Badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/Badge';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +30,7 @@ import {
   Camera
 } from 'lucide-react';
 import { useAvatar } from '../contexts/AvatarContext';
+import { AvatarUpload } from './ui/AvatarUpload';
 
 const ProfileSection = () => {
   const [editMode, setEditMode] = useState(false);
@@ -38,8 +39,6 @@ const ProfileSection = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const fileInputRef = useRef(null);
   const { avatarUrl, updateAvatar, refreshAvatar } = useAvatar();
 
   useEffect(() => {
@@ -84,73 +83,14 @@ const ProfileSection = () => {
     }
   };
 
-  const handleAvatarUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('يرجى اختيار صورة بصيغة JPG أو PNG أو WebP');
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('حجم الصورة يجب أن يكون أقل من 5 ميجابايت');
-      return;
-    }
-
-    try {
-      setUploadingAvatar(true);
-      const formData = new FormData();
-      formData.append('avatar', file);
-
-      const token = localStorage.getItem('token');
-      console.log('Token:', token ? 'Present' : 'Missing');
-      console.log('User role from profile:', profile?.role);
-
-      const response = await fetch(`/api/users/me/avatar`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
-        throw new Error(`Upload failed: ${response.status} - ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log('Upload success:', result);
-
-      // Update global avatar context
-      updateAvatar(result.avatar_url);
-
-      // Update local profile state
-      setProfile(prev => ({
-        ...prev,
-        avatar_url: result.avatar_url
-      }));
-
-      // Refresh profile data
-      await fetchProfileData();
-    } catch (err) {
-      console.error('Error uploading avatar:', err);
-      alert(`فشل في رفع الصورة: ${err.message}`);
-    } finally {
-      setUploadingAvatar(false);
-    }
-  };
-
-  const triggerFileUpload = () => {
-    fileInputRef.current?.click();
+  const handleUploadSuccess = (avatarUrl) => {
+    // Update local profile state
+    setProfile(prev => ({
+      ...prev,
+      avatar_url: avatarUrl
+    }));
+    // Refresh profile data
+    fetchProfileData();
   };
 
   // Keep achievements static as requested
@@ -227,46 +167,15 @@ const ProfileSection = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Hidden file input for avatar upload */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleAvatarUpload}
-        className="hidden"
-      />
-
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-            <div className="relative group">
-              <Avatar className="h-24 w-24 cursor-pointer transition-transform group-hover:scale-105">
-                <AvatarImage
-                  src={avatarUrl || profile?.avatar_url || undefined}
-                  alt={profile?.name || 'صورة الملف الشخصي'}
-                />
-                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-700 text-white text-2xl font-bold">
-                  {getInitials(profile?.name)}
-                </AvatarFallback>
-              </Avatar>
-
-              {/* Edit overlay */}
-              <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="h-8 w-8 rounded-full p-0 bg-white text-gray-800 hover:bg-gray-100"
-                  onClick={triggerFileUpload}
-                  disabled={uploadingAvatar}
-                >
-                  {uploadingAvatar ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Camera className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
+            <AvatarUpload
+              size="xl"
+              name={profile?.name}
+              onUploadSuccess={handleUploadSuccess}
+              className="h-24 w-24"
+            />
 
             <div className="flex-1 text-center md:text-right space-y-3">
               <div>

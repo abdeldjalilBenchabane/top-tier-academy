@@ -2,17 +2,18 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { 
-  LayoutDashboard, 
-  BookOpen, 
-  Calendar, 
-  Bell, 
-  Award, 
-  Settings, 
+import {
+  LayoutDashboard,
+  BookOpen,
+  Calendar,
+  Bell,
+  Award,
+  Settings,
   HelpCircle,
   Menu,
   X
 } from "lucide-react"
+import { UserAvatar } from './ui';
 
 interface SidebarProps {
   activeSection: string
@@ -51,7 +52,7 @@ const Sidebar = ({ activeSection, onSectionChange }: SidebarProps) => {
 
       {/* طبقة تغطية الهاتف المحمول */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setIsOpen(false)}
         />
@@ -81,10 +82,7 @@ const Sidebar = ({ activeSection, onSectionChange }: SidebarProps) => {
           {/* ملف المستخدم */}
           <div className="p-4 border-b border-gray-100">
             <div className="flex items-center space-x-3 space-x-reverse">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src="/placeholder.svg" alt="مريم" />
-                <AvatarFallback className="bg-blue-100 text-blue-600">م</AvatarFallback>
-              </Avatar>
+              <UserAvatar size="md" name="مريم أحمد" />
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-gray-900 truncate">مريم أحمد</p>
                 <p className="text-xs text-gray-500 truncate">mariam.ahmed@email.com</p>
@@ -101,11 +99,10 @@ const Sidebar = ({ activeSection, onSectionChange }: SidebarProps) => {
                   <li key={item.id}>
                     <Button
                       variant={isActive ? "default" : "ghost"}
-                      className={`w-full justify-start h-11 ${
-                        isActive 
-                          ? "bg-blue-600 text-white hover:bg-blue-700" 
+                      className={`w-full justify-start h-11 ${isActive
+                          ? "bg-blue-600 text-white hover:bg-blue-700"
                           : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                      }`}
+                        }`}
                       onClick={() => handleSectionChange(item.id)}
                     >
                       <item.icon className={`h-4 w-4 ml-3 ${isActive ? "text-white" : "text-gray-500"}`} />
