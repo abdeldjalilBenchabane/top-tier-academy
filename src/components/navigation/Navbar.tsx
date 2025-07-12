@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/lib/toast';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 
 const Navbar = () => {
   const { user, logout, isAdmin } = useAuth();
@@ -40,7 +41,7 @@ const Navbar = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-2">
-                <UserIcon className="h-4 w-4" />
+                <UserAvatar size="sm" className="h-6 w-6" />
                 <span className="hidden md:block">{user?.name}</span>
               </Button>
             </DropdownMenuTrigger>

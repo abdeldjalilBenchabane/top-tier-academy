@@ -29,7 +29,7 @@ export const AvatarProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 return;
             }
 
-            const response = await fetch('/api/users/me', {
+            const response = await fetch('/api/auth/me', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -37,7 +37,7 @@ export const AvatarProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
             if (response.ok) {
                 const userData = await response.json();
-                setAvatarUrl(userData.avatar_url);
+                setAvatarUrl(userData.user.avatar_url);
             }
         } catch (error) {
             console.error('Error fetching user avatar:', error);

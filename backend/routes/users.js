@@ -506,6 +506,20 @@ router.get('/test-role', verifyToken, async (req, res) => {
   }
 });
 
+// Test endpoint to check if /me/profile route is accessible
+router.get('/test-me-profile', verifyToken, async (req, res) => {
+  try {
+    console.log('Test me/profile route - User:', req.user);
+    res.json({
+      message: '/me/profile route is accessible',
+      user: req.user
+    });
+  } catch (error) {
+    console.error('Test me/profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get current user profile (works for all roles)
 router.get('/me', verifyToken, async (req, res) => {
   try {
@@ -584,6 +598,82 @@ router.get('/student/live-sessions', verifyToken, requireRole(['student']), asyn
     res.json(allSessions);
   } catch (error) {
     console.error('Student live sessions error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update current user profile (name and password)
+router.put('/me/profile', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { name, currentPassword, newPassword, confirmPassword } = req.body;
+
+    // Check if user exists
+    const existingUser = await getRow('SELECT id, name, email, password_hash FROM users WHERE id = $1', [userId]);
+    if (!existingUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Prepare update fields
+    let updateFields = [];
+    let updateValues = [];
+    let paramCount = 1;
+
+    // Handle name update
+    if (name !== undefined && name.trim() !== '') {
+      if (name.length < 2) {
+        return res.status(400).json({ error: 'Name must be at least 2 characters long' });
+      }
+      updateFields.push(`name = $${paramCount++}`);
+      updateValues.push(name.trim());
+    }
+
+    // Handle password update
+    if (newPassword) {
+      // Validate current password
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Current password is required to change password' });
+      }
+
+      const isValidCurrentPassword = await bcrypt.compare(currentPassword, existingUser.password_hash);
+      if (!isValidCurrentPassword) {
+        return res.status(400).json({ error: 'Current password is incorrect' });
+      }
+
+      // Validate new password
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+      }
+
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({ error: 'New password and confirmation do not match' });
+      }
+
+      // Hash new password
+      const saltRounds = 10;
+      const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+      updateFields.push(`password_hash = $${paramCount++}`);
+      updateValues.push(passwordHash);
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    updateValues.push(userId);
+
+    // Update user
+    const result = await query(
+      `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramCount} RETURNING id, name, email, role, avatar_url, created_at`,
+      updateValues
+    );
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error updating user profile:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

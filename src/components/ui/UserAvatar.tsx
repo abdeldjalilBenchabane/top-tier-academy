@@ -1,6 +1,7 @@
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 import { useAvatar } from '../../contexts/AvatarContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface UserAvatarProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -30,6 +31,10 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   showFallback = true
 }) => {
   const { avatarUrl, loading } = useAvatar();
+  const { user } = useAuth();
+
+  // Use provided name or fall back to authenticated user's name
+  const displayName = name || user?.name;
 
   const getInitials = (userName?: string) => {
     if (!userName) return '?';
@@ -49,12 +54,12 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   return (
     <Avatar className={`${sizeClasses[size]} ${className}`}>
       <AvatarImage 
-        src={avatarUrl || undefined} 
-        alt={name || 'صورة المستخدم'}
+        src={avatarUrl || user?.avatar_url || undefined} 
+        alt={displayName || 'صورة المستخدم'}
       />
       {showFallback && (
         <AvatarFallback className={`bg-gradient-to-br from-blue-500 to-blue-700 text-white font-bold ${textSizes[size]}`}>
-          {getInitials(name)}
+          {getInitials(displayName)}
         </AvatarFallback>
       )}
     </Avatar>

@@ -10,6 +10,7 @@ type AuthContextType = {
   login: (email: string, password: string) => Promise<User>;
   register: (userData: any) => Promise<User>;
   logout: () => void;
+  updateUser: (userData: Partial<User>) => void;
 };
 
 // Create the context with default values
@@ -20,7 +21,8 @@ const AuthContext = createContext<AuthContextType>({
   isProfessor: false,
   login: async () => { throw new Error('Login function not implemented'); },
   register: async () => { throw new Error('Register function not implemented'); },
-  logout: () => {},
+  logout: () => { },
+  updateUser: () => { },
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -45,13 +47,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsLoading(false);
         });
     } else {
-    setIsLoading(false);
+      setIsLoading(false);
     }
   }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    
+
     try {
       const response = await authAPI.login(email, password);
       setUser({ ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken });
@@ -66,7 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (userData: any) => {
     setIsLoading(true);
-    
+
     try {
       const response = await authAPI.register(userData);
       setUser({ ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken });
@@ -86,6 +88,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     authAPI.logout().catch(console.error);
   };
 
+  const updateUser = (userData: Partial<User>) => {
+    setUser(prevUser => prevUser ? { ...prevUser, ...userData } : null);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -96,6 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         logout,
+        updateUser,
       }}
     >
       {children}

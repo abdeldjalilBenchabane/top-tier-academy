@@ -14,6 +14,7 @@ import {
   X
 } from "lucide-react"
 import { UserAvatar } from './ui';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SidebarProps {
   activeSection: string
@@ -22,6 +23,7 @@ interface SidebarProps {
 
 const Sidebar = ({ activeSection, onSectionChange }: SidebarProps) => {
   const [isOpen, setIsOpen] = useState(false)
+  const { user } = useAuth();
 
   const menuItems = [
     { id: "overview", label: "نظرة عامة", icon: LayoutDashboard },
@@ -82,10 +84,10 @@ const Sidebar = ({ activeSection, onSectionChange }: SidebarProps) => {
           {/* ملف المستخدم */}
           <div className="p-4 border-b border-gray-100">
             <div className="flex items-center space-x-3 space-x-reverse">
-              <UserAvatar size="md" name="مريم أحمد" />
+              <UserAvatar size="md" name={user?.name} />
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate">مريم أحمد</p>
-                <p className="text-xs text-gray-500 truncate">mariam.ahmed@email.com</p>
+                <p className="font-medium text-gray-900 truncate">{user?.name || 'اسم المستخدم'}</p>
+                <p className="text-xs text-gray-500 truncate">{user?.email || 'البريد الإلكتروني'}</p>
               </div>
             </div>
           </div>
@@ -100,8 +102,8 @@ const Sidebar = ({ activeSection, onSectionChange }: SidebarProps) => {
                     <Button
                       variant={isActive ? "default" : "ghost"}
                       className={`w-full justify-start h-11 ${isActive
-                          ? "bg-blue-600 text-white hover:bg-blue-700"
-                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                         }`}
                       onClick={() => handleSectionChange(item.id)}
                     >
