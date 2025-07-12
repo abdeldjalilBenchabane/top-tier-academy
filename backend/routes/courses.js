@@ -523,14 +523,18 @@ router.put('/:id/language-path', verifyToken, requireRole(['professor']), async 
   }
 });
 
-// Add endpoint to update course cover (admin only)
-router.put('/:id/cover', verifyToken, requireRole(['admin']), courseUpload.single('cover'), async (req, res) => {
+// Add endpoint to update course cover (admin or professor who owns the course)
+router.put('/:id/cover', verifyToken, requireRole(['admin', 'professor']), courseUpload.single('cover'), async (req, res) => {
   try {
     const courseId = req.params.id;
     // Check if course exists
     const course = await getRow('SELECT * FROM courses WHERE id = $1', [courseId]);
     if (!course) {
       return res.status(404).json({ error: 'Course not found' });
+    }
+    // If professor, check ownership
+    if (req.user.role === 'professor' && course.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'You can only update your own courses' });
     }
     // Get old cover if exists
     const oldCover = await getRow('SELECT cover FROM course_covers WHERE course_id = $1', [courseId]);

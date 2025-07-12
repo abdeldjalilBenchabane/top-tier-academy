@@ -13,7 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Book, Layers, Calendar, FileText, Video, Image as ImageIcon, BookOpen, Download } from 'lucide-react';
-import { toast as toastLib } from '@/lib/toast';
+import { toast } from '@/lib/toast';
+import { api } from '@/lib/api';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 const ProfessorCourseDetails = () => {
@@ -53,6 +54,9 @@ const ProfessorCourseDetails = () => {
   const [addBlockTitle, setAddBlockTitle] = useState('');
   const [addBlockContent, setAddBlockContent] = useState('');
   const [addBlockFile, setAddBlockFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
   // Remove localSections state and all inline editing handlers
 
   useEffect(() => {
@@ -131,7 +135,7 @@ const ProfessorCourseDetails = () => {
 
   // Section handlers
   const handleAddSection = async (title: string) => {
-    if (!title.trim()) return toastLib.error('Section title required');
+    if (!title.trim()) return toast.error('Section title required');
     try {
       const res = await fetch('/api/courses/sections', {
         method: 'POST',
@@ -144,14 +148,14 @@ const ProfessorCourseDetails = () => {
       if (!res.ok) throw new Error('Failed to add section');
       const newSection = await res.json();
       setCourse((prev: any) => ({ ...prev, sections: [...prev.sections, { ...newSection, blocks: [] }] }));
-      toastLib.success('Section added');
+      toast.success('Section added');
     } catch (err) {
-      toastLib.error('Failed to add section');
+      toast.error('Failed to add section');
     }
   };
 
   const handleEditSection = async (sectionId: string, title: string) => {
-    if (!title.trim()) return toastLib.error('Section title required');
+    if (!title.trim()) return toast.error('Section title required');
     try {
       const res = await fetch(`/api/courses/sections/${sectionId}`, {
         method: 'PUT',
@@ -167,9 +171,9 @@ const ProfessorCourseDetails = () => {
         ...prev,
         sections: prev.sections.map((s: any) => s.id === sectionId ? { ...s, title: updatedSection.title } : s)
       }));
-      toastLib.success('Section updated');
+      toast.success('Section updated');
     } catch (err) {
-      toastLib.error('Failed to update section');
+      toast.error('Failed to update section');
     }
   };
 
@@ -182,15 +186,15 @@ const ProfessorCourseDetails = () => {
       });
       if (!res.ok) throw new Error('Failed to delete section');
       setCourse((prev: any) => ({ ...prev, sections: prev.sections.filter((s: any) => s.id !== sectionId) }));
-      toastLib.success('Section deleted');
+      toast.success('Section deleted');
     } catch (err) {
-      toastLib.error('Failed to delete section');
+      toast.error('Failed to delete section');
     }
   };
 
   // Block handlers
   const handleAddBlock = async (sectionId: string, type: string, title: string, content: string, file: File | null) => {
-    if (!title.trim() && type !== 'text') return toastLib.error('Block title required');
+    if (!title.trim() && type !== 'text') return toast.error('Block title required');
     try {
       const formData = new FormData();
       formData.append('section_id', sectionId);
@@ -214,14 +218,14 @@ const ProfessorCourseDetails = () => {
           s.id === sectionId ? { ...s, blocks: [...s.blocks, newBlock] } : s
         )
       }));
-      toastLib.success('Block added');
+      toast.success('Block added');
     } catch (err) {
-      toastLib.error('Failed to add block');
+      toast.error('Failed to add block');
     }
   };
 
   const handleEditBlock = async (blockId: string, title: string, content: string) => {
-    if (!title.trim()) return toastLib.error('Block title required');
+    if (!title.trim()) return toast.error('Block title required');
     try {
       const res = await fetch(`/api/courses/blocks/${blockId}`, {
         method: 'PUT',
@@ -240,9 +244,9 @@ const ProfessorCourseDetails = () => {
           blocks: section.blocks.map((block: any) => block.id === blockId ? { ...block, title: updatedBlock.title, content: updatedBlock.content } : block)
         }))
       }));
-      toastLib.success('Block updated');
+      toast.success('Block updated');
     } catch (err) {
-      toastLib.error('Failed to update block');
+      toast.error('Failed to update block');
     }
   };
 
@@ -264,9 +268,34 @@ const ProfessorCourseDetails = () => {
           }))
         };
       });
-      toastLib.success('Block deleted');
+      toast.success('Block deleted');
     } catch (err) {
-      toastLib.error('Failed to delete block');
+      toast.error('Failed to delete block');
+    }
+  };
+
+  // Handler for cover change
+  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    setCoverFile(file);
+    setIsUploadingCover(true);
+    // Show local preview
+    const previewUrl = URL.createObjectURL(file);
+    setCoverPreviewUrl(previewUrl);
+    try {
+      if (!course) throw new Error('No course loaded');
+      const newCoverUrl = await api.uploadCourseCover(course.id, file);
+      setCourse((prev: any) => prev ? { ...prev, cover_url: `${newCoverUrl}?t=${Date.now()}` } : prev);
+      setCoverPreviewUrl(null); // Switch to server image
+      setCoverFile(null);
+      toast.success('Course cover updated!');
+      // No reloadCourse() here for instant update
+    } catch (err) {
+      console.error('Failed to upload cover:', err);
+      toast.error('Failed to upload course cover');
+    } finally {
+      setIsUploadingCover(false);
     }
   };
 
@@ -276,6 +305,38 @@ const ProfessorCourseDetails = () => {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
+      {/* Cover Upload UI */}
+      {(coverPreviewUrl || course?.cover_url) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Course Cover</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <img
+              src={coverPreviewUrl || course.cover_url}
+              alt="Course Cover"
+              className="w-full h-auto rounded-md object-cover border mb-2"
+              style={{ maxHeight: 300 }}
+            />
+            <input
+              type="file"
+              accept="image/*"
+              id="cover-upload-input"
+              style={{ display: 'none' }}
+              onChange={handleCoverChange}
+              disabled={isUploadingCover}
+            />
+            <Button
+              variant="outline"
+              className="w-full mt-2"
+              onClick={() => document.getElementById('cover-upload-input')?.click()}
+              disabled={isUploadingCover}
+            >
+              {isUploadingCover ? 'Uploading...' : 'Change Cover'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>Course Details</CardTitle>
