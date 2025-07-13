@@ -88,6 +88,30 @@ export const authAPI = {
   verifyToken: () => {
     return apiRequest('/auth/verify', { method: 'POST' });
   },
+
+  // Forgot password
+  forgotPassword: async (email, platform = 'tth') => {
+    return apiRequest('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, platform }),
+    });
+  },
+
+  // Verify reset token
+  verifyResetToken: async (token) => {
+    return apiRequest('/auth/verify-reset-token', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  },
+
+  // Reset password
+  resetPassword: async (token, newPassword) => {
+    return apiRequest('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    });
+  },
 };
 
 // Users API calls

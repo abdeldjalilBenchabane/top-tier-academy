@@ -1,0 +1,38 @@
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=tth_database
+DB_USER=postgres
+DB_PASSWORD=***REMOVED***
+
+# Server Configuration
+PORT=5001
+NODE_ENV=development
+
+# JWT Secret (for authentication)
+JWT_SECRET=***REMOVED***
+
+# Email Configuration (for password reset)
+# Option 1: Gmail with App Password (recommended for production)
+# 1. Enable 2-Step Verification on your Google account
+# 2. Generate an App Password: Google Account → Security → 2-Step Verification → App passwords
+# 3. Use the 16-character App Password here (not your regular Gmail password)
+EMAIL_USER=pforgot315@gmail.com
+EMAIL_PASSWORD=your_16_character_app_password_here
+FRONTEND_URL=http://localhost:5173
+
+# Option 2: Mailtrap (for testing/development)
+# Uncomment the lines below and set USE_MAILTRAP=true to use Mailtrap instead of Gmail
+# USE_MAILTRAP=false
+# MAILTRAP_USER=your_mailtrap_username
+# MAILTRAP_PASS=your_mailtrap_password
+
+# Option 3: Development mode - log emails instead of sending (for frontend testing)
+# LOG_EMAILS=true
+
+# Agora Configuration (for live sessions)
+AGORA_APP_ID=your_agora_app_id
+AGORA_APP_CERTIFICATE=***REMOVED***
+
+# Chargily Configuration (for payments)
+CHARGILY_API_KEY=your_chargily_api_key 

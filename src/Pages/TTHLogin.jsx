@@ -120,7 +120,18 @@ const Login = () => {
                             </p>}
                         </div>
 
-                            {/* Submit Button */}
+                        {/* Forgot Password Link */}
+                        <div className="mb-6 text-right">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/forgot-password')}
+                                className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors duration-200"
+                            >
+                                نسيت كلمة المرور؟
+                            </button>
+                        </div>
+
+                        {/* Submit Button */}
                         <button
                             type="submit"
                             disabled={Loading}

@@ -23,23 +23,23 @@ const ProfessorCourses = () => {
   const [selectedDraftCourse, setSelectedDraftCourse] = useState<PendingCourse | null>(null);
   const [activeTab, setActiveTab] = useState('drafts');
 
-  const fetchCourses = async () => {
-    setIsLoading(true);
-    try {
-      console.log('[ProfessorCourses] user:', user);
-      if (!user) return;
-      const res = await fetch(`/api/courses?created_by=${user.id}`);
-      const data = await res.json();
-      console.log('[ProfessorCourses] API response:', data);
-      setCourses(data);
-      console.log('[ProfessorCourses] setCourses:', data);
-    } catch (error) {
-      console.error('Failed to fetch courses:', error);
-      toastLib.error('Failed to load course data');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    const fetchCourses = async () => {
+      setIsLoading(true);
+      try {
+        console.log('[ProfessorCourses] user:', user);
+        if (!user) return;
+        const res = await fetch(`/api/courses?created_by=${user.id}`);
+        const data = await res.json();
+        console.log('[ProfessorCourses] API response:', data);
+        setCourses(data);
+        console.log('[ProfessorCourses] setCourses:', data);
+      } catch (error) {
+        console.error('Failed to fetch courses:', error);
+        toastLib.error('Failed to load course data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
   useEffect(() => {
     fetchCourses();

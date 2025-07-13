@@ -7,6 +7,7 @@ A comprehensive React + Vite + Tailwind CSS application with Express.js backend 
 ### Frontend (React + Vite)
 - **Modern UI/UX**: Beautiful, responsive design with Tailwind CSS
 - **Authentication System**: Complete login/registration with JWT tokens
+- **Password Reset System**: Forgot password functionality with email verification
 - **User Avatar System**: Dynamic user avatars with dropdown menus
 - **Role-Based Access**: Admin, Professor, and Student dashboards
 - **Arabic RTL Support**: Full right-to-left language support
@@ -17,11 +18,67 @@ A comprehensive React + Vite + Tailwind CSS application with Express.js backend 
 ### Backend (Express.js + PostgreSQL)
 - **RESTful API**: Complete CRUD operations for users, courses, and slides
 - **JWT Authentication**: Secure token-based authentication
+- **Password Reset System**: Secure token-based password reset with email verification
+- **Email Service**: Nodemailer integration for password reset emails
 - **Password Hashing**: Bcrypt encryption for user passwords
 - **Database Integration**: PostgreSQL with connection pooling
 - **CORS Support**: Cross-origin resource sharing enabled
 - **File Upload System**: Multer-based file uploads for slides
 - **Slides Analytics**: View and click tracking for slides
+
+## 📧 Password Reset System
+
+### Features
+- **Forgot Password**: Users can request password reset via email
+- **Secure Tokens**: Time-limited reset tokens (1 hour expiration)
+- **Email Verification**: Password reset links sent to user's email
+- **Dual Platform Support**: Separate flows for TTH and SchoolHouse platforms
+- **Security**: Tokens are single-use and expire automatically
+- **User-Friendly**: Clear success/error messages and automatic redirects
+
+### Email Configuration
+The system supports multiple email providers:
+
+#### Option 1: Gmail (Recommended for Production)
+1. **Enable 2-Step Verification** on your Google account
+2. **Generate App Password**: Google Account → Security → 2-Step Verification → App passwords
+3. **Use App Password**: 16-character password (no spaces) in `.env`
+4. **Update `.env`**:
+   ```env
+   EMAIL_USER=your-email@gmail.com
+   EMAIL_PASSWORD=your16characterapppassword
+   LOG_EMAILS=false
+   ```
+
+#### Option 2: Mailtrap (For Testing)
+1. Create free account at [Mailtrap.io](https://mailtrap.io/)
+2. Get SMTP credentials from your inbox
+3. **Update `.env`**:
+   ```env
+   USE_MAILTRAP=true
+   MAILTRAP_USER=your_mailtrap_username
+   MAILTRAP_PASS=your_mailtrap_password
+   ```
+
+#### Option 3: Development Mode (Console Logging)
+For frontend testing without sending emails:
+```env
+LOG_EMAILS=true
+```
+
+### ⚠️ Important Email Notes
+- **Check Spam Folder**: Password reset emails may go to spam/junk folder
+- **Gmail App Password**: Regular Gmail password won't work - must use App Password
+- **Token Expiration**: Reset links expire after 1 hour for security
+- **Single Use**: Each reset token can only be used once
+
+### Password Reset Flow
+1. User clicks "Forgot Password" on login page
+2. Enters email address
+3. System sends reset link to email (or logs to console in dev mode)
+4. User clicks link in email
+5. User sets new password
+6. Success message shown and redirect to login
 
 ## 📦 Installation
 
@@ -29,6 +86,7 @@ A comprehensive React + Vite + Tailwind CSS application with Express.js backend 
 - Node.js (v16 or higher)
 - PostgreSQL database
 - npm or yarn package manager
+- Email service (Gmail, Mailtrap, or other SMTP provider)
 
 ### Frontend Setup
 ```bash
@@ -54,10 +112,13 @@ cd backend
 npm install
 
 # Set up environment variables
-cp .env.example .env
-# Edit .env with your database credentials
+cp ../env-template.txt .env
+# Edit .env with your database and email credentials
 
-# ⚠️ IMPORTANT: Run the slides migration script first
+# ⚠️ IMPORTANT: Run the password reset migration script first
+node add-password-reset-table.js
+
+# ⚠️ IMPORTANT: Run the slides migration script
 node migrate-slides.js
 
 # ⚠️ IMPORTANT: Run the languages migration script
@@ -76,7 +137,7 @@ The backend API will be available at `http://localhost:5001`
 
 ### ⚠️ **IMPORTANT: Database Schema Updates**
 
-**For team members:** The database schema has been updated with new slides functionality. You **MUST** run the migration script before starting the application.
+**For team members:** The database schema has been updated with password reset functionality and slides system. You **MUST** run the migration scripts before starting the application.
 
 ### PostgreSQL Configuration
 1. Create a PostgreSQL database
@@ -94,20 +155,24 @@ The backend API will be available at `http://localhost:5001`
    ```bash
    cd backend
 
-# 1. First, run the slides migration script
+# 1. First, run the password reset migration script
+node add-password-reset-table.js
+
+# 2. Run the slides migration script
 node migrate-slides.js
 
-# 2. Run the languages migration script
+# 3. Run the languages migration script
 node migrate-languages.js
 
-# 3. Run the language course prices migration script
+# 4. Run the language course prices migration script
 node create_language_course_prices_table.js
 
-# 4. Then initialize the database
+# 5. Then initialize the database
 npm run init-db
 ```
 
 This will:
+- Create the password reset tokens table
 - Create the enhanced slides tables and relationships
 - Set up slides analytics and target audience tables
 - Create the language and language level tables
@@ -118,11 +183,105 @@ This will:
 
 ### New Database Tables
 The following new tables have been added:
+- `password_reset_tokens` - Secure password reset tokens with expiration
 - `enhanced_slides` - Main slides table
 - `slide_target_audience` - Target audience relationships
 - `slide_analytics` - View and click tracking
 - `languages` - Language management table
 - `language_levels` - Language proficiency levels (A1, B2, C1, etc.)
+
+## 🔧 Environment Variables
+
+### Required Variables
+```env
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=tth_database
+DB_USER=postgres
+DB_PASSWORD=your_password
+
+# Server Configuration
+PORT=5001
+NODE_ENV=development
+
+# JWT Secret (for authentication)
+JWT_SECRET=***REMOVED***
+
+# Email Configuration (for password reset)
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your_16_character_app_password
+FRONTEND_URL=http://localhost:5173
+
+# Optional: Development mode (logs emails to console)
+LOG_EMAILS=true
+
+# Optional: Mailtrap for testing
+USE_MAILTRAP=false
+MAILTRAP_USER=your_mailtrap_username
+MAILTRAP_PASS=your_mailtrap_password
+```
+
+## 📝 Changelog
+
+### 2025-07-13 02:26 AM - Password Reset System Implementation
+
+#### ✅ Added Features
+- **Complete Password Reset System**: Forgot password functionality for both TTH and SchoolHouse platforms
+- **Email Service Integration**: Nodemailer with Gmail and Mailtrap support
+- **Secure Token System**: Time-limited, single-use password reset tokens
+- **Database Migration**: Added `password_reset_tokens` table with proper indexing
+- **Frontend Pages**: 
+  - `/forgot-password` - TTH forgot password page (Arabic)
+  - `/schoolhouse/forgot-password` - SchoolHouse forgot password page (English)
+  - `/reset-password` - TTH password reset page (Arabic)
+  - `/schoolhouse/reset-password` - SchoolHouse password reset page (English)
+- **Backend API Endpoints**:
+  - `POST /api/auth/forgot-password` - Request password reset
+  - `POST /api/auth/verify-reset-token` - Verify reset token
+  - `POST /api/auth/reset-password` - Set new password
+- **Email Templates**: Beautiful HTML emails for both platforms
+- **Development Mode**: Console logging for testing without email sending
+- **Error Handling**: Comprehensive error messages and validation
+
+#### 🔧 Technical Improvements
+- **Environment Configuration**: Updated `.env` template with email settings
+- **Email Service**: Modular email service with multiple provider support
+- **Security**: Token expiration, single-use tokens, password validation
+- **UI/UX**: Responsive design, loading states, success/error messages
+- **RTL Support**: Proper Arabic layout with left-positioned eye icons
+- **Testing**: Email configuration test scripts
+
+#### 📁 Files Added/Modified
+- **New Files**:
+  - `backend/migrations/add-password-reset-table.js`
+  - `backend/services/emailService.js`
+  - `src/Pages/TTHForgotPassword.jsx`
+  - `src/Pages/TTHResetPassword.jsx`
+  - `src/Pages/ForgotPassword.tsx`
+  - `src/Pages/ResetPassword.tsx`
+  - `test-email-config.js`
+  - `test-forgot-password-api.js`
+  - `env-template.txt` (updated)
+
+- **Modified Files**:
+  - `backend/routes/auth.js` - Added password reset endpoints
+  - `src/services/api.js` - Added password reset API calls
+  - `src/App.tsx` - Added new routes
+  - `README.md` - Updated with password reset documentation
+
+#### 🚀 How to Use
+1. **Set up email configuration** in `.env` file
+2. **Run database migration**: `node add-password-reset-table.js`
+3. **Restart backend server** to load new environment variables
+4. **Test the flow**: Use forgot password on login pages
+5. **Check email** (or console logs in dev mode) for reset links
+
+#### ⚠️ Important Notes
+- **Email Configuration**: Must set up Gmail App Password or use Mailtrap
+- **Spam Folder**: Check spam/junk folder for password reset emails
+- **Token Expiration**: Reset links expire after 1 hour
+- **Development Mode**: Use `LOG_EMAILS=true` for testing without sending emails
 
 ## 🎠 Slides System
 

@@ -108,14 +108,14 @@ export default function Languages() {
               <p className="text-gray-600">سيتم إضافة دورات جديدة قريباً</p>
             </div>
           ) : (
-            <div dir="rtl" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3  xl:grid-cols-3 gap-8 justify-items-center relative z-10">
+          <div dir="rtl" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3  xl:grid-cols-3 gap-8 justify-items-center relative z-10">
               {courses.map((course) => (
-                <CourseCard
-                  key={course.id}
-                  course={course}
-                />
-              ))}
-            </div>
+              <CourseCard
+                key={course.id}
+                course={course}
+              />
+            ))}
+          </div>
           )}
         </div>
       </main>

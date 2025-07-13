@@ -345,8 +345,8 @@ const CourseDetailsPage = () => {
                       </Button>
                     </div>
                   ) : (
-                    <Badge variant="outline" className="text-xs flex items-center">
-                      <Layers className="h-3 w-3 mr-1" />
+                  <Badge variant="outline" className="text-xs flex items-center">
+                    <Layers className="h-3 w-3 mr-1" />
                       {languageLevel && language ? (
                         <>{language.name} &gt; {languageLevel.name}</>
                       ) : languageLevel && !language ? (
@@ -355,16 +355,16 @@ const CourseDetailsPage = () => {
                         <>{language.name} &gt; Unknown Level</>
                       ) : (
                         <>
-                          {level && <>{level.name}</>}
-                          {level && year && <>&nbsp;&gt;&nbsp;</>}
-                          {year && <>{year.name}</>}
-                          {year && speciality && <>&nbsp;&gt;&nbsp;</>}
-                          {speciality && <>{speciality.name}</>}
-                          {speciality && material && <>&nbsp;&gt;&nbsp;</>}
-                          {material && <>{material.name}</>}
+                    {level && <>{level.name}</>}
+                    {level && year && <>&nbsp;&gt;&nbsp;</>}
+                    {year && <>{year.name}</>}
+                    {year && speciality && <>&nbsp;&gt;&nbsp;</>}
+                    {speciality && <>{speciality.name}</>}
+                    {speciality && material && <>&nbsp;&gt;&nbsp;</>}
+                    {material && <>{material.name}</>}
                         </>
                       )}
-                    </Badge>
+                  </Badge>
                   )}
                 </div>
               </div>

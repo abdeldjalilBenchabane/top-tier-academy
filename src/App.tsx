@@ -12,6 +12,8 @@ import { AvatarProvider } from './contexts/AvatarContext';
 import TTHHome from './Pages/TTHHome';
 import TTHFormulair from './Pages/TTHFormulair';
 import TTHLogin from './Pages/TTHLogin';
+import TTHForgotPassword from './Pages/TTHForgotPassword';
+import TTHResetPassword from './Pages/TTHResetPassword';
 import TTHCourseDetail from './Pages/TTHCourseDetails';
 import TTHStudentDashboard from './Pages/TTHStudentDashboard.jsx';
 import TTHCourses from './Pages/TTHCourses';
@@ -28,6 +30,8 @@ import PointsFailure from './Pages/PointsFailure';
 // Schoolhouse Layouts & Pages
 import AppLayout from './components/layouts/AppLayout';
 import Login from './Pages/Login';
+import ForgotPassword from './Pages/ForgotPassword';
+import ResetPassword from './Pages/ResetPassword';
 import NotFound from './Pages/NotFound';
 import Index from './Pages/Index';
 // Admin
@@ -80,6 +84,8 @@ const App: React.FC = () => {
                 <Route path="/" element={<TTHHome />} />
                 <Route path="/register" element={<TTHFormulair />} />
                 <Route path="/login" element={<TTHLogin />} />
+                <Route path="/forgot-password" element={<TTHForgotPassword />} />
+                <Route path="/reset-password" element={<TTHResetPassword />} />
                 <Route path="/description" element={<TTHCourseDetail />} />
                 <Route path="/TTHStudentDashboard" element={<TTHStudentDashboard />} />
                 <Route path="/TTHCourses" element={<TTHCourses />} />
@@ -99,6 +105,8 @@ const App: React.FC = () => {
 
                 {/* Schoolhouse public */}
                 <Route path="/schoolhouse/login" element={<Login />} />
+                <Route path="/schoolhouse/forgot-password" element={<ForgotPassword />} />
+                <Route path="/schoolhouse/reset-password" element={<ResetPassword />} />
                 <Route path="/schoolhouse" element={<Index />} />
 
                 {/* Admin (protected) */}
