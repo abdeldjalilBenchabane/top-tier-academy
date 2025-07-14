@@ -4,6 +4,7 @@ import Footer from "../components/TTHFooter";
 import CourseCard from "../components/ui/TTHCourseCard";
 import LanguageFilter from "../components/ui/TTHLanguageFilter";
 import { languageCourses } from "../data";
+import { pointsAPI } from '@/services/api';
 
 export default function Languages() {
   const [courses, setCourses] = useState([]);
@@ -36,6 +37,14 @@ export default function Languages() {
           // Continue without prices - courses will still display
         }
         
+        // Fetch purchased course IDs
+        let purchasedIds = [];
+        try {
+          const purchasedRes = await pointsAPI.getMyCourses();
+          purchasedIds = purchasedRes.courseIds || [];
+        } catch (e) { /* ignore if not logged in */ }
+        // Mark purchased courses
+        data = data.map(course => ({ ...course, purchased: purchasedIds.includes(course.id) }));
         setCourses(data);
       } catch (e) {
         setCourses([]);

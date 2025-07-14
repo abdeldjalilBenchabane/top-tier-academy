@@ -499,6 +499,17 @@ DB_USER=your_username
 DB_PASSWORD=your_password
 JWT_SECRET=your_secret_key_here
 PORT=5001
+EMAIL_USER=pforgot315@gmail.com
+EMAIL_PASSWORD=***REMOVED***
+FRONTEND_URL=http://localhost:8080
+LOG_EMAILS=false
+# Agora Configuration (for live sessions)
+AGORA_APP_ID=e8a09e60ab1548d4b0f18a0cd440f8b7
+AGORA_APP_CERTIFICATE=***REMOVED***
+
+# Chargily Configuration (for payments)
+VITE_SUCCESS_URL=http://localhost:5173/payments/success
+VITE_CHARGILY_API_KEY=***REMOVED***
 ```
 
 ### CORS Configuration

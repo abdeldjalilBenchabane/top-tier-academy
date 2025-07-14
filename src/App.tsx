@@ -26,6 +26,7 @@ import TTHTeacherProfile from './Pages/TTHTeacherProfile';
 import PointsPurchase from './Pages/PointsPurchase';
 import PointsSuccess from './Pages/PointsSuccess';
 import PointsFailure from './Pages/PointsFailure';
+import PointsHistory from './Pages/PointsHistory';
 
 // Schoolhouse Layouts & Pages
 import AppLayout from './components/layouts/AppLayout';
@@ -101,6 +102,7 @@ const App: React.FC = () => {
                 <Route path="/points" element={<PointsPurchase />} />
                 <Route path="/points/success" element={<PointsSuccess />} />
                 <Route path="/points/failure" element={<PointsFailure />} />
+                <Route path="/points/history" element={<PointsHistory />} />
 
 
                 {/* Schoolhouse public */}

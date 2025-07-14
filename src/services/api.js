@@ -211,6 +211,18 @@ export const pointsAPI = {
   
   // Get transaction by ID
   getTransaction: (id) => apiRequest(`/points/transaction/${id}`),
+
+  // Buy a course with points
+  buyCourse: (courseId) => apiRequest('/points/buy-course', {
+    method: 'POST',
+    body: JSON.stringify({ courseId }),
+  }),
+
+  // Get my own point transaction history
+  getMyTransactions: () => apiRequest('/points/transactions/me'),
+
+  // Get all purchased course IDs for the logged-in user
+  getMyCourses: () => apiRequest('/points/my-courses'),
 };
 
 // Payments API calls
