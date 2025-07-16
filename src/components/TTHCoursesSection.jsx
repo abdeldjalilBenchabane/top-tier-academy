@@ -13,75 +13,13 @@ import {
   Users,
   Calendar
 } from 'lucide-react';
+import TTHCourseCard from './ui/TTHCourseCard';
 
-const CoursesSection = () => {
+const CoursesSection = ({ purchasedCourses }) => {
+  console.log('CoursesSection purchasedCourses:', purchasedCourses);
   const [courseFilter, setCourseFilter] = useState('all');
 
-  const courses = [
-    {
-      id: 1,
-      title: 'البرمجة بـ JavaScript من الصفر',
-      instructor: 'د. محمد أحمد',
-      category: 'البرمجة',
-      progress: 100,
-      totalLessons: 25,
-      completedLessons: 25,
-      duration: '12 ساعة',
-      rating: 4.8,
-      enrolledStudents: 1250,
-      status: 'completed',
-      thumbnail: '/placeholder.svg',
-      purchaseDate: '2024-01-15',
-      completionDate: '2024-02-20'
-    },
-    {
-      id: 2,
-      title: 'تطوير تطبيقات الويب بـ React',
-      instructor: 'أ. فاطمة علي',
-      category: 'تطوير الويب',
-      progress: 65,
-      totalLessons: 30,
-      completedLessons: 19,
-      duration: '15 ساعة',
-      rating: 4.9,
-      enrolledStudents: 890,
-      status: 'in_progress',
-      thumbnail: '/placeholder.svg',
-      purchaseDate: '2024-02-01',
-      lastAccessed: '2024-03-15'
-    },
-    {
-      id: 3,
-      title: 'أساسيات قواعد البيانات MySQL',
-      instructor: 'د. أحمد حسن',
-      category: 'قواعد البيانات',
-      progress: 30,
-      totalLessons: 20,
-      completedLessons: 6,
-      duration: '10 ساعات',
-      rating: 4.7,
-      enrolledStudents: 650,
-      status: 'in_progress',
-      thumbnail: '/placeholder.svg',
-      purchaseDate: '2024-03-01',
-      lastAccessed: '2024-03-18'
-    },
-    {
-      id: 4,
-      title: 'التصميم الجرافيكي باستخدام Photoshop',
-      instructor: 'أ. سارة محمود',
-      category: 'التصميم',
-      progress: 0,
-      totalLessons: 18,
-      completedLessons: 0,
-      duration: '8 ساعات',
-      rating: 4.6,
-      enrolledStudents: 420,
-      status: 'not_started',
-      thumbnail: '/placeholder.svg',
-      purchaseDate: '2024-03-10'
-    }
-  ];
+  const courses = purchasedCourses && purchasedCourses.length > 0 ? purchasedCourses : [];
 
   const getStatusBadge = (status, progress) => {
     switch (status) {
@@ -124,89 +62,19 @@ const CoursesSection = () => {
       </div>
 
       <Tabs value={courseFilter} onValueChange={setCourseFilter} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-6">
+        <TabsList className="grid w-full grid-cols-1 mb-6">
           <TabsTrigger value="all">جميع الدورات</TabsTrigger>
-          <TabsTrigger value="in_progress">قيد التقدم</TabsTrigger>
-          <TabsTrigger value="completed">مكتملة</TabsTrigger>
-          <TabsTrigger value="not_started">لم تبدأ</TabsTrigger>
         </TabsList>
 
         <TabsContent value={courseFilter} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCourses.map((course) => (
-              <Card key={course.id} className="hover:shadow-lg transition-shadow duration-300 overflow-hidden">
-                <div className="aspect-video bg-gradient-to-r from-blue-400 to-purple-500 relative">
-                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                    <div className="text-white text-center">
-                      <BookOpen className="w-12 h-12 mx-auto mb-2 opacity-80" />
-                      <p className="text-sm opacity-90">صورة الدورة</p>
-                    </div>
-                  </div>
-                  <div className="absolute top-3 right-3">
-                    {getStatusBadge(course.status, course.progress)}
-                  </div>
-                </div>
-
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg line-clamp-2 mb-2">
-                    {course.title}
-                  </CardTitle>
-                  <div className="flex items-center justify-between text-sm text-gray-600">
-                    <span className="flex items-center gap-1">
-                      <Users className="w-4 h-4" />
-                      {course.instructor}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                      <span>{course.rating}</span>
-                    </div>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>التقدم</span>
-                      <span>{course.progress}%</span>
-                    </div>
-                    <Progress value={course.progress} className="h-2" />
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>{course.completedLessons} من {course.totalLessons} درس</span>
-                      <span>{course.duration}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-sm text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      <span>
-                        {course.status === 'completed' 
-                          ? `اكتمل في ${course.completionDate}`
-                          : `آخر دخول ${course.lastAccessed || course.purchaseDate}`
-                        }
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button 
-                      className="flex-1 bg-education-blue hover:bg-education-blue/90"
-                      size="sm"
-                    >
-                      <Play className="w-4 h-4 ml-2" />
-                      {course.status === 'not_started' ? 'ابدأ الدورة' : 'متابعة'}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="px-3"
-                    >
-                      <BookOpen className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            {courses.length > 0 ? (
+              courses.map((course) => (
+                <TTHCourseCard key={course.id} course={course} />
+              ))
+            ) : (
+              <div className="col-span-full text-center py-12 text-gray-500 text-lg font-bold">لا توجد دورات مشتراة بعد</div>
+            )}
           </div>
 
           {filteredCourses.length === 0 && (

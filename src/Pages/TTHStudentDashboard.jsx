@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from './../components/ui/TTHCard';
 import { Badge } from './../components/ui/TTHBadge';
 import { Button } from './../components/ui/TTHButton';
 import { Progress } from './../components/ui/TTHprogress';
 import { Avatar, AvatarFallback, AvatarImage } from './../components/ui/TTHAvatar';
+import TTHCourseCard from '../components/ui/TTHCourseCard';
 
 import {
     BookOpen,
@@ -21,7 +22,7 @@ import CoursesSection from '../components/TTHCoursesSection';
 import CalendarSection from '../components/TTHCalendarSection';
 import CommentsSection from '../components/TTHCommentsSection';
 import ProfileSection from '../components/TTHProfileSection';
-import { useNavigate } from 'react-router-dom';
+import { pointsAPI } from '@/services/api';
 
 // Fonction utilitaire pour calculer le nombre total d'heures passées sur la plateforme
 function calculateTotalHours(activities) {
@@ -31,12 +32,19 @@ function calculateTotalHours(activities) {
 }
 
 const StudentDashboard = () => {
-    const [activeTab, setActiveTab] = useState('overview');
+    const location = useLocation();
+    const getInitialTab = () => {
+      const params = new URLSearchParams(location.search);
+      return params.get('tab') || 'profile';
+    };
+    const [activeTab, setActiveTab] = useState(getInitialTab());
     const [studentStats, setStudentStats] = useState(null);
     const [recentActivities, setRecentActivities] = useState([]);
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [purchasedCourses, setPurchasedCourses] = useState([]);
+    const [pointsBalance, setPointsBalance] = useState(0);
     const navigate = useNavigate();
     const [editMode, setEditMode] = useState(false);
 
@@ -74,9 +82,47 @@ const StudentDashboard = () => {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
                 });
                 const prof = await profRes.json();
+                // Fetch purchased course IDs
+                let purchasedIds = [];
+                try {
+                  const purchasedRes = await pointsAPI.getMyCourses();
+                  purchasedIds = purchasedRes.courses || purchasedRes.courseIds || [];
+                } catch (e) { purchasedIds = []; }
+                // Fetch all approved courses (like TTHCourses.jsx)
+                let allCourses = [];
+                try {
+                  const res = await fetch('/api/courses?status=approved');
+                  let data = await res.json();
+                  // Only keep courses WITHOUT a language_level_id (education path)
+                  data = data.filter(course => !course.language_level_id || course.language_level_id === null || course.language_level_id === undefined);
+                  // For education courses, fetch price from materials table
+                  try {
+                    const materialsRes = await fetch('/api/courses/materials/list');
+                    if (materialsRes.ok) {
+                      const materialsData = await materialsRes.json();
+                      data = data.map(course => {
+                        const material = materialsData.find(m => m.name === course.material_name);
+                        return material ? { ...course, price: material.price } : course;
+                      });
+                    }
+                  } catch (e) { /* ignore */ }
+                  allCourses = data;
+                } catch (e) { allCourses = []; }
+                // Filter to only purchased courses (full objects)
+                const purchased = allCourses
+                  .filter(course => purchasedIds.includes(course.id))
+                  .map(course => ({ ...course, purchased: true }));
+                // Fetch points balance
+                let balance = 0;
+                try {
+                  const balanceRes = await pointsAPI.getBalance();
+                  balance = balanceRes.points || balanceRes.balance || 0;
+                } catch (e) { balance = 0; }
                 setStudentStats(stats);
                 setRecentActivities(activities);
                 setProfile(prof);
+                setPurchasedCourses(purchased);
+                setPointsBalance(balance);
             } catch (e) {
                 setError('Erreur lors du chargement des données');
             } finally {
@@ -85,6 +131,15 @@ const StudentDashboard = () => {
         }
         fetchData();
     }, []);
+
+    useEffect(() => {
+      // Update tab if URL changes
+      const params = new URLSearchParams(location.search);
+      const tab = params.get('tab');
+      if (tab && tab !== activeTab) {
+        setActiveTab(tab);
+      }
+    }, [location.search]);
 
     if (loading) return <div className="p-8 text-center">Chargement...</div>;
     if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
@@ -166,13 +221,12 @@ const StudentDashboard = () => {
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-blue-100">إجمالي الدورات</p>
-                                            <p className="text-3xl mt-2 font-bold">{studentStats?.totalCourses ?? 0}</p>
+                                            <p className="text-3xl mt-2 font-bold">{purchasedCourses.length}</p>
                                         </div>
                                         <BookOpen className="w-8 h-8 text-blue-200" />
                                     </div>
                                 </CardContent>
                             </Card>
-
                             <Card className="bg-gradient-to-r from-purple-400 to-purple-700 text-white">
                                 <CardContent className="p-8">
                                     <div className="flex items-center mt-2 justify-between">
@@ -184,23 +238,20 @@ const StudentDashboard = () => {
                                     </div>
                                 </CardContent>
                             </Card>
-
                             <Card className="bg-gradient-to-r from-yellow-400  to-yellow-600 text-white cursor-pointer">
                                 <CardContent className="p-8">
                                     <Link to="/points">
                                         <div className="flex mt-2 items-center justify-between">
                                             <div>
                                                 <p className="text-yellow-100"> رصيد النقاط</p>
-                                                <p className="text-3xl font-bold mt-2">{studentStats?.totalCourses ?? 0}</p>
+                                                <p className="text-3xl font-bold mt-2">{pointsBalance}</p>
                                             </div>
                                             <BadgeDollarSign className="w-8 h-8 text-yellow-200" />
                                         </div>
-
                                         <div className="text-sm">دج</div>
                                     </Link>
                                 </CardContent>
                             </Card>
-
                             <Card className="bg-gradient-to-r from-orange-500 to-orange-700 text-white">
                                 <CardContent className="p-8">
                                     <div className="flex mt-2 items-center justify-between">
@@ -213,85 +264,28 @@ const StudentDashboard = () => {
                                 </CardContent>
                             </Card>
                         </div>
-
-
-                        {/* Progress Section */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Trophy className="w-5 h-5 text-education-yellow" />
-                                        تقدمك الأكاديمي
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div>
-                                        <div className="flex justify-between mb-2">
-                                            <span>إكمال الدورات</span>
-                                            <span>{studentStats ? Math.round(((studentStats.completedCourses ?? 0) / (studentStats.totalCourses || 1)) * 100) : 0}%</span>
-                                        </div>
-                                        <Progress
-                                            value={studentStats ? ((studentStats.completedCourses ?? 0) / (studentStats.totalCourses || 1)) * 100 : 0}
-                                            className="h-2"
-                                        />
-                                    </div>
-                                    <div>
-                                        <div className="flex justify-between mb-2">
-                                            <span>ساعات الدراسة</span>
-                                            <span>{totalHoursSpent} ساعة</span>
-                                        </div>
-                                        <Progress
-                                            value={studentStats ? ((studentStats.completedHours ?? 0) / (studentStats.totalHours || 1)) * 100 : 0}
-                                            className="h-2"
-                                        />
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>إحصائيات سريعة</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3 mt-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className=" text-gray-600">أيام متتالية</span>
-                                        <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">
-                                            {studentProfile.streak} يوم
-                                        </Badge>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className=" text-gray-600">معدل الإكمال</span>
-                                        <Badge className="bg-blue-300 text-blue-600">
-                                            {Math.round((studentProfile.completedCourses / studentProfile.totalCourses) * 100)}%
-                                        </Badge>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className=" text-gray-600">الساعات هذا الشهر</span>
-                                        <Badge className="bg-purple-100 text-purple-800 hover:bg-green-100">
-                                            24 ساعة
-                                        </Badge>
-                                    </div>
-                                </CardContent>
-
-                                <CardContent>
-                                    <div className="space-y-4">
-                                        {recentActivities.map((activity) => (
-                                            <div key={activity.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                                                <activity.icon className={`w-5 h-5 ${activity.color}`} />
-                                                <div className="flex-1">
-                                                    <p className="font-medium text-sm">{activity.title}</p>
-                                                    <p className="text-xs text-gray-500">{activity.time}</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                        {/* Purchased Courses Preview */}
+                        {purchasedCourses.length > 0 && (
+                          <div>
+                            <h2 className="text-xl font-bold text-gray-900 mb-4 mt-8">دوراتك الأخيرة</h2>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                              {purchasedCourses.slice(0, 4).map((course) => (
+                                <TTHCourseCard key={course.id} course={course} />
+                              ))}
+                            </div>
+                            {purchasedCourses.length > 4 && (
+                              <div className="text-center mt-4">
+                                <Link to="#" onClick={() => setActiveTab('courses')} className="text-blue-600 underline font-bold">عرض كل الدورات</Link>
+                              </div>
+                            )}
+                          </div>
+                        )}
                     </div>
                 )}
 
-                {activeTab === 'courses' && <CoursesSection />}
+                {activeTab === 'courses' && (
+                  <CoursesSection purchasedCourses={purchasedCourses} />
+                )}
                 {activeTab === 'calendar' && <CalendarSection />}
                 {activeTab === 'comments' && <CommentsSection />}
                 {activeTab === 'profile' && <ProfileSection />}

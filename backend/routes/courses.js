@@ -869,4 +869,87 @@ router.post('/language-course-price', async (req, res) => {
   }
 });
 
+// Get comments for a course and tab (now from course_comments table)
+router.get('/:id/comments', async (req, res) => {
+  const { id } = req.params;
+  const { tab } = req.query;
+  try {
+    // Join with users to get name
+    const result = await pool.query(
+      `SELECT c.id, c.user_id, u.name, c.comment, c.course_id, c.section_id, c.created_at, c.reply, c.tab, c.rating
+       FROM course_comments c
+       LEFT JOIN users u ON c.user_id = u.id
+       WHERE c.course_id = $1
+       ORDER BY c.created_at DESC`,
+      [id]
+    );
+    res.json({ comments: result.rows });
+  } catch (err) {
+    console.error('Error fetching course comments:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add a comment to a course (now to course_comments table)
+router.post('/:id/comments', async (req, res) => {
+  const { id } = req.params;
+  const { name, comment, user_id, section_id, tab, rating } = req.body;
+  if (!comment || !user_id || !name || !tab) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  try {
+    const result = await pool.query(
+      `INSERT INTO course_comments (user_id, course_id, section_id, name, comment, tab, rating, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING id, user_id, course_id, section_id, name, comment, tab, rating, created_at` ,
+      [user_id, id, section_id || null, name, comment, tab, rating || null]
+    );
+    res.json({ success: true, comment: result.rows[0] });
+  } catch (err) {
+    console.error('Error adding course comment:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all comments for courses created by the logged-in professor (from course_comments)
+router.get('/professor/comments', verifyToken, requireRole(['professor']), async (req, res) => {
+  try {
+    const professorId = req.user.id;
+    const result = await pool.query(
+      `SELECT c.*, u.name as student_name, crs.title as course_title FROM course_comments c
+       LEFT JOIN users u ON c.user_id = u.id
+       JOIN courses crs ON c.course_id = crs.id
+       WHERE crs.created_by = $1
+       ORDER BY c.created_at DESC`,
+      [professorId]
+    );
+    res.json({ comments: result.rows });
+  } catch (err) {
+    console.error('Error fetching professor comments:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Professor replies to a comment (update reply column in course_comments)
+router.post('/professor/comments/:commentId/reply', verifyToken, requireRole(['professor']), async (req, res) => {
+  try {
+    const professorId = req.user.id;
+    const { commentId } = req.params;
+    const { reply } = req.body;
+    if (!reply) return res.status(400).json({ error: 'Reply is required' });
+    // Ensure the comment belongs to a course created by this professor
+    const check = await pool.query(
+      `SELECT c.id FROM course_comments c JOIN courses crs ON c.course_id = crs.id WHERE c.id = $1 AND crs.created_by = $2`,
+      [commentId, professorId]
+    );
+    if (check.rows.length === 0) return res.status(403).json({ error: 'Not allowed' });
+    await pool.query(
+      `UPDATE course_comments SET reply = $1 WHERE id = $2`,
+      [reply, commentId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error replying to comment:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router; 

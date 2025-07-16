@@ -610,6 +610,16 @@ To add the `course_covers` table (for course cover images), run:
 node add_course_cover_table.js
 ```
 
+## Database: Course Comments Table Setup
+
+To create the `course_comments` table (used for all course comments and professor replies), run the following script:
+
+```sh
+node backend/create-course-comments-table.js
+```
+
+This will create the table with all required columns. Make sure your database connection settings are correct in your environment variables before running the script.
+
 ---
 
 ## 🤝 Contributing

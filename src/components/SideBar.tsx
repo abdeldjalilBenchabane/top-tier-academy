@@ -36,7 +36,11 @@ const Sidebar = ({ activeSection, onSectionChange }: SidebarProps) => {
   ]
 
   const handleSectionChange = (section: string) => {
-    onSectionChange(section)
+    if (section === 'settings') {
+      onSectionChange('profile');
+    } else {
+      onSectionChange(section);
+    }
     setIsOpen(false) // إغلاق القائمة المحمولة بعد الاختيار
   }
 

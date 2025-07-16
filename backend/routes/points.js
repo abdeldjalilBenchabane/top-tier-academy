@@ -4,6 +4,14 @@ import { verifyToken as auth } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Middleware to check admin
+function requireAdmin(req, res, next) {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
 // Get user points balance
 router.get('/balance', auth, async (req, res) => {
   try {
@@ -63,6 +71,58 @@ router.get('/packages', async (req, res) => {
     res.json({ packages: result.rows });
   } catch (error) {
     console.error('Error fetching point packages:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update a point package (admin only)
+router.put('/packages/:id', auth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, points, price, currency, is_active } = req.body;
+    const result = await pool.query(
+      `UPDATE point_packages SET name = $1, points = $2, price = $3, currency = $4, is_active = $5 WHERE id = $6 RETURNING *`,
+      [name, points, price, currency, is_active, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Package not found' });
+    }
+    res.json({ success: true, package: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating point package:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add a new point package (admin only)
+router.post('/packages', auth, requireAdmin, async (req, res) => {
+  try {
+    const { name, points, price, currency, is_active } = req.body;
+    const result = await pool.query(
+      `INSERT INTO point_packages (name, points, price, currency, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [name, points, price, currency, is_active ?? true]
+    );
+    res.json({ success: true, package: result.rows[0] });
+  } catch (error) {
+    console.error('Error adding point package:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete a point package (admin only)
+router.delete('/packages/:id', auth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `DELETE FROM point_packages WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Package not found' });
+    }
+    res.json({ success: true, deleted: result.rows[0] });
+  } catch (error) {
+    console.error('Error deleting point package:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

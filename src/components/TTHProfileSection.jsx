@@ -366,65 +366,6 @@ const ProfileSection = () => {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Statistics Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>إحصائيات التعلم</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">{studentStats?.totalCourses ?? 0}</div>
-                <div className="text-sm text-gray-600">إجمالي الدورات</div>
-              </div>
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">{studentStats?.completedCourses ?? 0}</div>
-                <div className="text-sm text-gray-600">الدورات المكتملة</div>
-              </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600">{studentStats?.totalHours ?? 0}</div>
-                <div className="text-sm text-gray-600">ساعات الدراسة</div>
-              </div>
-              <div className="text-center p-4 bg-orange-50 rounded-lg">
-                <div className="text-2xl font-bold text-orange-600">{studentStats?.upcomingLives ?? 0}</div>
-                <div className="text-sm text-gray-600">الجلسات القادمة</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Achievements Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>الإنجازات</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {achievements.map((achievement) => (
-                <div
-                  key={achievement.id}
-                  className={`p-4 rounded-lg border-2 transition-all ${achievement.earned
-                    ? 'border-blue-200 bg-blue-50'
-                    : 'border-gray-200 bg-gray-50 opacity-60'
-                    }`}
-                >
-                  <achievement.icon className={`w-8 h-8 mx-auto mb-2 ${achievement.color}`} />
-                  <div className="text-center">
-                    <div className="font-medium text-sm">{achievement.title}</div>
-                    {achievement.earned && (
-                      <Badge className="mt-1 bg-blue-100 text-blue-800 hover:bg-blue-100">
-                        مكتسب
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Settings Modal */}
       <Dialog dir="rtl" open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent className="max-w-md">

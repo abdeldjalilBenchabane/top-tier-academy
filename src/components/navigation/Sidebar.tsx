@@ -13,7 +13,9 @@ import {
   Video,
   FolderOpen,
   HelpCircle,
-  BarChart
+  BarChart,
+  DollarSign,
+  MessageCircle
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -29,6 +31,7 @@ const Sidebar = () => {
     { name: 'Live Sessions', path: '/admin/live-sessions', icon: <Video className="h-5 w-5" /> },
     { name: 'User Management', path: '/admin/users', icon: <Users className="h-5 w-5" /> },
     { name: 'Enhanced Slides', path: '/admin/enhanced-slides', icon: <Image className="h-5 w-5" /> },
+    { name: 'Points', path: '/admin/points', icon: <DollarSign className="h-5 w-5" /> },
     { name: 'Settings', path: '/admin/settings', icon: <Settings className="h-5 w-5" /> },
   ];
 
@@ -38,6 +41,7 @@ const Sidebar = () => {
     { name: 'Create Course', path: '/professor/create', icon: <FileText className="h-5 w-5" /> },
     { name: 'Create Quiz', path: '/professor/quiz', icon: <HelpCircle className="h-5 w-5" /> },
     { name: 'Quiz Results', path: '/professor/results', icon: <BarChart className="h-5 w-5" /> },
+    { name: 'تعليقات الطلاب', path: '/professor/comments', icon: <MessageCircle className="h-5 w-5" /> },
     { name: 'Settings', path: '/professor/settings', icon: <Settings className="h-5 w-5" /> },
   ];
 

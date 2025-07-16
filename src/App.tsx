@@ -43,12 +43,14 @@ import AdminCourses from './Pages/admin/Courses';
 import AdminCourseDetails from './Pages/admin/CourseDetails';
 import AdminSettings from './Pages/admin/Settings';
 import CourseFilesPage from './Pages/admin/CourseFiles';
+import AdminPoints from './Pages/admin/Points';
 // Professor
 import ProfessorDashboard from './Pages/professor/Dashboard';
 import ProfessorCourses from './Pages/professor/Courses';
 import ProfessorCreate from './Pages/professor/Create';
 import ProfessorSettings from './Pages/professor/Settings';
 import ProfessorCourseDetails from './Pages/professor/CourseDetails';
+import ProfessorComments from './Pages/professor/Comments';
 // Admin components
 import UserManagement from './components/admin/UserManagement';
 import HomepageSlides from './components/admin/HomepageSlides';
@@ -125,6 +127,7 @@ const App: React.FC = () => {
                   <Route path="enhanced-slides" element={<EnhancedHomepageSlides />} />
                   <Route path="live-sessions" element={<LiveSessionApprovals />} />
                   <Route path="settings" element={<AdminSettings />} />
+                  <Route path="points" element={<AdminPoints />} />
                 </Route>
 
                 {/* Professor (protected) */}
@@ -136,6 +139,7 @@ const App: React.FC = () => {
                   <Route path="quiz" element={<QuizCreation />} />
                   <Route path="results" element={<QuizResults professorId="1" />} />
                   <Route path="settings" element={<ProfessorSettings />} />
+                  <Route path="comments" element={<ProfessorComments />} />
                 </Route>
 
                 {/* Catch-all */}

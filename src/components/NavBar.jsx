@@ -131,10 +131,10 @@ const Navbar = () => {
                           <div className="font-medium">{user.name}</div>
                           <div className="text-gray-500">{user.email}</div>
                         </div>
-                        <Link to="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onClick={() => setIsDropdownOpen(false)}>
+                        <Link to="/profile?tab=overview" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onClick={() => setIsDropdownOpen(false)}>
                           <FaUser className="w-4 h-4" /> الملف الشخصي
                         </Link>
-                        <Link to="/settings" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onClick={() => setIsDropdownOpen(false)}>
+                        <Link to="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onClick={() => setIsDropdownOpen(false)}>
                           <FaCog className="w-4 h-4" /> الإعدادات
                         </Link>
                         <button onClick={handleLogout}
@@ -201,10 +201,10 @@ const Navbar = () => {
                       <div className="text-xs text-blue-200">{user.email}</div>
                     </div>
                   </div>
-                  <Link to="/profile" className="block py-2 px-4 rounded hover:bg-white/20 transition" onClick={() => setIsMenuOpen(false)}>
+                  <Link to="/profile?tab=overview" className="block py-2 px-4 rounded hover:bg-white/20 transition" onClick={() => setIsMenuOpen(false)}>
                     الملف الشخصي
                   </Link>
-                  <Link to="/settings" className="block py-2 px-4 rounded hover:bg-white/20 transition" onClick={() => setIsMenuOpen(false)}>
+                  <Link to="/profile" className="block py-2 px-4 rounded hover:bg-white/20 transition" onClick={() => setIsMenuOpen(false)}>
                     الإعدادات
                   </Link>
                   <button onClick={() => {

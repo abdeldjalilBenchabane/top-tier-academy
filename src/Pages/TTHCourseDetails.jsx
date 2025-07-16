@@ -5,6 +5,7 @@ import { Button } from "../components/ui/Button";
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
+import { useAuth } from '../contexts/AuthContext';
 
 const levelLabels = {
     "primaire": "ابتدائي",
@@ -52,6 +53,8 @@ export default function CourseDetail() {
     
     // New state for language course prices
     const [languageCoursePrices, setLanguageCoursePrices] = useState({});
+
+    const { user } = useAuth();
 
     useEffect(() => {
         const fetchCourseData = async () => {
@@ -177,28 +180,14 @@ export default function CourseDetail() {
                     }
                 }
 
-                // Generate mock reviews for now (in real app, these would come from API)
-                const mockReviews = [
-                    {
-                        name: "أم سارة",
-                        rating: 5,
-                        comment: "درس ممتاز! ابنتي تحسنت كثيراً في الرياضيات بعد مشاهدة هذا الدرس.",
-                        date: "منذ أسبوعين"
-                    },
-                    {
-                        name: "أحمد علي",
-                        rating: 4,
-                        comment: "شرح واضح ومفهوم. أنصح به لجميع الطلاب.",
-                        date: "منذ شهر"
-                    },
-                    {
-                        name: "فاطمة محمد",
-                        rating: 5,
-                        comment: "المدرس يشرح بطريقة سهلة ومبسطة. شكراً لكم.",
-                        date: "منذ 3 أسابيع"
-                    }
-                ];
-                setReviews(mockReviews);
+                // Fetch reviews for the course
+                const reviewsRes = await fetch(`/api/courses/${id}/comments?tab=reviews`);
+                if (reviewsRes.ok) {
+                    const reviewsData = await reviewsRes.json();
+                    setReviews(reviewsData.comments || []);
+                } else {
+                    console.error('Failed to fetch reviews for course:', id);
+                }
 
             } catch (err) {
                 setError(err.message);
@@ -400,14 +389,40 @@ export default function CourseDetail() {
         setNewReview((prev) => ({ ...prev, rating }));
     };
 
-    const handleReviewSubmit = (e) => {
+    const handleReviewSubmit = async (e) => {
         e.preventDefault();
         if (!newReview.name.trim() || !newReview.comment.trim()) return;
-        setReviews([
-            { ...newReview, date: 'الآن' },
-            ...reviews,
-        ]);
-        setNewReview({ name: '', rating: 5, comment: '' });
+        if (!user || !user.id) {
+            alert('يجب تسجيل الدخول لإضافة تعليق');
+            return;
+        }
+        try {
+            const response = await fetch(`/api/courses/${id}/comments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: newReview.name,
+                    comment: newReview.comment,
+                    user_id: user.id,
+                    tab: 'reviews',
+                    rating: newReview.rating || 5
+                }),
+            });
+            if (response.ok) {
+                const newReviewData = await response.json();
+                setReviews(prev => [newReviewData.comment, ...prev]);
+                setNewReview({ name: '', rating: 5, comment: '' });
+            } else {
+                const err = await response.json();
+                alert('فشل إرسال التعليق: ' + (err.error || response.status));
+                console.error('Failed to submit review:', response.status, err);
+            }
+        } catch (err) {
+            alert('فشل إرسال التعليق: ' + err.message);
+            console.error('Error submitting review:', err);
+        }
     };
 
     // Calculate course statistics
@@ -603,9 +618,9 @@ export default function CourseDetail() {
                             <div className="border-b border-purple-100 bg-gradient-to-r from-purple-50 to-purple-50 rounded-t-3xl">
                                 <nav className="flex px-8">
                                     {[
-                                        { id: "overview", label: "نظرة عامة" },
                                         { id: "curriculum", label: "المنهج" },
-                                        { id: "reviews", label: "التقييمات" }
+                                        { id: "overview", label: "نظرة عامة" },
+                                        { id: "reviews", label: "إسأل الاستاذ" }
                                     ].map((tab) => (
                                         <button
                                             key={tab.id}
@@ -838,7 +853,7 @@ export default function CourseDetail() {
                                                     <div className="flex items-center justify-between mb-2">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                                                                {review.name.charAt(0)}
+                                                                {(review.name && review.name.length > 0) ? review.name.charAt(0) : '?'}
                                                             </div>
                                                             <div>
                                                                 <p className="font-semibold text-blue-900">{review.name}</p>
