@@ -5,6 +5,7 @@ import { Button } from "../components/ui/Button";
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
+import { useAuth } from '../contexts/AuthContext';
 
 const levelLabels = {
     "primaire": "ابتدائي",
@@ -52,6 +53,8 @@ export default function CourseDetail() {
     
     // New state for language course prices
     const [languageCoursePrices, setLanguageCoursePrices] = useState({});
+
+    const { user } = useAuth();
 
     useEffect(() => {
         const fetchCourseData = async () => {
@@ -177,28 +180,14 @@ export default function CourseDetail() {
                     }
                 }
 
-                // Generate mock reviews for now (in real app, these would come from API)
-                const mockReviews = [
-                    {
-                        name: "أم سارة",
-                        rating: 5,
-                        comment: "درس ممتاز! ابنتي تحسنت كثيراً في الرياضيات بعد مشاهدة هذا الدرس.",
-                        date: "منذ أسبوعين"
-                    },
-                    {
-                        name: "أحمد علي",
-                        rating: 4,
-                        comment: "شرح واضح ومفهوم. أنصح به لجميع الطلاب.",
-                        date: "منذ شهر"
-                    },
-                    {
-                        name: "فاطمة محمد",
-                        rating: 5,
-                        comment: "المدرس يشرح بطريقة سهلة ومبسطة. شكراً لكم.",
-                        date: "منذ 3 أسابيع"
-                    }
-                ];
-                setReviews(mockReviews);
+                // Fetch reviews for the course
+                const reviewsRes = await fetch(`/api/courses/${id}/comments?tab=reviews`);
+                if (reviewsRes.ok) {
+                    const reviewsData = await reviewsRes.json();
+                    setReviews(reviewsData.comments || []);
+                } else {
+                    console.error('Failed to fetch reviews for course:', id);
+                }
 
             } catch (err) {
                 setError(err.message);
@@ -400,14 +389,40 @@ export default function CourseDetail() {
         setNewReview((prev) => ({ ...prev, rating }));
     };
 
-    const handleReviewSubmit = (e) => {
+    const handleReviewSubmit = async (e) => {
         e.preventDefault();
         if (!newReview.name.trim() || !newReview.comment.trim()) return;
-        setReviews([
-            { ...newReview, date: 'الآن' },
-            ...reviews,
-        ]);
-        setNewReview({ name: '', rating: 5, comment: '' });
+        if (!user || !user.id) {
+            alert('يجب تسجيل الدخول لإضافة تعليق');
+            return;
+        }
+        try {
+            const response = await fetch(`/api/courses/${id}/comments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: newReview.name,
+                    comment: newReview.comment,
+                    user_id: user.id,
+                    tab: 'reviews',
+                    rating: newReview.rating || 5
+                }),
+            });
+            if (response.ok) {
+                const newReviewData = await response.json();
+                setReviews(prev => [newReviewData.comment, ...prev]);
+                setNewReview({ name: '', rating: 5, comment: '' });
+            } else {
+                const err = await response.json();
+                alert('فشل إرسال التعليق: ' + (err.error || response.status));
+                console.error('Failed to submit review:', response.status, err);
+            }
+        } catch (err) {
+            alert('فشل إرسال التعليق: ' + err.message);
+            console.error('Error submitting review:', err);
+        }
     };
 
     // Calculate course statistics
@@ -603,9 +618,9 @@ export default function CourseDetail() {
                             <div className="border-b border-purple-100 bg-gradient-to-r from-purple-50 to-purple-50 rounded-t-3xl">
                                 <nav className="flex px-8">
                                     {[
-                                        { id: "overview", label: "نظرة عامة" },
                                         { id: "curriculum", label: "المنهج" },
-                                        { id: "reviews", label: "التقييمات" }
+                                        { id: "overview", label: "نظرة عامة" },
+                                        { id: "reviews", label: "إسأل الاستاذ" }
                                     ].map((tab) => (
                                         <button
                                             key={tab.id}
@@ -655,9 +670,9 @@ export default function CourseDetail() {
                                                     <span className="text-gray-700">الرغبة في التعلم والتطوير</span>
                                                 </li>
                                                 <li className="flex items-start gap-3">
-                                                    <div className="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div>
+                                                        <div className="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div>
                                                     <span className="text-gray-700">لا حاجة لخبرة سابقة</span>
-                                                </li>
+                                                    </li>
                                             </ul>
                                         </div>
 
@@ -743,10 +758,10 @@ export default function CourseDetail() {
                                                                                 </div>
                                                                             )}
                                                                         </div>
-                                                                    </li>
+                                                            </li>
                                                                 );
                                                             })}
-                                                        </ul>
+                                                    </ul>
                                                         
                                                         {/* Display text content directly */}
                                                         {section.blocks?.map((block, blockIndex) => {
@@ -768,7 +783,7 @@ export default function CourseDetail() {
                                                             }
                                                             return null;
                                                         })}
-                                                    </div>
+                                                </div>
                                                 )}
                                             </div>
                                         ))}
@@ -838,7 +853,7 @@ export default function CourseDetail() {
                                                     <div className="flex items-center justify-between mb-2">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                                                                {review.name.charAt(0)}
+                                                                {(review.name && review.name.length > 0) ? review.name.charAt(0) : '?'}
                                                             </div>
                                                             <div>
                                                                 <p className="font-semibold text-blue-900">{review.name}</p>
@@ -884,14 +899,14 @@ export default function CourseDetail() {
                                             )
                                         ) && (
                                             <Button className="flex-1 flex justify-center items-center bg-blue-600 text-white font-normal shadow hover:bg-blue-700 transition">
-                                                <FileText size={18} className="absolute mr-[-1rem]" />
+                                                    <FileText size={18} className="absolute mr-[-1rem]" />
                                                 تحميل الملفات
                                             </Button>
                                         )}
                                         <Button variant="outline" className="flex-1 text-blue-900 hover:bg-gray-50">
                                             <Play size={18} className="absolute mr-[-8.35rem]" />
                                             مشاهدة الدرس
-                                        </Button>
+                                            </Button>
                                     </div>
                                 </div>
                             </CardContent>
@@ -917,11 +932,11 @@ export default function CourseDetail() {
 
                         {/* Related Courses */}
                         {relatedCourses.length > 0 && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-lg">دروس مشابهة</CardTitle>
-                                </CardHeader>
-                                <CardContent>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-lg">دروس مشابهة</CardTitle>
+                            </CardHeader>
+                            <CardContent>
                                     <div className="space-y-3">
                                         {relatedCourses.map((relatedCourse) => {
                                             const price = languageCoursePrices[`${relatedCourse.id}-${relatedCourse.language_level_id}`];
@@ -929,8 +944,8 @@ export default function CourseDetail() {
                                             const displayPrice = relatedCourse.material_price || price;
 
                                             return (
-                                                <div
-                                                    key={relatedCourse.id}
+                                        <div
+                                            key={relatedCourse.id}
                                                     className="flex gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-100"
                                                     onClick={() => navigate(`/coursesList/courses/${relatedCourse.id}`)}
                                                 >
@@ -948,20 +963,20 @@ export default function CourseDetail() {
                                                     <div className="flex-shrink-0">
                                                         <img
                                                             src={relatedCourse.cover_url || "/placeholder.svg"}
-                                                            alt={relatedCourse.title}
+                                                alt={relatedCourse.title}
                                                             className="w-16 h-12 object-cover rounded-lg"
-                                                        />
+                                            />
                                                     </div>
                                                     
                                                     {/* Course info */}
-                                                    <div className="flex-1 min-w-0">
+                                            <div className="flex-1 min-w-0">
                                                         <h4 className="font-medium text-sm text-gray-900 line-clamp-2 leading-tight mb-1">
-                                                            {relatedCourse.title}
-                                                        </h4>
+                                                    {relatedCourse.title}
+                                                </h4>
                                                         <p className="text-xs text-gray-600 mb-2">{relatedCourse.created_by_name}</p>
                                                         <div className="flex items-center gap-2">
-                                                            <div className="flex items-center gap-1">
-                                                                <Star className="text-yellow-400 fill-current" size={12} />
+                                                    <div className="flex items-center gap-1">
+                                                        <Star className="text-yellow-400 fill-current" size={12} />
                                                                 <span className="text-xs font-medium">4.8</span>
                                                                 <span className="text-xs text-gray-500">(123)</span>
                                                             </div>
@@ -974,9 +989,9 @@ export default function CourseDetail() {
                                                 </div>
                                             );
                                         })}
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                </div>
+                            </CardContent>
+                        </Card>
                         )}
                     </div>
                 </div>

@@ -6,6 +6,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { pointsAPI } from '@/services/api';
+import { UserAvatar } from './ui';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -112,13 +113,11 @@ const Navbar = () => {
                   <FaCoins className="w-4 h-4" />
                   <span className="hidden custom:block text-sm">{userPoints.toLocaleString()} دج</span>
                 </Link>
-                
+
                 <div className="relative" ref={dropdownRef}>
                   <button onClick={toggleDropdown}
                     className="flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-full p-2 transition-all duration-200">
-                    <div className="w-8 h-8 bg-white text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
-                      {getInitials(user.name)}
-                    </div>
+                    <UserAvatar size="sm" name={user.name} />
                     <span className="hidden custom:block text-sm font-medium hover:text-white/90">
                       {user.name}
                     </span>
@@ -132,10 +131,10 @@ const Navbar = () => {
                           <div className="font-medium">{user.name}</div>
                           <div className="text-gray-500">{user.email}</div>
                         </div>
-                        <Link to="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onClick={() => setIsDropdownOpen(false)}>
+                        <Link to="/profile?tab=overview" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onClick={() => setIsDropdownOpen(false)}>
                           <FaUser className="w-4 h-4" /> الملف الشخصي
                         </Link>
-                        <Link to="/settings" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onClick={() => setIsDropdownOpen(false)}>
+                        <Link to="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" onClick={() => setIsDropdownOpen(false)}>
                           <FaCog className="w-4 h-4" /> الإعدادات
                         </Link>
                         <button onClick={handleLogout}
@@ -194,20 +193,18 @@ const Navbar = () => {
                     <FaCoins className="w-4 h-4 text-yellow-400" />
                     <span className="text-sm">{userPoints.toLocaleString()} دج - شراء النقاط</span>
                   </Link>
-                  
+
                   <div className="flex items-center gap-3 py-2 px-4">
-                    <div className="w-8 h-8 bg-white text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
-                      {getInitials(user.name)}
-                    </div>
+                    <UserAvatar size="sm" name={user.name} />
                     <div>
                       <div className="text-sm font-medium">{user.name}</div>
                       <div className="text-xs text-blue-200">{user.email}</div>
                     </div>
                   </div>
-                  <Link to="/profile" className="block py-2 px-4 rounded hover:bg-white/20 transition" onClick={() => setIsMenuOpen(false)}>
+                  <Link to="/profile?tab=overview" className="block py-2 px-4 rounded hover:bg-white/20 transition" onClick={() => setIsMenuOpen(false)}>
                     الملف الشخصي
                   </Link>
-                  <Link to="/settings" className="block py-2 px-4 rounded hover:bg-white/20 transition" onClick={() => setIsMenuOpen(false)}>
+                  <Link to="/profile" className="block py-2 px-4 rounded hover:bg-white/20 transition" onClick={() => setIsMenuOpen(false)}>
                     الإعدادات
                   </Link>
                   <button onClick={() => {

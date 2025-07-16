@@ -2,17 +2,19 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { 
-  LayoutDashboard, 
-  BookOpen, 
-  Calendar, 
-  Bell, 
-  Award, 
-  Settings, 
+import {
+  LayoutDashboard,
+  BookOpen,
+  Calendar,
+  Bell,
+  Award,
+  Settings,
   HelpCircle,
   Menu,
   X
 } from "lucide-react"
+import { UserAvatar } from './ui';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SidebarProps {
   activeSection: string
@@ -21,6 +23,7 @@ interface SidebarProps {
 
 const Sidebar = ({ activeSection, onSectionChange }: SidebarProps) => {
   const [isOpen, setIsOpen] = useState(false)
+  const { user } = useAuth();
 
   const menuItems = [
     { id: "overview", label: "نظرة عامة", icon: LayoutDashboard },
@@ -33,7 +36,11 @@ const Sidebar = ({ activeSection, onSectionChange }: SidebarProps) => {
   ]
 
   const handleSectionChange = (section: string) => {
-    onSectionChange(section)
+    if (section === 'settings') {
+      onSectionChange('profile');
+    } else {
+      onSectionChange(section);
+    }
     setIsOpen(false) // إغلاق القائمة المحمولة بعد الاختيار
   }
 
@@ -51,7 +58,7 @@ const Sidebar = ({ activeSection, onSectionChange }: SidebarProps) => {
 
       {/* طبقة تغطية الهاتف المحمول */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setIsOpen(false)}
         />
@@ -81,13 +88,10 @@ const Sidebar = ({ activeSection, onSectionChange }: SidebarProps) => {
           {/* ملف المستخدم */}
           <div className="p-4 border-b border-gray-100">
             <div className="flex items-center space-x-3 space-x-reverse">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src="/placeholder.svg" alt="مريم" />
-                <AvatarFallback className="bg-blue-100 text-blue-600">م</AvatarFallback>
-              </Avatar>
+              <UserAvatar size="md" name={user?.name} />
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate">مريم أحمد</p>
-                <p className="text-xs text-gray-500 truncate">mariam.ahmed@email.com</p>
+                <p className="font-medium text-gray-900 truncate">{user?.name || 'اسم المستخدم'}</p>
+                <p className="text-xs text-gray-500 truncate">{user?.email || 'البريد الإلكتروني'}</p>
               </div>
             </div>
           </div>
@@ -101,11 +105,10 @@ const Sidebar = ({ activeSection, onSectionChange }: SidebarProps) => {
                   <li key={item.id}>
                     <Button
                       variant={isActive ? "default" : "ghost"}
-                      className={`w-full justify-start h-11 ${
-                        isActive 
-                          ? "bg-blue-600 text-white hover:bg-blue-700" 
-                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                      }`}
+                      className={`w-full justify-start h-11 ${isActive
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                        }`}
                       onClick={() => handleSectionChange(item.id)}
                     >
                       <item.icon className={`h-4 w-4 ml-3 ${isActive ? "text-white" : "text-gray-500"}`} />
