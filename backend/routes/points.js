@@ -31,6 +31,38 @@ router.get('/balance', auth, async (req, res) => {
   }
 });
 
+// Debug endpoint to check any user's balance (admin only)
+router.get('/balance/:userId', auth, requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Get current balance
+    const balanceResult = await pool.query(
+      'SELECT balance FROM user_points WHERE user_id = $1',
+      [userId]
+    );
+    
+    const balance = balanceResult.rows[0]?.balance || 0;
+    // Get recent transactions
+    const transactionsResult = await pool.query(
+      `SELECT id, transaction_type, points, amount, status, created_at, metadata 
+       FROM point_transactions 
+       WHERE user_id = $1  ORDER BY created_at DESC 
+       LIMIT 10`,
+      [userId]
+    );
+    
+    res.json({ 
+      userId: parseInt(userId),
+      balance,
+      recentTransactions: transactionsResult.rows
+    });
+  } catch (error) {
+    console.error('Error fetching user balance for debugging:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Update user points balance (for testing or manual updates)
 router.put('/balance', auth, async (req, res) => {
   try {
@@ -71,6 +103,20 @@ router.get('/packages', async (req, res) => {
     res.json({ packages: result.rows });
   } catch (error) {
     console.error('Error fetching point packages:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all point packages (admin only) - includes inactive packages
+router.get('/packages/all', auth, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, points, price, currency, is_active FROM point_packages ORDER BY points ASC'
+    );
+    
+    res.json({ packages: result.rows });
+  } catch (error) {
+    console.error('Error fetching all point packages:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -211,12 +257,21 @@ router.post('/purchase', auth, async (req, res) => {
         packageData.points,
         amount,
         currency || 'DZD',
-        'pending',
+        'completed', // Mark as completed immediately
         JSON.stringify(metadata)
       ]
     );
     
     const transactionId = transactionResult.rows[0].id;
+    
+    // Add points to user account immediately
+    await pool.query(
+      `INSERT INTO user_points (user_id, balance) 
+       VALUES ($1, $2) 
+       ON CONFLICT (user_id) 
+       DO UPDATE SET balance = user_points.balance + $2`,
+      [userId, packageData.points]
+    );
     
     // Prepare payment data for external API
     const paymentData = {
@@ -405,6 +460,73 @@ router.post('/transactions/log', auth, async (req, res) => {
   }
 });
 
+// Get all point transactions (admin only) - with user and package details
+router.get('/transactions/admin', auth, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        pt.*,
+        u.name as user_name,
+        u.email as user_email,
+        pp.name as package_name
+      FROM point_transactions pt
+      LEFT JOIN users u ON pt.user_id = u.id
+      LEFT JOIN point_packages pp ON pt.package_id = pp.id
+      ORDER BY pt.created_at DESC`
+    );
+    
+    res.json({ transactions: result.rows });
+  } catch (error) {
+    console.error('Error fetching all point transactions:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update a point transaction (admin only)
+router.put('/transactions/:id', auth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { transaction_type, points, amount, currency, status, payment_reference, metadata } = req.body;
+    
+    const result = await pool.query(
+      `UPDATE point_transactions 
+       SET transaction_type = $1, points = $2, amount = $3, currency = $4, status = $5, payment_reference = $6, metadata = $7
+       WHERE id = $8 
+       RETURNING *`,
+      [transaction_type, points, amount, currency, status, payment_reference, JSON.stringify(metadata), id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    res.json({ success: true, transaction: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating point transaction:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete a point transaction (admin only)
+router.delete('/transactions/:id', auth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'DELETE FROM point_transactions WHERE id = $1 RETURNING *',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    res.json({ success: true, deleted: result.rows[0] });
+  } catch (error) {
+    console.error('Error deleting point transaction:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get my own point transaction history (student)
 router.get('/transactions/me', auth, async (req, res) => {
   try {
@@ -432,6 +554,159 @@ router.get('/my-courses', auth, async (req, res) => {
     res.json({ courseIds });
   } catch (error) {
     console.error('Error fetching my courses:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin buy points for student (admin only)
+router.post('/admin/buy-for-student', auth, requireAdmin, async (req, res) => {
+  try {
+    const { userId, points, amount, currency, packageName, paymentReference, requestId } = req.body;
+    
+    console.log(`=== ADMIN BUY POINTS REQUEST ===`);
+    console.log(`Request ID: ${requestId}`);
+    console.log(`Admin: ${req.user.name} (${req.user.id})`);
+    console.log(`User: ${userId}`);
+    console.log(`Points to add: ${points}`);
+    console.log(`Amount: ${amount}`);
+    console.log(`Package: ${packageName}`);
+    
+    if (!userId || !points || !amount) {
+      return res.status(400).json({ error: 'userId, points, and amount are required' });
+    }
+
+    // Verify user exists
+    const userResult = await pool.query('SELECT id, name, email FROM users WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check recent transactions for this user (last 10)
+    const recentTransactionsResult = await pool.query(
+      `SELECT id, transaction_type, points, amount, status, created_at, metadata 
+       FROM point_transactions 
+       WHERE user_id = $1  ORDER BY created_at DESC 
+       LIMIT 10`,
+      [userId]
+    );
+    console.log(`Recent transactions for user ${userId}:`, recentTransactionsResult.rows);
+
+    // Check for recent duplicate transactions (within last 5 seconds)
+    const recentTransaction = await pool.query(
+      `SELECT id FROM point_transactions 
+       WHERE user_id = $1 
+       AND transaction_type = 'purchase' 
+       AND status = 'completed'
+       AND created_at > NOW() - INTERVAL '5 seconds'
+       AND metadata->>'admin_id' = $2
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId, req.user.id.toString()]
+    );
+
+    if (recentTransaction.rows.length > 0) {
+      console.log(`Preventing duplicate transaction for user ${userId} by admin ${req.user.id}`);
+      return res.status(409).json({ error: 'Duplicate transaction detected. Please wait a moment and try again.' });
+    }
+
+    // Find the package if packageName is provided
+    let packageId = null;
+    if (packageName) {
+      const packageResult = await pool.query('SELECT id FROM point_packages WHERE name = $1', [packageName]);
+      if (packageResult.rows.length > 0) {
+        packageId = packageResult.rows[0].id;
+        console.log(`Found package ID: ${packageId} for package: ${packageName}`);
+      }
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      console.log(`Transaction started for request ID: ${requestId}`);
+      
+      // Get current balance INSIDE the transaction to prevent race conditions
+      const currentBalanceResult = await client.query('SELECT balance FROM user_points WHERE user_id = $1', [userId]);
+      const currentBalance = currentBalanceResult.rows[0]?.balance || 0;
+      console.log(`Current balance inside transaction: ${currentBalance}`);
+      
+      // Create transaction record with completed status
+      const transactionResult = await client.query(
+        `INSERT INTO point_transactions 
+         (user_id, package_id, transaction_type, points, amount, currency, status, payment_reference, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING id`,
+        [
+          userId,
+          packageId,
+          'purchase',
+          points,
+          amount,
+          currency || 'DZD',
+          'completed', // Mark as completed immediately
+          paymentReference || `Admin-${Date.now()}`,
+          JSON.stringify({ 
+            packageName, 
+            source: 'admin_manual',
+            admin_id: req.user.id,
+            admin_name: req.user.name,
+            requestId: requestId
+          })
+        ]
+      );
+      
+      console.log(`Transaction record created with ID: ${transactionResult.rows[0].id} for request ID: ${requestId}`);
+      
+      // The database trigger will automatically add points when the transaction is created
+      // No need to manually add points here
+      console.log(`Database trigger will automatically add ${points} points to user ${userId}`);
+      
+      // Get the new balance after the trigger has run
+      const newBalanceResult = await client.query('SELECT balance FROM user_points WHERE user_id = $1', [userId]);
+      const newBalance = newBalanceResult.rows[0]?.balance || 0;
+      console.log(`Points added for request ID ${requestId}. New balance: ${newBalance} (was: ${currentBalance}, added: ${points})`);
+      console.log(`Balance change verification: ${newBalance} - ${currentBalance} = ${newBalance - currentBalance}`);
+      console.log(`Expected balance: ${currentBalance + points}, Actual balance: ${newBalance}`);
+      
+      await client.query('COMMIT');
+      console.log(`Transaction committed successfully for request ID: ${requestId}`);
+      
+      console.log(`Admin ${req.user.name} added ${points} points to user ${userId} (package: ${packageName}) - Request ID: ${requestId}`);
+      console.log(`=== ADMIN BUY POINTS COMPLETED for request ID: ${requestId} ===`);
+      
+      res.json({ 
+        success: true, 
+        transactionId: transactionResult.rows[0].id,
+        message: `Successfully added ${points} points to user ${userResult.rows[0].name}`,
+        oldBalance: currentBalance,
+        newBalance: newBalance,
+        pointsAdded: points,
+        requestId: requestId
+      });
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error(`Transaction failed and rolled back for request ID ${requestId}:`, error);
+      throw error;
+    } finally {
+      client.release();
+    }
+    
+  } catch (error) {
+    console.error('Error admin buying points for student:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all students for admin (admin only)
+router.get('/admin/students', auth, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, email, role, avatar_url FROM users WHERE role = $1 ORDER BY name ASC',
+      ['student']
+    );
+    
+    res.json({ students: result.rows });
+  } catch (error) {
+    console.error('Error fetching students:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

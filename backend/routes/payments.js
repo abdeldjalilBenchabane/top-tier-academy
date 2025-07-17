@@ -28,12 +28,21 @@ router.post('/create-checkout', auth, async (req, res) => {
         parseInt(amount), // Convert to integer
         parseFloat(amount), // Convert to float for amount
         currency,
-        'pending',
+        'completed', // Mark as completed immediately for student purchases
         JSON.stringify({ packageName, source: 'chargily' })
       ]
     );
 
     const transactionId = transactionResult.rows[0].id;
+
+    // Add points to user account immediately
+    await pool.query(
+      `INSERT INTO user_points (user_id, balance) 
+       VALUES ($1, $2) 
+       ON CONFLICT (user_id) 
+       DO UPDATE SET balance = user_points.balance + $2`,
+      [userId, parseInt(amount)]
+    );
 
     // Create Chargily checkout
     const checkoutData = {
@@ -129,37 +138,15 @@ router.post('/webhook', async (req, res) => {
     if (status === 'paid') {
       newStatus = 'completed';
       
-      // Add points to user account when payment is successful
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        
-        // Update transaction status
-        await client.query(
-          'UPDATE point_transactions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-          [newStatus, transaction.id]
-        );
-        
-        // Add points to user account
-        await client.query(
-          `INSERT INTO user_points (user_id, balance) 
-           VALUES ($1, $2) 
-           ON CONFLICT (user_id) 
-           DO UPDATE SET balance = user_points.balance + $2`,
-          [transaction.user_id, transaction.points]
-        );
-        
-        await client.query('COMMIT');
-        console.log(`Points added successfully: ${transaction.points} points to user ${transaction.user_id}`);
-        
-      } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-      } finally {
-        client.release();
-      }
+      // Update transaction status only - points were already added in purchase endpoint
+      await pool.query(
+        'UPDATE point_transactions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [newStatus, transaction.id]
+      );
       
-    } else if (status === 'failed' || status === 'expired') {
+      console.log(`Transaction ${transaction.id} marked as completed - points already added`);
+      
+    } else {
       newStatus = 'failed';
       
       await pool.query(

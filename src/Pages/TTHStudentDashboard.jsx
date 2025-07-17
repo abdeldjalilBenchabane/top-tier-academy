@@ -116,7 +116,7 @@ const StudentDashboard = () => {
                 let balance = 0;
                 try {
                   const balanceRes = await pointsAPI.getBalance();
-                  balance = balanceRes.points || balanceRes.balance || 0;
+                  balance = balanceRes.balance || 0
                 } catch (e) { balance = 0; }
                 setStudentStats(stats);
                 setRecentActivities(activities);

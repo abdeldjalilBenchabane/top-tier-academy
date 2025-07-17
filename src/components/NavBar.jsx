@@ -33,6 +33,29 @@ const Navbar = () => {
     return name.charAt(0).toUpperCase();
   };
 
+  // Function to refresh points balance
+  const refreshPoints = async () => {
+    if (isStudent) {
+      try {
+        const response = await pointsAPI.getBalance();
+        setUserPoints(response.balance || 0);
+        console.log('Points refreshed:', response.balance);
+      } catch (error) {
+        console.error('Error refreshing user points:', error);
+      }
+    }
+  };
+
+  // Expose refresh function globally for admin use
+  useEffect(() => {
+    if (isStudent) {
+      window.refreshUserPoints = refreshPoints;
+    }
+    return () => {
+      delete window.refreshUserPoints;
+    };
+  }, [isStudent]);
+
   // Fetch user points on component mount (only for students)
   useEffect(() => {
     const fetchUserPoints = async () => {
@@ -55,7 +78,17 @@ const Navbar = () => {
 
     const handlePointsUpdate = (event) => {
       const { points } = event.detail;
-      setUserPoints(prev => prev + points);
+      console.log('Points update event received:', points);
+      // Refresh the entire balance instead of just adding
+      const fetchUserPoints = async () => {
+        try {
+          const response = await pointsAPI.getBalance();
+          setUserPoints(response.balance || 0);
+        } catch (error) {
+          console.error('Error fetching user points after update:', error);
+        }
+      };
+      fetchUserPoints();
     };
 
     window.addEventListener('pointsUpdated', handlePointsUpdate);

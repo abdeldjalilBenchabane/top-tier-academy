@@ -44,6 +44,7 @@ import AdminCourseDetails from './Pages/admin/CourseDetails';
 import AdminSettings from './Pages/admin/Settings';
 import CourseFilesPage from './Pages/admin/CourseFiles';
 import AdminPoints from './Pages/admin/Points';
+import AdminPointTransactions from './Pages/admin/PointTransactions';
 // Professor
 import ProfessorDashboard from './Pages/professor/Dashboard';
 import ProfessorCourses from './Pages/professor/Courses';
@@ -128,6 +129,7 @@ const App: React.FC = () => {
                   <Route path="live-sessions" element={<LiveSessionApprovals />} />
                   <Route path="settings" element={<AdminSettings />} />
                   <Route path="points" element={<AdminPoints />} />
+                  <Route path="point-transactions" element={<AdminPointTransactions />} />
                 </Route>
 
                 {/* Professor (protected) */}

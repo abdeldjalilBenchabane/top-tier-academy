@@ -199,6 +199,9 @@ export const pointsAPI = {
   // Get available point packages
   getPackages: () => apiRequest('/points/packages'),
   
+  // Get all point packages (admin only) - includes inactive packages
+  getAllPackages: () => apiRequest('/points/packages/all'),
+  
   // Get user transaction history
   getTransactions: (page = 1, limit = 10) => 
     apiRequest(`/points/transactions?page=${page}&limit=${limit}`),
