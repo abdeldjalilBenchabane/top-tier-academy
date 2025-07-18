@@ -109,7 +109,7 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
 
         {/* Action Buttons for Professors */}
         {isProfessor && showActions && session.status === 'في الانتظار' && (
-          <div className="flex gap-2 mt-4">
+          <div className="flex flex-row gap-2 mt-4 flex-nowrap">
             <button
               className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition"
               onClick={() => onAccept && onAccept(session.id)}

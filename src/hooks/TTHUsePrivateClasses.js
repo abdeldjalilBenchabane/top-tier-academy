@@ -233,7 +233,7 @@ export const usePrivateClasses = () => {
       setSelectedSession(pendingRequest);
     } else {
       const session = allOrders.find(s => s.id === sessionId) || privateClassesData.find(s => s.id === sessionId);
-      setSelectedSession(session);
+    setSelectedSession(session);
     }
     setIsModalOpen(true);
   };
