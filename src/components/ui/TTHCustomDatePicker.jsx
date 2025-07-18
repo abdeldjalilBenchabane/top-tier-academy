@@ -35,9 +35,9 @@ const CustomDatePicker = ({ value, onChange, label }) => {
   };
 
   const formatDate = (date) => {
-    return date.toLocaleDateString('ar-SA', {
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric'
     });
   };
@@ -106,9 +106,9 @@ const CustomDatePicker = ({ value, onChange, label }) => {
     );
   }
 
-  const arabicMonths = [
-    'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-    'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+  const englishMonths = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
   ];
 
   return (
@@ -123,7 +123,7 @@ const CustomDatePicker = ({ value, onChange, label }) => {
           onClick={() => setIsOpen(!isOpen)}
           className="w-full bg-white border-2 border-gray-200 text-base font-bold font-poppins rounded-xl py-3 pr-4 pl-10 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition-all duration-300 shadow-sm text-right min-w-[220px] group-hover:border-orange-300 group-hover:shadow-md cursor-pointer text-gray-700"
         >
-          {selectedDate ? formatDate(selectedDate) : 'اختر التاريخ'}
+          {selectedDate ? formatDate(selectedDate) : 'Select Date'}
         </button>
         <FaCalendarAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-orange-500 transition-colors" />
       </div>
@@ -140,7 +140,7 @@ const CustomDatePicker = ({ value, onChange, label }) => {
               <FaChevronRight className="text-gray-600" />
             </button>
             <h3 className="text-lg font-bold text-gray-900">
-              {arabicMonths[currentDate.getMonth()]} {currentDate.getFullYear()}
+              {englishMonths[currentDate.getMonth()]} {currentDate.getFullYear()}
             </h3>
             <button
               onClick={nextMonth}
@@ -152,7 +152,7 @@ const CustomDatePicker = ({ value, onChange, label }) => {
 
           {/* Days of Week */}
           <div className="grid grid-cols-7 gap-1 mb-2">
-            {['أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'].map(day => (
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
               <div key={day} className="w-10 h-10 flex items-center justify-center text-xs font-bold text-gray-500">
                 {day}
               </div>
@@ -173,7 +173,7 @@ const CustomDatePicker = ({ value, onChange, label }) => {
               }}
               className="w-full bg-blue-100 text-blue-600 py-2 rounded-lg font-medium hover:bg-blue-200 transition-colors"
             >
-              اليوم
+              Today
             </button>
           </div>
         </div>
@@ -182,7 +182,7 @@ const CustomDatePicker = ({ value, onChange, label }) => {
       {/* Selected Date Display */}
       {selectedDate && (
         <div className="mt-2 text-xs text-orange-600 font-medium">
-          تم اختيار: {formatDate(selectedDate)}
+          Selected: {formatDate(selectedDate)}
         </div>
       )}
     </div>

@@ -42,6 +42,7 @@ const Sidebar = () => {
     { name: 'Create Quiz', path: '/professor/quiz', icon: <HelpCircle className="h-5 w-5" /> },
     { name: 'Quiz Results', path: '/professor/results', icon: <BarChart className="h-5 w-5" /> },
     { name: 'تعليقات الطلاب', path: '/professor/comments', icon: <MessageCircle className="h-5 w-5" /> },
+    { name: 'الحصص الخاصة', path: '/professor/private-classes', icon: <Clock className="h-5 w-5" /> },
     { name: 'Settings', path: '/professor/settings', icon: <Settings className="h-5 w-5" /> },
   ];
 

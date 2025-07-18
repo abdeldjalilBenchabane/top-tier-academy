@@ -417,7 +417,7 @@ export default function CourseDetail() {
             if (response.ok) {
                 const newReviewData = await response.json();
                 setReviews(prev => [newReviewData.comment, ...prev]);
-                setNewReview({ name: '', rating: 5, comment: '' });
+        setNewReview({ name: '', rating: 5, comment: '' });
             } else {
                 const err = await response.json();
                 alert('فشل إرسال التعليق: ' + (err.error || response.status));
@@ -719,9 +719,9 @@ export default function CourseDetail() {
                                                     <span className="text-gray-700">الرغبة في التعلم والتطوير</span>
                                                 </li>
                                                 <li className="flex items-start gap-3">
-                                                        <div className="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div>
+                                                    <div className="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div>
                                                     <span className="text-gray-700">لا حاجة لخبرة سابقة</span>
-                                                    </li>
+                                                </li>
                                             </ul>
                                         </div>
 
@@ -807,10 +807,10 @@ export default function CourseDetail() {
                                                                                 </div>
                                                                             )}
                                                                         </div>
-                                                            </li>
+                                                                    </li>
                                                                 );
                                                             })}
-                                                    </ul>
+                                                        </ul>
                                                         
                                                         {/* Display text content directly */}
                                                         {section.blocks?.map((block, blockIndex) => {
@@ -832,7 +832,7 @@ export default function CourseDetail() {
                                                             }
                                                             return null;
                                                         })}
-                                                </div>
+                                                    </div>
                                                 )}
                                             </div>
                                         ))}
@@ -952,9 +952,9 @@ export default function CourseDetail() {
                                                                     }`}>
                                                                         {reply.reply_text}
                                                                     </p>
-                                                                </div>
-                                                            ))}
-                                                        </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                                     )}
                                                     
                                                     {/* Legacy single reply (for backward compatibility) */}
@@ -968,8 +968,8 @@ export default function CourseDetail() {
                                                                 <span className="text-xs text-gray-500">(المدرس)</span>
                                                             </div>
                                                             <p className="text-blue-800 text-sm">{review.reply}</p>
-                                                        </div>
-                                                    )}
+                                    </div>
+                                )}
                                                     
                                                     {/* Add Reply Button */}
                                                     <div className="mt-3">
@@ -1039,14 +1039,14 @@ export default function CourseDetail() {
                                             )
                                         ) && (
                                             <Button className="flex-1 flex justify-center items-center bg-blue-600 text-white font-normal shadow hover:bg-blue-700 transition">
-                                                    <FileText size={18} className="absolute mr-[-1rem]" />
+                                                <FileText size={18} className="absolute mr-[-1rem]" />
                                                 تحميل الملفات
                                             </Button>
                                         )}
                                         <Button variant="outline" className="flex-1 text-blue-900 hover:bg-gray-50">
                                             <Play size={18} className="absolute mr-[-8.35rem]" />
                                             مشاهدة الدرس
-                                            </Button>
+                                        </Button>
                                     </div>
                                 </div>
                             </CardContent>
@@ -1072,11 +1072,11 @@ export default function CourseDetail() {
 
                         {/* Related Courses */}
                         {relatedCourses.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">دروس مشابهة</CardTitle>
-                            </CardHeader>
-                            <CardContent>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-lg">دروس مشابهة</CardTitle>
+                                </CardHeader>
+                                <CardContent>
                                     <div className="space-y-3">
                                         {relatedCourses.map((relatedCourse) => {
                                             const price = languageCoursePrices[`${relatedCourse.id}-${relatedCourse.language_level_id}`];
@@ -1084,8 +1084,8 @@ export default function CourseDetail() {
                                             const displayPrice = relatedCourse.material_price || price;
 
                                             return (
-                                        <div
-                                            key={relatedCourse.id}
+                                                <div
+                                                    key={relatedCourse.id}
                                                     className="flex gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-100"
                                                     onClick={() => navigate(`/coursesList/courses/${relatedCourse.id}`)}
                                                 >
@@ -1103,20 +1103,20 @@ export default function CourseDetail() {
                                                     <div className="flex-shrink-0">
                                                         <img
                                                             src={relatedCourse.cover_url || "/placeholder.svg"}
-                                                alt={relatedCourse.title}
+                                                            alt={relatedCourse.title}
                                                             className="w-16 h-12 object-cover rounded-lg"
-                                            />
+                                                        />
                                                     </div>
                                                     
                                                     {/* Course info */}
-                                            <div className="flex-1 min-w-0">
+                                                    <div className="flex-1 min-w-0">
                                                         <h4 className="font-medium text-sm text-gray-900 line-clamp-2 leading-tight mb-1">
-                                                    {relatedCourse.title}
-                                                </h4>
+                                                            {relatedCourse.title}
+                                                        </h4>
                                                         <p className="text-xs text-gray-600 mb-2">{relatedCourse.created_by_name}</p>
                                                         <div className="flex items-center gap-2">
-                                                    <div className="flex items-center gap-1">
-                                                        <Star className="text-yellow-400 fill-current" size={12} />
+                                                            <div className="flex items-center gap-1">
+                                                                <Star className="text-yellow-400 fill-current" size={12} />
                                                                 <span className="text-xs font-medium">4.8</span>
                                                                 <span className="text-xs text-gray-500">(123)</span>
                                                             </div>
@@ -1129,9 +1129,9 @@ export default function CourseDetail() {
                                                 </div>
                                             );
                                         })}
-                                </div>
-                            </CardContent>
-                        </Card>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         )}
                     </div>
                 </div>

@@ -1,215 +1,226 @@
-import React, { useState } from 'react';
-import { FaTimes, FaChalkboardTeacher, FaBookOpen, FaCalendarAlt, FaClock, FaFileAlt, FaPaperPlane } from 'react-icons/fa';
+import React from 'react';
+import { FaTimes, FaCalendarAlt, FaUserTie, FaBook, FaClock, FaInfoCircle, FaCheckCircle, FaSpinner } from 'react-icons/fa';
 
-const PrivateClassModal = ({ isOpen, onClose, session }) => {
-  const [formData, setFormData] = useState({
-    title: '',
-    sessionsCount: '',
-    requestText: ''
-  });
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log('Request submitted:', formData);
-    // Here you would typically send the data to your backend
-    alert('تم إرسال طلبك بنجاح!');
-    setFormData({ title: '', sessionsCount: '', requestText: '' });
-    onClose();
-  };
-
+const PrivateClassModal = ({ isOpen, onClose, session, isRequestForm = false, requestForm = {}, onRequestFormChange = () => {}, onSubmitRequest = () => {}, selectedTeacher = '', selectedDate = '', selectedSubject = '', selectedGrade = '', selectedYear = '' }) => {
   if (!isOpen) return null;
 
-  // If session exists, show details modal
-  if (session && Object.keys(session).length > 0) {
+  if (isRequestForm) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" dir="rtl">
-        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           {/* Header */}
-          <div className="flex justify-between items-center p-6 border-b border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-900">تفاصيل الطلب</h2>
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                <FaBook className="text-white text-lg" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-800">طلب حصة خاصة</h2>
+            </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"
             >
-              <FaTimes size={24} />
+              <FaTimes className="text-gray-600" />
             </button>
           </div>
 
-          {/* Content */}
-          <div className="p-6 space-y-6">
-            {/* استاذ */}
-            <div className="flex items-start space-x-4 space-x-reverse">
-              <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <FaChalkboardTeacher className="text-blue-600 text-xl" />
+          {/* Form */}
+          <div className="p-6">
+            <div className="space-y-6">
+              {/* Selected Info Display */}
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 border border-blue-200">
+                <h3 className="font-semibold text-blue-800 mb-3">المعلومات المحددة</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <FaUserTie className="text-blue-600" />
+                    <span className="text-gray-700">الأستاذ: <span className="font-semibold">{selectedTeacher || 'لم يتم الاختيار'}</span></span>
               </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">استاذ</h3>
-                <p className="text-gray-700 text-lg">· {session.teacher}</p>
+                  <div className="flex items-center gap-2">
+                    <FaCalendarAlt className="text-blue-600" />
+                    <span className="text-gray-700">التاريخ: <span className="font-semibold">{selectedDate || 'لم يتم الاختيار'}</span></span>
+              </div>
+                  <div className="flex items-center gap-2">
+                    <FaBook className="text-blue-600" />
+                    <span className="text-gray-700">المادة: <span className="font-semibold">{selectedSubject || 'لم يتم الاختيار'}</span></span>
+            </div>
+                  <div className="flex items-center gap-2">
+                    <FaInfoCircle className="text-blue-600" />
+                    <span className="text-gray-700">المرحلة: <span className="font-semibold">{selectedYear} {selectedGrade}</span></span>
+              </div>
+            </div>
+              </div>
+
+              {/* Request Form */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2 text-right">أدخل عنوان الطلب</label>
+                  <input
+                    type="text"
+                    value={requestForm.title}
+                    onChange={(e) => onRequestFormChange('title', e.target.value)}
+                    placeholder="مثال: دعم في الجبر والمعادلات"
+                    className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
+                    dir="rtl"
+                  />
+            </div>
+
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2 text-right">كم عدد الحصص المطلوبة؟</label>
+                  <input
+                    type="number"
+                    value={requestForm.sessionsCount}
+                    onChange={(e) => onRequestFormChange('sessionsCount', e.target.value)}
+                    placeholder="مثال: 3"
+                    min="1"
+                    max="10"
+                    className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
+                    dir="rtl"
+                  />
+            </div>
+
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2 text-right">نص الطلب</label>
+                  <textarea
+                    value={requestForm.description}
+                    onChange={(e) => onRequestFormChange('description', e.target.value)}
+                    placeholder="اشرح تفاصيل ما تحتاجه من الدعم..."
+                    rows="4"
+                    className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all resize-none"
+                    dir="rtl"
+                  />
+              </div>
+              </div>
               </div>
             </div>
 
-            {/* المادة */}
-            <div className="flex items-start space-x-4 space-x-reverse">
-              <div className="flex-shrink-0 w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <FaBookOpen className="text-green-600 text-xl" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">المادة</h3>
-                <p className="text-gray-700 text-lg">· {session.subject} {session.grade}</p>
-              </div>
-            </div>
-
-            {/* تاريخ الطلب */}
-            <div className="flex items-start space-x-4 space-x-reverse">
-              <div className="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <FaCalendarAlt className="text-purple-600 text-xl" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">تاريخ الطلب</h3>
-                <p className="text-gray-700 text-lg">· {session.date}</p>
-              </div>
-            </div>
-
-            {/* تاريخ الحصص */}
-            <div className="flex items-start space-x-4 space-x-reverse">
-              <div className="flex-shrink-0 w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                <FaClock className="text-orange-600 text-xl" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">تاريخ الحصص</h3>
-                <p className="text-gray-700 text-lg">· {session.time}</p>
-              </div>
-            </div>
-
-            {/* عدد الحصص المطلوبة */}
-            <div className="flex items-start space-x-4 space-x-reverse">
-              <div className="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <FaClock className="text-red-600 text-xl" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">عدد الحصص المطلوبة</h3>
-                <p className="text-gray-700 text-lg">· {session.sessions}</p>
-              </div>
-            </div>
-
-            {/* نص الطلب */}
-            <div className="flex items-start space-x-4 space-x-reverse">
-              <div className="flex-shrink-0 w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center">
-                <FaFileAlt className="text-indigo-600 text-xl" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">نص الطلب</h3>
-                <p className="text-gray-700 text-lg">· {session.description}</p>
-              </div>
-            </div>
-
-            {/* Status */}
-            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-              <div className="flex items-center space-x-2 space-x-reverse">
-                <span className="text-lg font-semibold text-gray-900">الحالة:</span>
-                <span className={`px-3 py-1 text-sm font-semibold rounded-full ${
-                  session.status === 'مؤكد' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {session.status}
-                </span>
-              </div>
+          {/* Footer */}
+          <div className="flex items-center justify-between p-6 border-t border-gray-200">
               <button
                 onClick={onClose}
-                className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+              className="px-6 py-3 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold transition-colors"
               >
-                إغلاق
+              إلغاء
+            </button>
+            <button
+              onClick={onSubmitRequest}
+              className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all hover:shadow-lg"
+            >
+              إرسال الطلب
               </button>
-            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // If no session, show request form modal
+  // Original session details modal
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4" dir="rtl">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-sm sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" dir="rtl">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">طلب حصة خاصة</h2>
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+              <FaBook className="text-white text-lg" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800">تفاصيل الحصة الخاصة</h2>
+          </div>
           <button
             onClick={onClose}
-            className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
+            className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"
           >
-            <FaTimes className="text-gray-600 text-sm sm:text-base" />
+            <FaTimes className="text-gray-600" />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-          {/* Title */}
+        {/* Content */}
+        <div className="p-6">
+          {session ? (
+            <div className="space-y-6">
+              {/* Status Badge */}
+              <div className="flex items-center gap-2">
+                <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                  session.status === 'مؤكد' 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {session.status === 'مؤكد' ? <FaCheckCircle className="inline mr-1" /> : <FaSpinner className="inline mr-1" />}
+                  {session.status}
+                </div>
+              </div>
+
+              {/* Session Info */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
+                  <FaUserTie className="text-blue-600 text-xl" />
+                  <div>
+                    <p className="text-sm text-gray-600">الأستاذ</p>
+                    <p className="font-semibold text-gray-800">{session.teacher}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
+                  <FaBook className="text-purple-600 text-xl" />
+                  <div>
+                    <p className="text-sm text-gray-600">المادة</p>
+                    <p className="font-semibold text-gray-800">{session.subject}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
+                  <FaCalendarAlt className="text-green-600 text-xl" />
           <div>
-            <label className="block text-gray-700 font-bold mb-2 text-right text-sm sm:text-base">
-              العنوان
-            </label>
-            <input
-              type="text"
-              name="title"
-              value={formData.title}
-              onChange={handleInputChange}
-              className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl py-2 sm:py-3 px-3 sm:px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all duration-300 text-sm sm:text-base"
-              placeholder="أدخل عنوان الطلب"
-              required
-            />
+                    <p className="text-sm text-gray-600">التاريخ</p>
+                    <p className="font-semibold text-gray-800">{session.date}</p>
+                  </div>
           </div>
 
-          {/* Sessions Count */}
+                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
+                  <FaClock className="text-orange-600 text-xl" />
+                  <div>
+                    <p className="text-sm text-gray-600">الوقت</p>
+                    <p className="font-semibold text-gray-800">{session.time}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Details */}
+              <div className="space-y-4">
           <div>
-            <label className="block text-gray-700 font-bold mb-2 text-right text-sm sm:text-base">
-              كم عدد الحصص المطلوبة؟
-            </label>
-            <input
-              type="number"
-              name="sessionsCount"
-              value={formData.sessionsCount}
-              onChange={handleInputChange}
-              min="1"
-              max="20"
-              className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl py-2 sm:py-3 px-3 sm:px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all duration-300 text-sm sm:text-base"
-              placeholder="عدد الحصص"
-              required
-            />
+                  <h3 className="font-semibold text-gray-800 mb-2">المرحلة الدراسية</h3>
+                  <p className="text-gray-600">{session.grade}</p>
           </div>
 
-          {/* Request Text */}
           <div>
-            <label className="block text-gray-700 font-bold mb-2 text-right text-sm sm:text-base">
-              نص الطلب
-            </label>
-            <textarea
-              name="requestText"
-              value={formData.requestText}
-              onChange={handleInputChange}
-              rows="3"
-              className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl py-2 sm:py-3 px-3 sm:px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all duration-300 resize-none text-sm sm:text-base"
-              placeholder="أكتب هنا طلبك"
-              required
-            />
+                  <h3 className="font-semibold text-gray-800 mb-2">عدد الحصص</h3>
+                  <p className="text-gray-600">{session.sessions}</p>
           </div>
 
-          {/* Submit Button */}
+                <div>
+                  <h3 className="font-semibold text-gray-800 mb-2">وصف الطلب</h3>
+                  <p className="text-gray-600">{session.description}</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FaInfoCircle className="text-gray-400 text-2xl" />
+              </div>
+              <p className="text-gray-500">لا توجد تفاصيل متاحة</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end p-6 border-t border-gray-200">
           <button
-            type="submit"
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 sm:py-4 rounded-xl font-bold text-sm sm:text-base hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            onClick={onClose}
+            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all hover:shadow-lg"
           >
-            <FaPaperPlane className="text-sm sm:text-base" />
-            ارسال
+            إغلاق
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );

@@ -8,23 +8,35 @@ import PrivateClassModal from "../components/ui/TTHPrivateClassModal";
 import { usePrivateClasses } from "../hooks/TTHUsePrivateClasses";
 
 const PrivateClasses = () => {
-  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
-  
   const {
     selectedGrade,
     selectedYear,
     selectedSubject,
     selectedDate,
+    selectedTeacher,
+    availableTeachers,
     filteredSessions,
     isModalOpen,
     selectedSession,
+    isProfessor,
+    loading,
+    isRequestModalOpen,
+    requestForm,
+    pendingRequests,
     handleGradeChange,
     handleYearChange,
     handleSubjectChange,
     handleDateChange,
+    handleTeacherChange,
     handleSearch,
+    handleRequestClick,
+    closeRequestModal,
+    handleRequestFormChange,
+    handleSubmitRequest,
     handleDetailsClick,
-    closeModal
+    closeModal,
+    requestsLoading,
+    myPendingRequests
   } = usePrivateClasses();
 
   const handleFilterChange = (filters) => {
@@ -33,14 +45,6 @@ const PrivateClasses = () => {
 
   const handleSidebarSearch = (filters) => {
     console.log('Searching with sidebar filters:', filters);
-  };
-
-  const handleRequestClick = () => {
-    setIsRequestModalOpen(true);
-  };
-
-  const closeRequestModal = () => {
-    setIsRequestModalOpen(false);
   };
 
   return (
@@ -57,10 +61,10 @@ const PrivateClasses = () => {
             </div>
             <div className="text-center sm:text-right">
               <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-blue-600  mb-4">
-                تحتاج دعم أكثر؟
+                {isProfessor ? 'إدارة الحصص الخاصة' : 'تحتاج دعم أكثر؟'}
               </h1>
               <h2 className="text-sm sm:text-lg md:text-lg lg:text-2xl  opacity-75     font-semibold text-purple-600 ">
-                اطلب حصة خاصة مع أستاذك المفضل
+                {isProfessor ? 'عرض وإدارة طلبات الحصص الخاصة' : 'اطلب حصة خاصة مع أستاذك المفضل'}
               </h2>
             </div>
           </div>
@@ -73,13 +77,68 @@ const PrivateClasses = () => {
             selectedYear={selectedYear}
             selectedSubject={selectedSubject}
             selectedDate={selectedDate}
+            selectedTeacher={selectedTeacher}
+            availableTeachers={availableTeachers}
+            isProfessor={isProfessor}
             onGradeChange={handleGradeChange}
             onYearChange={handleYearChange}
             onSubjectChange={handleSubjectChange}
             onDateChange={handleDateChange}
-            onSearch={handleRequestClick}
+            onTeacherChange={handleTeacherChange}
+            onSearch={isProfessor ? handleSearch : handleRequestClick}
+            loading={loading}
           />
         </div>
+
+        {/* Pending Requests Section - Only for students */}
+        {!isProfessor && (
+          <div className="mb-8 sm:mb-12">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-8 h-8 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-full flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">طلباتك</h2>
+            </div>
+            
+            {requestsLoading ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </div>
+                <p className="text-gray-500">جاري تحميل الطلبات...</p>
+              </div>
+            ) : myPendingRequests.filter(r => r.status !== 'مرفوض').length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+                {myPendingRequests.filter(r => r.status !== 'مرفوض').map((request, index) => (
+                  <div 
+                    key={request.id} 
+                    className="animate-fadeIn"
+                    style={{ animationDelay: `${index * 100}ms` }}
+                  >
+                    <PrivateClassCard
+                      session={request}
+                      onDetailsClick={handleDetailsClick}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">لا توجد طلبات حالياً</h3>
+                <p className="text-gray-500">قم بإنشاء طلب جديد للحصول على حصة خاصة</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Main Content with Sidebar */}
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8">
@@ -99,8 +158,12 @@ const PrivateClasses = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33" />
                     </svg>
                   </div>
-                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">لا توجد حصص مطابقة</h3>
-                  <p className="text-sm sm:text-base text-gray-500">جرب تغيير الفلاتر للعثور على حصص أخرى</p>
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
+                    {isProfessor ? 'لا توجد حصص خاصة' : 'لا توجد حصص مطابقة'}
+                  </h3>
+                  <p className="text-sm sm:text-base text-gray-500">
+                    {isProfessor ? 'لم يتم طلب أي حصص خاصة منك بعد' : 'جرب تغيير الفلاتر للعثور على حصص أخرى'}
+                  </p>
                 </div>
               ) : (
                 filteredSessions.map((session, index) => (
@@ -129,16 +192,27 @@ const PrivateClasses = () => {
         </div>
       </main>
       
+      {/* Session Details Modal */}
       <PrivateClassModal
         isOpen={isModalOpen}
         onClose={closeModal}
         session={selectedSession}
       />
       
+      {/* Request Form Modal */}
       <PrivateClassModal
         isOpen={isRequestModalOpen}
         onClose={closeRequestModal}
         session={null}
+        isRequestForm={true}
+        requestForm={requestForm}
+        onRequestFormChange={handleRequestFormChange}
+        onSubmitRequest={handleSubmitRequest}
+        selectedTeacher={selectedTeacher}
+        selectedDate={selectedDate}
+        selectedSubject={selectedSubject}
+        selectedGrade={selectedGrade}
+        selectedYear={selectedYear}
       />
       
       <Footer />

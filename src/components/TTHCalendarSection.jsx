@@ -17,7 +17,7 @@ import {
   Search
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 
 const CalendarSection = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -173,7 +173,7 @@ const CalendarSection = () => {
                 mode="single"
                 selected={selectedDate}
                 onSelect={setSelectedDate}
-                locale={ar}
+                locale={enUS}
                 className="rounded-md border-0 p-4 mr-6 font-semibold"
                 modifiers={{
                   hasSession: (date) => hasSessionOnDate(date)
@@ -202,7 +202,7 @@ const CalendarSection = () => {
             <CardHeader>
               <CardTitle>
                 {selectedDate ? (
-                  `الجلسات في ${format(selectedDate, 'dd MMMM yyyy', { locale: ar })}`
+                  `Sessions on ${format(selectedDate, 'dd MMMM yyyy', { locale: enUS })}`
                 ) : (
                   'الجلسات المباشرة'
                 )}
