@@ -53,6 +53,10 @@ export default function CourseDetail() {
     
     // New state for language course prices
     const [languageCoursePrices, setLanguageCoursePrices] = useState({});
+    
+    // New state for threaded replies
+    const [showReplyForm, setShowReplyForm] = useState(null);
+    const [replyText, setReplyText] = useState({});
 
     const { user } = useAuth();
 
@@ -422,6 +426,51 @@ export default function CourseDetail() {
         } catch (err) {
             alert('فشل إرسال التعليق: ' + err.message);
             console.error('Error submitting review:', err);
+        }
+    };
+
+    const handleAddReply = async (commentId) => {
+        const text = replyText[commentId];
+        if (!text || !text.trim()) return;
+        if (!user || !user.id) {
+            alert('يجب تسجيل الدخول لإضافة رد');
+            return;
+        }
+        
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/courses/comments/${commentId}/replies`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ reply_text: text })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                // Update the reviews state to include the new reply
+                setReviews(prev => prev.map(review => {
+                    if (review.id === commentId) {
+                        return {
+                            ...review,
+                            threaded_replies: [...(review.threaded_replies || []), result.reply]
+                        };
+                    }
+                    return review;
+                }));
+                
+                // Clear the reply text and hide the form
+                setReplyText(prev => ({ ...prev, [commentId]: '' }));
+                setShowReplyForm(null);
+            } else {
+                const err = await response.json();
+                alert('فشل إرسال الرد: ' + (err.error || response.status));
+            }
+        } catch (err) {
+            alert('فشل إرسال الرد: ' + err.message);
+            console.error('Error adding reply:', err);
         }
     };
 
@@ -867,6 +916,97 @@ export default function CourseDetail() {
                                                         <span className="text-sm text-gray-400">{review.date}</span>
                                                     </div>
                                                     <p className="text-gray-700 pr-13">{review.comment}</p>
+                                                    
+                                                    {/* Threaded Replies */}
+                                                    {review.threaded_replies && review.threaded_replies.length > 0 && (
+                                                        <div className="mt-3 space-y-2">
+                                                            {review.threaded_replies.map((reply, replyIndex) => (
+                                                                <div 
+                                                                    key={reply.id} 
+                                                                    className={`pr-4 border-r-4 p-3 rounded-lg ${
+                                                                        reply.user_role === 'professor' 
+                                                                            ? 'border-blue-500 bg-blue-50' 
+                                                                            : 'border-green-500 bg-green-50'
+                                                                    }`}
+                                                                >
+                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                                                            reply.user_role === 'professor' ? 'bg-blue-600' : 'bg-green-600'
+                                                                        }`}>
+                                                                            {reply.user_name?.charAt(0) || '?'}
+                                                                        </div>
+                                                                        <span className={`font-semibold text-sm ${
+                                                                            reply.user_role === 'professor' ? 'text-blue-900' : 'text-green-900'
+                                                                        }`}>
+                                                                            {reply.user_name}
+                                                                        </span>
+                                                                        <span className="text-xs text-gray-500">
+                                                                            ({reply.user_role === 'professor' ? 'المدرس' : 'الطالب'})
+                                                                        </span>
+                                                                        <span className="text-xs text-gray-400">
+                                                                            {new Date(reply.created_at).toLocaleString()}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className={`text-sm ${
+                                                                        reply.user_role === 'professor' ? 'text-blue-800' : 'text-green-800'
+                                                                    }`}>
+                                                                        {reply.reply_text}
+                                                                    </p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {/* Legacy single reply (for backward compatibility) */}
+                                                    {review.reply && (!review.threaded_replies || review.threaded_replies.length === 0) && (
+                                                        <div className="mt-3 pr-4 border-r-4 border-blue-500 bg-blue-50 p-3 rounded-lg">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                                                    {course.created_by_name?.charAt(0) || 'م'}
+                                                                </div>
+                                                                <span className="font-semibold text-blue-900 text-sm">{course.created_by_name}</span>
+                                                                <span className="text-xs text-gray-500">(المدرس)</span>
+                                                            </div>
+                                                            <p className="text-blue-800 text-sm">{review.reply}</p>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {/* Add Reply Button */}
+                                                    <div className="mt-3">
+                                                        <button
+                                                            onClick={() => setShowReplyForm(review.id)}
+                                                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                                        >
+                                                            رد على هذا التعليق
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    {/* Reply Form */}
+                                                    {showReplyForm === review.id && (
+                                                        <div className="mt-3 pr-4 border border-gray-200 rounded-lg p-3 bg-gray-50">
+                                                            <textarea
+                                                                value={replyText[review.id] || ''}
+                                                                onChange={(e) => setReplyText(prev => ({ ...prev, [review.id]: e.target.value }))}
+                                                                placeholder="اكتب ردك هنا..."
+                                                                className="w-full p-2 border border-gray-300 rounded-md text-sm resize-none"
+                                                                rows="3"
+                                                            />
+                                                            <div className="flex gap-2 mt-2">
+                                                                <button
+                                                                    onClick={() => handleAddReply(review.id)}
+                                                                    className="px-3 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                                                                >
+                                                                    إرسال الرد
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setShowReplyForm(null)}
+                                                                    className="px-3 py-1 bg-gray-500 text-white rounded-md text-sm hover:bg-gray-600"
+                                                                >
+                                                                    إلغاء
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>

@@ -440,15 +440,27 @@ To add the `course_covers` table (for course cover images), run:
 node add_course_cover_table.js
 ```
 
-## Database: Course Comments Table Setup
+## Database: Course Comments and Threaded Replies Setup
 
+### Course Comments Table
 To create the `course_comments` table (used for all course comments and professor replies), run the following script:
 
 ```sh
 node backend/create-course-comments-table.js
 ```
 
-This will create the table with all required columns. Make sure your database connection settings are correct in your environment variables before running the script.
+### Threaded Replies Table
+To create the `comment_replies` table (used for threaded conversations between students and professors), run the following script:
+
+```sh
+node backend/create-comment-replies-table.js
+```
+
+These tables work together to provide a complete commenting system:
+- `course_comments`: Stores the main comments from students
+- `comment_replies`: Stores threaded replies allowing back-and-forth conversations
+
+Make sure your database connection settings are correct in your environment variables before running the scripts.
 
 ---
 

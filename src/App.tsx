@@ -51,6 +51,8 @@ import ProfessorCreate from './Pages/professor/Create';
 import ProfessorSettings from './Pages/professor/Settings';
 import ProfessorCourseDetails from './Pages/professor/CourseDetails';
 import ProfessorComments from './Pages/professor/Comments';
+import CourseCommentsOverview from './Pages/professor/CourseCommentsOverview';
+import CourseComments from './Pages/professor/CourseComments';
 // Admin components
 import UserManagement from './components/admin/UserManagement';
 import HomepageSlides from './components/admin/HomepageSlides';
@@ -139,7 +141,9 @@ const App: React.FC = () => {
                   <Route path="quiz" element={<QuizCreation />} />
                   <Route path="results" element={<QuizResults professorId="1" />} />
                   <Route path="settings" element={<ProfessorSettings />} />
-                  <Route path="comments" element={<ProfessorComments />} />
+                  <Route path="comments" element={<CourseCommentsOverview />} />
+                  <Route path="comments/:courseId" element={<CourseComments />} />
+                  <Route path="comments-old" element={<ProfessorComments />} />
                 </Route>
 
                 {/* Catch-all */}
