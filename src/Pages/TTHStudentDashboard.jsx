@@ -53,7 +53,7 @@ const StudentDashboard = () => {
         email: 'ahmed.mohamed@example.com',
         phone: '+966 50 123 4567',
         location: 'الرياض، السعودية',
-        joinDate: 'سبتمبر 2023',
+        joinDate: 'Sep 2023',
         level: 'متوسط',
         totalCourses: 12,
         completedCourses: 8,
@@ -266,19 +266,19 @@ const StudentDashboard = () => {
                         </div>
                         {/* Purchased Courses Preview */}
                         {purchasedCourses.length > 0 && (
-                          <div>
+                                    <div>
                             <h2 className="text-xl font-bold text-gray-900 mb-4 mt-8">دوراتك الأخيرة</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                               {purchasedCourses.slice(0, 4).map((course) => (
                                 <TTHCourseCard key={course.id} course={course} />
-                              ))}
-                            </div>
+                                        ))}
+                                    </div>
                             {purchasedCourses.length > 4 && (
                               <div className="text-center mt-4">
                                 <Link to="#" onClick={() => setActiveTab('courses')} className="text-blue-600 underline font-bold">عرض كل الدورات</Link>
                               </div>
                             )}
-                          </div>
+                        </div>
                         )}
                     </div>
                 )}

@@ -146,7 +146,7 @@ const Navbar = () => {
                   <FaCoins className="w-4 h-4" />
                   <span className="hidden custom:block text-sm">{userPoints.toLocaleString()} دج</span>
                 </Link>
-
+                
                 <div className="relative" ref={dropdownRef}>
                   <button onClick={toggleDropdown}
                     className="flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-full p-2 transition-all duration-200">
@@ -226,7 +226,7 @@ const Navbar = () => {
                     <FaCoins className="w-4 h-4 text-yellow-400" />
                     <span className="text-sm">{userPoints.toLocaleString()} دج - شراء النقاط</span>
                   </Link>
-
+                  
                   <div className="flex items-center gap-3 py-2 px-4">
                     <UserAvatar size="sm" name={user.name} />
                     <div>

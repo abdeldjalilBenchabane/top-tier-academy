@@ -11,6 +11,7 @@ import liveSessionRoutes from './routes/live-sessions.js';
 import slidesRoutes from './routes/slides.js';
 import pointsRoutes from './routes/points.js';
 import paymentsRoutes from './routes/payments.js';
+import privateClassRequestsRoutes from './routes/private-class-requests.js';
 import AgoraToken from 'agora-access-token';
 import hierarchyRoutes from './routes/hierarchy.routes.js';
 import path from 'path';
@@ -76,6 +77,7 @@ app.use('/api/courses', courseRoutes);
 app.use('/api/slides', slidesRoutes);
 app.use('/api/points', pointsRoutes);
 app.use('/api/payments', paymentsRoutes);
+app.use('/api/private-class-requests', privateClassRequestsRoutes);
 app.use('/api', liveSessionRoutes);
 app.use('/api', hierarchyRoutes);
 app.use('/api/structure', hierarchyRoutes); // <-- Add this line to alias structure endpoints

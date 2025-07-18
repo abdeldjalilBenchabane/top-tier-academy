@@ -1,5 +1,15 @@
 import { FaSignInAlt, FaChalkboardTeacher, FaShoppingCart, FaRocket} from "react-icons/fa";
 
+// Utility function to format dates
+export const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
 export const cards = [
   {
     title: "  ابدأ و تعلّم",
@@ -107,17 +117,18 @@ export const courseData = [
   }
 ];
 
-// Private Classes Data
+// Private Classes Data with normal date format
 export const privateClassesData = [
   {
     id: 1,
     subject: 'لغة عربية',
     sessions: 'حصتين',
-    date: '17 أبريل',
+    date: 'Apr 17, 2024',
     grade: 'الأولى إبتدائي',
     description: 'اريد استادة خاصة لي ابنتي',
     details: 'عرض التفاصيل',
-    teacher: 'أ. فاطمة أحمد',
+    teacher: 'azzouz',
+    teacherId: 3,
     time: '14:00 - 15:30',
     status: 'مؤكد'
   },
@@ -125,11 +136,12 @@ export const privateClassesData = [
     id: 2,
     subject: 'رياضيات',
     sessions: '3 حصص',
-    date: '18 أبريل',
+    date: 'Apr 18, 2024',
     grade: 'الثالثة متوسط',
     description: 'دعم في الجبر والمعادلات',
     details: 'عرض التفاصيل',
-    teacher: 'أ. محمد علي',
+    teacher: 'roli',
+    teacherId: 20,
     time: '16:00 - 17:30',
     status: 'في الانتظار'
   },
@@ -137,11 +149,12 @@ export const privateClassesData = [
     id: 3,
     subject: 'علوم طبيعية',
     sessions: 'حصتين',
-    date: '19 أبريل',
+    date: 'Apr 19, 2024',
     grade: 'الثانية ثانوي',
     description: 'شرح مفصل في الكيمياء',
     details: 'عرض التفاصيل',
-    teacher: 'أ. أحمد حسن',
+    teacher: 'teachers',
+    teacherId: 5,
     time: '10:00 - 11:30',
     status: 'مؤكد'
   },
@@ -149,15 +162,83 @@ export const privateClassesData = [
     id: 4,
     subject: 'لغة فرنسية',
     sessions: 'حصتين',
-    date: '20 أبريل',
+    date: 'Apr 20, 2024',
     grade: 'الخامسة ابتدائي',
     description: 'تحسين النطق والمحادثة',
     details: 'عرض التفاصيل',
-    teacher: 'أ. سارة محمود',
+    teacher: 'Test Teacher',
+    teacherId: 6,
     time: '13:00 - 14:30',
+    status: 'مؤكد'
+  },
+  {
+    id: 5,
+    subject: 'لغة إنجليزية',
+    sessions: 'حصتين',
+    date: 'Apr 21, 2024',
+    grade: 'الرابعة متوسط',
+    description: 'تحسين مهارات المحادثة والكتابة',
+    details: 'عرض التفاصيل',
+    teacher: 'azzouz',
+    teacherId: 3,
+    time: '15:00 - 16:30',
+    status: 'مؤكد'
+  },
+  {
+    id: 6,
+    subject: 'فيزياء',
+    sessions: '3 حصص',
+    date: 'Apr 22, 2024',
+    grade: 'الثالثة ثانوي',
+    description: 'شرح مفصل في الميكانيكا والديناميكا',
+    details: 'عرض التفاصيل',
+    teacher: 'roli',
+    teacherId: 20,
+    time: '09:00 - 10:30',
+    status: 'في الانتظار'
+  },
+  {
+    id: 7,
+    subject: 'كيمياء',
+    sessions: 'حصتين',
+    date: 'Apr 23, 2024',
+    grade: 'الثانية ثانوي',
+    description: 'شرح مفصل في التفاعلات الكيميائية',
+    details: 'عرض التفاصيل',
+    teacher: 'teachers',
+    teacherId: 5,
+    time: '11:00 - 12:30',
+    status: 'مؤكد'
+  },
+  {
+    id: 8,
+    subject: 'تاريخ',
+    sessions: 'حصتين',
+    date: 'Apr 24, 2024',
+    grade: 'الأولى متوسط',
+    description: 'شرح مفصل في التاريخ الإسلامي',
+    details: 'عرض التفاصيل',
+    teacher: 'Test Teacher',
+    teacherId: 6,
+    time: '14:00 - 15:30',
     status: 'مؤكد'
   }
 ];
+
+// Function to get unique teachers
+export const getUniqueTeachers = () => {
+  const teachers = privateClassesData.map(session => ({
+    id: session.teacherId,
+    name: session.teacher
+  }));
+  
+  // Remove duplicates based on teacherId
+  const uniqueTeachers = teachers.filter((teacher, index, self) => 
+    index === self.findIndex(t => t.id === teacher.id)
+  );
+  
+  return uniqueTeachers;
+};
 
 export const gradeOptions = [
   { 

@@ -55,6 +55,23 @@ router.get('/', verifyToken, requireRole(['admin']), async (req, res) => {
   }
 });
 
+// Get all teachers (professors)
+router.get('/teachers', verifyToken, async (req, res) => {
+  try {
+    const teachers = await getRows(`
+      SELECT id, name, email, avatar_url, created_at 
+      FROM users 
+      WHERE role = 'professor' 
+      ORDER BY name ASC
+    `);
+    
+    res.json({ teachers });
+  } catch (error) {
+    console.error('Error fetching teachers:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get user by ID (admin only)
 router.get('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
   try {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaCalendarAlt, FaChevronDown, FaSearch, FaFilter } from 'react-icons/fa';
+import { FaCalendarAlt, FaChevronDown, FaSearch, FaFilter, FaUserTie, FaSpinner } from 'react-icons/fa';
 import CustomDatePicker from './TTHCustomDatePicker';
 
 const gradeOptions = [
@@ -13,10 +13,15 @@ const PrivateClassFilter = ({
   selectedYear, 
   selectedSubject, 
   selectedDate,
+  selectedTeacher,
+  availableTeachers,
+  isProfessor,
+  loading,
   onGradeChange,
   onYearChange,
   onSubjectChange,
   onDateChange,
+  onTeacherChange,
   onSearch 
 }) => {
   const currentGrade = gradeOptions.find(g => g.label === selectedGrade);
@@ -30,12 +35,40 @@ const PrivateClassFilter = ({
             <FaFilter className="text-white text-sm sm:text-lg" />
           </div>
           <h3 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            حدد المرحلة الدراسية المناسبة لك
+            {isProfessor ? 'إدارة حصصك الخاصة' : 'حدد المرحلة الدراسية المناسبة لك'}
           </h3>
         </div>
 
         {/* Filters Row */}
         <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 w-full items-center">
+          {/* Teacher Filter - Only show if not a professor or if admin */}
+          {!isProfessor && (
+            <div className="relative w-full flex flex-col justify-end min-w-[200px] sm:min-w-[220px] group">
+              <label className="block text-gray-700 font-bold mb-2 pr-1 text-sm sm:text-base text-right group-hover:text-orange-600 transition-colors">الأستاذ</label>
+              <div className="relative flex items-center">
+                <select
+                  value={selectedTeacher}
+                  onChange={onTeacherChange}
+                  disabled={loading}
+                  className="appearance-none w-full bg-white border-2 border-gray-200 text-sm sm:text-base font-bold font-poppins rounded-xl py-2 sm:py-3 pr-4 pl-10 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition-all duration-300 shadow-sm text-right min-w-[200px] sm:min-w-[220px] group-hover:border-orange-300 group-hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  dir="rtl"
+                >
+                  <option value="">
+                    {loading ? 'جاري التحميل...' : 'اختر الأستاذ'}
+                  </option>
+                  {!loading && availableTeachers.map(teacher => (
+                    <option key={teacher.id} value={teacher.name}>{teacher.name}</option>
+                  ))}
+                </select>
+                {loading ? (
+                  <FaSpinner className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />
+                ) : (
+                  <FaUserTie className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-orange-500 transition-colors" />
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Grade */}
           <div className="relative w-full flex flex-col justify-end min-w-[200px] sm:min-w-[220px] group">
             <label className="block text-gray-700 font-bold mb-2 pr-1 text-sm sm:text-base text-right group-hover:text-blue-600 transition-colors">المرحلة</label>
@@ -110,7 +143,7 @@ const PrivateClassFilter = ({
           style={{ minWidth: '120px' }}
         >
           <FaSearch className="text-lg sm:text-xl" />
-          طلب
+          {isProfessor ? 'عرض الحصص' : 'طلب'}
         </button>
 
         {/* Decorative Elements */}

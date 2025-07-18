@@ -576,7 +576,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                 {/* Video Player (Agora placeholder) - Responsive */}
                 <div className="lg:col-span-3">
                     <div className="bg-black rounded-xl overflow-hidden shadow-2xl relative">
-                        <div id="agora-video-container" className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 relative flex items-center justify-center">
+                        <div id="agora-video-container" className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 relative flex items-center justify-center" style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
                             {/* Zone vidéo Agora */}
                             {agoraToken ? (
                                 <>

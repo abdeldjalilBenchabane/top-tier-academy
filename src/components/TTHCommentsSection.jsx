@@ -16,7 +16,7 @@ import {
   Pin
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 
 const CommentsSection = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -176,7 +176,7 @@ const CommentsSection = () => {
                   <div className="flex items-center gap-4 text-xs text-gray-500">
                     <div className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
-                      <span>{format(new Date(comment.date), 'dd MMM yyyy - HH:mm', { locale: ar })}</span>
+                      <span>{format(new Date(comment.date), 'dd MMM yyyy - HH:mm', { locale: enUS })}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Heart className="w-3 h-3" />
@@ -218,7 +218,7 @@ const CommentsSection = () => {
                     </Avatar>
                     <span className="text-sm font-medium text-education-blue">رد المدرس</span>
                     <span className="text-xs text-gray-500">
-                      {format(new Date(comment.instructorReply.date), 'dd MMM - HH:mm', { locale: ar })}
+                      {format(new Date(comment.instructorReply.date), 'dd MMM - HH:mm', { locale: enUS })}
                     </span>
                   </div>
                   <p className="text-sm text-gray-700">{comment.instructorReply.content}</p>

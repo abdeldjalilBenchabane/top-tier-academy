@@ -293,11 +293,11 @@ const ProfileSection = () => {
 
   // Format join date
   const formatJoinDate = (dateString) => {
-    if (!dateString) return 'غير محدد';
+    if (!dateString) return 'Not specified';
     const date = new Date(dateString);
     const months = [
-      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     return `${months[date.getMonth()]} ${date.getFullYear()}`;
   };

@@ -1,61 +1,54 @@
 import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
+import { ArrowLeft, MessageCircle, Calendar, User } from 'lucide-react';
 
-const ProfessorComments = () => {
+const CourseComments = () => {
+  const { courseId } = useParams();
+  const navigate = useNavigate();
   const [comments, setComments] = useState([]);
+  const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [reply, setReply] = useState({});
   const [showReplyForm, setShowReplyForm] = useState(null);
   const [replyText, setReplyText] = useState({});
 
   useEffect(() => {
-    fetchComments();
-  }, []);
+    if (courseId) {
+      fetchCourseAndComments();
+    }
+  }, [courseId]);
 
-  const fetchComments = async () => {
+  const fetchCourseAndComments = async () => {
     setLoading(true);
     setError(null);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/courses/professor/comments', {
+      
+      // Fetch course details
+      const courseRes = await fetch(`/api/courses/${courseId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const data = await res.json();
-      setComments(data.comments || []);
+      if (courseRes.ok) {
+        const courseData = await courseRes.json();
+        setCourse(courseData);
+      }
+      
+      // Fetch comments for this specific course
+      const commentsRes = await fetch(`/api/courses/professor/comments/${courseId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (commentsRes.ok) {
+        const commentsData = await commentsRes.json();
+        setComments(commentsData.comments || []);
+      } else {
+        throw new Error('Failed to fetch comments');
+      }
     } catch (e) {
       setError('فشل تحميل التعليقات');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleReplyChange = (commentId, value) => {
-    setReply(r => ({ ...r, [commentId]: value }));
-  };
-
-  const handleReplySubmit = async (commentId) => {
-    const replyText = reply[commentId];
-    if (!replyText) return;
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/courses/professor/comments/${commentId}/reply`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ reply: replyText })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setComments(comments => comments.map(c => c.id === commentId ? { ...c, reply: replyText } : c));
-        setReply(r => ({ ...r, [commentId]: '' }));
-      }
-    } catch (e) {
-      alert('فشل إرسال الرد');
     }
   };
 
@@ -100,24 +93,101 @@ const ProfessorComments = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">جاري تحميل التعليقات...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <div className="text-center text-red-500">
+          <p>{error}</p>
+          <Button onClick={() => navigate('/professor/comments')} className="mt-4">
+            العودة للدورات
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">تعليقات الطلاب على دوراتك</h2>
-      {error && <div className="text-red-500 mb-2">{error}</div>}
-      {loading ? (
-        <div>جاري التحميل...</div>
-      ) : comments.length === 0 ? (
-        <div>لا توجد تعليقات بعد.</div>
+      {/* Header */}
+      <div className="mb-6">
+        <Button
+          variant="ghost"
+          onClick={() => navigate('/professor/comments')}
+          className="mb-4 flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          العودة لجميع الدورات
+        </Button>
+        
+        {course && (
+          <div className="bg-white rounded-lg border p-4 mb-6">
+            <div className="flex items-start gap-4">
+              {course.cover_url && (
+                <img
+                  src={course.cover_url}
+                  alt={course.title}
+                  className="w-20 h-20 object-cover rounded-lg"
+                />
+              )}
+              <div className="flex-1">
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">{course.title}</h1>
+                <p className="text-gray-600 mb-2">{course.description}</p>
+                <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <div className="flex items-center gap-1">
+                    <MessageCircle className="h-4 w-4" />
+                    <span>{comments.length} تعليق</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-4 w-4" />
+                    <span>أنشئت في {new Date(course.created_at).toLocaleDateString('ar-SA')}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Comments */}
+      {comments.length === 0 ? (
+        <div className="text-center py-12">
+          <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد تعليقات بعد</h3>
+          <p className="text-gray-600">لم يعلق أي طالب على هذه الدورة بعد</p>
+        </div>
       ) : (
         <div className="space-y-6">
           {comments.map(comment => (
             <div key={comment.id} className="border rounded-lg p-4 bg-white shadow">
               <div className="mb-2">
-                <span className="font-bold text-blue-700">{comment.student_name || comment.name}</span>
-                <span className="mx-2 text-gray-400 text-xs">{new Date(comment.created_at).toLocaleString()}</span>
-                <span className="ml-2 text-purple-600 text-xs">({comment.tab})</span>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                    {(comment.student_name || comment.name)?.charAt(0) || '?'}
+                  </div>
+                  <span className="font-bold text-blue-700">{comment.student_name || comment.name}</span>
+                  <span className="text-gray-400 text-xs">{new Date(comment.created_at).toLocaleString()}</span>
+                  <span className="ml-2 text-purple-600 text-xs">({comment.tab})</span>
+                </div>
+                {comment.rating && (
+                  <div className="flex items-center gap-1 mb-2">
+                    {Array.from({ length: comment.rating }).map((_, i) => (
+                      <span key={i} className="text-yellow-400">★</span>
+                    ))}
+                    <span className="text-sm text-gray-500">({comment.rating}/5)</span>
+                  </div>
+                )}
               </div>
-              <div className="mb-1 text-sm text-gray-500">الدورة: {comment.course_title}</div>
               <div className="mb-2 text-gray-800">{comment.comment}</div>
               
               {/* Threaded Replies */}
@@ -211,4 +281,4 @@ const ProfessorComments = () => {
   );
 };
 
-export default ProfessorComments; 
+export default CourseComments; 

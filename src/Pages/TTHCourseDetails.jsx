@@ -53,6 +53,10 @@ export default function CourseDetail() {
     
     // New state for language course prices
     const [languageCoursePrices, setLanguageCoursePrices] = useState({});
+    
+    // New state for threaded replies
+    const [showReplyForm, setShowReplyForm] = useState(null);
+    const [replyText, setReplyText] = useState({});
 
     const { user } = useAuth();
 
@@ -413,7 +417,7 @@ export default function CourseDetail() {
             if (response.ok) {
                 const newReviewData = await response.json();
                 setReviews(prev => [newReviewData.comment, ...prev]);
-                setNewReview({ name: '', rating: 5, comment: '' });
+        setNewReview({ name: '', rating: 5, comment: '' });
             } else {
                 const err = await response.json();
                 alert('فشل إرسال التعليق: ' + (err.error || response.status));
@@ -422,6 +426,51 @@ export default function CourseDetail() {
         } catch (err) {
             alert('فشل إرسال التعليق: ' + err.message);
             console.error('Error submitting review:', err);
+        }
+    };
+
+    const handleAddReply = async (commentId) => {
+        const text = replyText[commentId];
+        if (!text || !text.trim()) return;
+        if (!user || !user.id) {
+            alert('يجب تسجيل الدخول لإضافة رد');
+            return;
+        }
+        
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/courses/comments/${commentId}/replies`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ reply_text: text })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                // Update the reviews state to include the new reply
+                setReviews(prev => prev.map(review => {
+                    if (review.id === commentId) {
+                        return {
+                            ...review,
+                            threaded_replies: [...(review.threaded_replies || []), result.reply]
+                        };
+                    }
+                    return review;
+                }));
+                
+                // Clear the reply text and hide the form
+                setReplyText(prev => ({ ...prev, [commentId]: '' }));
+                setShowReplyForm(null);
+            } else {
+                const err = await response.json();
+                alert('فشل إرسال الرد: ' + (err.error || response.status));
+            }
+        } catch (err) {
+            alert('فشل إرسال الرد: ' + err.message);
+            console.error('Error adding reply:', err);
         }
     };
 
@@ -670,9 +719,9 @@ export default function CourseDetail() {
                                                     <span className="text-gray-700">الرغبة في التعلم والتطوير</span>
                                                 </li>
                                                 <li className="flex items-start gap-3">
-                                                        <div className="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div>
+                                                    <div className="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div>
                                                     <span className="text-gray-700">لا حاجة لخبرة سابقة</span>
-                                                    </li>
+                                                </li>
                                             </ul>
                                         </div>
 
@@ -758,10 +807,10 @@ export default function CourseDetail() {
                                                                                 </div>
                                                                             )}
                                                                         </div>
-                                                            </li>
+                                                                    </li>
                                                                 );
                                                             })}
-                                                    </ul>
+                                                        </ul>
                                                         
                                                         {/* Display text content directly */}
                                                         {section.blocks?.map((block, blockIndex) => {
@@ -783,7 +832,7 @@ export default function CourseDetail() {
                                                             }
                                                             return null;
                                                         })}
-                                                </div>
+                                                    </div>
                                                 )}
                                             </div>
                                         ))}
@@ -867,6 +916,97 @@ export default function CourseDetail() {
                                                         <span className="text-sm text-gray-400">{review.date}</span>
                                                     </div>
                                                     <p className="text-gray-700 pr-13">{review.comment}</p>
+                                                    
+                                                    {/* Threaded Replies */}
+                                                    {review.threaded_replies && review.threaded_replies.length > 0 && (
+                                                        <div className="mt-3 space-y-2">
+                                                            {review.threaded_replies.map((reply, replyIndex) => (
+                                                                <div 
+                                                                    key={reply.id} 
+                                                                    className={`pr-4 border-r-4 p-3 rounded-lg ${
+                                                                        reply.user_role === 'professor' 
+                                                                            ? 'border-blue-500 bg-blue-50' 
+                                                                            : 'border-green-500 bg-green-50'
+                                                                    }`}
+                                                                >
+                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                                                            reply.user_role === 'professor' ? 'bg-blue-600' : 'bg-green-600'
+                                                                        }`}>
+                                                                            {reply.user_name?.charAt(0) || '?'}
+                                                                        </div>
+                                                                        <span className={`font-semibold text-sm ${
+                                                                            reply.user_role === 'professor' ? 'text-blue-900' : 'text-green-900'
+                                                                        }`}>
+                                                                            {reply.user_name}
+                                                                        </span>
+                                                                        <span className="text-xs text-gray-500">
+                                                                            ({reply.user_role === 'professor' ? 'المدرس' : 'الطالب'})
+                                                                        </span>
+                                                                        <span className="text-xs text-gray-400">
+                                                                            {new Date(reply.created_at).toLocaleString()}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className={`text-sm ${
+                                                                        reply.user_role === 'professor' ? 'text-blue-800' : 'text-green-800'
+                                                                    }`}>
+                                                                        {reply.reply_text}
+                                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                                    )}
+                                                    
+                                                    {/* Legacy single reply (for backward compatibility) */}
+                                                    {review.reply && (!review.threaded_replies || review.threaded_replies.length === 0) && (
+                                                        <div className="mt-3 pr-4 border-r-4 border-blue-500 bg-blue-50 p-3 rounded-lg">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                                                    {course.created_by_name?.charAt(0) || 'م'}
+                                                                </div>
+                                                                <span className="font-semibold text-blue-900 text-sm">{course.created_by_name}</span>
+                                                                <span className="text-xs text-gray-500">(المدرس)</span>
+                                                            </div>
+                                                            <p className="text-blue-800 text-sm">{review.reply}</p>
+                                    </div>
+                                )}
+                                                    
+                                                    {/* Add Reply Button */}
+                                                    <div className="mt-3">
+                                                        <button
+                                                            onClick={() => setShowReplyForm(review.id)}
+                                                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                                        >
+                                                            رد على هذا التعليق
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    {/* Reply Form */}
+                                                    {showReplyForm === review.id && (
+                                                        <div className="mt-3 pr-4 border border-gray-200 rounded-lg p-3 bg-gray-50">
+                                                            <textarea
+                                                                value={replyText[review.id] || ''}
+                                                                onChange={(e) => setReplyText(prev => ({ ...prev, [review.id]: e.target.value }))}
+                                                                placeholder="اكتب ردك هنا..."
+                                                                className="w-full p-2 border border-gray-300 rounded-md text-sm resize-none"
+                                                                rows="3"
+                                                            />
+                                                            <div className="flex gap-2 mt-2">
+                                                                <button
+                                                                    onClick={() => handleAddReply(review.id)}
+                                                                    className="px-3 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                                                                >
+                                                                    إرسال الرد
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setShowReplyForm(null)}
+                                                                    className="px-3 py-1 bg-gray-500 text-white rounded-md text-sm hover:bg-gray-600"
+                                                                >
+                                                                    إلغاء
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
@@ -899,14 +1039,14 @@ export default function CourseDetail() {
                                             )
                                         ) && (
                                             <Button className="flex-1 flex justify-center items-center bg-blue-600 text-white font-normal shadow hover:bg-blue-700 transition">
-                                                    <FileText size={18} className="absolute mr-[-1rem]" />
+                                                <FileText size={18} className="absolute mr-[-1rem]" />
                                                 تحميل الملفات
                                             </Button>
                                         )}
                                         <Button variant="outline" className="flex-1 text-blue-900 hover:bg-gray-50">
                                             <Play size={18} className="absolute mr-[-8.35rem]" />
                                             مشاهدة الدرس
-                                            </Button>
+                                        </Button>
                                     </div>
                                 </div>
                             </CardContent>
@@ -932,11 +1072,11 @@ export default function CourseDetail() {
 
                         {/* Related Courses */}
                         {relatedCourses.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">دروس مشابهة</CardTitle>
-                            </CardHeader>
-                            <CardContent>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-lg">دروس مشابهة</CardTitle>
+                                </CardHeader>
+                                <CardContent>
                                     <div className="space-y-3">
                                         {relatedCourses.map((relatedCourse) => {
                                             const price = languageCoursePrices[`${relatedCourse.id}-${relatedCourse.language_level_id}`];
@@ -944,8 +1084,8 @@ export default function CourseDetail() {
                                             const displayPrice = relatedCourse.material_price || price;
 
                                             return (
-                                        <div
-                                            key={relatedCourse.id}
+                                                <div
+                                                    key={relatedCourse.id}
                                                     className="flex gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-100"
                                                     onClick={() => navigate(`/coursesList/courses/${relatedCourse.id}`)}
                                                 >
@@ -963,20 +1103,20 @@ export default function CourseDetail() {
                                                     <div className="flex-shrink-0">
                                                         <img
                                                             src={relatedCourse.cover_url || "/placeholder.svg"}
-                                                alt={relatedCourse.title}
+                                                            alt={relatedCourse.title}
                                                             className="w-16 h-12 object-cover rounded-lg"
-                                            />
+                                                        />
                                                     </div>
                                                     
                                                     {/* Course info */}
-                                            <div className="flex-1 min-w-0">
+                                                    <div className="flex-1 min-w-0">
                                                         <h4 className="font-medium text-sm text-gray-900 line-clamp-2 leading-tight mb-1">
-                                                    {relatedCourse.title}
-                                                </h4>
+                                                            {relatedCourse.title}
+                                                        </h4>
                                                         <p className="text-xs text-gray-600 mb-2">{relatedCourse.created_by_name}</p>
                                                         <div className="flex items-center gap-2">
-                                                    <div className="flex items-center gap-1">
-                                                        <Star className="text-yellow-400 fill-current" size={12} />
+                                                            <div className="flex items-center gap-1">
+                                                                <Star className="text-yellow-400 fill-current" size={12} />
                                                                 <span className="text-xs font-medium">4.8</span>
                                                                 <span className="text-xs text-gray-500">(123)</span>
                                                             </div>
@@ -989,9 +1129,9 @@ export default function CourseDetail() {
                                                 </div>
                                             );
                                         })}
-                                </div>
-                            </CardContent>
-                        </Card>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         )}
                     </div>
                 </div>

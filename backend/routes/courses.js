@@ -869,12 +869,132 @@ router.post('/language-course-price', async (req, res) => {
   }
 });
 
+// Get comments for a specific course created by the logged-in professor
+router.get('/professor/comments/:courseId', verifyToken, requireRole(['professor']), async (req, res) => {
+  try {
+    const professorId = req.user.id;
+    const { courseId } = req.params;
+    
+    // First verify that the course belongs to this professor
+    const courseCheck = await pool.query(
+      'SELECT id FROM courses WHERE id = $1 AND created_by = $2',
+      [courseId, professorId]
+    );
+    
+    if (courseCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Not authorized to view comments for this course' });
+    }
+    
+    const result = await pool.query(
+      `SELECT 
+         c.id, c.course_id, c.name, c.comment, c.tab, c.rating, c.created_at, c.reply,
+         COALESCE(u.name, c.name) as student_name
+       FROM course_comments c
+       LEFT JOIN users u ON c.user_id = u.id
+       WHERE c.course_id = $1
+       ORDER BY c.created_at DESC`,
+      [courseId]
+    );
+    
+    // Get threaded replies for each comment
+    const commentsWithReplies = await Promise.all(
+      result.rows.map(async (comment) => {
+        const repliesResult = await pool.query(
+          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+           FROM comment_replies r
+           WHERE r.comment_id = $1
+           ORDER BY r.created_at ASC`,
+          [comment.id]
+        );
+        return {
+          ...comment,
+          threaded_replies: repliesResult.rows
+        };
+      })
+    );
+    
+    res.json({ comments: commentsWithReplies });
+  } catch (err) {
+    console.error('Error fetching course comments:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all courses with comment counts for the logged-in professor
+router.get('/professor/courses-with-comments', verifyToken, requireRole(['professor']), async (req, res) => {
+  try {
+    const professorId = req.user.id;
+    const result = await pool.query(
+      `SELECT 
+         c.id, c.title, c.description, c.price, c.status, c.created_at,
+         cc.cover as cover_url,
+         COALESCE(comment_counts.comment_count, 0) as comment_count
+       FROM courses c
+       LEFT JOIN course_covers cc ON c.id = cc.course_id
+       LEFT JOIN (
+         SELECT course_id, COUNT(*) as comment_count
+         FROM course_comments
+         GROUP BY course_id
+       ) comment_counts ON c.id = comment_counts.course_id
+       WHERE c.created_by = $1
+       ORDER BY c.created_at DESC`,
+      [professorId]
+    );
+    
+    res.json({ courses: result.rows });
+  } catch (err) {
+    console.error('Error fetching professor courses with comments:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all comments for courses created by the logged-in professor (from course_comments) - LEGACY ENDPOINT
+router.get('/professor/comments', verifyToken, requireRole(['professor']), async (req, res) => {
+  try {
+    const professorId = req.user.id;
+    const result = await pool.query(
+      `SELECT 
+         c.id, c.course_id, c.name, c.comment, c.tab, c.rating, c.created_at, c.reply,
+         COALESCE(u.name, c.name) as student_name,
+         crs.title as course_title
+       FROM course_comments c
+       LEFT JOIN users u ON c.user_id = u.id
+       JOIN courses crs ON c.course_id = crs.id
+       WHERE crs.created_by = $1
+       ORDER BY c.created_at DESC`,
+      [professorId]
+    );
+    
+    // Get threaded replies for each comment
+    const commentsWithReplies = await Promise.all(
+      result.rows.map(async (comment) => {
+        const repliesResult = await pool.query(
+          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+           FROM comment_replies r
+           WHERE r.comment_id = $1
+           ORDER BY r.created_at ASC`,
+          [comment.id]
+        );
+        return {
+          ...comment,
+          threaded_replies: repliesResult.rows
+        };
+      })
+    );
+    
+    res.json({ comments: commentsWithReplies });
+  } catch (err) {
+    console.error('Error fetching professor comments:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get comments for a course and tab (now from course_comments table)
 router.get('/:id/comments', async (req, res) => {
   const { id } = req.params;
   const { tab } = req.query;
   try {
-    // Join with users to get name
+    // Join with users to get name and include threaded replies
     const result = await pool.query(
       `SELECT c.id, c.user_id, u.name, c.comment, c.course_id, c.section_id, c.created_at, c.reply, c.tab, c.rating
        FROM course_comments c
@@ -883,7 +1003,25 @@ router.get('/:id/comments', async (req, res) => {
        ORDER BY c.created_at DESC`,
       [id]
     );
-    res.json({ comments: result.rows });
+    
+    // Get threaded replies for each comment
+    const commentsWithReplies = await Promise.all(
+      result.rows.map(async (comment) => {
+        const repliesResult = await pool.query(
+          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+           FROM comment_replies r
+           WHERE r.comment_id = $1
+           ORDER BY r.created_at ASC`,
+          [comment.id]
+        );
+        return {
+          ...comment,
+          threaded_replies: repliesResult.rows
+        };
+      })
+    );
+    
+    res.json({ comments: commentsWithReplies });
   } catch (err) {
     console.error('Error fetching course comments:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -909,26 +1047,76 @@ router.post('/:id/comments', async (req, res) => {
   }
 });
 
-// Get all comments for courses created by the logged-in professor (from course_comments)
-router.get('/professor/comments', verifyToken, requireRole(['professor']), async (req, res) => {
+// Add a threaded reply to a comment (for both students and professors)
+router.post('/comments/:commentId/replies', verifyToken, async (req, res) => {
   try {
-    const professorId = req.user.id;
-    const result = await pool.query(
-      `SELECT c.*, u.name as student_name, crs.title as course_title FROM course_comments c
-       LEFT JOIN users u ON c.user_id = u.id
-       JOIN courses crs ON c.course_id = crs.id
-       WHERE crs.created_by = $1
-       ORDER BY c.created_at DESC`,
-      [professorId]
+    const userId = req.user.id;
+    const { commentId } = req.params;
+    const { reply_text } = req.body;
+    
+    if (!reply_text) return res.status(400).json({ error: 'Reply text is required' });
+    
+    // Get user info
+    const userResult = await pool.query('SELECT name, role FROM users WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    
+    const user = userResult.rows[0];
+    
+    // Check if comment exists and get course info
+    const commentResult = await pool.query(
+      `SELECT c.id, c.course_id, crs.created_by as course_creator_id 
+       FROM course_comments c 
+       JOIN courses crs ON c.course_id = crs.id 
+       WHERE c.id = $1`,
+      [commentId]
     );
-    res.json({ comments: result.rows });
+    
+    if (commentResult.rows.length === 0) return res.status(404).json({ error: 'Comment not found' });
+    
+    const comment = commentResult.rows[0];
+    
+    // Determine user role for this reply
+    let userRole = 'student';
+    if (user.role === 'professor' && comment.course_creator_id === userId) {
+      userRole = 'professor';
+    }
+    
+    // Add the reply
+    const replyResult = await pool.query(
+      `INSERT INTO comment_replies (comment_id, user_id, user_name, reply_text, user_role, created_at) 
+       VALUES ($1, $2, $3, $4, $5, NOW()) 
+       RETURNING id, user_id, user_name, reply_text, user_role, created_at`,
+      [commentId, userId, user.name, reply_text, userRole]
+    );
+    
+    res.json({ success: true, reply: replyResult.rows[0] });
   } catch (err) {
-    console.error('Error fetching professor comments:', err);
+    console.error('Error adding threaded reply:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Professor replies to a comment (update reply column in course_comments)
+// Get threaded replies for a specific comment
+router.get('/comments/:commentId/replies', async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    
+    const repliesResult = await pool.query(
+      `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+       FROM comment_replies r
+       WHERE r.comment_id = $1
+       ORDER BY r.created_at ASC`,
+      [commentId]
+    );
+    
+    res.json({ replies: repliesResult.rows });
+  } catch (err) {
+    console.error('Error fetching threaded replies:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Professor replies to a comment (update reply column in course_comments) - KEEP FOR BACKWARD COMPATIBILITY
 router.post('/professor/comments/:commentId/reply', verifyToken, requireRole(['professor']), async (req, res) => {
   try {
     const professorId = req.user.id;

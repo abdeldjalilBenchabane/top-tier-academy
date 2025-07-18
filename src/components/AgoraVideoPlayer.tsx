@@ -284,6 +284,34 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
         }
     }, [isLocalCameraEnabled, localVideoTrackRef]);
 
+    // Helper to ensure video fills container correctly
+    const ensureVideoFullSize = useCallback((type = 'camera') => {
+        if (videoContainerRef.current) {
+            const video = videoContainerRef.current.querySelector('video');
+            if (video) {
+                video.style.width = '100%';
+                video.style.height = '100%';
+                video.style.background = 'black';
+                video.style.touchAction = 'none';
+                video.style.userSelect = 'none';
+                video.style.WebkitUserSelect = 'none';
+                video.style.WebkitTouchCallout = 'none';
+                video.style.transform = 'none';
+                video.style.transition = 'none';
+                if (type === 'screen') {
+                    video.style.objectFit = 'contain';
+                } else {
+                    video.style.objectFit = 'cover';
+                }
+            }
+        }
+    }, []);
+
+    // Patch play() calls to ensure video is always full size
+    useEffect(() => {
+        ensureVideoFullSize();
+    });
+
     useEffect(() => {
         mountedRef.current = true;
         const initializeConnection = async () => {
@@ -332,18 +360,25 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
                     if (!data.muted) {
                         // Unmute: passer en host et publier la piste audio
                         if (clientRef.current && localAudioTrackRef.current) {
+                            console.log('[DEBUG] Student: setting role to host and publishing audio');
                             await clientRef.current.setClientRole('host');
+                            await new Promise(res => setTimeout(res, 200)); // Add a small delay
                             await clientRef.current.publish([localAudioTrackRef.current]);
                             localAudioTrackRef.current.setEnabled(true);
-                            console.log('[DEBUG] Student set to host and audio published');
+                            console.log('[DEBUG] Student: audio published, mic enabled');
+                        } else {
+                            console.warn('[DEBUG] Student: clientRef or localAudioTrackRef missing');
                         }
                     } else {
                         // Mute: unpublish et repasser en audience
                         if (clientRef.current && localAudioTrackRef.current) {
+                            console.log('[DEBUG] Student: unpublishing audio and setting role to audience');
                             await clientRef.current.unpublish([localAudioTrackRef.current]);
                             localAudioTrackRef.current.setEnabled(false);
                             await clientRef.current.setClientRole('audience');
-                            console.log('[DEBUG] Student set to audience and audio unpublished');
+                            console.log('[DEBUG] Student: audio unpublished, mic disabled');
+                        } else {
+                            console.warn('[DEBUG] Student: clientRef or localAudioTrackRef missing');
                         }
                     }
                 } catch (err) {
@@ -419,13 +454,29 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
     return (
         <div className="relative w-full h-full min-h-[400px] bg-black rounded-lg overflow-hidden">
             <div ref={videoRef} className="w-full h-full" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-                <div ref={videoContainerRef} className="w-full h-full" style={{ position: 'relative', width: '100%', height: '100%' }} />
+                <div
+                  ref={videoContainerRef}
+                  className="w-full h-full"
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '100%',
+                    touchAction: 'none',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    WebkitTouchCallout: 'none',
+                    ...(role === 'audience' ? { transform: 'scaleX(-1)' } : {})
+                  }}
+                />
                 {role === 'audience' && remoteUsers.length === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center">
                         <div className="text-white text-center">
                             <p>في انتظار أن يبدأ الأستاذ البث...</p>
                         </div>
                     </div>
+                )}
+                {role === 'audience' && !isLocalMicMuted && (
+                    <div className="absolute top-2 left-2 bg-green-600 text-white px-3 py-1 rounded-full text-xs z-50">الميكروفون نشط</div>
                 )}
             </div>
         </div>
