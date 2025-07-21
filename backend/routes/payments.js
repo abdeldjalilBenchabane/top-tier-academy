@@ -15,7 +15,7 @@ router.post('/create-checkout', auth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid amount' });
     }
 
-    // Create transaction record first
+    // Create transaction record first (status: 'pending')
     const transactionResult = await pool.query(
       `INSERT INTO point_transactions 
        (user_id, package_id, transaction_type, points, amount, currency, status, metadata)
@@ -28,28 +28,21 @@ router.post('/create-checkout', auth, async (req, res) => {
         parseInt(amount), // Convert to integer
         parseFloat(amount), // Convert to float for amount
         currency,
-        'completed', // Mark as completed immediately for student purchases
+        'pending', // Mark as pending until payment is confirmed
         JSON.stringify({ packageName, source: 'chargily' })
       ]
     );
 
     const transactionId = transactionResult.rows[0].id;
 
-    // Add points to user account immediately
-    await pool.query(
-      `INSERT INTO user_points (user_id, balance) 
-       VALUES ($1, $2) 
-       ON CONFLICT (user_id) 
-       DO UPDATE SET balance = user_points.balance + $2`,
-      [userId, parseInt(amount)]
-    );
+    // DO NOT add points to user account here!
 
     // Create Chargily checkout
     const checkoutData = {
       amount: parseInt(amount),
       currency: 'dzd', // Chargily expects lowercase 'dzd'
-      success_url: process.env.FRONTEND_URL || 'http://localhost:8080',
-      failure_url: `${process.env.FRONTEND_URL || 'http://localhost:8080'}/points/failure?transaction_id=${transactionId}`,
+      success_url: process.env.FRONTEND_URL || 'http://localhost:8080/TTHCourses',
+      failure_url: `${process.env.FRONTEND_URL || 'http://localhost:8080/TTHCourses'}/points/failure?transaction_id=${transactionId}`,
       metadata: {
         transaction_id: transactionId.toString(),
         user_id: userId.toString(),
@@ -116,9 +109,9 @@ router.post('/create-checkout', auth, async (req, res) => {
 // Webhook to handle Chargily payment status updates
 router.post('/webhook', async (req, res) => {
   try {
+    console.log('--- WEBHOOK DEBUG START ---');
+    console.log('Raw webhook payload:', req.body);
     const { checkout_id, status, amount, currency } = req.body;
-
-    console.log('Webhook received:', { checkout_id, status, amount, currency });
 
     // Find transaction by checkout ID
     const transactionResult = await pool.query(
@@ -128,35 +121,34 @@ router.post('/webhook', async (req, res) => {
 
     if (transactionResult.rows.length === 0) {
       console.error('Transaction not found for checkout_id:', checkout_id);
+      // Log all payment_references in the DB for debugging
+      const allRefs = await pool.query('SELECT id, payment_reference, status FROM point_transactions ORDER BY id DESC LIMIT 10');
+      console.log('Recent payment_references in DB:', allRefs.rows);
+      console.log('--- WEBHOOK DEBUG END (not found) ---');
       return res.status(404).json({ error: 'Transaction not found' });
     }
 
     const transaction = transactionResult.rows[0];
-
-    // Update transaction status based on Chargily status
-    let newStatus = 'pending';
-    if (status === 'paid') {
-      newStatus = 'completed';
-      
-      // Update transaction status only - points were already added in purchase endpoint
+    console.log('Found transaction:', transaction);
+    console.log('Expected payment_reference:', checkout_id, 'Actual in DB:', transaction.payment_reference);
+    console.log('Status:', status);
+    // Only update to completed if not already completed
+    if (status && status.toLowerCase() === 'paid' && transaction.status !== 'completed') {
       await pool.query(
         'UPDATE point_transactions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [newStatus, transaction.id]
+        ['completed', transaction.id]
       );
-      
-      console.log(`Transaction ${transaction.id} marked as completed - points already added`);
-      
+      console.log(`Transaction ${transaction.id} marked as completed (points will be added by trigger)`);
+    } else if (!status || status.toLowerCase() !== 'paid') {
+      await pool.query(
+        'UPDATE point_transactions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        ['failed', transaction.id]
+      );
+      console.log(`Transaction ${transaction.id} marked as failed`);
     } else {
-      newStatus = 'failed';
-      
-      await pool.query(
-        'UPDATE point_transactions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [newStatus, transaction.id]
-      );
+      console.log(`Transaction ${transaction.id} already completed, skipping update.`);
     }
-
-    console.log(`Transaction ${transaction.id} updated to status: ${newStatus}`);
-
+    console.log('--- WEBHOOK DEBUG END (success) ---');
     res.json({ success: true });
 
   } catch (error) {

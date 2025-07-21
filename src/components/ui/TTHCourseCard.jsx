@@ -92,10 +92,10 @@ const CourseCard = ({ course }) => {
             <button
               className={`group flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transform transition-all duration-300 ease-out shadow-lg hover:shadow-xl ${isHovered ? 'translate-x-1' : ''}`}
               onClick={e => { e.stopPropagation(); }}
-            >
-              التسجيل الآن
+          >
+            التسجيل الآن
               <ArrowRight className={`w-4 h-4 transform transition-transform duration-300 ${isHovered ? 'translate-x-1' : 'group-hover:translate-x-1'}`} />
-            </button>
+          </button>
           </Link>
           <div className="text-2xl font-bold bg-gradient-to-r from-blue-800 to-blue-500 bg-clip-text text-transparent">
             {price}

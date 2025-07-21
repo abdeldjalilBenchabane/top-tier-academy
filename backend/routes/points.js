@@ -244,7 +244,7 @@ router.post('/purchase', auth, async (req, res) => {
       return res.status(400).json({ error: 'Amount does not match package price' });
     }
     
-    // Create transaction record
+    // Create transaction record (status: 'pending')
     const transactionResult = await pool.query(
       `INSERT INTO point_transactions 
        (user_id, package_id, transaction_type, points, amount, currency, status, metadata)
@@ -257,21 +257,14 @@ router.post('/purchase', auth, async (req, res) => {
         packageData.points,
         amount,
         currency || 'DZD',
-        'completed', // Mark as completed immediately
+        'pending', // Mark as pending until payment is confirmed
         JSON.stringify(metadata)
       ]
     );
     
     const transactionId = transactionResult.rows[0].id;
     
-    // Add points to user account immediately
-    await pool.query(
-      `INSERT INTO user_points (user_id, balance) 
-       VALUES ($1, $2) 
-       ON CONFLICT (user_id) 
-       DO UPDATE SET balance = user_points.balance + $2`,
-      [userId, packageData.points]
-    );
+    // DO NOT add points to user account here!
     
     // Prepare payment data for external API
     const paymentData = {
