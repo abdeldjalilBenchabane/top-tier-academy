@@ -738,3 +738,46 @@ node migrate-student-dashboard.js
 - **Filtres** : recherche, type de session, statut
 - **Calendrier** avec indicateurs visuels des sessions
 - **Responsive design** pour tous les appareils
+
+## Updating the Points System Trigger (PostgreSQL)
+
+To ensure points are only added when a transaction is marked as 'completed', update your database trigger and function as follows:
+
+```sql
+CREATE OR REPLACE FUNCTION update_user_points_balance()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Only add points if status is 'completed' and it was not completed before
+    IF (TG_OP = 'INSERT' AND (NEW.transaction_type = 'purchase' OR NEW.transaction_type = 'bonus') AND NEW.status = 'completed')
+    OR (TG_OP = 'UPDATE' AND (NEW.transaction_type = 'purchase' OR NEW.transaction_type = 'bonus') AND NEW.status = 'completed' AND OLD.status <> 'completed') THEN
+        INSERT INTO user_points (user_id, balance, updated_at)
+        VALUES (NEW.user_id, 
+                COALESCE((SELECT balance FROM user_points WHERE user_id = NEW.user_id), 0) + NEW.points,
+                CURRENT_TIMESTAMP)
+        ON CONFLICT (user_id) 
+        DO UPDATE SET 
+            balance = user_points.balance + NEW.points,
+            updated_at = CURRENT_TIMESTAMP;
+    ELSIF NEW.transaction_type = 'spend' THEN
+        INSERT INTO user_points (user_id, balance, updated_at)
+        VALUES (NEW.user_id, 
+                COALESCE((SELECT balance FROM user_points WHERE user_id = NEW.user_id), 0) - NEW.points,
+                CURRENT_TIMESTAMP)
+        ON CONFLICT (user_id) 
+        DO UPDATE SET 
+            balance = user_points.balance - NEW.points,
+            updated_at = CURRENT_TIMESTAMP;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_user_points_balance ON point_transactions;
+
+CREATE TRIGGER trigger_update_user_points_balance
+    AFTER INSERT OR UPDATE ON point_transactions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_user_points_balance();
+```
+
+**Run this SQL in your PostgreSQL database after deploying or updating the backend to ensure correct points logic.**
