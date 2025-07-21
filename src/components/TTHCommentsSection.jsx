@@ -121,42 +121,7 @@ const CommentsSection = () => {
         </div>
       </div>
 
-      {/* Search and Filter */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="ابحث في تعليقاتك..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pr-10"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              {[
-                { id: 'all', label: 'الكل' },
-                { id: 'pinned', label: 'مثبت' },
-                { id: 'questions', label: 'أسئلة' },
-                { id: 'notes', label: 'ملاحظات' }
-              ].map((filter) => (
-                <Button
-                  key={filter.id}
-                  variant={selectedFilter === filter.id ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedFilter(filter.id)}
-                  className={selectedFilter === filter.id ? 'bg-education-blue' : ''}
-                >
-                  {filter.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+
 
       {/* Comments List */}
       <div className="space-y-4">
@@ -259,46 +224,7 @@ const CommentsSection = () => {
         )}
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="text-center p-4">
-            <MessageSquare className="w-8 h-8 mx-auto text-education-blue mb-2" />
-            <div className="text-2xl font-bold text-gray-900">{comments.length}</div>
-            <div className="text-sm text-gray-600">إجمالي التعليقات</div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardContent className="text-center p-4">
-            <Pin className="w-8 h-8 mx-auto text-education-yellow mb-2" />
-            <div className="text-2xl font-bold text-gray-900">
-              {comments.filter(c => c.isPinned).length}
-            </div>
-            <div className="text-sm text-gray-600">مثبتة</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="text-center p-4">
-            <Heart className="w-8 h-8 mx-auto text-red-500 mb-2" />
-            <div className="text-2xl font-bold text-gray-900">
-              {comments.reduce((sum, c) => sum + c.likes, 0)}
-            </div>
-            <div className="text-sm text-gray-600">إعجابات</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="text-center p-4">
-            <Reply className="w-8 h-8 mx-auto text-green-600 mb-2" />
-            <div className="text-2xl font-bold text-gray-900">
-              {comments.reduce((sum, c) => sum + c.replies, 0)}
-            </div>
-            <div className="text-sm text-gray-600">ردود</div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 };

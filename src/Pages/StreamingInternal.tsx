@@ -537,7 +537,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
             {debugPanel}
             
             {/* Header - Responsive */}
-            <div className="bg-black/20 backdrop-blur-sm border-b border-white/10">
+            <div className="bg-white/10 backdrop-blur-sm border-b border-white/10 rounded-b-xl">
                 <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-4 flex items-center justify-between">
                     <div className="flex items-center gap-2 sm:gap-4">
                         <Button

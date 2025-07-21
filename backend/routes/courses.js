@@ -990,19 +990,37 @@ router.get('/professor/comments', verifyToken, requireRole(['professor']), async
 });
 
 // Get comments for a course and tab (now from course_comments table)
+// Also handles getting all comments by a user when id is 'user' and userId is provided
 router.get('/:id/comments', async (req, res) => {
   const { id } = req.params;
-  const { tab } = req.query;
+  const { tab, userId } = req.query;
+  
   try {
-    // Join with users to get name and include threaded replies
-    const result = await pool.query(
-      `SELECT c.id, c.user_id, u.name, c.comment, c.course_id, c.section_id, c.created_at, c.reply, c.tab, c.rating
-       FROM course_comments c
-       LEFT JOIN users u ON c.user_id = u.id
-       WHERE c.course_id = $1
-       ORDER BY c.created_at DESC`,
-      [id]
-    );
+    let result;
+    
+    // If id is 'user', get all comments by a specific user
+    if (id === 'user' && userId) {
+      result = await pool.query(
+        `SELECT c.id, c.user_id, u.name, c.comment, c.course_id, c.section_id, c.created_at, c.reply, c.tab, c.rating,
+                crs.title as course_title
+         FROM course_comments c
+         LEFT JOIN users u ON c.user_id = u.id
+         JOIN courses crs ON c.course_id = crs.id
+         WHERE c.user_id = $1
+         ORDER BY c.created_at DESC`,
+        [userId]
+      );
+    } else {
+      // Get comments for a specific course
+      result = await pool.query(
+        `SELECT c.id, c.user_id, u.name, c.comment, c.course_id, c.section_id, c.created_at, c.reply, c.tab, c.rating
+         FROM course_comments c
+         LEFT JOIN users u ON c.user_id = u.id
+         WHERE c.course_id = $1
+         ORDER BY c.created_at DESC`,
+        [id]
+      );
+    }
     
     // Get threaded replies for each comment
     const commentsWithReplies = await Promise.all(
@@ -1115,6 +1133,56 @@ router.get('/comments/:commentId/replies', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Get all comments made by a specific user (dynamic - works for any user)
+router.get('/all-comments-by-user/:userId', verifyToken, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    
+    // Verify the user is requesting their own comments
+    if (req.user.id != userId) {
+      return res.status(403).json({ error: 'Not authorized to view these comments' });
+    }
+    
+    const result = await pool.query(
+      `SELECT 
+         c.id, c.course_id, c.user_id, c.name, c.comment, c.tab, c.rating, c.created_at, c.reply,
+         COALESCE(u.name, c.name) as student_name,
+         crs.title as course_title
+       FROM course_comments c
+       LEFT JOIN users u ON c.user_id = u.id
+       JOIN courses crs ON c.course_id = crs.id
+       WHERE c.user_id = $1
+       ORDER BY c.created_at DESC`,
+      [userId]
+    );
+    
+    // Get threaded replies for each comment
+    const commentsWithReplies = await Promise.all(
+      result.rows.map(async (comment) => {
+        const repliesResult = await pool.query(
+          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+           FROM comment_replies r
+           WHERE r.comment_id = $1
+           ORDER BY r.created_at ASC`,
+          [comment.id]
+        );
+        return {
+          ...comment,
+          threaded_replies: repliesResult.rows
+        };
+      })
+    );
+    
+    console.log(`Found ${commentsWithReplies.length} comments for user ${userId}`);
+    res.json({ comments: commentsWithReplies });
+  } catch (err) {
+    console.error('Error fetching user comments:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
 
 // Professor replies to a comment (update reply column in course_comments) - KEEP FOR BACKWARD COMPATIBILITY
 router.post('/professor/comments/:commentId/reply', verifyToken, requireRole(['professor']), async (req, res) => {

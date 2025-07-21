@@ -1,15 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from './../components/ui/TTHCard';
 import { Badge } from './../components/ui/TTHBadge';
 import { Button } from './../components/ui/TTHButton';
 import { Progress } from './../components/ui/TTHprogress';
 import { Avatar, AvatarFallback, AvatarImage } from './../components/ui/TTHAvatar';
-import TTHCourseCard from '../components/ui/TTHCourseCard';
 
 import {
     BookOpen,
-    Calendar,
     BadgeDollarSign,
     CheckCircle,
     MessageSquare,
@@ -18,11 +16,11 @@ import {
     TrendingUp,
     User
 } from 'lucide-react';
-import CoursesSection from '../components/TTHCoursesSection';
-import CalendarSection from '../components/TTHCalendarSection';
-import CommentsSection from '../components/TTHCommentsSection';
+import PrivateClassesSection from '../components/TTHPrivateClassesSection';
+import StudentCommentsSection from '../components/TTHStudentCommentsSection';
 import ProfileSection from '../components/TTHProfileSection';
 import { pointsAPI } from '@/services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 // Fonction utilitaire pour calculer le nombre total d'heures passées sur la plateforme
 function calculateTotalHours(activities) {
@@ -32,6 +30,7 @@ function calculateTotalHours(activities) {
 }
 
 const StudentDashboard = () => {
+    const { user } = useAuth();
     const location = useLocation();
     const getInitialTab = () => {
       const params = new URLSearchParams(location.search);
@@ -45,8 +44,35 @@ const StudentDashboard = () => {
     const [error, setError] = useState(null);
     const [purchasedCourses, setPurchasedCourses] = useState([]);
     const [pointsBalance, setPointsBalance] = useState(0);
+    const [myPendingRequests, setMyPendingRequests] = useState([]);
     const navigate = useNavigate();
     const [editMode, setEditMode] = useState(false);
+
+    // Function to fetch private class requests
+    const fetchPrivateClassRequests = useCallback(async () => {
+        if (!user?.id) {
+            console.log('No user ID available');
+            return;
+        }
+        try {
+            console.log('Fetching private class requests for user:', user.id);
+            const requestsRes = await fetch(`/api/private-class-requests/student/${user.id}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            if (requestsRes.ok) {
+                const data = await requestsRes.json();
+                console.log('Private class requests data:', data);
+                const filteredRequests = data.requests.filter(request => request.status !== 'مرفوض');
+                console.log('Filtered requests:', filteredRequests);
+                setMyPendingRequests(filteredRequests);
+            } else {
+                console.error('Failed to fetch requests:', requestsRes.status);
+            }
+        } catch (e) { 
+            console.error('Error fetching private class requests:', e);
+            setMyPendingRequests([]); 
+        }
+    }, [user?.id]);
 
     const studentProfile = {
         name: 'أحمد محمد علي',
@@ -118,6 +144,10 @@ const StudentDashboard = () => {
                   const balanceRes = await pointsAPI.getBalance();
                   balance = balanceRes.balance || 0
                 } catch (e) { balance = 0; }
+
+                // Fetch private class requests
+                await fetchPrivateClassRequests();
+
                 setStudentStats(stats);
                 setRecentActivities(activities);
                 setProfile(prof);
@@ -140,6 +170,20 @@ const StudentDashboard = () => {
         setActiveTab(tab);
       }
     }, [location.search]);
+
+    // Polling for real-time updates of private class requests
+    useEffect(() => {
+        if (!user?.id) return;
+        
+        // Initial fetch
+        fetchPrivateClassRequests();
+        
+        // Set up polling every 30 seconds
+        const interval = setInterval(fetchPrivateClassRequests, 30000);
+        
+        // Cleanup interval on unmount
+        return () => clearInterval(interval);
+    }, [user?.id]);
 
     if (loading) return <div className="p-8 text-center">Chargement...</div>;
     if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
@@ -191,8 +235,7 @@ const StudentDashboard = () => {
                 <div className="flex space-x-1 space-x-reverse bg-white rounded-lg p-1 mb-8 shadow-sm">
                     {[
                         { id: 'overview', label: 'نظرة عامة', icon: TrendingUp },
-                        { id: 'courses', label: 'دوراتي', icon: BookOpen },
-                        { id: 'calendar', label: 'التقويم', icon: Calendar },
+                        { id: 'courses', label: 'الحصص الخاصة', icon: BookOpen },
                         { id: 'comments', label: 'تعليقاتي', icon: MessageSquare },
                         { id: 'profile', label: 'الملف الشخصي', icon: User }
                     ].map((tab) => (
@@ -227,12 +270,18 @@ const StudentDashboard = () => {
                                     </div>
                                 </CardContent>
                             </Card>
-                            <Card className="bg-gradient-to-r from-purple-400 to-purple-700 text-white">
+                            <Card className="bg-gradient-to-r from-purple-400 to-purple-700 text-white cursor-pointer hover:shadow-lg transition-all duration-300" onClick={fetchPrivateClassRequests}>
                                 <CardContent className="p-8">
                                     <div className="flex items-center mt-2 justify-between">
                                         <div>
-                                            <p className="text-purple-100">الدورات المكتملة</p>
-                                            <p className="text-3xl mt-2 font-bold">{studentStats?.completedCourses ?? 0}</p>
+                                            <p className="text-purple-100">الحصص الخاصة</p>
+                                            <p className="text-3xl mt-2 font-bold">
+                                                {(() => {
+                                                    const count = myPendingRequests?.filter(req => req.status === 'مؤكد').length ?? 0;
+                                                    console.log('Confirmed requests count:', count, 'Total requests:', myPendingRequests?.length);
+                                                    return count;
+                                                })()}
+                                            </p>
                                         </div>
                                         <CheckCircle className="w-8 h-8 text-purple-200" />
                                     </div>
@@ -264,30 +313,14 @@ const StudentDashboard = () => {
                                 </CardContent>
                             </Card>
                         </div>
-                        {/* Purchased Courses Preview */}
-                        {purchasedCourses.length > 0 && (
-                                    <div>
-                            <h2 className="text-xl font-bold text-gray-900 mb-4 mt-8">دوراتك الأخيرة</h2>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                              {purchasedCourses.slice(0, 4).map((course) => (
-                                <TTHCourseCard key={course.id} course={course} />
-                                        ))}
-                                    </div>
-                            {purchasedCourses.length > 4 && (
-                              <div className="text-center mt-4">
-                                <Link to="#" onClick={() => setActiveTab('courses')} className="text-blue-600 underline font-bold">عرض كل الدورات</Link>
-                              </div>
-                            )}
-                        </div>
-                        )}
+
                     </div>
                 )}
 
                 {activeTab === 'courses' && (
-                  <CoursesSection purchasedCourses={purchasedCourses} />
+                  <PrivateClassesSection />
                 )}
-                {activeTab === 'calendar' && <CalendarSection />}
-                {activeTab === 'comments' && <CommentsSection />}
+                {activeTab === 'comments' && <StudentCommentsSection />}
                 {activeTab === 'profile' && <ProfileSection />}
             </div>
         </div>
