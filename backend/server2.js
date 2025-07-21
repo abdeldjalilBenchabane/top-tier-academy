@@ -209,6 +209,30 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Professeur retire un utilisateur du room
+  socket.on('remove-user', (roomId, targetUserId) => {
+    // Trouve le socket de l'utilisateur à retirer
+    const roomSockets = io.sockets.adapter.rooms.get(roomId);
+    if (roomSockets) {
+      for (const socketId of roomSockets) {
+        const targetSocket = io.sockets.sockets.get(socketId);
+        if (targetSocket && targetSocket.userData && targetSocket.userData.id === targetUserId) {
+          // Envoie un message à l'utilisateur retiré
+          targetSocket.emit('removed-from-room', { roomId });
+          // Déconnecte l'utilisateur du room
+          targetSocket.leave(roomId);
+          // Notifie les autres
+          io.to(roomId).emit('user-left', {
+            id: targetSocket.id,
+            userId: targetUserId,
+            name: targetSocket.userData.name || 'مستخدم'
+          });
+          break;
+        }
+      }
+    }
+  });
+
   // [LIVE STREAM MODIF] --- Gestion de la fin de stream (professeur) ---
   socket.on('end-stream', (roomId) => {
     console.log('[DEBUG] end-stream event received', { roomId }); // [LIVE STREAM MODIF]

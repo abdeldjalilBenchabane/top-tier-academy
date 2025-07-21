@@ -41,7 +41,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     const [cameraDevices, setCameraDevices] = useState<{ deviceId: string, label: string }[]>([]);
     const [selectedCameraId, setSelectedCameraId] = useState<string>('');
     const [isLocalCameraEnabled, setIsLocalCameraEnabled] = useState(true);
-    
+
     // Socket.IO for chat
     const [socket, setSocket] = useState<Socket | null>(null);
 
@@ -137,14 +137,23 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         if (!user?.id || !id) return;
 
         console.log('[DEBUG] Initializing Socket.IO for chat');
-        
+
         const newSocket = io('http://localhost:5001');
         setSocket(newSocket);
+
+        // Listener pour l'état courant du mute dès la connexion
+        newSocket.on('connect', () => {
+            console.log('[DEBUG] Student socket connected:', newSocket.id, 'room:', id);
+        });
+        newSocket.on('students-muted-state', (isMuted) => {
+            console.log('[SOCKET] Received students-muted-state:', isMuted);
+            setStudentsMuted(isMuted);
+        });
 
         // Connection event handlers
         newSocket.on('connect', () => {
             console.log('[DEBUG] Socket.IO connected successfully');
-            
+
             // Add current user to participants list
             setParticipants(prev => {
                 const currentUser = {
@@ -154,7 +163,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                     role: user.role,
                     avatar_url: user.avatar_url
                 };
-                
+
                 // Check if user already exists using userId as unique identifier
                 if (prev.find(p => p.userId === currentUser.userId)) return prev;
                 return [...prev, currentUser];
@@ -223,7 +232,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         newSocket.on('students-muted', () => {
             console.log('[DEBUG] Students muted by professor');
             setStudentsMuted(true);
-            
+
             // Update all student mute states to true
             setStudentMuteStates(prev => {
                 const newState = { ...prev };
@@ -240,7 +249,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         newSocket.on('students-unmuted', () => {
             console.log('[DEBUG] Students unmuted by professor');
             setStudentsMuted(false);
-            
+
             // Update all student mute states to muted by default (students can control their own)
             setStudentMuteStates(prev => {
                 const newState = { ...prev };
@@ -292,6 +301,41 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         };
     }, [user?.id, id]);
 
+    // [LIVE STREAM MODIF] --- Gestion de la fin de stream côté professeur et élève ---
+    useEffect(() => {
+        if (!socket) return;
+        const handleRemoved = ({ roomId }) => {
+            alert('Vous avez été retiré de la session par le professeur.');
+            window.location.href = '/'; // Redirige hors du live
+        };
+        socket.on('removed-from-room', handleRemoved);
+        return () => {
+            socket.off('removed-from-room', handleRemoved);
+        };
+    }, [socket]);
+
+    // [LIVE STREAM MODIF] --- Réception de l'événement 'stream-ended' côté élève ---
+    useEffect(() => {
+        if (!socket) return;
+        const handleStreamEnded = ({ roomId }) => {
+            console.log('[DEBUG] stream-ended event received', roomId); // [LIVE STREAM MODIF]
+            // Désactive micro et caméra avant de rediriger [LIVE STREAM MODIF]
+            if (agoraVideoRef.current) {
+                if (!agoraVideoRef.current.isLocalMicMuted) {
+                    agoraVideoRef.current.toggleLocalMic();
+                }
+                if (agoraVideoRef.current.isLocalCameraEnabled) {
+                    agoraVideoRef.current.toggleLocalCamera();
+                }
+            }
+            window.location.href = '/TTHLiveClasses'; // [LIVE STREAM MODIF]
+        };
+        socket.on('stream-ended', handleStreamEnded);
+        return () => {
+            socket.off('stream-ended', handleStreamEnded);
+        };
+    }, [socket]);
+
     useEffect(() => {
         console.log('[DEBUG] Re-render, messages.length:', messages.length);
         console.log('[DEBUG] Messages:', messages);
@@ -300,10 +344,10 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     // Send message function (Socket.IO only)
     const handleSend = () => {
         if (!input.trim() || !socket) {
-            console.log('[DEBUG] Cannot send message:', { 
-                hasInput: !!input.trim(), 
+            console.log('[DEBUG] Cannot send message:', {
+                hasInput: !!input.trim(),
                 hasSocket: !!socket,
-                input: input 
+                input: input
             });
             return;
         }
@@ -333,13 +377,13 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     // Professor controls (Socket.IO only)
     const handleMuteAll = async () => {
         if (controlsLoading) return;
-        
+
         console.log('[DEBUG] Professor clicking mute all, current studentsMuted:', studentsMuted);
         setControlsLoading(true);
-        
+
         try {
             setStudentsMuted(true);
-            
+
             // Update all student mute states to true
             setStudentMuteStates(prev => {
                 const newState = { ...prev };
@@ -351,7 +395,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                 console.log('[DEBUG] Updated all student mute states to true:', newState);
                 return newState;
             });
-            
+
             if (socket) {
                 console.log('[DEBUG] Emitting mute-all event to room:', id);
                 socket.emit('mute-all', id);
@@ -364,16 +408,16 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
             setControlsLoading(false);
         }
     };
-    
+
     const handleUnmuteAll = async () => {
         if (controlsLoading) return;
-        
+
         console.log('[DEBUG] Professor clicking unmute all, current studentsMuted:', studentsMuted);
         setControlsLoading(true);
-        
+
         try {
             setStudentsMuted(false);
-            
+
             // Update all student mute states to false (unmuted) but students can control their own
             // Note: When teacher unmutes all, students are still muted by default but can unmute themselves
             setStudentMuteStates(prev => {
@@ -388,7 +432,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                 console.log('[DEBUG] Updated all student mute states to muted by default:', newState);
                 return newState;
             });
-            
+
             if (socket) {
                 console.log('[DEBUG] Emitting unmute-all event to room:', id);
                 socket.emit('unmute-all', id);
@@ -401,7 +445,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
             setControlsLoading(false);
         }
     };
-    
+
     const handleToggleChat = () => {
         setChatEnabled((v) => {
             const newValue = !v;
@@ -535,7 +579,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     return (
         <div dir='rtl' className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-700 to-purple-700 text-white">
             {debugPanel}
-            
+
             {/* Header - Responsive */}
             <div className="bg-white/10 backdrop-blur-sm border-b border-white/10 rounded-b-xl">
                 <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-4 flex items-center justify-between">
@@ -616,15 +660,15 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                 <Button size="sm" variant="secondary" className="bg-black/50 hover:bg-black/70 text-white border-0 text-xs sm:text-sm" onClick={handleFullScreen}>
                                     <Fullscreen className="w-3 h-3 sm:w-4 sm:h-4" />
                                 </Button>
-                                
+
                                 {/* Student Mic Control - Responsive */}
                                 {!isProfessor && (
                                     <>
                                         <div className="w-px h-6 bg-white/30 mx-1 sm:mx-2"></div>
-                                        <Button 
-                                            size="sm" 
-                                            variant={studentMuteStates[user?.id] ? 'destructive' : 'default'} 
-                                            className={`${studentMuteStates[user?.id] ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'} text-white border-0 ${studentsMuted ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} text-xs sm:text-sm`} 
+                                        <Button
+                                            size="sm"
+                                            variant={studentMuteStates[user?.id] ? 'destructive' : 'default'}
+                                            className={`${studentMuteStates[user?.id] ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'} text-white border-0 ${studentsMuted ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} text-xs sm:text-sm`}
                                             onClick={() => {
                                                 if (!studentsMuted) {
                                                     // Student can toggle their own mic
@@ -646,45 +690,45 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                         </Button>
                                     </>
                                 )}
-                                
+
                                 {/* Professor Video Controls - Responsive */}
                                 {isProfessor && (
                                     <>
                                         <div className="w-px h-6 bg-white/30 mx-1 sm:mx-2"></div>
-                                        
+
                                         {/* Mic Control */}
-                                        <Button 
-                                            size="sm" 
-                                            variant="secondary" 
-                                            className="bg-black/50 hover:bg-black/70 text-white border-0 text-xs sm:text-sm" 
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            className="bg-black/50 hover:bg-black/70 text-white border-0 text-xs sm:text-sm"
                                             onClick={handleToggleMic}
                                             title="كتم/إلغاء كتم الميكروفون"
                                         >
                                             {isLocalMicMuted ? <MicOff className="w-3 h-3 sm:w-4 sm:h-4" /> : <Mic className="w-3 h-3 sm:w-4 sm:h-4" />}
                                         </Button>
-                                        
+
                                         {/* Camera Control */}
-                                        <Button 
-                                            size="sm" 
-                                            variant={isLocalCameraEnabled ? 'secondary' : 'destructive'} 
-                                            className={`${isLocalCameraEnabled ? 'bg-black/50 hover:bg-black/70' : 'bg-red-600 hover:bg-red-700'} text-white border-0 text-xs sm:text-sm`} 
+                                        <Button
+                                            size="sm"
+                                            variant={isLocalCameraEnabled ? 'secondary' : 'destructive'}
+                                            className={`${isLocalCameraEnabled ? 'bg-black/50 hover:bg-black/70' : 'bg-red-600 hover:bg-red-700'} text-white border-0 text-xs sm:text-sm`}
                                             onClick={handleToggleCamera}
                                             title={isLocalCameraEnabled ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'}
                                         >
                                             {isLocalCameraEnabled ? <Video className="w-3 h-3 sm:w-4 sm:h-4" /> : <VideoOff className="w-3 h-3 sm:w-4 sm:h-4" />}
                                         </Button>
-                                        
+
                                         {/* Screen Share Control */}
-                                        <Button 
-                                            size="sm" 
-                                            variant={isScreenSharing ? 'destructive' : 'secondary'} 
-                                            className={`${isScreenSharing ? 'bg-red-600 hover:bg-red-700' : 'bg-black/50 hover:bg-black/70'} text-white border-0 text-xs sm:text-sm`} 
+                                        <Button
+                                            size="sm"
+                                            variant={isScreenSharing ? 'destructive' : 'secondary'}
+                                            className={`${isScreenSharing ? 'bg-red-600 hover:bg-red-700' : 'bg-black/50 hover:bg-black/70'} text-white border-0 text-xs sm:text-sm`}
                                             onClick={handleScreenShare}
                                             title={isScreenSharing ? 'إيقاف مشاركة الشاشة' : 'مشاركة الشاشة'}
                                         >
                                             <Monitor className="w-3 h-3 sm:w-4 sm:h-4" />
                                         </Button>
-                                        
+
                                         {/* Camera Device Selector - Responsive */}
                                         {isLocalCameraEnabled && cameraDevices.length > 1 && (
                                             <select
@@ -700,14 +744,14 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                                 ))}
                                             </select>
                                         )}
-                                        
+
                                         <div className="w-px h-6 bg-white/30 mx-1 sm:mx-2"></div>
-                                        
+
                                         {/* Professor Controls - Responsive */}
-                                        <Button 
-                                            size="sm" 
-                                            variant={studentsMuted ? 'destructive' : 'secondary'} 
-                                            className={`${studentsMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-black/50 hover:bg-black/70'} text-white border-0 text-xs sm:text-sm`} 
+                                        <Button
+                                            size="sm"
+                                            variant={studentsMuted ? 'destructive' : 'secondary'}
+                                            className={`${studentsMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-black/50 hover:bg-black/70'} text-white border-0 text-xs sm:text-sm`}
                                             onClick={handleMuteAll}
                                             title="كتم جميع الطلاب"
                                             disabled={controlsLoading}
@@ -718,10 +762,10 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                                 <MicOff className="w-3 h-3 sm:w-4 sm:h-4" />
                                             )}
                                         </Button>
-                                        <Button 
-                                            size="sm" 
-                                            variant={!studentsMuted ? 'default' : 'secondary'} 
-                                            className={`${!studentsMuted ? 'bg-green-600 hover:bg-green-700' : 'bg-black/50 hover:bg-black/70'} text-white border-0 text-xs sm:text-sm`} 
+                                        <Button
+                                            size="sm"
+                                            variant={!studentsMuted ? 'default' : 'secondary'}
+                                            className={`${!studentsMuted ? 'bg-green-600 hover:bg-green-700' : 'bg-black/50 hover:bg-black/70'} text-white border-0 text-xs sm:text-sm`}
                                             onClick={handleUnmuteAll}
                                             title="إلغاء كتم جميع الطلاب"
                                             disabled={controlsLoading}
@@ -732,15 +776,58 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                                 <Mic className="w-3 h-3 sm:w-4 sm:h-4" />
                                             )}
                                         </Button>
-                                        <Button 
-                                            size="sm" 
-                                            variant={chatEnabled ? 'secondary' : 'destructive'} 
-                                            className={`${chatEnabled ? 'bg-black/50 hover:bg-black/70' : 'bg-red-600 hover:bg-red-700'} text-white border-0 text-xs sm:text-sm`} 
+                                        <Button
+                                            size="sm"
+                                            variant={chatEnabled ? 'secondary' : 'destructive'}
+                                            className={`${chatEnabled ? 'bg-black/50 hover:bg-black/70' : 'bg-red-600 hover:bg-red-700'} text-white border-0 text-xs sm:text-sm`}
                                             onClick={handleToggleChat}
                                             title={chatEnabled ? 'إيقاف الدردشة' : 'تفعيل الدردشة'}
                                         >
                                             <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4" />
                                         </Button>
+                                        {isProfessor && (
+                                            <Button
+                                                variant="destructive"
+                                                className="ml-2"
+                                                onClick={async () => {
+                                                    console.log('[DEBUG] Prof click Terminer le stream', { id, socket, socketId: socket?.id }); // [LIVE STREAM MODIF]
+                                                    // Désactive micro et caméra avant de terminer le stream [LIVE STREAM MODIF]
+                                                    if (agoraVideoRef.current) {
+                                                        if (!agoraVideoRef.current.isLocalMicMuted) {
+                                                            agoraVideoRef.current.toggleLocalMic();
+                                                        }
+                                                        if (agoraVideoRef.current.isLocalCameraEnabled) {
+                                                            agoraVideoRef.current.toggleLocalCamera();
+                                                        }
+                                                    }
+                                                    if (socket && id) {
+                                                        console.log('[DEBUG] Emitting end-stream', { id }); // [LIVE STREAM MODIF]
+                                                        socket.emit('end-stream', id); // [LIVE STREAM MODIF]
+                                                    } else {
+                                                        console.error('[DEBUG] end-stream NOT emitted', { socket, id }); // [LIVE STREAM MODIF]
+                                                    }
+                                                    // Appelle l’API PATCH pour mettre à jour le statut du live
+                                                    try {
+                                                        await fetch(`http://localhost:5001/api/live-sessions/${id}`, {
+                                                            method: 'PATCH',
+                                                            headers: {
+                                                                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                                                                'Content-Type': 'application/json'
+                                                            },
+                                                            body: JSON.stringify({ status: 'ended' })
+                                                        });
+                                                    } catch (err) {
+                                                        console.error('Failed to update live status:', err);
+                                                    }
+                                                    // Attendre un peu pour s'assurer que l'événement est envoyé [LIVE STREAM MODIF]
+                                                    await new Promise(resolve => setTimeout(resolve, 500));
+                                                    // Redirige le prof [LIVE STREAM MODIF]
+                                                    navigate('/professor/dashboard');
+                                                }}
+                                            >
+                                                Terminer le stream
+                                            </Button>
+                                        )}
                                     </>
                                 )}
                             </div>
@@ -752,7 +839,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                         <h1 className="text-2xl font-bold mb-2">{session.title}</h1>
                         <p className="text-gray-300 mb-4">مقدم من: {session.presenter}</p>
                         <p className="text-gray-400 leading-relaxed">{session.description}</p>
-                       
+
                     </div>
                 </div>
 
@@ -784,7 +871,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                         </div>
                     )}
                 </h3>
-                
+
                 {participants.length === 0 ? (
                     <div className="text-center py-6 sm:py-8">
                         <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/10 rounded-full mx-auto mb-2 sm:mb-3 flex items-center justify-center">
@@ -804,43 +891,43 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                             return (
                                 <div
                                     key={participant.userId}
-                                className="relative group cursor-pointer"
-                                title={participant.name}
-                            >
-                                {/* Avatar Circle */}
-                                <div className="relative w-12 h-12 sm:w-16 sm:h-16 mx-auto">
-                                    {/* Profile Picture or Initial */}
-                                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm sm:text-lg border-2 border-white/20 group-hover:border-green-400 transition-all duration-200">
-                                        {participant.avatar_url ? (
-                                            <img 
-                                                src={participant.avatar_url} 
-                                                alt={participant.name}
-                                                className="w-full h-full rounded-full object-cover"
-                                            />
-                                        ) : (
-                                            <span>{participant.name ? participant.name.charAt(0).toUpperCase() : 'م'}</span>
-                                        )}
+                                    className="relative group cursor-pointer"
+                                    title={participant.name}
+                                >
+                                    {/* Avatar Circle */}
+                                    <div className="relative w-12 h-12 sm:w-16 sm:h-16 mx-auto">
+                                        {/* Profile Picture or Initial */}
+                                        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm sm:text-lg border-2 border-white/20 group-hover:border-green-400 transition-all duration-200">
+                                            {participant.avatar_url ? (
+                                                <img
+                                                    src={participant.avatar_url}
+                                                    alt={participant.name}
+                                                    className="w-full h-full rounded-full object-cover"
+                                                />
+                                            ) : (
+                                                <span>{participant.name ? participant.name.charAt(0).toUpperCase() : 'م'}</span>
+                                            )}
+                                        </div>
+                                        {/* Online Status Indicator */}
+                                        <div className="absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 w-3 h-3 sm:w-5 sm:h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                                            <div className="w-1 h-1 sm:w-2 sm:h-2 bg-white rounded-full"></div>
+                                        </div>
+                                        {/* Hover Effect */}
+                                        <div className="absolute inset-0 rounded-full bg-green-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                                     </div>
-                                    {/* Online Status Indicator */}
-                                    <div className="absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 w-3 h-3 sm:w-5 sm:h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
-                                        <div className="w-1 h-1 sm:w-2 sm:h-2 bg-white rounded-full"></div>
-                                    </div>
-                                    {/* Hover Effect */}
-                                    <div className="absolute inset-0 rounded-full bg-green-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                                </div>
                                     {/* Name + Mic Icon */}
                                     <div className="text-center mt-1 sm:mt-2 flex items-center justify-center gap-1">
                                         <p className="text-white text-xs sm:text-sm font-medium truncate mb-0">
-                                        {participant.name || 'مستخدم'}
-                                    </p>
+                                            {participant.name || 'مستخدم'}
+                                        </p>
                                         {isStudent && (
                                             <span
                                                 className={`inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded-full ${canToggle ? 'cursor-pointer hover:scale-110 hover:opacity-80 transition-all duration-200' : 'cursor-default opacity-50'} ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}
                                                 title={
                                                     canProfToggle ? (isMuted ? 'إلغاء كتم الطالب' : 'كتم الطالب') :
-                                                    canStudentToggleOwn ? (isMuted ? 'إلغاء كتم الميكروفون' : 'كتم الميكروفون') :
-                                                    studentsMuted ? 'مكتوم من قبل الأستاذ' :
-                                                    isMuted ? 'مكتوم' : 'ميكروفون نشط'
+                                                        canStudentToggleOwn ? (isMuted ? 'إلغاء كتم الميكروفون' : 'كتم الميكروفون') :
+                                                            studentsMuted ? 'مكتوم من قبل الأستاذ' :
+                                                                isMuted ? 'مكتوم' : 'ميكروفون نشط'
                                                 }
                                                 onClick={() => {
                                                     console.log('[DEBUG] Mic icon clicked!', {
@@ -898,17 +985,17 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                             {participant.role === 'professor' ? 'أستاذ' : 'طالب'}
                                         </p>
                                     )}
-                                {/* Hover Tooltip */}
-                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 sm:px-3 py-1 bg-black/80 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
-                                    {participant.name || 'مستخدم'}
-                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black/80"></div>
+                                    {/* Hover Tooltip */}
+                                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 sm:px-3 py-1 bg-black/80 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                        {participant.name || 'مستخدم'}
+                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black/80"></div>
+                                    </div>
                                 </div>
-                            </div>
                             );
                         })}
                     </div>
                 )}
-                
+
                 {/* Participants Summary - Responsive */}
                 <div className="mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-white/10">
                     <div className="flex justify-between text-xs sm:text-sm text-gray-300">
