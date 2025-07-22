@@ -98,10 +98,20 @@ router.get('/', async (req, res) => {
         c.id, c.title, c.description, c.price, c.is_published, c.created_at,
         c.approved_at, c.created_by, c.status, u.name as created_by_name,
         m.name as material_name, m.price as material_price, m.speciality_id as speciality_id, cc.cover as cover_url,
-        c.language_level_id, c.material_id
+        c.language_level_id, c.material_id,
+        s.name as speciality_name,
+        ll.name as language_level_name,
+        l.name as language_name,
+        lvl.name as level_name,
+        y.name as year_name
       FROM courses c
       LEFT JOIN users u ON c.created_by = u.id
       LEFT JOIN materials m ON c.material_id = m.id
+      LEFT JOIN specialities s ON m.speciality_id = s.id
+      LEFT JOIN years y ON s.year_id = y.id
+      LEFT JOIN levels lvl ON y.level_id = lvl.id
+      LEFT JOIN language_levels ll ON c.language_level_id = ll.id
+      LEFT JOIN languages l ON ll.language_id = l.id
       LEFT JOIN course_covers cc ON c.id = cc.course_id
       WHERE 1=1
     `;

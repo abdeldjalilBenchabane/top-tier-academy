@@ -282,7 +282,7 @@ const AdminPoints: React.FC = () => {
           <CardDescription>Manage all available point packages</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
+      {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               <span className="ml-3 text-gray-600">Loading...</span>
@@ -307,7 +307,7 @@ const AdminPoints: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {packages.map((pack, idx) => (
+            {packages.map((pack, idx) => (
                   <TableRow key={pack.id}>
                     <TableCell>
                       <Input 

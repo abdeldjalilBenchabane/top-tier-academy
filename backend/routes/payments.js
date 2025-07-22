@@ -41,8 +41,8 @@ router.post('/create-checkout', auth, async (req, res) => {
     const checkoutData = {
       amount: parseInt(amount),
       currency: 'dzd', // Chargily expects lowercase 'dzd'
-      success_url: process.env.FRONTEND_URL || 'http://localhost:8080/TTHCourses',
-      failure_url: `${process.env.FRONTEND_URL || 'http://localhost:8080/TTHCourses'}/points/failure?transaction_id=${transactionId}`,
+      success_url:  'http://localhost:8080/points',
+      failure_url: `${ 'http://localhost:8080/points'}/points/failure?transaction_id=${transactionId}`,
       metadata: {
         transaction_id: transactionId.toString(),
         user_id: userId.toString(),
@@ -109,15 +109,28 @@ router.post('/create-checkout', auth, async (req, res) => {
 // Webhook to handle Chargily payment status updates
 router.post('/webhook', async (req, res) => {
   try {
-    console.log('--- WEBHOOK DEBUG START ---');
-    console.log('Raw webhook payload:', req.body);
+    console.log('--- WEBHOOK DEBUG ---');
+    console.log('Webhook received:', {
+      headers: req.headers,
+      body: req.body
+    });
     const { checkout_id, status, amount, currency } = req.body;
+    console.log('Parsed webhook data:', {
+      checkout_id,
+      status,
+      amount,
+      currency
+    });
 
     // Find transaction by checkout ID
     const transactionResult = await pool.query(
       'SELECT * FROM point_transactions WHERE payment_reference = $1',
       [checkout_id]
     );
+    console.log('DB query for payment_reference:', {
+      payment_reference: checkout_id,
+      result: transactionResult.rows
+    });
 
     if (transactionResult.rows.length === 0) {
       console.error('Transaction not found for checkout_id:', checkout_id);
@@ -130,23 +143,35 @@ router.post('/webhook', async (req, res) => {
 
     const transaction = transactionResult.rows[0];
     console.log('Found transaction:', transaction);
-    console.log('Expected payment_reference:', checkout_id, 'Actual in DB:', transaction.payment_reference);
-    console.log('Status:', status);
+    console.log('Status transition:', {
+      current_db_status: transaction.status,
+      webhook_status: status
+    });
+      
     // Only update to completed if not already completed
     if (status && status.toLowerCase() === 'paid' && transaction.status !== 'completed') {
       await pool.query(
-        'UPDATE point_transactions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+          'UPDATE point_transactions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
         ['completed', transaction.id]
-      );
-      console.log(`Transaction ${transaction.id} marked as completed (points will be added by trigger)`);
+        );
+      console.log({
+        message: 'Transaction marked as completed (points will be added by trigger)',
+        transaction_id: transaction.id
+      });
     } else if (!status || status.toLowerCase() !== 'paid') {
       await pool.query(
         'UPDATE point_transactions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
         ['failed', transaction.id]
       );
-      console.log(`Transaction ${transaction.id} marked as failed`);
+      console.log({
+        message: 'Transaction marked as failed',
+        transaction_id: transaction.id
+      });
     } else {
-      console.log(`Transaction ${transaction.id} already completed, skipping update.`);
+      console.log({
+        message: 'Transaction already completed, skipping update.',
+        transaction_id: transaction.id
+      });
     }
     console.log('--- WEBHOOK DEBUG END (success) ---');
     res.json({ success: true });
@@ -154,6 +179,60 @@ router.post('/webhook', async (req, res) => {
   } catch (error) {
     console.error('Webhook error:', error);
     res.status(500).json({ error: 'Webhook processing failed' });
+  }
+});
+
+// Diagnostic endpoint: List last 5 transactions
+router.get('/debug/transactions', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, payment_reference, status FROM point_transactions ORDER BY id DESC LIMIT 5');
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch transactions', details: error.message });
+  }
+});
+
+// Fallback endpoint: Mark transaction as completed if user lands on success_url with a valid token
+router.post('/mark-completed', async (req, res) => {
+  const { checkout_id, transaction_id } = req.body;
+  console.log('--- /mark-completed endpoint called ---', req.body);
+  if (!checkout_id && !transaction_id) return res.status(400).json({ error: 'Missing checkout_id or transaction_id' });
+
+  try {
+    let result;
+    if (checkout_id) {
+      result = await pool.query(
+        'UPDATE point_transactions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE payment_reference = $2 AND status != $1 RETURNING *',
+        ['completed', checkout_id]
+      );
+      if (result.rows.length > 0) {
+        console.log({
+          message: 'Transaction marked as completed via success_url fallback (by checkout_id)',
+          transaction_id: result.rows[0].id
+        });
+      }
+    }
+    // Fallback: try by transaction_id if not found by checkout_id
+    if ((!result || result.rows.length === 0) && transaction_id) {
+      result = await pool.query(
+        'UPDATE point_transactions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND status != $1 RETURNING *',
+        ['completed', transaction_id]
+      );
+      if (result.rows.length > 0) {
+        console.log({
+          message: 'Transaction marked as completed via success_url fallback (by transaction_id)',
+          transaction_id: result.rows[0].id
+        });
+      }
+    }
+    if (!result || result.rows.length === 0) {
+      console.log('No transaction found or already completed for:', { checkout_id, transaction_id });
+      return res.status(404).json({ error: 'Transaction not found or already completed', checkout_id, transaction_id });
+    }
+    res.json({ success: true, transaction: result.rows[0] });
+  } catch (error) {
+    console.error('Error in /mark-completed:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 

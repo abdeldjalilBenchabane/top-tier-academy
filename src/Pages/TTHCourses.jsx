@@ -3,57 +3,75 @@ import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 import CourseCard from "../components/ui/TTHCourseCard";
 import SearchFilter from "../components/ui/TTHSearchFilter";
-import { courseData } from "../data";
 import { pointsAPI } from '@/services/api';
 
 export default function Courses() {
-  const [courses, setCourses] = useState([]);
+  const [coursesByPath, setCoursesByPath] = useState({});
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    async function fetchCourses() {
+    async function fetchAllCourses() {
       setLoading(true);
       try {
-        // Fetch approved courses
         const res = await fetch('/api/courses?status=approved');
-        let data = await res.json();
-        console.log('COURSES DATA', data);
-        // Only keep courses WITHOUT a language_level_id (education path)
-        data = data.filter(course => !course.language_level_id || course.language_level_id === null || course.language_level_id === undefined);
+        let allCourses = await res.json();
         
-        // For education courses, fetch price from materials table
+        let purchasedIds = [];
+        if (localStorage.getItem('token')) {
+          try {
+            const purchasedRes = await pointsAPI.getMyCourses();
+            purchasedIds = purchasedRes.courseIds || [];
+          } catch (e) { /* ignore if not logged in */ }
+        }
+
+        allCourses = allCourses.map(course => ({ ...course, purchased: purchasedIds.includes(course.id) }));
+
+        // Fetch material prices for education courses
+        let materialsData = [];
         try {
           const materialsRes = await fetch('/api/courses/materials/list');
           if (materialsRes.ok) {
-            const materialsData = await materialsRes.json();
-            data = data.map(course => {
-              const material = materialsData.find(m => m.name === course.material_name);
-              return material ? { ...course, price: material.price } : course;
-            });
-          } else {
-            console.warn('Failed to fetch materials, continuing without prices');
+            materialsData = await materialsRes.json();
           }
-        } catch (e) {
-          console.warn('Error fetching materials:', e);
-          // Continue without prices - courses will still display
-        }
+        } catch (e) { /* ignore */ }
+
+        allCourses = allCourses.map(course => {
+          // For education courses, use material price if course price is 0/null
+          if (!course.language_level_id) {
+            let price = course.price;
+            if (!price || price === 0) {
+              const material = materialsData.find(m => m.name === course.material_name);
+              price = material ? material.price : 0;
+            }
+            return { ...course, price };
+          }
+          return course;
+        });
+
+        // Dynamically group courses by a combined path, filtering out language courses
+        const groupedCourses = allCourses.reduce((acc, course) => {
+          if (course.level_name && course.year_name && !course.language_level_id) {
+            const pathName = `${course.level_name} - ${course.year_name}`;
+            if (!acc[pathName]) {
+              acc[pathName] = [];
+            }
+            acc[pathName].push(course);
+          }
+          return acc;
+        }, {});
         
-        // Fetch purchased course IDs
-        let purchasedIds = [];
-        try {
-          const purchasedRes = await pointsAPI.getMyCourses();
-          purchasedIds = purchasedRes.courseIds || [];
-        } catch (e) { /* ignore if not logged in */ }
-        // Mark purchased courses
-        data = data.map(course => ({ ...course, purchased: purchasedIds.includes(course.id) }));
-        setCourses(data);
+        setCoursesByPath(groupedCourses);
+
       } catch (e) {
-        setCourses([]);
+        console.error("Failed to fetch or group courses:", e);
+        setCoursesByPath({});
       } finally {
         setLoading(false);
       }
     }
-    fetchCourses();
+    fetchAllCourses();
   }, []);
+
   return (
     <div dir="rtl" className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 flex flex-col">
       <Navbar />
@@ -103,79 +121,55 @@ export default function Courses() {
           </div>
         </section>
 
-        {/* Courses Section */}
+        {/* Courses Section by Path */}
         <section className="py-12 md:py-16">
-          <div className="container mx-auto px-4">
-          
-            <div className="text-center mb-12">
-              <div className="inline-block">
-                <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold font-rowdies mb-4 relative">
-                  <span className="text-gray-800">حصص </span>
-                  <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                    الثالثة علوم تجريبية ثانوي
-                  </span>
-
-                 
-                </h2>
-              </div>
-              <p className="text-gray-600 mt-6 text-lg max-w-2xl mx-auto">
-                اكتشف مجموعة شاملة من الدروس المصممة خصيصاً لطلاب الثالثة علوم تجريبية
-              </p>
-            </div>
-
-           
-           
-            <div className="relative">
-              
-              
-              <div className="absolute inset-0 -z-10">
-                <div className="absolute top-1/4 right-10 w-32 h-32 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full opacity-20 blur-2xl"></div>
-                <div className="absolute bottom-1/4 left-10 w-40 h-40 bg-gradient-to-r from-purple-200 to-blue-200 rounded-full opacity-20 blur-2xl"></div>
-              </div>
-
-             
-              <div 
-                dir="rtl" 
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 md:gap-8 justify-items-center relative z-10"
-              >
-                {courses.map((course, index) => (
-                  <div
-                    key={course.id}
-                    className="w-full max-w-sm transform hover:scale-105 transition-all duration-300"
-                    style={{
-                      animationDelay: `${index * 100}ms`
-                    }}
-                  >
-                    <CourseCard course={course} />
+          <div className="container mx-auto px-4 space-y-16">
+            {loading ? (
+              <div className="text-center">Loading...</div>
+            ) : Object.keys(coursesByPath).length > 0 ? (
+              Object.keys(coursesByPath).map(pathName => (
+                coursesByPath[pathName] && coursesByPath[pathName].length > 0 && (
+                  <div key={pathName}>
+                    <div className="text-center mb-12">
+                      <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold font-rowdies mb-4 relative">
+                        <span className="text-gray-800">حصص </span>
+                        <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                          {pathName}
+                        </span>
+                      </h2>
+                    </div>
+                    <div 
+                      dir="rtl" 
+                      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 md:gap-8 justify-items-center"
+                    >
+                      {coursesByPath[pathName].map((course, index) => (
+                        <div
+                          key={course.id}
+                          className="w-full max-w-sm"
+                          style={{ animationDelay: `${index * 100}ms` }}
+                        >
+                          <CourseCard course={course} />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </div>
-
-              {courses.length === 0 && !loading && (
-                <div className="text-center py-16">
-                  <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
-                    <svg className="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-800 mb-2">لا توجد دروس متاحة حالياً</h3>
-                  <p className="text-gray-600">سيتم إضافة دروس جديدة قريباً</p>
+                )
+              ))
+            ) : (
+              <div className="text-center py-16">
+                <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+                  <svg className="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
                 </div>
-              )}
-            </div>
-
-         
-            {courses.length > 0 && (
-              <div className="text-center mt-12">
-                <button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
-                  عرض المزيد من الدروس
-                </button>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">لا توجد دروس متاحة حالياً</h3>
+                <p className="text-gray-600">سيتم إضافة دروس جديدة قريباً</p>
               </div>
             )}
           </div>
         </section>
       </main>
-
+      
       <Footer />
     </div>
   );

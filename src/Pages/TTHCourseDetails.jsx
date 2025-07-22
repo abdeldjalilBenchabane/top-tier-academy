@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Play, Download, FileText, Star, Clock, Globe, CheckCircle, BookOpen, Award, Users, Calendar, Eye, X, Image as ImageIcon, Video as VideoIcon, FileText as FileTextIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Play, Download, FileText, Star, Clock, Globe, CheckCircle, BookOpen, Award, Users, Calendar, Eye, X, Image as ImageIcon, Video as VideoIcon, FileText as FileTextIcon, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
@@ -59,6 +59,8 @@ export default function CourseDetail() {
     const [replyText, setReplyText] = useState({});
 
     const { user } = useAuth();
+    const [hasAccess, setHasAccess] = useState(false);
+    const [isPreview, setIsPreview] = useState(false);
 
     useEffect(() => {
         const fetchCourseData = async () => {
@@ -70,6 +72,17 @@ export default function CourseDetail() {
                     throw new Error('Course not found');
                 }
                 const courseData = await courseRes.json();
+
+                // Check if user has purchased this course
+                let purchased = false;
+                if (user) {
+                    try {
+                        const purchasedRes = await import('@/services/api').then(m => m.pointsAPI.getMyCourses());
+                        const purchasedIds = purchasedRes.courseIds || purchasedRes.courses || [];
+                        purchased = purchasedIds.includes(courseData.id);
+                    } catch (e) { /* ignore */ }
+                }
+                courseData.purchased = purchased;
                 setCourse(courseData);
 
                 // Prepare all content for navigation
@@ -203,7 +216,22 @@ export default function CourseDetail() {
         if (id) {
             fetchCourseData();
         }
-    }, [id]);
+    }, [id, user]);
+
+    useEffect(() => {
+        // Determine access: purchased, admin, or professor
+        if (!course) return;
+        if (user && (user.role === 'admin' || user.role === 'professor')) {
+            setHasAccess(true);
+            setIsPreview(false);
+        } else if (user && (course.purchased || course.purchased === true)) {
+            setHasAccess(true);
+            setIsPreview(false);
+        } else {
+            setHasAccess(false);
+            setIsPreview(true);
+        }
+    }, [user, course]);
 
     // New functions for interactive curriculum
     const toggleSection = (sectionIndex) => {
@@ -528,62 +556,76 @@ export default function CourseDetail() {
                             )}
                             
                             <div className="relative aspect-video">
-                                {currentContent?.type === 'video' && mainVideoUrl ? (
+                                {!hasAccess ? (
+                                    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[2px] text-white">
+                                        <Lock className="w-16 h-16 mb-4 text-white/90" />
+                                        <span className="font-bold text-2xl mb-2">محتوى الدرس مغلق</span>
+                                        <span className="text-md mb-4">قم بشراء الدرس للوصول الكامل إلى جميع الدروس والفيديوهات</span>
+                                        <button
+                                            className="px-8 py-3 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-lg shadow-lg"
+                                            onClick={() => user ? navigate('/points') : navigate('/login')}
+                                        >
+                                            {user ? 'شراء الدرس بالنقاط' : 'سجّل الدخول للوصول الكامل'}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    currentContent?.type === 'video' && mainVideoUrl ? (
                                     <video
                                         controls
-                                        src={mainVideoUrl}
+                                            src={mainVideoUrl}
                                         className="w-full h-full rounded-2xl"
-                                        poster={course.cover_url || "/placeholder.svg"}
+                                            poster={course.cover_url || "/placeholder.svg"}
                                         onPlay={() => setIsVideoPlaying(true)}
                                         onPause={() => setIsVideoPlaying(false)}
                                     >
-                                        <source src={mainVideoUrl} type="video/mp4" />
+                                            <source src={mainVideoUrl} type="video/mp4" />
                                         متصفحك لا يدعم عرض الفيديو.
                                     </video>
-                                ) : currentContent?.type === 'image' ? (
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-900">
-                                        <img
-                                            src={currentContent.url}
-                                            alt={currentContent.title}
-                                            className="max-w-full max-h-full object-contain rounded-2xl"
-                                        />
-                                    </div>
-                                ) : currentContent?.type === 'pdf' ? (
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-900">
-                                        <div className="text-center text-white">
-                                            <FileTextIcon size={64} className="mx-auto mb-4" />
-                                            <h3 className="text-xl font-bold mb-2">{currentContent.title}</h3>
-                                            <p className="text-gray-300 mb-4">ملف PDF</p>
-                                            <button
-                                                onClick={() => handleDownload(currentContent.url, currentContent.fileName)}
-                                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 mx-auto"
-                                            >
-                                                <Download size={16} />
-                                                تحميل الملف
-                                            </button>
+                                    ) : currentContent?.type === 'image' ? (
+                                        <div className="w-full h-full flex items-center justify-center bg-gray-900">
+                                            <img
+                                                src={currentContent.url}
+                                                alt={currentContent.title}
+                                                className="max-w-full max-h-full object-contain rounded-2xl"
+                                            />
                                         </div>
-                                    </div>
-                                ) : currentContent?.type === 'text' ? (
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-900">
-                                        <div className="text-center text-white max-w-md mx-auto p-6">
-                                            <FileTextIcon size={64} className="mx-auto mb-4" />
-                                            <h3 className="text-xl font-bold mb-4">{currentContent.title}</h3>
-                                            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-right">
-                                                <p className="text-white leading-relaxed">{currentContent.content}</p>
+                                    ) : currentContent?.type === 'pdf' ? (
+                                        <div className="w-full h-full flex items-center justify-center bg-gray-900">
+                                            <div className="text-center text-white">
+                                                <FileTextIcon size={64} className="mx-auto mb-4" />
+                                                <h3 className="text-xl font-bold mb-2">{currentContent.title}</h3>
+                                                <p className="text-gray-300 mb-4">ملف PDF</p>
+                                                <button
+                                                    onClick={() => handleDownload(currentContent.url, currentContent.fileName)}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 mx-auto"
+                                                >
+                                                    <Download size={16} />
+                                                    تحميل الملف
+                                                </button>
                                             </div>
                                         </div>
-                                    </div>
+                                    ) : currentContent?.type === 'text' ? (
+                                        <div className="w-full h-full flex items-center justify-center bg-gray-900">
+                                            <div className="text-center text-white max-w-md mx-auto p-6">
+                                                <FileTextIcon size={64} className="mx-auto mb-4" />
+                                                <h3 className="text-xl font-bold mb-4">{currentContent.title}</h3>
+                                                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-right">
+                                                    <p className="text-white leading-relaxed">{currentContent.content}</p>
+                                                </div>
+                                            </div>
+                                        </div>
                                 ) : (
                                     <div className="flex items-center justify-center h-full">
-                                        <img 
-                                            src={course.cover_url || "/placeholder.svg"} 
-                                            alt={course.title} 
-                                            className="w-full h-full object-cover" 
-                                        />
+                                            <img 
+                                                src={course.cover_url || "/placeholder.svg"} 
+                                                alt={course.title} 
+                                                className="w-full h-full object-cover" 
+                                            />
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                                             <Play size={64} className="text-white" />
                                         </div>
                                     </div>
+                                    )
                                 )}
                             </div>
                             
@@ -756,7 +798,17 @@ export default function CourseDetail() {
                                                             {section.blocks?.filter(block => block.type !== 'text').map((block, blockIndex) => {
                                                                 const fileUrl = block.files?.[0]?.file_path || block.fileUrl || block.content;
                                                                 const fileName = block.files?.[0]?.original_name || block.title || `ملف ${blockIndex + 1}`;
-                                                                
+                                                                if (!hasAccess) {
+                                                                    return (
+                                                                        <li key={blockIndex} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50">
+                                                                            <div className="flex items-center gap-3 flex-1">
+                                                                                <Lock className="text-gray-400" size={20} />
+                                                                                <span className="text-gray-500 font-medium">{block.title || `محتوى ${blockIndex + 1}`}</span>
+                                                                                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">محتوى مغلق</span>
+                                                                            </div>
+                                                            </li>
+                                                                    );
+                                                                }
                                                                 return (
                                                                     <li key={blockIndex} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
                                                                         <div className="flex items-center gap-3 flex-1">
@@ -807,7 +859,7 @@ export default function CourseDetail() {
                                                                                 </div>
                                                                             )}
                                                                         </div>
-                                                            </li>
+                                                                    </li>
                                                                 );
                                                             })}
                                                     </ul>

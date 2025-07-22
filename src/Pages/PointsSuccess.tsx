@@ -10,8 +10,43 @@ const PointsSuccess: React.FC = () => {
   const navigate = useNavigate();
   const [transaction, setTransaction] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [markCompletedLog, setMarkCompletedLog] = useState<string | null>(null);
+  const [debugTransactions, setDebugTransactions] = useState<any[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const transactionId = searchParams.get('transaction_id');
+  const checkoutId = searchParams.get('checkout_id');
+
+  useEffect(() => {
+    const markCompletedIfNeeded = async () => {
+      if (checkoutId || transactionId) {
+        try {
+          console.log('Calling /api/payments/mark-completed', { checkoutId, transactionId });
+          const res = await fetch('/api/payments/mark-completed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ checkout_id: checkoutId, transaction_id: transactionId })
+          });
+          const data = await res.json();
+          setMarkCompletedLog(JSON.stringify(data, null, 2));
+        } catch (err) {
+          setMarkCompletedLog('Error calling /mark-completed: ' + (err instanceof Error ? err.message : String(err)));
+          setErrorMsg('Failed to call /api/payments/mark-completed. See browser console for details.');
+        }
+      } else {
+        setErrorMsg('No checkout_id or transaction_id found in URL.');
+      }
+    };
+    markCompletedIfNeeded();
+  }, [checkoutId, transactionId]);
+
+  useEffect(() => {
+    // Fetch last 5 transactions for debug
+    fetch('/api/payments/debug/transactions')
+      .then(res => res.json())
+      .then(setDebugTransactions)
+      .catch(() => setDebugTransactions([]));
+  }, []);
 
   useEffect(() => {
     const checkTransaction = async () => {
@@ -68,6 +103,23 @@ const PointsSuccess: React.FC = () => {
           </CardHeader>
           
           <CardContent className="space-y-6">
+            {errorMsg && (
+              <div className="bg-red-100 text-red-700 rounded-lg p-3 mb-3 border border-red-300">
+                <strong>Frontend Error:</strong> {errorMsg}
+              </div>
+            )}
+            {markCompletedLog && (
+              <div className="bg-yellow-50 text-left text-xs rounded-lg p-3 mb-3 border border-yellow-300">
+                <strong>Backend /mark-completed log:</strong>
+                <pre className="whitespace-pre-wrap break-all">{markCompletedLog}</pre>
+              </div>
+            )}
+            {debugTransactions.length > 0 && (
+              <div className="bg-blue-50 text-left text-xs rounded-lg p-3 mb-3 border border-blue-300">
+                <strong>Last 5 DB Transactions:</strong>
+                <pre className="whitespace-pre-wrap break-all">{JSON.stringify(debugTransactions, null, 2)}</pre>
+              </div>
+            )}
             {transaction && (
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-center justify-center space-x-2 space-x-reverse mb-3">

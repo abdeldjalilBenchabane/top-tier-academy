@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, BookOpen, ArrowRight, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { Clock, BookOpen, ArrowRight, CheckCircle, AlertTriangle, Loader2, Lock } from 'lucide-react';
 import { pointsAPI } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -11,14 +11,33 @@ const CourseCard = ({ course }) => {
   const [buySuccess, setBuySuccess] = useState(false);
   const { user } = useAuth ? useAuth() : { user: null };
   const cover = course.cover_url || course.image || '/default-course-cover.png';
-  let path = course.material_name || '';
-  if (!path && course.language_level_id && course.language_level_name) {
-    path = course.language_level_name;
+  
+  let path;
+  if (course.material_name) {
+    // Education course path: "Material - Speciality"
+    path = course.speciality_name ? `${course.material_name} - ${course.speciality_name}` : course.material_name;
+  } else if (course.language_name && course.language_level_name) {
+    // Language course path: "Language Level"
+    path = `${course.language_name} ${course.language_level_name}`;
+  } else {
+    path = 'مسار غير محدد'; // Fallback
   }
+
   const price = course.price ? `${course.price} دج` : 'مجاني';
   const purchased = course.purchased || buySuccess;
 
   const handleBuyWithPoints = async () => {
+    if (!user) {
+      alert('يجب تسجيل الدخول كطالب لشراء هذا الكورس.');
+      return;
+    }
+    if (user.role !== 'student') {
+      alert('يجب أن تكون مسجلاً كطالب لشراء هذا الكورس.');
+      return;
+    }
+    if (!window.confirm('هل أنت متأكد أنك تريد شراء هذا الكورس بالنقاط؟')) {
+      return;
+    }
     setBuyLoading(true);
     setBuyError(null);
     setBuySuccess(false);
@@ -26,7 +45,8 @@ const CourseCard = ({ course }) => {
       const res = await pointsAPI.buyCourse(course.id);
       if (res.success) {
         setBuySuccess(true);
-        window.dispatchEvent(new CustomEvent('pointsUpdated', { detail: { points: -parseInt(course.price) } }));
+        alert('تم شراء الكورس بنجاح! سيتم توجيهك إلى محتوى الكورس.');
+        window.location.href = `/coursesList/courses/${course.id}`;
       } else {
         setBuyError(res.error || 'حدث خطأ أثناء الشراء');
       }
@@ -49,6 +69,7 @@ const CourseCard = ({ course }) => {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{ fontFamily: 'Nunito, Rowdies, Poppins, sans-serif' }}
+      onClick={() => window.location.href = `/coursesList/courses/${course.id}`}
     >
       <div className="relative mt-9 border overflow-hidden">
         <div className={`transform transition-all duration-700 ease-out ${isHovered ? 'scale-110' : 'scale-100'}`}> 
@@ -60,9 +81,14 @@ const CourseCard = ({ course }) => {
           />
         </div>
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300" />
-        {purchased && (
+        {/* Lock/Check icon indicator */}
+        {purchased ? (
           <div className="absolute top-4 left-4 z-20 flex items-center gap-1 bg-green-500/90 text-white px-3 py-1 rounded-full text-xs font-bold shadow">
             <CheckCircle className="w-4 h-4 mr-1" /> تم الشراء
+          </div>
+        ) : (
+          <div className="absolute top-4 left-4 z-20 flex items-center gap-1 bg-gray-300/90 text-gray-700 px-3 py-1 rounded-full text-xs font-bold shadow">
+            <Lock className="w-4 h-4 mr-1" /> غير مملوك
           </div>
         )}
       </div>
@@ -88,21 +114,25 @@ const CourseCard = ({ course }) => {
           {course.description}
         </p>
         <div className="flex items-center justify-between pt-4">
-          <Link to={`/coursesList/courses/${course.id}`}>
-            <button
-              className={`group flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transform transition-all duration-300 ease-out shadow-lg hover:shadow-xl ${isHovered ? 'translate-x-1' : ''}`}
-              onClick={e => { e.stopPropagation(); }}
-          >
-            التسجيل الآن
-              <ArrowRight className={`w-4 h-4 transform transition-transform duration-300 ${isHovered ? 'translate-x-1' : 'group-hover:translate-x-1'}`} />
-          </button>
-          </Link>
+          {/* Watch button if user owns the course */}
+          {user && purchased && (
+            <Link to={`/coursesList/courses/${course.id}`}>
+              <button
+                className="group flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transform transition-all duration-300 ease-out shadow-lg hover:shadow-xl"
+                onClick={e => { e.stopPropagation(); }}
+              >
+                مشاهدة
+                <ArrowRight className="w-4 h-4 transform transition-transform duration-300 group-hover:translate-x-1" />
+              </button>
+            </Link>
+          )}
+          {/* Price display */}
           <div className="text-2xl font-bold bg-gradient-to-r from-blue-800 to-blue-500 bg-clip-text text-transparent">
             {price}
           </div>
         </div>
         {/* Buy with points button and messages */}
-        {course.price && course.price > 0 && !purchased && (
+        {user && user.role === 'student' && course.price && course.price > 0 && !purchased && (
           <div className="mt-4 flex flex-col gap-2">
             <button
               className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-extrabold text-lg shadow-lg transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
@@ -125,11 +155,21 @@ const CourseCard = ({ course }) => {
                 ) : buyError}
               </div>
             )}
-            {buySuccess && (
-              <div className="flex items-center justify-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded p-2 text-sm font-bold mt-1">
-                <CheckCircle className="w-4 h-4" /> تم شراء الكورس بنجاح!
-              </div>
-            )}
+          </div>
+        )}
+        {/* If not logged in, show buy button that redirects to login after alert */}
+        {!user && course.price && course.price > 0 && !purchased && (
+          <div className="mt-4 flex flex-col gap-2">
+            <button
+              className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-extrabold text-lg shadow-lg transition-all duration-300"
+              onClick={e => {
+                e.stopPropagation();
+                alert('يجب تسجيل الدخول كطالب لشراء هذا الكورس.');
+                window.location.href = '/login';
+              }}
+            >
+              شراء بالدفع بالنقاط
+            </button>
           </div>
         )}
       </div>

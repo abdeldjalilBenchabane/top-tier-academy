@@ -348,6 +348,23 @@ export const slidesAPI = {
   getAnalytics: (id, period = '7d') => apiRequest(`/slides/${id}/analytics?period=${period}`),
 };
 
+// General API for fetching structure data
+export const api = {
+  getLevels: () => apiRequest('/levels'),
+  getYears: () => apiRequest('/years'),
+  getSpecialities: () => apiRequest('/specialities'),
+  getMaterials: () => apiRequest('/materials'),
+  getLanguages: () => apiRequest('/languages'),
+  getLanguageLevels: () => apiRequest('/language-levels'),
+  getHomeSlides: () => slidesAPI.getActive(),
+  getCourses: () => coursesAPI.getAll(),
+  getUsers: () => usersAPI.getAll(),
+  getPendingCourses: () => apiRequest('/courses?status=pending'),
+  getCourseById: (id) => coursesAPI.getById(id),
+  getProfessorById: (id) => usersAPI.getById(id),
+};
+
+
 // Health check
 export const healthAPI = {
   check: () => apiRequest('/health'),
