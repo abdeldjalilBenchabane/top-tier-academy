@@ -102,13 +102,37 @@ router.patch('/:requestId/status', verifyToken, async (req, res) => {
     if (req.user.role !== 'professor' && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Unauthorized' });
     }
+    // Fetch current request
+    const current = await getRow('SELECT * FROM private_class_requests WHERE id = $1', [requestId]);
+    if (!current) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
     let updateQuery = 'UPDATE private_class_requests SET status = $1, updated_at = CURRENT_TIMESTAMP';
     let params = [status];
+    let paramIdx = 2;
+    // If time is being set/updated, also set scheduled_at and agora_channel if not already set
+    let scheduledAt = current.scheduled_at;
+    let agoraChannel = current.agora_channel;
     if (time) {
-      updateQuery += ', time = $2';
+      updateQuery += `, time = $${paramIdx}`;
       params.push(time);
+      paramIdx++;
+      // Combine date and time into a timestamp (assume date is stored as YYYY-MM-DD and time as HH:mm - HH:mm)
+      const dateStr = current.date;
+      const startTime = time.split(' - ')[0];
+      if (dateStr && startTime) {
+        scheduledAt = new Date(`${dateStr}T${startTime}:00`);
+        updateQuery += `, scheduled_at = $${paramIdx}`;
+        params.push(scheduledAt);
+        paramIdx++;
+      }
+      // Always set agora_channel
+      agoraChannel = `private_class_${requestId}`;
+      updateQuery += `, agora_channel = $${paramIdx}`;
+      params.push(agoraChannel);
+      paramIdx++;
     }
-    updateQuery += ' WHERE id = $' + (time ? '3' : '2') + ' RETURNING *';
+    updateQuery += ' WHERE id = $' + paramIdx + ' RETURNING *';
     params.push(requestId);
     const result = await query(updateQuery, params);
     if (result.rows.length === 0) {
@@ -142,6 +166,35 @@ router.delete('/:requestId', verifyToken, async (req, res) => {
     res.json({ message: 'Request deleted successfully' });
   } catch (error) {
     console.error('Error deleting private class request:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get Agora info for a private class request
+router.get('/:requestId/agora-info', verifyToken, async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const request = await getRow('SELECT * FROM private_class_requests WHERE id = $1', [requestId]);
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+    // Only allow student or teacher to access
+    if (
+      req.user.role !== 'admin' &&
+      req.user.id !== request.student_id &&
+      req.user.name !== request.teacher_name
+    ) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    // Placeholder for agora_token (replace with real token logic)
+    const agora_token = 'PLACEHOLDER_TOKEN';
+    res.json({
+      agora_channel: request.agora_channel,
+      scheduled_at: request.scheduled_at,
+      agora_token
+    });
+  } catch (error) {
+    console.error('Error fetching Agora info:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

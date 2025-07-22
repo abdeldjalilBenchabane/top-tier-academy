@@ -8,7 +8,7 @@ const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
   database: process.env.DB_NAME || 'tth_database',
-  password: process.env.DB_PASSWORD || 'your_password',
+  password: process.env.DB_PASSWORD || '***REMOVED***',
   port: process.env.DB_PORT || 5432,
 });
 
@@ -29,6 +29,8 @@ async function createPrivateClassRequestsTable() {
         title VARCHAR(255),
         description TEXT,
         status VARCHAR(50) DEFAULT 'في الانتظار',
+        agora_channel VARCHAR(100),
+        scheduled_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );

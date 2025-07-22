@@ -3,6 +3,7 @@ import pool from '../db.js';
 import { verifyToken, requireProfessor, requireStudent, requireRole } from '../middleware/auth.js';
 import AgoraToken from 'agora-access-token';
 import jwt from 'jsonwebtoken';
+import { getRow } from '../db.js';
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;
 const router = express.Router();
@@ -110,11 +111,27 @@ router.get('/live-sessions', async (req, res) => {
     }
 });
 
-// GET /api/live-sessions/:sessionId → récupère les détails d'une session
-router.get('/live-sessions/:sessionId', async (req, res) => {
-    const { sessionId } = req.params;
+// GET /api/live-sessions/:id → récupère les détails d'une session
+router.get('/live-sessions/:id', verifyToken, async (req, res) => {
+    const { id } = req.params;
     try {
-        const result = await pool.query('SELECT * FROM live_sessions WHERE id = $1', [sessionId]);
+        if (id.startsWith('private_class_')) {
+            // Extract the private class request ID
+            const requestId = id.replace('private_class_', '');
+            // Fetch from private_class_requests using getRow helper
+            const request = await getRow('SELECT * FROM private_class_requests WHERE id = $1', [requestId]);
+            if (!request) return res.status(404).json({ error: 'Private class not found' });
+            // Return a session-like object
+            return res.json({
+                id,
+                title: request.title || 'حصة خاصة',
+                description: request.description || '',
+                presenter: request.teacher_name,
+                scheduled_at: request.scheduled_at,
+                // Add any other fields your frontend expects
+            });
+        }
+        const result = await pool.query('SELECT * FROM live_sessions WHERE id = $1', [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Live session not found' });
         }

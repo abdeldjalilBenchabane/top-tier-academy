@@ -456,28 +456,32 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         });
     };
 
+    // Remove access check for students
     useEffect(() => {
-        const checkAccess = async () => {
-            if (user?.role === 'student' && id) {
-                try {
-                    console.log('[DEBUG] Checking access for user.id:', user.id, 'session id:', id);
-                    const res = await fetch(`/api/live-sessions/${id}/access?student_id=${user.id}`, {
-                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                    });
-                    const data = await res.json();
-                    console.log('[DEBUG] Access API response:', data);
-                    setCanAccess(data.can_access);
-                } catch (err) {
-                    console.error('[DEBUG] Error checking access:', err);
-                    setCanAccess(false);
-                } finally {
+        if (String(id).startsWith('private_class_')) {
+            setCanAccess(true);
+            setAccessChecked(true);
+        } else {
+            // Original access check for normal live sessions
+            const checkAccess = async () => {
+                if (user?.role === 'student' && id) {
+                    try {
+                        const res = await fetch(`/api/live-sessions/${id}/access?student_id=${user.id}`, {
+                            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                        });
+                        const data = await res.json();
+                        setCanAccess(data.can_access);
+                    } catch (err) {
+                        setCanAccess(false);
+                    } finally {
+                        setAccessChecked(true);
+                    }
+                } else {
                     setAccessChecked(true);
                 }
-            } else {
-                setAccessChecked(true);
-            }
-        };
-        checkAccess();
+            };
+            checkAccess();
+        }
     }, [id, user]);
 
     useEffect(() => {

@@ -659,6 +659,18 @@ These tables work together to provide a complete commenting system:
 
 Make sure your database connection settings are correct in your environment variables before running the scripts.
 
+## Database Migration for Private Classes Live Feature
+
+If you encounter errors related to missing columns (such as `scheduled_at` or `agora_channel`) in the `private_class_requests` table, run the following SQL in your PostgreSQL database:
+
+```sql
+ALTER TABLE private_class_requests
+ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP,
+ADD COLUMN IF NOT EXISTS agora_channel VARCHAR(100);
+```
+
+This will ensure your database is compatible with the private classes live session feature.
+
 ---
 
 ## 🤝 Contributing

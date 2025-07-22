@@ -1,10 +1,41 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaCalendarAlt, FaClock, FaBookOpen, FaEye, FaUserTie, FaChalkboardTeacher, FaFileAlt, FaUser } from 'react-icons/fa';
 import { formatDate } from '../../data/index';
 import { useAuth } from '../../contexts/AuthContext';
 
-const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionLoading, showActions, studentName }) => {
+const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionLoading, showActions, studentName, onEditTime, onJoinLive }) => {
   const { isProfessor } = useAuth();
+
+  // Countdown logic
+  const [timeLeft, setTimeLeft] = useState('');
+  const [canJoin, setCanJoin] = useState(false);
+  useEffect(() => {
+    // Use scheduled_at if present, otherwise estimate from date and time
+    let scheduled = null;
+    if (session.scheduled_at) {
+      scheduled = new Date(session.scheduled_at);
+    } else if (session.date && session.time) {
+      const startTime = session.time.split(' - ')[0];
+      scheduled = new Date(`${session.date}T${startTime}:00`);
+    }
+    if (!scheduled) return;
+    const interval = setInterval(() => {
+      const now = new Date();
+      const diff = scheduled - now;
+      if (diff <= 0) {
+        setTimeLeft('');
+        setCanJoin(true);
+        clearInterval(interval);
+      } else {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff / (1000 * 60)) % 60);
+        const seconds = Math.floor((diff / 1000) % 60);
+        setTimeLeft(`${hours > 0 ? hours + 'h ' : ''}${minutes}m ${seconds}s`);
+        setCanJoin(false);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [session.scheduled_at, session.date, session.time]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -127,12 +158,46 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
           </div>
         )}
 
-        {/* Status message for accepted/refused */}
+        {/* Status message for accepted/refused and Edit Time button */}
         {isProfessor && session.status === 'مؤكد' && (
+          <>
+            <div className="text-green-700 font-bold text-center mt-2">تم قبول الطلب</div>
+            <button
+              className="w-full mt-2 px-4 py-2 bg-yellow-500 text-white rounded-lg font-bold hover:bg-yellow-600 transition"
+              onClick={() => onEditTime && onEditTime(session)}
+            >
+              تعديل التوقيت
+            </button>
+          </>
+        )}
+        {!isProfessor && session.status === 'مؤكد' && (
           <div className="text-green-700 font-bold text-center mt-2">تم قبول الطلب</div>
         )}
         {isProfessor && session.status === 'مرفوض' && (
           <div className="text-red-700 font-bold text-center mt-2">تم رفض الطلب</div>
+        )}
+
+        {/* Join/Start Live Button & Countdown */}
+        {session.status === 'مؤكد' && (
+          <div className="mt-4 flex flex-col items-center gap-2">
+            {/* Only show counter and button if time is selected */}
+            {session.time ? (
+              <>
+                {!canJoin && (
+                  <div className="text-sm text-blue-600 font-semibold">الوقت المتبقي: {timeLeft}</div>
+                )}
+                <button
+                  className={`w-full px-4 py-2 rounded-lg font-bold transition ${canJoin ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                  disabled={!canJoin}
+                  onClick={() => canJoin && onJoinLive && onJoinLive(session)}
+                >
+                  {isProfessor ? 'بدء البث المباشر' : 'دخول البث المباشر'}
+                </button>
+              </>
+            ) : (
+              <div className="text-sm text-gray-500 font-semibold">لم يتم تحديد توقيت الحصة بعد</div>
+            )}
+          </div>
         )}
 
         {/* Action Button */}

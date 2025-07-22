@@ -1,15 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import PrivateClassCard from '../../components/ui/TTHPrivateClassCard';
+import { useNavigate } from 'react-router-dom';
 
 const ProfessorPrivateClasses = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
   const [selectedTime, setSelectedTime] = useState('16:00 - 17:30');
   const [showTimeModal, setShowTimeModal] = useState(false);
+  // New: store the session being edited (for edit time)
+  const [editMode, setEditMode] = useState(false);
+  const [editingSession, setEditingSession] = useState(null);
 
   useEffect(() => {
     fetchRequests();
@@ -56,6 +61,14 @@ const ProfessorPrivateClasses = () => {
     setShowTimeModal(true);
   };
 
+  const handleEditTime = (session) => {
+    setEditMode(true);
+    setEditingSession(session);
+    setSelectedRequestId(session.id);
+    setSelectedTime(session.time || '16:00 - 17:30');
+    setShowTimeModal(true);
+  };
+
   const handleConfirmAccept = async () => {
     if (!selectedRequestId) return;
     setActionLoading(true);
@@ -71,6 +84,30 @@ const ProfessorPrivateClasses = () => {
       if (response.ok) {
         setShowTimeModal(false);
         setSelectedRequestId(null);
+        fetchRequests();
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmTime = async () => {
+    if (!selectedRequestId) return;
+    setActionLoading(true);
+    try {
+      const response = await fetch(`/api/private-class-requests/${selectedRequestId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(editMode ? { time: selectedTime } : { status: 'مؤكد', time: selectedTime })
+      });
+      if (response.ok) {
+        setShowTimeModal(false);
+        setSelectedRequestId(null);
+        setEditMode(false);
+        setEditingSession(null);
         fetchRequests();
       }
     } finally {
@@ -95,6 +132,11 @@ const ProfessorPrivateClasses = () => {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleJoinLive = (session) => {
+    const channel = `private_class_${session.id}`;
+    navigate(`/streaming/${channel}`);
   };
 
   return (
@@ -127,6 +169,8 @@ const ProfessorPrivateClasses = () => {
                 onDetailsClick={() => {}}
                 onAccept={handleAccept}
                 onRefuse={handleRefuse}
+                onEditTime={handleEditTime}
+                onJoinLive={handleJoinLive}
                 actionLoading={actionLoading}
                 showActions={true}
                 studentName={request.studentName}
@@ -147,27 +191,32 @@ const ProfessorPrivateClasses = () => {
               value={selectedTime}
               onChange={e => setSelectedTime(e.target.value)}
             >
-              <option value="08:00 - 09:30">08:00 - 09:30</option>
-              <option value="10:00 - 11:30">10:00 - 11:30</option>
-              <option value="12:00 - 13:30">12:00 - 13:30</option>
-              <option value="14:00 - 15:30">14:00 - 15:30</option>
-              <option value="16:00 - 17:30">16:00 - 17:30</option>
-              <option value="18:00 - 19:30">18:00 - 19:30</option>
+              {Array.from({ length: 48 }).map((_, i) => {
+                const startHour = Math.floor(i / 2);
+                const startMin = i % 2 === 0 ? '00' : '30';
+                const endHour = Math.floor((i + 1) / 2) % 24;
+                const endMin = (i + 1) % 2 === 0 ? '00' : '30';
+                const pad = n => n.toString().padStart(2, '0');
+                const label = `${pad(startHour)}:${startMin} - ${pad(endHour)}:${endMin}`;
+                return (
+                  <option key={label} value={label}>{label}</option>
+                );
+              })}
             </select>
             <div className="flex gap-4 justify-end">
               <button
                 className="px-4 py-2 bg-gray-300 rounded-lg font-bold"
-                onClick={() => setShowTimeModal(false)}
+                onClick={() => { setShowTimeModal(false); setEditMode(false); setEditingSession(null); }}
                 disabled={actionLoading}
               >
                 إلغاء
               </button>
               <button
                 className="px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition"
-                onClick={handleConfirmAccept}
+                onClick={handleConfirmTime}
                 disabled={actionLoading}
               >
-                تأكيد القبول
+                {editMode ? 'تحديث التوقيت' : 'تأكيد القبول'}
               </button>
             </div>
           </div>

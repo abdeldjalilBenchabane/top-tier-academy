@@ -408,3 +408,22 @@ CREATE TRIGGER trigger_update_user_points_balance
     FOR EACH ROW
     EXECUTE FUNCTION update_user_points_balance();
 
+-- PRIVATE CLASS REQUESTS
+CREATE TABLE private_class_requests (
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    teacher_name VARCHAR(100) NOT NULL,
+    subject VARCHAR(100),
+    grade VARCHAR(100),
+    date VARCHAR(50),
+    time VARCHAR(50),
+    sessions_count INTEGER,
+    title VARCHAR(255),
+    description TEXT,
+    status VARCHAR(50) DEFAULT 'في الانتظار',
+    agora_channel VARCHAR(100),
+    scheduled_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+

@@ -6,6 +6,7 @@ import PrivateClassSidebar from "../components/ui/TTHPrivateClassSidebar";
 import PrivateClassCard from "../components/ui/TTHPrivateClassCard";
 import PrivateClassModal from "../components/ui/TTHPrivateClassModal";
 import { usePrivateClasses } from "../hooks/TTHUsePrivateClasses";
+import { useNavigate } from 'react-router-dom';
 
 const PrivateClasses = () => {
   const {
@@ -39,12 +40,19 @@ const PrivateClasses = () => {
     myPendingRequests
   } = usePrivateClasses();
 
+  const navigate = useNavigate();
+
   const handleFilterChange = (filters) => {
     console.log('Filter changed:', filters);
   };
 
   const handleSidebarSearch = (filters) => {
     console.log('Searching with sidebar filters:', filters);
+  };
+
+  const handleJoinLive = (session) => {
+    const channel = `private_class_${session.id}`;
+    navigate(`/streaming/${channel}`);
   };
 
   return (
@@ -122,6 +130,7 @@ const PrivateClasses = () => {
                     <PrivateClassCard
                       session={request}
                       onDetailsClick={handleDetailsClick}
+                      onJoinLive={handleJoinLive}
                     />
                   </div>
                 ))}
@@ -175,6 +184,7 @@ const PrivateClasses = () => {
                     <PrivateClassCard
                       session={session}
                       onDetailsClick={handleDetailsClick}
+                      onJoinLive={handleJoinLive}
                     />
                   </div>
                 ))

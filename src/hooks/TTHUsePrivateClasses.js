@@ -77,7 +77,9 @@ export const usePrivateClasses = () => {
               grade: request.grade,
               status: request.status,
               time: request.time,
-              createdAt: request.created_at
+              createdAt: request.created_at,
+              agora_channel: request.agora_channel,
+              scheduled_at: request.scheduled_at
             }));
           setMyPendingRequests(transformedRequests);
         }
@@ -114,7 +116,9 @@ export const usePrivateClasses = () => {
             status: request.status,
             time: request.time,
             createdAt: request.created_at,
-            studentId: request.student_id
+            studentId: request.student_id,
+            agora_channel: request.agora_channel,
+            scheduled_at: request.scheduled_at
           }));
           setAllOrders(transformedOrders);
         }
