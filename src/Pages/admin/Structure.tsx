@@ -129,6 +129,10 @@ const Structure = () => {
     return materials.filter(material => material.specialityId === specialityId);
   };
 
+  const getMaterialsForYear = (yearId: string) => {
+    return materials.filter(material => material.yearId === yearId);
+  };
+
   const getLanguageLevelsForLanguage = (languageId: string) => {
     return languageLevels.filter(level => level.languageId === languageId);
   };
@@ -568,47 +572,86 @@ const Structure = () => {
                                           </div>
                                   <AccordionContent>
                                     <div className="pl-4 border-l border-gray-200">
-                                      {getSpecialitiesForYear(year.id).length > 0 ? (
-                                        <ul className="space-y-1">
-                                          {getSpecialitiesForYear(year.id).map(speciality => (
-                                            <li key={speciality.id}>
-                                                      <div className="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-50">
-                                                        <div
-                                                onClick={() => handleSpecialityClick(speciality)}
-                                                          className={`text-left text-sm flex-1 cursor-pointer ${
-                                                  currentSpeciality?.id === speciality.id
-                                                              ? 'font-medium text-blue-600'
-                                                              : ''
-                                                }`}
-                                              >
-                                                {speciality.name}
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                          <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleEditSpeciality(speciality)}
-                                                            className="h-4 w-4 p-0 hover:bg-blue-100 hover:text-blue-600"
-                                                          >
-                                                            <Edit className="h-2 w-2" />
-                                                          </Button>
-                                                          <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleDeleteSpeciality(speciality)}
-                                                            className="h-4 w-4 p-0 hover:bg-red-100 hover:text-red-600"
-                                                          >
-                                                            <Trash className="h-2 w-2" />
-                                                          </Button>
-                                                        </div>
+                                      {/* Show specialities if year has speciality_id */}
+                                      {year.speciality_id ? (
+                                        getSpecialitiesForYear(year.id).length > 0 ? (
+                                          <ul className="space-y-1">
+                                            {getSpecialitiesForYear(year.id).map(speciality => (
+                                              <li key={speciality.id}>
+                                                <div className="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-50">
+                                                  <div
+                                                    onClick={() => handleSpecialityClick(speciality)}
+                                                    className={`text-left text-sm flex-1 cursor-pointer ${
+                                                      currentSpeciality?.id === speciality.id
+                                                        ? 'font-medium text-blue-600'
+                                                        : ''
+                                                    }`}
+                                                  >
+                                                    {speciality.name}
+                                                  </div>
+                                                  <div className="flex items-center gap-1">
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => handleEditSpeciality(speciality)}
+                                                      className="h-4 w-4 p-0 hover:bg-blue-100 hover:text-blue-600"
+                                                    >
+                                                      <Edit className="h-2 w-2" />
+                                                    </Button>
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => handleDeleteSpeciality(speciality)}
+                                                      className="h-4 w-4 p-0 hover:bg-red-100 hover:text-red-600"
+                                                    >
+                                                      <Trash className="h-2 w-2" />
+                                                    </Button>
+                                                  </div>
+                                                </div>
+                                                <div className="pl-4">
+                                                  {getMaterialsForSpeciality(speciality.id).map(material => (
+                                                    <div key={material.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-50">
+                                                      <div className="text-sm text-gray-600">{material.name}</div>
+                                                      <div className="flex items-center gap-1">
+                                                        <Button
+                                                          size="sm"
+                                                          variant="ghost"
+                                                          onClick={() => handleEditMaterial(material)}
+                                                          className="h-4 w-4 p-0 hover:bg-blue-100 hover:text-blue-600"
+                                                        >
+                                                          <Edit className="h-2 w-2" />
+                                                        </Button>
+                                                        <Button
+                                                          size="sm"
+                                                          variant="ghost"
+                                                          onClick={() => handleDeleteMaterial(material)}
+                                                          className="h-4 w-4 p-0 hover:bg-red-100 hover:text-red-600"
+                                                        >
+                                                          <Trash className="h-2 w-2" />
+                                                        </Button>
                                                       </div>
-                                            </li>
-                                          ))}
-                                        </ul>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        ) : (
+                                          <p className="text-sm text-gray-500 py-1">
+                                            No specialities defined
+                                          </p>
+                                        )
                                       ) : (
-                                        <p className="text-sm text-gray-500 py-1">
-                                          No specialities defined
-                                        </p>
+                                        /* Show materials directly if year has material_id */
+                                        year.material_id ? (
+                                          <div className="text-sm text-gray-600 py-2">
+                                            Direct Material: {materials.find(m => m.id === year.material_id)?.name || 'Unknown'}
+                                          </div>
+                                        ) : (
+                                          <p className="text-sm text-gray-500 py-1">
+                                            No path configured
+                                          </p>
+                                        )
                                       )}
                                     </div>
                                   </AccordionContent>

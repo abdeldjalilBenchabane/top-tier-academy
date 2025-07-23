@@ -19,6 +19,8 @@ export type Year = {
   id: string;
   name: string;
   levelId: string;
+  specialityId?: string;
+  materialId?: string;
 };
 
 export type Speciality = {
