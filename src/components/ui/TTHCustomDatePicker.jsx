@@ -49,7 +49,13 @@ const CustomDatePicker = ({ value, onChange, label }) => {
   const handleDateSelect = (day) => {
     const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
     if (!isDateDisabled(newDate)) {
-      onChange({ target: { value: newDate.toISOString().split('T')[0] } });
+      // Format the date in local timezone to avoid timezone issues
+      const year = newDate.getFullYear();
+      const month = String(newDate.getMonth() + 1).padStart(2, '0');
+      const dayStr = String(day).padStart(2, '0');
+      const localDateString = `${year}-${month}-${dayStr}`;
+      
+      onChange({ target: { value: localDateString } });
       setIsOpen(false);
     }
   };
@@ -168,7 +174,13 @@ const CustomDatePicker = ({ value, onChange, label }) => {
           <div className="mt-4 pt-4 border-t border-gray-200">
             <button
               onClick={() => {
-                onChange({ target: { value: today.toISOString().split('T')[0] } });
+                // Format today's date in local timezone
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                const localDateString = `${year}-${month}-${day}`;
+                
+                onChange({ target: { value: localDateString } });
                 setIsOpen(false);
               }}
               className="w-full bg-blue-100 text-blue-600 py-2 rounded-lg font-medium hover:bg-blue-200 transition-colors"

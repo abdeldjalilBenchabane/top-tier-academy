@@ -710,5 +710,104 @@ router.delete('/language-levels/:id', verifyToken, requireRole(['admin']), async
   }
 });
 
+// ===== PUBLIC ENDPOINTS (No authentication required) =====
+
+// GET /api/public/levels → list all levels (public)
+router.get('/public/levels', async (req, res) => {
+  try {
+    const levels = await getRows('SELECT * FROM levels ORDER BY name');
+    res.json(levels);
+  } catch (error) {
+    console.error('Error fetching levels:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/public/levels/:levelId/years → list years for a specific level (public)
+router.get('/public/levels/:levelId/years', async (req, res) => {
+  const { levelId } = req.params;
+  try {
+    const years = await getRows(
+      'SELECT * FROM years WHERE level_id = $1 ORDER BY name',
+      [levelId]
+    );
+    res.json(years);
+  } catch (error) {
+    console.error('Error fetching years:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/public/years/:yearId/specialities → list specialities for a specific year (public)
+router.get('/public/years/:yearId/specialities', async (req, res) => {
+  const { yearId } = req.params;
+  try {
+    const specialities = await getRows(
+      'SELECT * FROM specialities WHERE year_id = $1 ORDER BY name',
+      [yearId]
+    );
+    res.json(specialities);
+  } catch (error) {
+    console.error('Error fetching specialities:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/public/specialities/:specialityId/materials → list materials for a specific speciality (public)
+router.get('/public/specialities/:specialityId/materials', async (req, res) => {
+  const { specialityId } = req.params;
+  try {
+    const materials = await getRows(
+      'SELECT * FROM materials WHERE speciality_id = $1 ORDER BY name',
+      [specialityId]
+    );
+    res.json(materials);
+  } catch (error) {
+    console.error('Error fetching materials:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/public/hierarchy → get complete hierarchy structure (public)
+router.get('/public/hierarchy', async (req, res) => {
+  try {
+    const levels = await getRows('SELECT * FROM levels ORDER BY name');
+    const hierarchy = [];
+    
+    for (const level of levels) {
+      const years = await getRows('SELECT * FROM years WHERE level_id = $1 ORDER BY name', [level.id]);
+      const levelData = {
+        ...level,
+        years: []
+      };
+      
+      for (const year of years) {
+        const specialities = await getRows('SELECT * FROM specialities WHERE year_id = $1 ORDER BY name', [year.id]);
+        const yearData = {
+          ...year,
+          specialities: []
+        };
+        
+        for (const speciality of specialities) {
+          const materials = await getRows('SELECT * FROM materials WHERE speciality_id = $1 ORDER BY name', [speciality.id]);
+          yearData.specialities.push({
+            ...speciality,
+            materials
+          });
+        }
+        
+        levelData.years.push(yearData);
+      }
+      
+      hierarchy.push(levelData);
+    }
+    
+    res.json(hierarchy);
+  } catch (error) {
+    console.error('Error fetching hierarchy:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
     
