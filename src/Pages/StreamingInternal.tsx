@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, Heart, MessageSquare, Share2, Settings, MicOff, Mic, MessageCircle, Fullscreen, Pause, Play as PlayIcon, Video, VideoOff, Monitor } from 'lucide-react';
+import { ArrowLeft, Users, Heart, MessageSquare, Share2, Settings, MicOff, Mic, MessageCircle, Fullscreen, Pause, Play as PlayIcon, Video, VideoOff, Monitor, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import AgoraVideoPlayer, { AgoraVideoPlayerRef } from '@/components/AgoraVideoPlayer';
@@ -568,6 +568,44 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     // Debug panel for development
     const debugPanel = null; // Removed debug panel to hide sensitive information
 
+    useEffect(() => {
+        // Keep isFullScreen in sync with actual fullscreen state
+        const handleFullscreenChange = () => {
+            const elem = document.getElementById('agora-video-container');
+            if (document.fullscreenElement === elem) {
+                setIsFullScreen(true);
+            } else {
+                setIsFullScreen(false);
+            }
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        };
+    }, []);
+
+    const [showChatOverlay, setShowChatOverlay] = useState(true);
+    const [lastMessageCount, setLastMessageCount] = useState(0);
+    const [hasNewMessages, setHasNewMessages] = useState(false);
+    const [unseenCount, setUnseenCount] = useState(0);
+
+    // Track new messages for notification badge (with count)
+    useEffect(() => {
+        if (!isFullScreen) {
+            setHasNewMessages(false);
+            setLastMessageCount(messages.length);
+            setUnseenCount(0);
+        } else if (showChatOverlay) {
+            setHasNewMessages(false);
+            setLastMessageCount(messages.length);
+            setUnseenCount(0);
+        } else if (messages.length > lastMessageCount) {
+            setHasNewMessages(true);
+            setUnseenCount(unseenCount + (messages.length - lastMessageCount));
+            setLastMessageCount(messages.length);
+        }
+    }, [messages, isFullScreen, showChatOverlay]);
+
     if (loadingSession) {
         return <div className="py-8 text-center text-white">Chargement de la session...</div>;
     }
@@ -800,6 +838,80 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                     </>
                                 )}
                             </div>
+
+                            {/* Overlay ChatSidebar in fullscreen mode */}
+                            {isFullScreen && (
+                                <>
+                                    {/* Floating toggle icon for chat overlay */}
+                                    <button
+                                        onClick={() => setShowChatOverlay((v) => !v)}
+                                        style={{
+                                            position: 'absolute',
+                                            left: 10,
+                                            top: 10,
+                                            zIndex: 100,
+                                            background: 'rgba(30,30,60,0.7)',
+                                            borderRadius: '50%',
+                                            width: 44,
+                                            height: 44,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            boxShadow: '0 2px 8px 0 rgba(0,0,0,0.18)',
+                                        }}
+                                        title={showChatOverlay ? 'إخفاء الدردشة' : 'إظهار الدردشة'}
+                                    >
+                                        {showChatOverlay ? <XCircle size={28} color="#fff" /> : <MessageSquare size={28} color="#fff" />}
+                                        {hasNewMessages && !showChatOverlay && (
+                                            <span style={{
+                                                position: 'absolute',
+                                                top: 6,
+                                                right: 6,
+                                                background: '#f43f5e',
+                                                color: '#fff',
+                                                borderRadius: '50%',
+                                                minWidth: 16,
+                                                height: 16,
+                                                fontSize: 12,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontWeight: 700,
+                                                padding: '0 4px',
+                                            }}>{unseenCount}</span>
+                                        )}
+                                    </button>
+                                    {showChatOverlay && (
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                left: 0,
+                                                top: '5%',
+                                                width: 350,
+                                                height: '90%',
+                                                zIndex: 50,
+                                                pointerEvents: 'auto',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                            }}
+                                            className="chat-overlay-fullscreen"
+                                        >
+                                            <ChatSidebar
+                                                key={`chat-fullscreen-${messages.length}`}
+                                                messages={messages}
+                                                input={input}
+                                                setInput={setInput}
+                                                handleSend={handleSend}
+                                                chatEnabled={chatEnabled}
+                                                studentsMuted={studentsMuted}
+                                                isProfessor={isProfessor}
+                                            />
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </div>
                     </div>
 
@@ -808,22 +920,22 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                         <h1 className="text-2xl font-bold mb-2">{session.title}</h1>
                         <p className="text-gray-300 mb-4">مقدم من: {session.presenter}</p>
                         <p className="text-gray-400 leading-relaxed">{session.description}</p>
-
                     </div>
                 </div>
 
-                {/* Chat Sidebar */}
-                <ChatSidebar
-                    key={`chat-${messages.length}`}
-                    messages={messages}
-                    input={input}
-                    setInput={setInput}
-                    handleSend={handleSend}
-                    chatEnabled={chatEnabled}
-                    studentsMuted={studentsMuted}
-                    isProfessor={isProfessor}
-                />
-
+                {/* Chat Sidebar (hide in fullscreen) */}
+                {!isFullScreen && (
+                    <ChatSidebar
+                        key={`chat-${messages.length}`}
+                        messages={messages}
+                        input={input}
+                        setInput={setInput}
+                        handleSend={handleSend}
+                        chatEnabled={chatEnabled}
+                        studentsMuted={studentsMuted}
+                        isProfessor={isProfessor}
+                    />
+                )}
             </div>
 
             {/* Interactive Participants List - Responsive */}
