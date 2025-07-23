@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, Heart, MessageSquare, Share2, Settings, MicOff, Mic, MessageCircle, Fullscreen, Pause, Play as PlayIcon, Video, VideoOff, Monitor } from 'lucide-react';
+import { ArrowLeft, Users, Heart, MessageSquare, Share2, Settings, MicOff, Mic, MessageCircle, Fullscreen, Pause, Play as PlayIcon, Video, VideoOff, Monitor, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import AgoraVideoPlayer, { AgoraVideoPlayerRef } from '@/components/AgoraVideoPlayer';
@@ -140,6 +140,9 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
         const newSocket = io('http://localhost:5001');
         setSocket(newSocket);
+
+        // Set userData on the client socket for AgoraVideoPlayer to use
+        (newSocket as any).userData = { ...user };
 
         // Listener pour l'état courant du mute dès la connexion
         newSocket.on('connect', () => {
@@ -565,6 +568,44 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     // Debug panel for development
     const debugPanel = null; // Removed debug panel to hide sensitive information
 
+    useEffect(() => {
+        // Keep isFullScreen in sync with actual fullscreen state
+        const handleFullscreenChange = () => {
+            const elem = document.getElementById('agora-video-container');
+            if (document.fullscreenElement === elem) {
+                setIsFullScreen(true);
+            } else {
+                setIsFullScreen(false);
+            }
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        };
+    }, []);
+
+    const [showChatOverlay, setShowChatOverlay] = useState(true);
+    const [lastMessageCount, setLastMessageCount] = useState(0);
+    const [hasNewMessages, setHasNewMessages] = useState(false);
+    const [unseenCount, setUnseenCount] = useState(0);
+
+    // Track new messages for notification badge (with count)
+    useEffect(() => {
+        if (!isFullScreen) {
+            setHasNewMessages(false);
+            setLastMessageCount(messages.length);
+            setUnseenCount(0);
+        } else if (showChatOverlay) {
+            setHasNewMessages(false);
+            setLastMessageCount(messages.length);
+            setUnseenCount(0);
+        } else if (messages.length > lastMessageCount) {
+            setHasNewMessages(true);
+            setUnseenCount(unseenCount + (messages.length - lastMessageCount));
+            setLastMessageCount(messages.length);
+        }
+    }, [messages, isFullScreen, showChatOverlay]);
+
     if (loadingSession) {
         return <div className="py-8 text-center text-white">Chargement de la session...</div>;
     }
@@ -657,25 +698,20 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                             )}
 
                             {/* Video Controls - Responsive for Mobile/Tablet */}
-                            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex flex-wrap gap-1 sm:gap-2 max-w-full px-2">
-                                <Button size="sm" variant="secondary" className="bg-black/50 hover:bg-black/70 text-white border-0 text-xs sm:text-sm" onClick={handlePause}>
-                                    {isPaused ? <PlayIcon className="w-3 h-3 sm:w-4 sm:h-4" /> : <Pause className="w-3 h-3 sm:w-4 sm:h-4" />}
-                                </Button>
+                            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex flex-row flex-nowrap gap-1 sm:gap-2 max-w-full px-2 items-center justify-center w-auto">
+                                {/* Fullscreen button (all users) */}
                                 <Button size="sm" variant="secondary" className="bg-black/50 hover:bg-black/70 text-white border-0 text-xs sm:text-sm" onClick={handleFullScreen}>
                                     <Fullscreen className="w-3 h-3 sm:w-4 sm:h-4" />
                                 </Button>
 
-                                {/* Student Mic Control - Responsive */}
+                                {/* Student Mic Control */}
                                 {!isProfessor && (
-                                    <>
-                                        <div className="w-px h-6 bg-white/30 mx-1 sm:mx-2"></div>
                                         <Button
                                             size="sm"
                                             variant={studentMuteStates[user?.id] ? 'destructive' : 'default'}
                                             className={`${studentMuteStates[user?.id] ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'} text-white border-0 ${studentsMuted ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} text-xs sm:text-sm`}
                                             onClick={() => {
                                                 if (!studentsMuted) {
-                                                    // Student can toggle their own mic
                                                     const isMuted = studentMuteStates[user?.id] !== undefined ? studentMuteStates[user?.id] : true;
                                                     if (socket) {
                                                         const signalData = {
@@ -692,15 +728,11 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                         >
                                             {studentMuteStates[user?.id] ? <MicOff className="w-3 h-3 sm:w-4 sm:h-4" /> : <Mic className="w-3 h-3 sm:w-4 sm:h-4" />}
                                         </Button>
-                                    </>
                                 )}
 
-                                {/* Professor Video Controls - Responsive */}
+                                {/* Teacher Controls: all in one row */}
                                 {isProfessor && (
                                     <>
-                                        <div className="w-px h-6 bg-white/30 mx-1 sm:mx-2"></div>
-
-                                        {/* Mic Control */}
                                         <Button
                                             size="sm"
                                             variant="secondary"
@@ -710,8 +742,6 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                         >
                                             {isLocalMicMuted ? <MicOff className="w-3 h-3 sm:w-4 sm:h-4" /> : <Mic className="w-3 h-3 sm:w-4 sm:h-4" />}
                                         </Button>
-
-                                        {/* Camera Control */}
                                         <Button
                                             size="sm"
                                             variant={isLocalCameraEnabled ? 'secondary' : 'destructive'}
@@ -721,8 +751,6 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                         >
                                             {isLocalCameraEnabled ? <Video className="w-3 h-3 sm:w-4 sm:h-4" /> : <VideoOff className="w-3 h-3 sm:w-4 sm:h-4" />}
                                         </Button>
-
-                                        {/* Screen Share Control */}
                                         <Button
                                             size="sm"
                                             variant={isScreenSharing ? 'destructive' : 'secondary'}
@@ -732,8 +760,6 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                         >
                                             <Monitor className="w-3 h-3 sm:w-4 sm:h-4" />
                                         </Button>
-
-                                        {/* Camera Device Selector - Responsive */}
                                         {isLocalCameraEnabled && cameraDevices.length > 1 && (
                                             <select
                                                 value={selectedCameraId}
@@ -748,10 +774,6 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                                 ))}
                                             </select>
                                         )}
-
-                                        <div className="w-px h-6 bg-white/30 mx-1 sm:mx-2"></div>
-
-                                        {/* Professor Controls - Responsive */}
                                         <Button
                                             size="sm"
                                             variant={studentsMuted ? 'destructive' : 'secondary'}
@@ -789,7 +811,6 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                         >
                                             <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4" />
                                         </Button>
-                                        {isProfessor && (
                                             <Button
                                                 variant="destructive"
                                                 className="ml-2"
@@ -810,31 +831,87 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                                     } else {
                                                         console.error('[DEBUG] end-stream NOT emitted', { socket, id }); // [LIVE STREAM MODIF]
                                                     }
-                                                    // Appelle l’API PATCH pour mettre à jour le statut du live
-                                                    try {
-                                                        await fetch(`http://localhost:5001/api/live-sessions/${id}`, {
-                                                            method: 'PATCH',
-                                                            headers: {
-                                                                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                                                                'Content-Type': 'application/json'
-                                                            },
-                                                            body: JSON.stringify({ status: 'ended' })
-                                                        });
-                                                    } catch (err) {
-                                                        console.error('Failed to update live status:', err);
-                                                    }
-                                                    // Attendre un peu pour s'assurer que l'événement est envoyé [LIVE STREAM MODIF]
-                                                    await new Promise(resolve => setTimeout(resolve, 500));
-                                                    // Redirige le prof [LIVE STREAM MODIF]
-                                                    navigate('/professor/dashboard');
-                                                }}
-                                            >
-                                                Terminer le stream
+                                            }}
+                                        >
+                                            إنهاء البث
                                             </Button>
-                                        )}
                                     </>
                                 )}
                             </div>
+
+                            {/* Overlay ChatSidebar in fullscreen mode */}
+                            {isFullScreen && (
+                                <>
+                                    {/* Floating toggle icon for chat overlay */}
+                                    <button
+                                        onClick={() => setShowChatOverlay((v) => !v)}
+                                        style={{
+                                            position: 'absolute',
+                                            left: 10,
+                                            top: 10,
+                                            zIndex: 100,
+                                            background: 'rgba(30,30,60,0.7)',
+                                            borderRadius: '50%',
+                                            width: 44,
+                                            height: 44,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            boxShadow: '0 2px 8px 0 rgba(0,0,0,0.18)',
+                                        }}
+                                        title={showChatOverlay ? 'إخفاء الدردشة' : 'إظهار الدردشة'}
+                                    >
+                                        {showChatOverlay ? <XCircle size={28} color="#fff" /> : <MessageSquare size={28} color="#fff" />}
+                                        {hasNewMessages && !showChatOverlay && (
+                                            <span style={{
+                                                position: 'absolute',
+                                                top: 6,
+                                                right: 6,
+                                                background: '#f43f5e',
+                                                color: '#fff',
+                                                borderRadius: '50%',
+                                                minWidth: 16,
+                                                height: 16,
+                                                fontSize: 12,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontWeight: 700,
+                                                padding: '0 4px',
+                                            }}>{unseenCount}</span>
+                                        )}
+                                    </button>
+                                    {showChatOverlay && (
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                left: 0,
+                                                top: '5%',
+                                                width: 350,
+                                                height: '90%',
+                                                zIndex: 50,
+                                                pointerEvents: 'auto',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                            }}
+                                            className="chat-overlay-fullscreen"
+                                        >
+                                            <ChatSidebar
+                                                key={`chat-fullscreen-${messages.length}`}
+                                                messages={messages}
+                                                input={input}
+                                                setInput={setInput}
+                                                handleSend={handleSend}
+                                                chatEnabled={chatEnabled}
+                                                studentsMuted={studentsMuted}
+                                                isProfessor={isProfessor}
+                                            />
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </div>
                     </div>
 
@@ -843,22 +920,22 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                         <h1 className="text-2xl font-bold mb-2">{session.title}</h1>
                         <p className="text-gray-300 mb-4">مقدم من: {session.presenter}</p>
                         <p className="text-gray-400 leading-relaxed">{session.description}</p>
-
                     </div>
                 </div>
 
-                {/* Chat Sidebar */}
-                <ChatSidebar
-                    key={`chat-${messages.length}`}
-                    messages={messages}
-                    input={input}
-                    setInput={setInput}
-                    handleSend={handleSend}
-                    chatEnabled={chatEnabled}
-                    studentsMuted={studentsMuted}
-                    isProfessor={isProfessor}
-                />
-
+                {/* Chat Sidebar (hide in fullscreen) */}
+                {!isFullScreen && (
+                    <ChatSidebar
+                        key={`chat-${messages.length}`}
+                        messages={messages}
+                        input={input}
+                        setInput={setInput}
+                        handleSend={handleSend}
+                        chatEnabled={chatEnabled}
+                        studentsMuted={studentsMuted}
+                        isProfessor={isProfessor}
+                    />
+                )}
             </div>
 
             {/* Interactive Participants List - Responsive */}
@@ -919,69 +996,87 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                         {/* Hover Effect */}
                                         <div className="absolute inset-0 rounded-full bg-green-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                                     </div>
-                                    {/* Name + Mic Icon */}
-                                    <div className="text-center mt-1 sm:mt-2 flex items-center justify-center gap-1">
+                                    {/* Name + Mic Icon + Professor Controls */}
+                                    <div className="text-center mt-1 sm:mt-2 flex items-center justify-center gap-1 flex-col">
                                         <p className="text-white text-xs sm:text-sm font-medium truncate mb-0">
                                             {participant.name || 'مستخدم'}
                                         </p>
-                                        {isStudent && (
+                                        {/* Mic status icon for all */}
                                             <span
-                                                className={`inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded-full ${canToggle ? 'cursor-pointer hover:scale-110 hover:opacity-80 transition-all duration-200' : 'cursor-default opacity-50'} ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}
-                                                title={
-                                                    canProfToggle ? (isMuted ? 'إلغاء كتم الطالب' : 'كتم الطالب') :
-                                                        canStudentToggleOwn ? (isMuted ? 'إلغاء كتم الميكروفون' : 'كتم الميكروفون') :
-                                                            studentsMuted ? 'مكتوم من قبل الأستاذ' :
-                                                                isMuted ? 'مكتوم' : 'ميكروفون نشط'
-                                                }
+                                            className={`inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded-full ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}
+                                            title={isMuted ? 'مكتوم' : 'ميكروفون نشط'}
+                                        >
+                                            {isMuted ? <MicOff className="w-2 h-2 sm:w-3 sm:h-3 text-white" /> : <Mic className="w-2 h-2 sm:w-3 sm:h-3 text-white" />}
+                                        </span>
+                                        {/* Professor controls: Let student speak / Mute student */}
+                                        {canProfToggle && (
+                                            <div className="flex flex-col gap-1 mt-1">
+                                                <Button
+                                                    size="sm"
+                                                    variant="default"
+                                                    className={`flex items-center gap-1 px-2 py-1 text-xs ${isMuted ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
+                                                    disabled={!isMuted} // Only enable if student is muted
+                                                    title="إعطاء الطالب الميكروفون (Let student speak)"
+                                                    onClick={() => {
+                                                        if (socket && isMuted) {
+                                                            const signalData = {
+                                                                studentId: participant.userId,
+                                                                studentName: participant.name,
+                                                                muted: false
+                                                            };
+                                                            console.log('[PROF] Let student speak:', signalData);
+                                                            socket.emit('toggle-student-mic', id, signalData);
+                                                        }
+                                                    }}
+                                                >
+                                                    <Mic className="w-3 h-3 text-white" />
+                                                    <span>إعطاء الميكروفون</span>
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="default"
+                                                    className={`flex items-center gap-1 px-2 py-1 text-xs ${!isMuted ? 'bg-red-600 hover:bg-red-700 text-white' : ''}`}
+                                                    disabled={isMuted} // Only enable if student is unmuted
+                                                    title="كتم الطالب (Mute student)"
                                                 onClick={() => {
-                                                    console.log('[DEBUG] Mic icon clicked!', {
-                                                        isProfessor,
-                                                        isStudent,
-                                                        isCurrentUser,
-                                                        isMuted,
-                                                        canProfToggle,
-                                                        canStudentToggleOwn,
-                                                        studentsMuted,
-                                                        participantId: participant.userId,
-                                                        participantName: participant.name,
-                                                        socketId: socket?.id,
-                                                        hasSocket: !!socket,
-                                                        currentMuteState: studentMuteStates[participant.userId]
-                                                    });
-
-                                                    if (canProfToggle) {
-                                                        // Professor can mute/unmute the student
-                                                        console.log('[DEBUG] Professor toggling student mic:', !isMuted);
+                                                        if (socket && !isMuted) {
+                                                            const signalData = {
+                                                                studentId: participant.userId,
+                                                                studentName: participant.name,
+                                                                muted: true
+                                                            };
+                                                            console.log('[PROF] Mute student:', signalData);
+                                                            socket.emit('toggle-student-mic', id, signalData);
+                                                        }
+                                                    }}
+                                                >
+                                                    <MicOff className="w-3 h-3 text-white" />
+                                                    <span>كتم الطالب</span>
+                                                </Button>
+                                            </div>
+                                        )}
+                                        {/* Student can toggle own mic if allowed */}
+                                        {canStudentToggleOwn && (
+                                            <Button
+                                                size="sm"
+                                                variant="default"
+                                                className={`flex items-center gap-1 px-2 py-1 text-xs ${isMuted ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}
+                                                title={isMuted ? 'إلغاء كتم الميكروفون' : 'كتم الميكروفون'}
+                                                onClick={() => {
                                                         if (socket) {
                                                             const signalData = {
                                                                 studentId: participant.userId,
                                                                 studentName: participant.name,
                                                                 muted: !isMuted
                                                             };
-                                                            console.log('[DEBUG] Sending signal:', signalData);
+                                                        console.log('[STUDENT] Toggle own mic:', signalData);
                                                             socket.emit('toggle-student-mic', id, signalData);
-                                                        } else {
-                                                            console.error('[DEBUG] No socket available!');
-                                                        }
-                                                    } else if (canStudentToggleOwn) {
-                                                        // Student can toggle their own mic only if teacher hasn't muted all
-                                                        console.log('[DEBUG] Student toggling own mic:', !isMuted);
-                                                        if (socket) {
-                                                            const signalData = {
-                                                                studentId: participant.userId,
-                                                                studentName: participant.name,
-                                                                muted: !isMuted
-                                                            };
-                                                            console.log('[DEBUG] Student sending own mic toggle:', signalData);
-                                                            socket.emit('toggle-student-mic', id, signalData);
-                                                        }
-                                                    } else {
-                                                        console.log('[DEBUG] Cannot toggle - not allowed');
                                                     }
                                                 }}
                                             >
-                                                {isMuted ? <MicOff className="w-2 h-2 sm:w-3 sm:h-3 text-white" /> : <Mic className="w-2 h-2 sm:w-3 sm:h-3 text-white" />}
-                                            </span>
+                                                {isMuted ? <Mic className="w-3 h-3 text-white" /> : <MicOff className="w-3 h-3 text-white" />}
+                                                <span>{isMuted ? 'تشغيل الميكروفون' : 'كتم الميكروفون'}</span>
+                                            </Button>
                                         )}
                                     </div>
                                     {participant.role && (

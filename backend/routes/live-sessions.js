@@ -219,7 +219,8 @@ router.get('/rtcToken', verifyToken, (req, res) => {
     const uid = req.query.uid;
 
     // Determine role based on user type
-    const role = req.user.role === 'professor' ? RtcRole.PUBLISHER : RtcRole.SUBSCRIBER;
+    // Always allow publishing for both professors and students
+    const role = RtcRole.PUBLISHER;
 
     const expireTime = 3600; // 1 hour
     const currentTime = Math.floor(Date.now() / 1000);
