@@ -1,5 +1,5 @@
 import express from 'express';
-import { query, getRow, getRows } from '../db.js';
+import { query, getRow, getRows, pool } from '../db.js';
 import { verifyToken, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -135,19 +135,14 @@ router.get('/levels/:levelId/years', verifyToken, requireRole(['admin', 'profess
 // POST /api/years → create new year
 router.post('/years', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { name, level_id, speciality_id, material_id } = req.body;
+    const { name, level_id, speciality_id, material_name, material_price } = req.body;
     
     if (!name || !level_id) {
       return res.status(400).json({ error: 'Year name and level are required' });
     }
     
-    // Validate path type - must have either speciality_id or material_id, but not both
-    if (speciality_id && material_id) {
-      return res.status(400).json({ error: 'Year cannot have both speciality and material' });
-    }
-    
-    if (!speciality_id && !material_id) {
-      return res.status(400).json({ error: 'Year must have either speciality or material' });
+    if (!material_name) {
+      return res.status(400).json({ error: 'Material name is required' });
     }
     
     // Check if level exists
@@ -164,29 +159,53 @@ router.post('/years', verifyToken, requireRole(['admin']), async (req, res) => {
       }
     }
     
-    // Check if material exists if provided
-    if (material_id) {
-      const material = await getRow('SELECT id FROM materials WHERE id = $1', [material_id]);
-      if (!material) {
-        return res.status(400).json({ error: 'Material not found' });
-      }
-    }
-    
-    // Check if year already exists in this level with same path
+    // Check if year already exists in this level
     const existingYear = await getRow(
-      'SELECT id FROM years WHERE name = $1 AND level_id = $2 AND (speciality_id = $3 OR material_id = $4)', 
-      [name, level_id, speciality_id || null, material_id || null]
+      'SELECT id FROM years WHERE name = $1 AND level_id = $2', 
+      [name, level_id]
     );
     if (existingYear) {
-      return res.status(400).json({ error: 'Year with this name already exists in this level with the same path' });
+      return res.status(400).json({ error: 'Year with this name already exists in this level' });
     }
     
-    const result = await query(
-      'INSERT INTO years (name, level_id, speciality_id, material_id) VALUES ($1, $2, $3, $4) RETURNING *',
-      [name, level_id, speciality_id || null, material_id || null]
-    );
-    
-    res.status(201).json(result.rows[0]);
+    // Start transaction to create year and material
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Create the material first
+      let materialResult;
+      if (speciality_id) {
+        // Create material under speciality
+        materialResult = await client.query(
+          'INSERT INTO materials (name, speciality_id, price) VALUES ($1, $2, $3) RETURNING *',
+          [material_name, speciality_id, material_price || 0]
+        );
+      } else {
+        // Create material directly (will be linked to year)
+        materialResult = await client.query(
+          'INSERT INTO materials (name, price) VALUES ($1, $2) RETURNING *',
+          [material_name, material_price || 0]
+        );
+      }
+      
+      const materialId = materialResult.rows[0].id;
+      
+      // Create the year
+      const yearResult = await client.query(
+        'INSERT INTO years (name, level_id, speciality_id, material_id) VALUES ($1, $2, $3, $4) RETURNING *',
+        [name, level_id, speciality_id || null, materialId]
+      );
+      
+      await client.query('COMMIT');
+      
+      res.status(201).json(yearResult.rows[0]);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error('Error creating year:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -197,17 +216,12 @@ router.post('/years', verifyToken, requireRole(['admin']), async (req, res) => {
 router.put('/years/:id', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, level_id, speciality_id, material_id } = req.body;
+    const { name, level_id, speciality_id, material_name, material_price } = req.body;
     
     // Check if year exists
     const existingYear = await getRow('SELECT id FROM years WHERE id = $1', [id]);
     if (!existingYear) {
       return res.status(404).json({ error: 'Year not found' });
-    }
-    
-    // Validate path type - must have either speciality_id or material_id, but not both
-    if (speciality_id && material_id) {
-      return res.status(400).json({ error: 'Year cannot have both speciality and material' });
     }
     
     // Check if level exists if level_id is being changed
@@ -226,28 +240,28 @@ router.put('/years/:id', verifyToken, requireRole(['admin']), async (req, res) =
       }
     }
     
-    // Check if material exists if provided
-    if (material_id) {
-      const material = await getRow('SELECT id FROM materials WHERE id = $1', [material_id]);
-      if (!material) {
-        return res.status(400).json({ error: 'Material not found' });
+    // Check if name conflicts
+    if (name) {
+      const nameConflict = await getRow(
+        'SELECT id FROM years WHERE name = $1 AND level_id = $2 AND id != $3', 
+        [name, level_id || existingYear.level_id, id]
+      );
+      if (nameConflict) {
+        return res.status(400).json({ error: 'Year with this name already exists in this level' });
       }
     }
     
-    // Check if name conflicts with same path
-    if (name) {
-      const nameConflict = await getRow(
-        'SELECT id FROM years WHERE name = $1 AND level_id = $2 AND (speciality_id = $3 OR material_id = $4) AND id != $5', 
-        [name, level_id || existingYear.level_id, speciality_id || null, material_id || null, id]
+    // If material name is provided, update the material
+    if (material_name && existingYear.material_id) {
+      await query(
+        'UPDATE materials SET name = $1, price = $2 WHERE id = $3',
+        [material_name, material_price || 0, existingYear.material_id]
       );
-      if (nameConflict) {
-        return res.status(400).json({ error: 'Year with this name already exists in this level with the same path' });
-      }
     }
     
     const result = await query(
-      'UPDATE years SET name = COALESCE($1, name), level_id = COALESCE($2, level_id), speciality_id = $3, material_id = $4 WHERE id = $5 RETURNING *',
-      [name, level_id, speciality_id || null, material_id || null, id]
+      'UPDATE years SET name = COALESCE($1, name), level_id = COALESCE($2, level_id), speciality_id = $3 WHERE id = $4 RETURNING *',
+      [name, level_id, speciality_id || null, id]
     );
     
     res.json(result.rows[0]);

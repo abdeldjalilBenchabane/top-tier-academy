@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { structureAPI } from '@/services/api';
-import { Level, Speciality, Material } from '@/types';
+import { Level, Speciality } from '@/types';
 import { toast } from '@/lib/toast';
 
 interface YearFormProps {
@@ -33,25 +33,23 @@ const YearForm = ({
   const [levelId, setLevelId] = useState(year?.levelId || preselectedLevelId || '');
   const [pathType, setPathType] = useState<'speciality' | 'material'>('speciality');
   const [specialityId, setSpecialityId] = useState(year?.specialityId || '');
-  const [materialId, setMaterialId] = useState(year?.materialId || '');
+  const [materialName, setMaterialName] = useState('');
+  const [materialPrice, setMaterialPrice] = useState('');
   
   const [levels, setLevels] = useState<Level[]>([]);
   const [specialities, setSpecialities] = useState<Speciality[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [levelsData, specialitiesData, materialsData] = await Promise.all([
+        const [levelsData, specialitiesData] = await Promise.all([
           structureAPI.getLevels(),
-          structureAPI.getSpecialities(),
-          structureAPI.getMaterials()
+          structureAPI.getSpecialities()
         ]);
         setLevels(levelsData);
         setSpecialities(specialitiesData);
-        setMaterials(materialsData);
       } catch (error) {
         console.error(error);
         toast.error('Failed to fetch data');
@@ -71,7 +69,6 @@ const YearForm = ({
         setSpecialityId(year.specialityId);
       } else if (year.materialId) {
         setPathType('material');
-        setMaterialId(year.materialId);
       }
     }
   }, [year]);
@@ -94,8 +91,14 @@ const YearForm = ({
       return;
     }
     
-    if (pathType === 'material' && !materialId) {
-      toast.error('Please select a material');
+    if (!materialName.trim()) {
+      toast.error('Please enter a material name');
+      return;
+    }
+    
+    const priceValue = materialPrice ? parseFloat(materialPrice) : 0;
+    if (materialPrice && (isNaN(priceValue) || priceValue < 0)) {
+      toast.error('Please enter a valid price');
       return;
     }
     
@@ -106,7 +109,8 @@ const YearForm = ({
         name,
         level_id: levelId,
         speciality_id: pathType === 'speciality' ? specialityId : null,
-        material_id: pathType === 'material' ? materialId : null
+        material_name: materialName,
+        material_price: priceValue
       };
       
       if (isEditing && year) {
@@ -119,7 +123,8 @@ const YearForm = ({
       
       setName('');
       setSpecialityId('');
-      setMaterialId('');
+      setMaterialName('');
+      setMaterialPrice('');
       onSuccess?.();
     } catch (error: any) {
       console.error(error);
@@ -173,17 +178,18 @@ const YearForm = ({
           onValueChange={(value) => {
             setPathType(value as 'speciality' | 'material');
             setSpecialityId('');
-            setMaterialId('');
+            setMaterialName('');
+            setMaterialPrice('');
           }}
           disabled={isEditing}
         >
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="speciality" id="speciality" />
-            <Label htmlFor="speciality">With Speciality (Level → Speciality → Year)</Label>
+            <Label htmlFor="speciality">With Speciality (Level → Year → Speciality → Create Material)</Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="material" id="material" />
-            <Label htmlFor="material">Without Speciality (Level → Year → Material)</Label>
+            <Label htmlFor="material">Without Speciality (Level → Year → Create Material)</Label>
           </div>
         </RadioGroup>
       </div>
@@ -209,26 +215,29 @@ const YearForm = ({
         </div>
       )}
       
-      {pathType === 'material' && (
-        <div className="space-y-2">
-          <Label htmlFor="material-select">Material</Label>
-          <Select
-            value={materialId}
-            onValueChange={setMaterialId}
-          >
-            <SelectTrigger id="material-select">
-              <SelectValue placeholder="Select a material" />
-            </SelectTrigger>
-            <SelectContent>
-              {materials.map((material) => (
-                <SelectItem key={material.id} value={material.id}>
-                  {material.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      <div className="space-y-2">
+        <Label htmlFor="material-name">Material Name</Label>
+        <Input
+          id="material-name"
+          placeholder="e.g. Algebra, Web Development, Physics"
+          value={materialName}
+          onChange={(e) => setMaterialName(e.target.value)}
+          required
+        />
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="material-price">Material Price (Optional)</Label>
+        <Input
+          id="material-price"
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder="0.00"
+          value={materialPrice}
+          onChange={(e) => setMaterialPrice(e.target.value)}
+        />
+      </div>
       
       <div className="flex justify-end gap-2">
         {onCancel && (

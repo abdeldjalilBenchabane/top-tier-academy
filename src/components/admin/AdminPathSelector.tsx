@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { api } from '@/lib/api';
-import { Level, Year, Speciality, Material, Language, LanguageLevel } from '@/types';
+import { Level, Year, Speciality, Language, LanguageLevel } from '@/types';
 import { toast } from '@/lib/toast';
 
 interface AdminPathSelectorProps {
@@ -20,13 +21,13 @@ const AdminPathSelector = ({
   const [levels, setLevels] = useState<Level[]>([]);
   const [years, setYears] = useState<Year[]>([]);
   const [specialities, setSpecialities] = useState<Speciality[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
   
   // Selected values
   const [selectedLevelId, setSelectedLevelId] = useState<string>('');
   const [selectedYearId, setSelectedYearId] = useState<string>('');
   const [selectedSpecialityId, setSelectedSpecialityId] = useState<string>('');
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
+  const [materialName, setMaterialName] = useState('');
+  const [materialPrice, setMaterialPrice] = useState('');
   
   const [rootType, setRootType] = useState<'structure' | 'language' | ''>('');
   const [languages, setLanguages] = useState<Language[]>([]);
@@ -65,9 +66,9 @@ const AdminPathSelector = ({
           // Reset downstream selections
           setSelectedYearId('');
           setSelectedSpecialityId('');
-          setSelectedMaterialId('');
+          setMaterialName('');
+          setMaterialPrice('');
           setSpecialities([]);
-          setMaterials([]);
         } catch (error) {
           console.error(error);
           toast.error('Failed to fetch years');
@@ -89,8 +90,8 @@ const AdminPathSelector = ({
             setSpecialities(data);
             // Reset material selection
             setSelectedSpecialityId('');
-            setSelectedMaterialId('');
-            setMaterials([]);
+            setMaterialName('');
+            setMaterialPrice('');
           } catch (error) {
             console.error(error);
             toast.error('Failed to fetch specialities');
@@ -98,32 +99,13 @@ const AdminPathSelector = ({
         };
 
         fetchSpecialities();
-      } else if (selectedYear && selectedYear.material_id) {
-        // If year has material_id, set it directly
-        setSelectedMaterialId(selectedYear.material_id);
+      } else {
+        // If year doesn't have speciality_id, reset specialities
         setSpecialities([]);
-        setMaterials([]);
+        setSelectedSpecialityId('');
       }
     }
   }, [selectedYearId, years]);
-
-  // Load materials when speciality is selected
-  useEffect(() => {
-    if (selectedSpecialityId) {
-      const fetchMaterials = async () => {
-        try {
-          const data = await api.getMaterials(selectedSpecialityId);
-          setMaterials(data);
-          setSelectedMaterialId('');
-        } catch (error) {
-          console.error(error);
-          toast.error('Failed to fetch materials');
-        }
-      };
-
-      fetchMaterials();
-    }
-  }, [selectedSpecialityId]);
 
   // Load languages when root type is selected
   useEffect(() => {
@@ -160,15 +142,22 @@ const AdminPathSelector = ({
     }
   }, [selectedLanguageId]);
 
-  const handleAssignPath = async () => {
+  const handleAssign = async () => {
     if (rootType === 'structure') {
-      if (!selectedMaterialId) {
-        toast.error('Please select a complete path for the course');
+      if (!materialName.trim()) {
+        toast.error('Please enter a material name');
         return;
       }
       setIsSubmitting(true);
       try {
-        await api.assignMaterialPathAdmin(course.id, selectedMaterialId);
+        // Create material and assign to course
+        const materialData = {
+          name: materialName,
+          price: materialPrice ? parseFloat(materialPrice) : 0,
+          speciality_id: selectedSpecialityId || null
+        };
+        
+        await api.assignMaterialPathAdmin(course.id, materialData);
         toast.success('Course path assigned successfully');
         onSuccess();
       } catch (error) {
@@ -205,9 +194,9 @@ const AdminPathSelector = ({
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-lg font-medium">Assign Path to Approved Course</h3>
+        <h3 className="text-lg font-medium">Assign Course Path</h3>
         <p className="text-sm text-gray-500">
-          This course is approved but doesn't have a path assigned. Choose where to place "{course.title}" in the education hierarchy or languages.
+          Choose where to place "{course.title}" in the education hierarchy or languages.
         </p>
         
         <div className="space-y-4">
@@ -239,6 +228,9 @@ const AdminPathSelector = ({
                     ))}
                   </SelectContent>
                 </Select>
+                {levels.length === 0 && (
+                  <div className="text-xs text-red-500 mt-1">No levels available. Please create a level first.</div>
+                )}
               </div>
               {/* Year Select */}
               <div>
@@ -255,6 +247,9 @@ const AdminPathSelector = ({
                     ))}
                   </SelectContent>
                 </Select>
+                {selectedLevelId && years.length === 0 && (
+                  <div className="text-xs text-red-500 mt-1">No years available for the selected level.</div>
+                )}
               </div>
               {/* Speciality Select - only show if selected year has speciality_id */}
               {selectedYearId && years.find(y => y.id === selectedYearId)?.speciality_id && (
@@ -270,27 +265,32 @@ const AdminPathSelector = ({
                       ))}
                     </SelectContent>
                   </Select>
+                  {selectedYearId && specialities.length === 0 && (
+                    <div className="text-xs text-red-500 mt-1">No specialities available for the selected year.</div>
+                  )}
                 </div>
               )}
-              {/* Material Select */}
+              {/* Material Name Input */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Material</label>
-                <Select value={selectedMaterialId || ''} onValueChange={setSelectedMaterialId} disabled={!selectedSpecialityId && !years.find(y => y.id === selectedYearId)?.material_id}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={
-                      years.find(y => y.id === selectedYearId)?.material_id 
-                        ? "Material already assigned to year" 
-                        : selectedSpecialityId 
-                          ? "Select Material" 
-                          : "Select Speciality First"
-                    } />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {materials.map((material) => (
-                      <SelectItem key={material.id} value={material.id}>{material.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Material Name</label>
+                <Input
+                  placeholder="Enter material name (e.g., Algebra, Web Development)"
+                  value={materialName}
+                  onChange={(e) => setMaterialName(e.target.value)}
+                  required
+                />
+              </div>
+              {/* Material Price Input */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Material Price (Optional)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={materialPrice}
+                  onChange={(e) => setMaterialPrice(e.target.value)}
+                />
               </div>
             </>
           )}
@@ -356,7 +356,7 @@ const AdminPathSelector = ({
         
         <Button 
           type="button" 
-          onClick={handleAssignPath} 
+          onClick={handleAssign} 
           disabled={isSubmitting}
         >
           Assign Path

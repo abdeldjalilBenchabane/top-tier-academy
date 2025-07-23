@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { api } from '@/lib/api';
-import { Level, Year, Speciality, Material, Language, LanguageLevel } from '@/types';
+import { Level, Year, Speciality, Language, LanguageLevel } from '@/types';
 import { toast } from '@/lib/toast';
 
 interface PathSelectorProps {
@@ -21,13 +22,13 @@ const PathSelector = ({
   const [levels, setLevels] = useState<Level[]>([]);
   const [years, setYears] = useState<Year[]>([]);
   const [specialities, setSpecialities] = useState<Speciality[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
   
   // Selected values
   const [selectedLevelId, setSelectedLevelId] = useState<string>('');
   const [selectedYearId, setSelectedYearId] = useState<string>('');
   const [selectedSpecialityId, setSelectedSpecialityId] = useState<string>('');
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
+  const [materialName, setMaterialName] = useState('');
+  const [materialPrice, setMaterialPrice] = useState('');
   
   const [rootType, setRootType] = useState<'structure' | 'language' | ''>('');
   const [languages, setLanguages] = useState<Language[]>([]);
@@ -66,9 +67,9 @@ const PathSelector = ({
           // Reset downstream selections
           setSelectedYearId('');
           setSelectedSpecialityId('');
-          setSelectedMaterialId('');
+          setMaterialName('');
+          setMaterialPrice('');
           setSpecialities([]);
-          setMaterials([]);
         } catch (error) {
           console.error(error);
           toast.error('Failed to fetch years');
@@ -90,8 +91,8 @@ const PathSelector = ({
             setSpecialities(data);
             // Reset material selection
             setSelectedSpecialityId('');
-            setSelectedMaterialId('');
-            setMaterials([]);
+            setMaterialName('');
+            setMaterialPrice('');
           } catch (error) {
             console.error(error);
             toast.error('Failed to fetch specialities');
@@ -99,32 +100,13 @@ const PathSelector = ({
         };
 
         fetchSpecialities();
-      } else if (selectedYear && selectedYear.material_id) {
-        // If year has material_id, set it directly
-        setSelectedMaterialId(selectedYear.material_id);
+      } else {
+        // If year doesn't have speciality_id, reset specialities
         setSpecialities([]);
-        setMaterials([]);
+        setSelectedSpecialityId('');
       }
     }
   }, [selectedYearId, years]);
-
-  // Load materials when speciality is selected
-  useEffect(() => {
-    if (selectedSpecialityId) {
-      const fetchMaterials = async () => {
-        try {
-          const data = await api.getMaterials(selectedSpecialityId);
-          setMaterials(data);
-          setSelectedMaterialId('');
-        } catch (error) {
-          console.error(error);
-          toast.error('Failed to fetch materials');
-        }
-      };
-
-      fetchMaterials();
-    }
-  }, [selectedSpecialityId]);
 
   // Load languages when root type is selected
   useEffect(() => {
@@ -163,13 +145,20 @@ const PathSelector = ({
 
   const handleApprove = async () => {
     if (rootType === 'structure') {
-      if (!selectedMaterialId) {
-        toast.error('Please select a complete path for the course');
+      if (!materialName.trim()) {
+        toast.error('Please enter a material name');
         return;
       }
       setIsSubmitting(true);
       try {
-        await api.approveCourse(pendingCourse.id, selectedMaterialId);
+        // Create material and assign to course
+        const materialData = {
+          name: materialName,
+          price: materialPrice ? parseFloat(materialPrice) : 0,
+          speciality_id: selectedSpecialityId || null
+        };
+        
+        await api.approveCourseWithMaterial(pendingCourse.id, materialData);
         toast.success('Course path assigned successfully. Course is now pending admin approval.');
         onSuccess();
       } catch (error) {
@@ -299,28 +288,27 @@ const PathSelector = ({
                   )}
                 </div>
               )}
-              {/* Material Select */}
+              {/* Material Name Input */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Material</label>
-                <Select value={selectedMaterialId || ''} onValueChange={setSelectedMaterialId} disabled={!selectedSpecialityId && !years.find(y => y.id === selectedYearId)?.material_id}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={
-                      years.find(y => y.id === selectedYearId)?.material_id 
-                        ? "Material already assigned to year" 
-                        : selectedSpecialityId 
-                          ? "Select Material" 
-                          : "Select Speciality First"
-                    } />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {materials.map((material) => (
-                      <SelectItem key={material.id} value={material.id}>{material.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedSpecialityId && materials.length === 0 && (
-                  <div className="text-xs text-red-500 mt-1">No materials available for the selected speciality.</div>
-                )}
+                <label className="block text-xs font-medium text-gray-700 mb-1">Material Name</label>
+                <Input
+                  placeholder="Enter material name (e.g., Algebra, Web Development)"
+                  value={materialName}
+                  onChange={(e) => setMaterialName(e.target.value)}
+                  required
+                />
+              </div>
+              {/* Material Price Input */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Material Price (Optional)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={materialPrice}
+                  onChange={(e) => setMaterialPrice(e.target.value)}
+                />
               </div>
             </>
           )}
