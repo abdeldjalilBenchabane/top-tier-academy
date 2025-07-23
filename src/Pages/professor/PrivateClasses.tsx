@@ -15,11 +15,25 @@ const ProfessorPrivateClasses = () => {
   // New: store the session being edited (for edit time)
   const [editMode, setEditMode] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
+  const [pricingSettings, setPricingSettings] = useState(null);
 
   useEffect(() => {
     fetchRequests();
+    fetchPricingSettings();
     // eslint-disable-next-line
   }, [user]);
+
+  const fetchPricingSettings = async () => {
+    try {
+      const response = await fetch('/api/private-class-settings');
+      if (response.ok) {
+        const data = await response.json();
+        setPricingSettings(data.settings);
+      }
+    } catch (error) {
+      console.error('Error fetching pricing settings:', error);
+    }
+  };
 
   const fetchRequests = async () => {
     if (!user) return;
@@ -45,7 +59,8 @@ const ProfessorPrivateClasses = () => {
           time: request.time,
           createdAt: request.created_at,
           studentId: request.student_id,
-          studentName: request.student_name
+          studentName: request.student_name,
+          hierarchy_path: request.hierarchy_path
         }));
         setRequests(transformed);
       }
@@ -185,24 +200,85 @@ const ProfessorPrivateClasses = () => {
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl p-8 max-w-md w-full">
             <h2 className="text-xl font-bold mb-4 text-blue-700">حدد توقيت الحصة</h2>
+            
+            {/* Pricing Information */}
+            {pricingSettings && (
+              <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 mb-4 border border-green-200">
+                <h3 className="font-semibold text-green-800 mb-2">معلومات الحصة</h3>
+                <div className="text-sm text-gray-700 space-y-1">
+                  <p>• سعر الحصة: <span className="font-semibold text-green-700">{pricingSettings.price_per_session?.toLocaleString()} دينار جزائري</span></p>
+                  <p>• مدة الحصة: <span className="font-semibold text-green-700">{pricingSettings.session_duration} دقيقة</span></p>
+                  <p>• المواعيد المتاحة: <span className="font-semibold text-green-700">{pricingSettings.available_start_time?.substring(0, 5)} - {pricingSettings.available_end_time?.substring(0, 5)}</span></p>
+                </div>
+              </div>
+            )}
+            
             <label className="block mb-2 text-gray-700">اختر التوقيت المناسب:</label>
             <select
               className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-4"
               value={selectedTime}
               onChange={e => setSelectedTime(e.target.value)}
             >
-              {Array.from({ length: 48 }).map((_, i) => {
-                const startHour = Math.floor(i / 2);
-                const startMin = i % 2 === 0 ? '00' : '30';
-                const endHour = Math.floor((i + 1) / 2) % 24;
-                const endMin = (i + 1) % 2 === 0 ? '00' : '30';
-                const pad = n => n.toString().padStart(2, '0');
-                const label = `${pad(startHour)}:${startMin} - ${pad(endHour)}:${endMin}`;
-                return (
-                  <option key={label} value={label}>{label}</option>
-                );
-              })}
+              {(() => {
+                const options = [];
+                if (pricingSettings) {
+                  const startTime = pricingSettings.available_start_time;
+                  const endTime = pricingSettings.available_end_time;
+                  const duration = pricingSettings.session_duration;
+                  
+                  const startHour = parseInt(startTime.split(':')[0]);
+                  const startMin = parseInt(startTime.split(':')[1]);
+                  const endHour = parseInt(endTime.split(':')[0]);
+                  const endMin = parseInt(endTime.split(':')[1]);
+                  
+                  let currentHour = startHour;
+                  let currentMin = startMin;
+                  
+                  while (currentHour < endHour || (currentHour === endHour && currentMin < endMin)) {
+                    const startTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMin.toString().padStart(2, '0')}`;
+                    
+                    // Calculate end time based on duration
+                    const endTimeDate = new Date();
+                    endTimeDate.setHours(currentHour, currentMin + duration, 0);
+                    const endHourCalc = endTimeDate.getHours();
+                    const endMinCalc = endTimeDate.getMinutes();
+                    const endTimeStr = `${endHourCalc.toString().padStart(2, '0')}:${endMinCalc.toString().padStart(2, '0')}`;
+                    
+                    const label = `${startTimeStr} - ${endTimeStr}`;
+                    options.push(
+                      <option key={label} value={label}>{label}</option>
+                    );
+                    
+                    // Move to next 30-minute slot
+                    currentMin += 30;
+                    if (currentMin >= 60) {
+                      currentHour += 1;
+                      currentMin = 0;
+                    }
+                  }
+                } else {
+                  // Fallback to original 48 slots if no settings
+                  Array.from({ length: 48 }).map((_, i) => {
+                    const startHour = Math.floor(i / 2);
+                    const startMin = i % 2 === 0 ? '00' : '30';
+                    const endHour = Math.floor((i + 1) / 2) % 24;
+                    const endMin = (i + 1) % 2 === 0 ? '00' : '30';
+                    const pad = n => n.toString().padStart(2, '0');
+                    const label = `${pad(startHour)}:${startMin} - ${pad(endHour)}:${endMin}`;
+                    options.push(
+                      <option key={label} value={label}>{label}</option>
+                    );
+                  });
+                }
+                return options;
+              })()}
             </select>
+            
+            <div className="text-sm text-gray-600 mb-4">
+              <p>• سيتم إعلام الطالب بالتوقيت المحدد</p>
+              <p>• مدة الحصة: {pricingSettings?.session_duration || 60} دقيقة</p>
+            </div>
+            
             <div className="flex gap-4 justify-end">
               <button
                 className="px-4 py-2 bg-gray-300 rounded-lg font-bold"

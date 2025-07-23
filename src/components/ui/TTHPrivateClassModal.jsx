@@ -1,8 +1,48 @@
 import React from 'react';
-import { FaTimes, FaCalendarAlt, FaUserTie, FaBook, FaClock, FaInfoCircle, FaCheckCircle, FaSpinner } from 'react-icons/fa';
+import { FaTimes, FaCalendarAlt, FaUserTie, FaBook, FaClock, FaInfoCircle, FaCheckCircle, FaSpinner, FaGraduationCap, FaLayerGroup } from 'react-icons/fa';
 
-const PrivateClassModal = ({ isOpen, onClose, session, isRequestForm = false, requestForm = {}, onRequestFormChange = () => {}, onSubmitRequest = () => {}, selectedTeacher = '', selectedDate = '', selectedSubject = '', selectedGrade = '', selectedYear = '' }) => {
+const PrivateClassModal = ({ 
+  isOpen, 
+  onClose, 
+  session, 
+  isRequestForm = false, 
+  requestForm = {}, 
+  onRequestFormChange = () => {}, 
+  onSubmitRequest = () => {}, 
+  selectedTeacher = '', 
+  selectedDate = '', 
+  selectedLevel = '', 
+  selectedYear = '', 
+  selectedSpeciality = '',
+  selectedMaterial = '',
+  levels = [],
+  years = [],
+  specialities = [],
+  materials = [],
+  pricingSettings = null
+}) => {
   if (!isOpen) return null;
+
+  // Helper function to get names from IDs
+  const getLevelName = (levelId) => {
+    const level = levels.find(l => l.id === parseInt(levelId));
+    return level ? level.name : '';
+  };
+
+  const getYearName = (yearId) => {
+    const year = years.find(y => y.id === parseInt(yearId));
+    return year ? year.name : '';
+  };
+
+  const getSpecialityName = (specialityId) => {
+    const speciality = specialities.find(s => s.id === parseInt(specialityId));
+    return speciality ? speciality.name : '';
+  };
+
+  const getMaterialName = (materialId) => {
+    const material = materials.find(m => m.id === parseInt(materialId));
+    return material ? material.name : '';
+  };
 
   if (isRequestForm) {
     return (
@@ -34,21 +74,54 @@ const PrivateClassModal = ({ isOpen, onClose, session, isRequestForm = false, re
                   <div className="flex items-center gap-2">
                     <FaUserTie className="text-blue-600" />
                     <span className="text-gray-700">الأستاذ: <span className="font-semibold">{selectedTeacher || 'لم يتم الاختيار'}</span></span>
-              </div>
+                  </div>
                   <div className="flex items-center gap-2">
                     <FaCalendarAlt className="text-blue-600" />
                     <span className="text-gray-700">التاريخ: <span className="font-semibold">{selectedDate || 'لم يتم الاختيار'}</span></span>
-              </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <FaGraduationCap className="text-blue-600" />
+                    <span className="text-gray-700">المرحلة: <span className="font-semibold">{getLevelName(selectedLevel) || 'لم يتم الاختيار'}</span></span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <FaBook className="text-blue-600" />
-                    <span className="text-gray-700">المادة: <span className="font-semibold">{selectedSubject || 'لم يتم الاختيار'}</span></span>
-            </div>
+                    <span className="text-gray-700">السنة: <span className="font-semibold">{getYearName(selectedYear) || 'لم يتم الاختيار'}</span></span>
+                  </div>
                   <div className="flex items-center gap-2">
-                    <FaInfoCircle className="text-blue-600" />
-                    <span className="text-gray-700">المرحلة: <span className="font-semibold">{selectedYear} {selectedGrade}</span></span>
+                    <FaLayerGroup className="text-blue-600" />
+                    <span className="text-gray-700">التخصص: <span className="font-semibold">{getSpecialityName(selectedSpeciality) || 'لم يتم الاختيار'}</span></span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <FaBook className="text-blue-600" />
+                    <span className="text-gray-700">المادة: <span className="font-semibold">{getMaterialName(selectedMaterial) || 'لم يتم الاختيار'}</span></span>
+                  </div>
+                </div>
               </div>
-            </div>
-              </div>
+
+              {/* Pricing Information */}
+              {pricingSettings && (
+                <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-4 border border-green-200">
+                  <h3 className="font-semibold text-green-800 mb-3">معلومات التسعير والمواعيد</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      <FaClock className="text-green-600" />
+                      <span className="text-gray-700">سعر الحصة: <span className="font-semibold text-green-700">{pricingSettings.price_per_session?.toLocaleString()} دينار جزائري</span></span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FaClock className="text-green-600" />
+                      <span className="text-gray-700">مدة الحصة: <span className="font-semibold text-green-700">{pricingSettings.session_duration} دقيقة</span></span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FaClock className="text-green-600" />
+                      <span className="text-gray-700">المواعيد المتاحة: <span className="font-semibold text-green-700">{pricingSettings.available_start_time?.substring(0, 5)} - {pricingSettings.available_end_time?.substring(0, 5)}</span></span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FaInfoCircle className="text-green-600" />
+                      <span className="text-gray-700">سيختار الأستاذ الوقت المحدد</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Request Form */}
               <div className="space-y-4">
@@ -62,7 +135,7 @@ const PrivateClassModal = ({ isOpen, onClose, session, isRequestForm = false, re
                     className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
                     dir="rtl"
                   />
-            </div>
+                </div>
 
                 <div>
                   <label className="block text-gray-700 font-semibold mb-2 text-right">كم عدد الحصص المطلوبة؟</label>
@@ -76,7 +149,38 @@ const PrivateClassModal = ({ isOpen, onClose, session, isRequestForm = false, re
                     className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
                     dir="rtl"
                   />
-            </div>
+                </div>
+
+                {/* Dynamic Date Inputs */}
+                {requestForm.sessionsCount && parseInt(requestForm.sessionsCount) > 0 && (
+                  <div className="space-y-3">
+                    <label className="block text-gray-700 font-semibold mb-2 text-right">مواعيد الحصص المطلوبة</label>
+                    {Array.from({ length: parseInt(requestForm.sessionsCount) }, (_, index) => (
+                      <div key={index} className="flex items-center gap-3">
+                        <label className="text-sm text-gray-600 font-medium whitespace-nowrap">
+                          الحصة {index + 1}:
+                        </label>
+                        <input
+                          type="date"
+                          value={requestForm.dates?.[index] || ''}
+                          onChange={(e) => {
+                            const newDates = [...(requestForm.dates || [])];
+                            newDates[index] = e.target.value;
+                            onRequestFormChange('dates', newDates);
+                          }}
+                          min={new Date().toISOString().split('T')[0]}
+                          className="flex-1 bg-white border-2 border-gray-200 rounded-xl py-2 px-3 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
+                          dir="rtl"
+                        />
+                      </div>
+                    ))}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
+                      <p className="text-sm text-blue-800 text-right">
+                        <strong>ملاحظة:</strong> سيختار الأستاذ التوقيت المناسب لكل يوم وسيرد عليك في أقرب وقت ممكن
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-gray-700 font-semibold mb-2 text-right">نص الطلب</label>
@@ -88,25 +192,25 @@ const PrivateClassModal = ({ isOpen, onClose, session, isRequestForm = false, re
                     className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all resize-none"
                     dir="rtl"
                   />
-              </div>
-              </div>
+                </div>
               </div>
             </div>
+          </div>
 
           {/* Footer */}
           <div className="flex items-center justify-between p-6 border-t border-gray-200">
-              <button
-                onClick={onClose}
+            <button
+              onClick={onClose}
               className="px-6 py-3 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold transition-colors"
-              >
+            >
               إلغاء
             </button>
             <button
               onClick={onSubmitRequest}
-              className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all hover:shadow-lg"
+              className="px-6 py-3 text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl font-semibold transition-all hover:shadow-lg"
             >
               إرسال الطلب
-              </button>
+            </button>
           </div>
         </div>
       </div>
@@ -184,17 +288,36 @@ const PrivateClassModal = ({ isOpen, onClose, session, isRequestForm = false, re
                 </div>
               </div>
 
+              {/* Pricing Information */}
+              {session.price_per_session && (
+                <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-4 border border-green-200">
+                  <h3 className="font-semibold text-green-800 mb-3">معلومات التسعير</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      <FaClock className="text-green-600" />
+                      <span className="text-gray-700">سعر الحصة: <span className="font-semibold text-green-700">{session.price_per_session.toLocaleString()} دينار جزائري</span></span>
+                    </div>
+                    {session.session_duration && (
+                      <div className="flex items-center gap-2">
+                        <FaClock className="text-green-600" />
+                        <span className="text-gray-700">مدة الحصة: <span className="font-semibold text-green-700">{session.session_duration} دقيقة</span></span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Additional Details */}
               <div className="space-y-4">
-          <div>
+                <div>
                   <h3 className="font-semibold text-gray-800 mb-2">المرحلة الدراسية</h3>
                   <p className="text-gray-600">{session.grade}</p>
-          </div>
+                </div>
 
-          <div>
+                <div>
                   <h3 className="font-semibold text-gray-800 mb-2">عدد الحصص</h3>
                   <p className="text-gray-600">{session.sessions}</p>
-          </div>
+                </div>
 
                 <div>
                   <h3 className="font-semibold text-gray-800 mb-2">وصف الطلب</h3>

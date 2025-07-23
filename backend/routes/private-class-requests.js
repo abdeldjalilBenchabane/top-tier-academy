@@ -4,6 +4,40 @@ import { verifyToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Helper function to get complete hierarchy path
+const getHierarchyPath = async (levelId, yearId, specialityId, materialId) => {
+  try {
+    let path = [];
+    
+    if (levelId) {
+      const level = await getRow('SELECT name FROM levels WHERE id = $1', [levelId]);
+      if (level) path.push(level.name);
+    }
+    
+    if (yearId) {
+      const year = await getRow('SELECT name FROM years WHERE id = $1', [yearId]);
+      if (year) path.push(year.name);
+    }
+    
+    if (specialityId) {
+      const speciality = await getRow('SELECT name FROM specialities WHERE id = $1', [specialityId]);
+      if (speciality) path.push(speciality.name);
+    }
+    
+    if (materialId) {
+      const material = await getRow('SELECT name FROM materials WHERE id = $1', [materialId]);
+      if (material) path.push(material.name);
+    }
+    
+    const fullPath = path.join(' - ');
+    console.log('Generated hierarchy path:', { levelId, yearId, specialityId, materialId, path, fullPath });
+    return fullPath;
+  } catch (error) {
+    console.error('Error getting hierarchy path:', error);
+    return '';
+  }
+};
+
 // Get all private class requests (for admin/professors)
 router.get('/', verifyToken, async (req, res) => {
   try {
@@ -17,7 +51,23 @@ router.get('/', verifyToken, async (req, res) => {
       ORDER BY pcr.created_at DESC
     `);
     
-    res.json({ requests });
+    // Add hierarchy path to each request
+    const requestsWithPath = await Promise.all(
+      requests.map(async (request) => {
+        const hierarchyPath = await getHierarchyPath(
+          request.level_id,
+          request.year_id,
+          request.speciality_id,
+          request.material_id
+        );
+        return {
+          ...request,
+          hierarchy_path: hierarchyPath || `${request.subject} - ${request.grade}`
+        };
+      })
+    );
+    
+    res.json({ requests: requestsWithPath });
   } catch (error) {
     console.error('Error fetching private class requests:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -35,7 +85,23 @@ router.get('/student/:studentId', verifyToken, async (req, res) => {
       ORDER BY created_at DESC
     `, [studentId]);
     
-    res.json({ requests });
+    // Add hierarchy path to each request
+    const requestsWithPath = await Promise.all(
+      requests.map(async (request) => {
+        const hierarchyPath = await getHierarchyPath(
+          request.level_id,
+          request.year_id,
+          request.speciality_id,
+          request.material_id
+        );
+        return {
+          ...request,
+          hierarchy_path: hierarchyPath || `${request.subject} - ${request.grade}`
+        };
+      })
+    );
+    
+    res.json({ requests: requestsWithPath });
   } catch (error) {
     console.error('Error fetching student private class requests:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -53,7 +119,24 @@ router.get('/teacher/:teacherName', verifyToken, async (req, res) => {
       WHERE pcr.teacher_name = $1
       ORDER BY pcr.created_at DESC
     `, [teacherName]);
-    res.json({ requests });
+    
+    // Add hierarchy path to each request
+    const requestsWithPath = await Promise.all(
+      requests.map(async (request) => {
+        const hierarchyPath = await getHierarchyPath(
+          request.level_id,
+          request.year_id,
+          request.speciality_id,
+          request.material_id
+        );
+        return {
+          ...request,
+          hierarchy_path: hierarchyPath || `${request.subject} - ${request.grade}`
+        };
+      })
+    );
+    
+    res.json({ requests: requestsWithPath });
   } catch (error) {
     console.error('Error fetching teacher private class requests:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -71,21 +154,36 @@ router.post('/', verifyToken, async (req, res) => {
       time,
       sessions_count,
       title,
-      description
+      description,
+      level_id,
+      year_id,
+      speciality_id,
+      material_id
     } = req.body;
     
     const student_id = req.user.id;
     
+    // Get current pricing and duration settings
+    const settings = await getRow('SELECT price_per_session, session_duration FROM private_class_settings ORDER BY id DESC LIMIT 1');
+    const price_per_session = settings ? settings.price_per_session : 0;
+    const session_duration = settings ? settings.session_duration : 60;
+    
     const result = await query(`
       INSERT INTO private_class_requests 
-      (student_id, teacher_name, subject, grade, date, time, sessions_count, title, description)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      (student_id, teacher_name, subject, grade, date, time, sessions_count, title, description, level_id, year_id, speciality_id, material_id, price_per_session, session_duration)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *
-    `, [student_id, teacher_name, subject, grade, date, time, sessions_count, title, description]);
+    `, [student_id, teacher_name, subject, grade, date, time, sessions_count, title, description, level_id, year_id, speciality_id, material_id, price_per_session, session_duration]);
+    
+    // Get hierarchy path for the response
+    const hierarchyPath = await getHierarchyPath(level_id, year_id, speciality_id, material_id);
     
     res.status(201).json({ 
       message: 'Private class request created successfully',
-      request: result.rows[0]
+      request: {
+        ...result.rows[0],
+        hierarchy_path: hierarchyPath || `${subject} - ${grade}`
+      }
     });
   } catch (error) {
     console.error('Error creating private class request:', error);

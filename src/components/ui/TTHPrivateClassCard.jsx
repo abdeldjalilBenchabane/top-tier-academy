@@ -95,7 +95,30 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
           <h3 className="text-lg sm:text-xl font-bold mb-1">
             {isProfessor ? 'طلب حصة خاصة' : session.teacher}
           </h3>
-          <p className="text-sm sm:text-base opacity-90">{session.subject} - {session.grade}</p>
+                    <p className="text-sm sm:text-base opacity-90">
+            {session.hierarchy_path ? (
+              session.hierarchy_path
+            ) : (
+              `${session.subject} - ${session.grade}`
+            )}
+          </p>
+          {session.price_per_session && (
+            <div className="mt-2 flex items-center gap-2 text-sm">
+              <span className="bg-white bg-opacity-20 px-2 py-1 rounded-full">
+                سعر الحصة: {session.price_per_session.toLocaleString()} د.ج
+              </span>
+              {session.session_duration && (
+                <span className="bg-white bg-opacity-20 px-2 py-1 rounded-full">
+                  {session.session_duration} دقيقة
+                </span>
+              )}
+            </div>
+          )}
+          {session.price_per_session && isProfessor && (
+            <div className="mt-2 text-xs opacity-80">
+              <p>سيتم إعلام الطالب بالسعر والمدة المحددة</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -105,6 +128,26 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
         {isProfessor && studentName && (
           <div className="text-sm text-gray-700 font-semibold mb-2">الطالب: {studentName}</div>
         )}
+        
+        {/* Complete Hierarchy Path */}
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+            <FaBookOpen className="text-indigo-600 text-sm sm:text-base" />
+          </div>
+          <div>
+            <p className="text-xs sm:text-sm text-gray-500">المسار الدراسي</p>
+            <p className="text-sm sm:text-base font-semibold text-gray-900">
+              {session.hierarchy_path ? (
+                session.hierarchy_path
+              ) : (
+                <span className="text-orange-600">
+                  {session.subject && session.grade ? `${session.subject} - ${session.grade}` : 'لم يتم تحديد المسار'}
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+        
         {/* Date and Time */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center">

@@ -37,7 +37,19 @@ const PrivateClasses = () => {
     handleDetailsClick,
     closeModal,
     requestsLoading,
-    myPendingRequests
+    myPendingRequests,
+    selectedLevel,
+    selectedSpeciality,
+    selectedMaterial,
+    levels,
+    years,
+    specialities,
+    materials,
+    hierarchyLoading,
+    handleLevelChange,
+    handleSpecialityChange,
+    handleMaterialChange,
+    pricingSettings
   } = usePrivateClasses();
 
   const navigate = useNavigate();
@@ -81,20 +93,25 @@ const PrivateClasses = () => {
         {/* Top Filter */}
         <div className="mb-8 sm:mb-12">
           <PrivateClassFilter
-            selectedGrade={selectedGrade}
+            selectedLevel={selectedLevel}
             selectedYear={selectedYear}
-            selectedSubject={selectedSubject}
-            selectedDate={selectedDate}
+            selectedSpeciality={selectedSpeciality}
+            selectedMaterial={selectedMaterial}
             selectedTeacher={selectedTeacher}
             availableTeachers={availableTeachers}
+            levels={levels}
+            years={years}
+            specialities={specialities}
+            materials={materials}
             isProfessor={isProfessor}
-            onGradeChange={handleGradeChange}
+            onLevelChange={handleLevelChange}
             onYearChange={handleYearChange}
-            onSubjectChange={handleSubjectChange}
-            onDateChange={handleDateChange}
+            onSpecialityChange={handleSpecialityChange}
+            onMaterialChange={handleMaterialChange}
             onTeacherChange={handleTeacherChange}
             onSearch={isProfessor ? handleSearch : handleRequestClick}
             loading={loading}
+            hierarchyLoading={hierarchyLoading}
           />
         </div>
 
@@ -219,10 +236,15 @@ const PrivateClasses = () => {
         onRequestFormChange={handleRequestFormChange}
         onSubmitRequest={handleSubmitRequest}
         selectedTeacher={selectedTeacher}
-        selectedDate={selectedDate}
-        selectedSubject={selectedSubject}
-        selectedGrade={selectedGrade}
+        selectedLevel={selectedLevel}
         selectedYear={selectedYear}
+        selectedSpeciality={selectedSpeciality}
+        selectedMaterial={selectedMaterial}
+        levels={levels}
+        years={years}
+        specialities={specialities}
+        materials={materials}
+        pricingSettings={pricingSettings}
       />
       
       <Footer />
