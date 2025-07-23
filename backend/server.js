@@ -20,6 +20,8 @@ import { fileURLToPath } from 'url';
 const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 
 const roomUsers = {};
+// Persistent mute state for each room
+const roomMuteState = {}; // { [roomId]: true/false }
 
 // app.use('/api', hierarchyRoutes);
 dotenv.config();
@@ -92,6 +94,10 @@ io.on('connection', (socket) => {
     socket.userData = userData;
     socket.roomId = roomId;
 
+    // Send current mute state to the new user
+    const isMuted = roomMuteState[roomId] ?? false; // default to unmuted
+    socket.emit('students-muted-state', isMuted);
+
     console.log(`User ${userData.name} (${userData.role}) joined room ${roomId}`);
 
     // Remove any existing socket for this user (in case of reconnection)
@@ -160,17 +166,21 @@ io.on('connection', (socket) => {
 
   // Handle professor controls
   socket.on('mute-all', (roomId) => {
+    roomMuteState[roomId] = true;
     console.log(`[DEBUG] Professor ${socket.userData?.name} (${socket.id}) muted all students in room ${roomId}`);
     socket.to(roomId).emit('students-muted');
     // Also emit to the sender for immediate feedback
     socket.emit('students-muted');
+    io.to(roomId).emit('students-muted-state', true);
   });
 
   socket.on('unmute-all', (roomId) => {
+    roomMuteState[roomId] = false;
     console.log(`[DEBUG] Professor ${socket.userData?.name} (${socket.id}) unmuted all students in room ${roomId}`);
     socket.to(roomId).emit('students-unmuted');
     // Also emit to the sender for immediate feedback
     socket.emit('students-unmuted');
+    io.to(roomId).emit('students-muted-state', false);
   });
 
   socket.on('toggle-chat', (roomId, enabled) => {

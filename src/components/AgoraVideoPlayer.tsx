@@ -54,6 +54,8 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
     const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
     const [isLocalMicMuted, setIsLocalMicMuted] = useState(false);
     const [isLocalCameraEnabled, setIsLocalCameraEnabled] = useState(true);
+    // Local state for effective role (for dynamic promotion/demotion)
+    const [effectiveRole, setEffectiveRole] = useState(role);
 
     const cleanup = useCallback(async () => {
         if (cleanupInProgressRef.current) {
@@ -319,6 +321,7 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
             isInitializedRef.current = false;
             if (!mountedRef.current) return;
             await init();
+            setEffectiveRole(role); // Reset effective role on re-init
         };
         const timeoutId = setTimeout(initializeConnection, 100);
         return () => {
@@ -362,6 +365,7 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
                         if (clientRef.current && localAudioTrackRef.current) {
                             console.log('[DEBUG] Student: setting role to host and publishing audio');
                             await clientRef.current.setClientRole('host');
+                            setEffectiveRole('host');
                             await new Promise(res => setTimeout(res, 200)); // Add a small delay
                             await clientRef.current.publish([localAudioTrackRef.current]);
                             localAudioTrackRef.current.setEnabled(true);
@@ -376,6 +380,7 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
                             await clientRef.current.unpublish([localAudioTrackRef.current]);
                             localAudioTrackRef.current.setEnabled(false);
                             await clientRef.current.setClientRole('audience');
+                            setEffectiveRole('audience');
                             console.log('[DEBUG] Student: audio unpublished, mic disabled');
                         } else {
                             console.warn('[DEBUG] Student: clientRef or localAudioTrackRef missing');
@@ -413,7 +418,7 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
             <div className="flex items-center justify-center h-full min-h-[400px] bg-black rounded-lg">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                    <p className="text-white">{role === 'host' ? 'جاري الاتصال...' : 'في انتظار البث المباشر...'}</p>
+                    <p className="text-white">{effectiveRole === 'host' ? 'جاري الاتصال...' : 'في انتظار البث المباشر...'}</p>
                 </div>
             </div>
         );
@@ -424,7 +429,7 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
             <div className="flex items-center justify-center h-full min-h-[400px] bg-black rounded-lg">
                 <div className="text-center">
                     <div className="text-red-400 mb-4">{error}</div>
-                    {role === 'host' && (
+                    {effectiveRole === 'host' && (
                         <button
                             onClick={() => {
                                 setError(null);
@@ -445,7 +450,7 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
         return (
             <div className="flex items-center justify-center h-full min-h-[400px] bg-black rounded-lg">
                 <div className="text-center">
-                    <p className="text-white">{role === 'host' ? 'في انتظار الاتصال...' : 'في انتظار البث المباشر...'}</p>
+                    <p className="text-white">{effectiveRole === 'host' ? 'في انتظار الاتصال...' : 'في انتظار البث المباشر...'}</p>
                 </div>
             </div>
         );
