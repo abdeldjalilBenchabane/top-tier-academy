@@ -16,7 +16,8 @@ import {
   BarChart,
   DollarSign,
   MessageCircle,
-  TrendingUp
+  TrendingUp,
+  Key
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -33,6 +34,7 @@ const Sidebar = () => {
     { name: 'User Management', path: '/admin/users', icon: <Users className="h-5 w-5" /> },
     { name: 'Enhanced Slides', path: '/admin/enhanced-slides', icon: <Image className="h-5 w-5" /> },
     { name: 'Points', path: '/admin/points', icon: <DollarSign className="h-5 w-5" /> },
+    { name: 'Point Codes', path: '/admin/point-codes', icon: <Key className="h-5 w-5" /> },
     { name: 'Point Transactions', path: '/admin/point-transactions', icon: <TrendingUp className="h-5 w-5" /> },
     { name: 'Settings', path: '/admin/settings', icon: <Settings className="h-5 w-5" /> },
   ];

@@ -88,7 +88,7 @@ export default function CourseDetail() {
                 // Prepare all content for navigation
                 const content = prepareAllContent(courseData);
                 setAllContent(content);
-                
+
                 // Set initial content
                 if (content.length > 0) {
                     setCurrentContent(content[0]);
@@ -1140,7 +1140,7 @@ export default function CourseDetail() {
                                             key={relatedCourse.id}
                                                     className="flex gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-100"
                                                     onClick={() => navigate(`/coursesList/courses/${relatedCourse.id}`)}
-                                                >
+                                        >
                                                     {/* Price on the left */}
                                                     <div className="flex-shrink-0 flex flex-col items-center justify-center min-w-[60px]">
                                                         <div className="text-lg font-bold text-green-600">

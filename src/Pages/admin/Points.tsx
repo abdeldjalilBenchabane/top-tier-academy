@@ -378,7 +378,7 @@ const AdminPoints: React.FC = () => {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+            ))}
               </TableBody>
             </Table>
           )}

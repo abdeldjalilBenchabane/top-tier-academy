@@ -5,18 +5,34 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Coins, Check, Star, Zap } from 'lucide-react';
+import { Loader2, Coins, Check, Star, Zap, Key } from 'lucide-react';
 import { PointPackage } from '@/types';
+import { toast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+declare global {
+  interface Window {
+    refreshUserPoints?: () => void;
+  }
+}
 
 const PointsPurchase: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [packages, setPackages] = useState<PointPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [purchaseLoading, setPurchaseLoading] = useState<string | null>(null);
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isRedeemDialogOpen, setIsRedeemDialogOpen] = useState(false);
+  const [redeemCode, setRedeemCode] = useState('');
+  const [codeLoading, setCodeLoading] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState<string>('');
+  const [codeQuantity, setCodeQuantity] = useState<number>(1);
+  const [pointsBalance, setPointsBalance] = useState<number>(user?.pointsBalance || 0);
 
   useEffect(() => {
     fetchPackages();
+    fetchPointsBalance();
+    // eslint-disable-next-line
   }, []);
 
   const fetchPackages = async () => {
@@ -29,6 +45,16 @@ const PointsPurchase: React.FC = () => {
       setAlert({ type: 'error', message: 'فشل في تحميل الباقات' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPointsBalance = async () => {
+    try {
+      const response = await pointsAPI.getBalance();
+      setPointsBalance(response.balance);
+      updateUser({ pointsBalance: response.balance });
+    } catch (error) {
+      setPointsBalance(0);
     }
   };
 
@@ -83,6 +109,96 @@ const PointsPurchase: React.FC = () => {
     }
   };
 
+  const handleRedeemCode = async () => {
+    if (!redeemCode) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please enter a code"
+      });
+      return;
+    }
+    
+    setCodeLoading(true);
+    try {
+      const response = await fetch('http://localhost:5001/api/points/codes/redeem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ code: redeemCode })
+      });
+      
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error);
+      
+      toast({
+        variant: "default",
+        title: "Success",
+        description: data.message
+      });
+      setRedeemCode('');
+      fetchPointsBalance();
+      if (typeof window.refreshUserPoints === 'function') {
+        window.refreshUserPoints();
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || 'Failed to redeem code'
+      });
+    } finally {
+      setCodeLoading(false);
+      setIsRedeemDialogOpen(false);
+    }
+  };
+
+  const handleGenerateCodes = async () => {
+    if (!selectedPackage || codeQuantity < 1) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a package and enter valid quantity"
+      });
+      return;
+    }
+
+    setCodeLoading(true);
+    try {
+      const response = await fetch('http://localhost:5001/api/points/codes/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          packageId: selectedPackage,
+          quantity: codeQuantity
+        })
+      });
+
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error);
+
+      toast({
+        variant: "default",
+        title: "Success",
+        description: `Generated ${codeQuantity} codes successfully`
+      });
+      setIsRedeemDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || 'Failed to generate codes'
+      });
+    } finally {
+      setCodeLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center" dir="rtl">
@@ -99,15 +215,25 @@ const PointsPurchase: React.FC = () => {
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg border-b">
         <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div>
+          <div>
             <h1 className="text-3xl font-extrabold text-white mb-1">شراء النقاط</h1>
             <p className="text-blue-100 text-lg font-semibold">اختر الباقة المناسبة لك وادفع بأمان</p>
-            </div>
-          <div className="text-right bg-white/80 rounded-2xl px-6 py-4 shadow-md border border-blue-100">
-            <p className="text-sm text-blue-700 font-semibold mb-1">رصيدك الحالي</p>
-            <p className="text-3xl font-extrabold text-blue-700 tracking-widest">
-              {user?.pointsBalance || 0} <span className="text-lg font-bold">نقطة</span>
+          </div>
+          <div className="flex flex-col gap-2">
+            <div className="text-right bg-white/80 rounded-2xl px-6 py-4 shadow-md border border-blue-100">
+              <p className="text-sm text-blue-700 font-semibold mb-1">رصيدك الحالي</p>
+              <p className="text-3xl font-extrabold text-blue-700 tracking-widest">
+                {pointsBalance} <span className="text-lg font-bold">نقطة</span>
               </p>
+            </div>
+            <Button 
+              variant="secondary"
+              className="w-full bg-white text-blue-700 hover:bg-blue-50"
+              onClick={() => setIsRedeemDialogOpen(true)}
+            >
+              <Key className="h-4 w-4 ml-2" />
+              استخدام رمز النقاط
+            </Button>
           </div>
         </div>
       </div>
@@ -122,6 +248,43 @@ const PointsPurchase: React.FC = () => {
           </Alert>
         </div>
       )}
+
+      {/* Redeem Code Dialog */}
+      <Dialog open={isRedeemDialogOpen} onOpenChange={setIsRedeemDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>استخدام رمز النقاط</DialogTitle>
+            <DialogDescription>أدخل رمز النقاط الذي حصلت عليه من الإدارة أو من بطاقة مطبوعة</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <input
+              type="text"
+              className="w-full border rounded-lg px-4 py-2 text-lg"
+              placeholder="أدخل الرمز هنا"
+              value={redeemCode}
+              onChange={e => setRedeemCode(e.target.value)}
+              disabled={codeLoading}
+              dir="ltr"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRedeemDialogOpen(false)} disabled={codeLoading}>
+              إلغاء
+            </Button>
+            <Button onClick={handleRedeemCode} disabled={codeLoading || !redeemCode}>
+              {codeLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  جاري التحقق...
+                </>
+              ) : (
+                'تفعيل الرمز'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Packages */}
       <div className="max-w-7xl mx-auto px-6 py-12">
@@ -223,4 +386,4 @@ const PointsPurchase: React.FC = () => {
   );
 };
 
-export default PointsPurchase; 
+export default PointsPurchase;

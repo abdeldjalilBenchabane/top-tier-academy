@@ -6,6 +6,7 @@ import { Toaster as Sonner } from './components/ui/sonner';
 import { TooltipProvider } from './components/ui/tooltip';
 import { AuthProvider } from './contexts/AuthContext';
 import { AvatarProvider } from './contexts/AvatarContext';
+import AdminPointCodes from './Pages/admin/PointCodes';
 
 
 // TTH Pages
@@ -132,6 +133,7 @@ const App: React.FC = () => {
                   <Route path="live-sessions" element={<LiveSessionApprovals />} />
                   <Route path="settings" element={<AdminSettings />} />
                   <Route path="points" element={<AdminPoints />} />
+                  <Route path="point-codes" element={<AdminPointCodes />} />
                   <Route path="point-transactions" element={<AdminPointTransactions />} />
                 </Route>
 
@@ -161,4 +163,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App; 
+export default App;
