@@ -114,10 +114,10 @@ const PathSelector = ({
           // Get all materials and filter for the year
           const data = await api.getAllMaterials();
           const yearMaterials = data.filter((material: any) => {
-            const matchesYear = material.year_id === selectedYearId;
+            const matchesYear = material.yearId === selectedYearId;
             const matchesSpeciality = selectedSpecialityId 
-              ? material.speciality_id === selectedSpecialityId 
-              : !material.speciality_id;
+              ? material.specialityId === selectedSpecialityId 
+              : !material.specialityId;
             
             return matchesYear && matchesSpeciality;
           });
@@ -183,12 +183,7 @@ const PathSelector = ({
         // Assign existing material to course
         const selectedMaterial = materials.find(m => m.id === selectedMaterialId);
         if (selectedMaterial) {
-          await api.approveCourseWithMaterial(pendingCourse.id, {
-            name: selectedMaterial.name,
-            price: selectedMaterial.price || 0,
-            speciality_id: selectedMaterial.specialityId || null,
-            year_id: selectedYearId
-          });
+          await api.assignMaterialPathProfessor(pendingCourse.id, selectedMaterial.id);
         }
         toast.success('Course path assigned successfully. Course is now pending admin approval.');
         onSuccess();

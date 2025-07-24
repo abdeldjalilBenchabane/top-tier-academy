@@ -721,6 +721,24 @@ export const api = {
     }
     return;
   },
+  
+  // Professor function to assign existing material to course
+  assignMaterialPathProfessor: async (courseId: string, materialId: string): Promise<void> => {
+    const res = await fetch(`/api/courses/${courseId}/assign-material`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      body: JSON.stringify({ material_id: materialId }),
+      credentials: 'include'
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to assign material path');
+    }
+    return;
+  },
   approveCourseLanguage: async (courseId: string, languageLevelId: string): Promise<void> => {
     const res = await fetch(`/api/courses/${courseId}/language-path`, {
       method: 'PUT',

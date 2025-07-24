@@ -494,11 +494,11 @@ router.get('/materials', verifyToken, requireRole(['admin', 'professor']), async
   try {
     const materials = await getRows(`
       SELECT 
-        m.id, m.name, m.price, m.speciality_id as "specialityId", m.year_id as "yearId",
+        m.id, m.name, m.price, m.speciality_id as "specialityId", 
+        COALESCE(m.year_id, s.year_id) as "yearId",
         s.name as speciality_name,
         COALESCE(sy.name, dy.name) as year_name,
-        COALESCE(sl.name, dl.name) as level_name,
-        COALESCE(sy.id, dy.id) as year_id
+        COALESCE(sl.name, dl.name) as level_name
       FROM materials m 
       LEFT JOIN specialities s ON m.speciality_id = s.id 
       LEFT JOIN years sy ON s.year_id = sy.id 

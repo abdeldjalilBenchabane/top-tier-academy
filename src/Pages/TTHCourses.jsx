@@ -770,40 +770,40 @@ export default function Courses() {
                 const filteredCourses = getDisplayCourses()[pathName];
                 return filteredCourses && filteredCourses.length > 0 ? (
                   <div key={pathName}>
-                    <div className="text-center mb-12">
-                      <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold font-rowdies mb-4 relative">
-                        <span className="text-gray-800">حصص </span>
-                        <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+            <div className="text-center mb-12">
+                <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold font-rowdies mb-4 relative">
+                  <span className="text-gray-800">حصص </span>
+                  <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
                           {pathName}
-                        </span>
-                      </h2>
-                    </div>
-                    <div 
-                      dir="rtl" 
+                  </span>
+                </h2>
+              </div>
+              <div 
+                dir="rtl" 
                       className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 md:gap-8 justify-items-center"
-                    >
+              >
                       {filteredCourses.map((course, index) => (
-                        <div
-                          key={course.id}
+                  <div
+                    key={course.id}
                           className="w-full max-w-sm"
                           style={{ animationDelay: `${index * 100}ms` }}
-                        >
-                          <CourseCard course={course} />
-                        </div>
-                      ))}
-                    </div>
+                  >
+                    <CourseCard course={course} />
+                  </div>
+                ))}
+              </div>
                   </div>
                 ) : null;
               })
             ) : (
-              <div className="text-center py-16">
-                <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
-                  <svg className="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">لا توجد دروس متاحة حالياً</h3>
-                <p className="text-gray-600">سيتم إضافة دروس جديدة قريباً</p>
+                <div className="text-center py-16">
+                  <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+                    <svg className="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">لا توجد دروس متاحة حالياً</h3>
+                  <p className="text-gray-600">سيتم إضافة دروس جديدة قريباً</p>
               </div>
             )}
           </div>

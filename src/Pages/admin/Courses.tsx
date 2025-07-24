@@ -148,8 +148,8 @@ const CoursesPage = () => {
     // Filter by educational structure path
     if (courseType === 'all' || courseType === 'structure') {
       if (selectedMaterialId && selectedMaterialId !== 'all') {
-        filtered = filtered.filter(course => course.materialId === selectedMaterialId);
-      }
+      filtered = filtered.filter(course => course.materialId === selectedMaterialId);
+    }
       else if (selectedSpeciality && selectedSpeciality !== 'all') {
         // Get materials linked to this speciality
         const materialIds = materials
@@ -462,9 +462,9 @@ const CoursesPage = () => {
                         setSelectedLanguageLevel(''); // Reset language level when language changes
                       }}
                       disabled={courseType === 'all'}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Language" />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Language" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Languages</SelectItem>

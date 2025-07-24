@@ -151,7 +151,9 @@ const AdminPointCodes: React.FC = () => {
     } else if (mode === 'selected') {
       codesToDownload = codes.filter(c => selectedCodes.includes(c.id));
     }
-    const csv = [
+    
+    // Create CSV with proper UTF-8 encoding and BOM
+    const csvContent = [
       ['Code', 'Points', 'Package', 'Generated At'],
       ...codesToDownload.map(code => [
         code.code,
@@ -159,12 +161,54 @@ const AdminPointCodes: React.FC = () => {
         code.package_name || '',
         new Date(code.created_at).toLocaleString()
       ])
-    ].map(row => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    ].map(row => 
+      row.map(cell => {
+        // Escape quotes and wrap in quotes if contains comma, quote, or newline
+        const cellStr = String(cell);
+        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+          return `"${cellStr.replace(/"/g, '""')}"`;
+        }
+        return cellStr;
+      }).join(',')
+    ).join('\n');
+    
+    // Add UTF-8 BOM for proper encoding
+    const BOM = '\uFEFF';
+    const csvWithBOM = BOM + csvContent;
+    
+    const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `point-codes-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // Download JSON format (better for Arabic text)
+  const handleDownloadJSON = (mode: 'all' | 'date' | 'selected') => {
+    let codesToDownload: PointCode[] = [];
+    if (mode === 'all') {
+      codesToDownload = codes.filter(c => !c.is_used);
+    } else if (mode === 'date') {
+      codesToDownload = codes.filter(c => !c.is_used && c.created_at.startsWith(dateFilter));
+    } else if (mode === 'selected') {
+      codesToDownload = codes.filter(c => selectedCodes.includes(c.id));
+    }
+    
+    const jsonData = codesToDownload.map(code => ({
+      code: code.code,
+      points: code.points,
+      package: code.package_name || '',
+      generatedAt: new Date(code.created_at).toISOString(),
+      status: 'unused'
+    }));
+    
+    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `point-codes-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -300,9 +344,9 @@ const AdminPointCodes: React.FC = () => {
               <input id="date" type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="border rounded px-2 py-1 w-full" />
             </div>
             <div className="flex gap-2 items-end">
-              <Button variant="outline" className="w-full" onClick={() => handleDownloadCodes('all')}><Download className="h-4 w-4 mr-2" />Download All Unused</Button>
-              <Button variant="outline" className="w-full" onClick={() => handleDownloadCodes('date')} disabled={!dateFilter}><Download className="h-4 w-4 mr-2" />Download Unused by Date</Button>
-              <Button variant="outline" className="w-full" onClick={() => handleDownloadCodes('selected')} disabled={selectedCodes.length === 0}><Download className="h-4 w-4 mr-2" />Download Selected</Button>
+              <Button variant="outline" className="w-full" onClick={() => handleDownloadCodes('all')}><Download className="h-4 w-4 mr-2" />Download All Unused (CSV)</Button>
+              <Button variant="outline" className="w-full" onClick={() => handleDownloadCodes('date')} disabled={!dateFilter}><Download className="h-4 w-4 mr-2" />Download Unused by Date (CSV)</Button>
+              <Button variant="outline" className="w-full" onClick={() => handleDownloadCodes('selected')} disabled={selectedCodes.length === 0}><Download className="h-4 w-4 mr-2" />Download Selected (CSV)</Button>
             </div>
           </div>
         </CardContent>
@@ -310,8 +354,16 @@ const AdminPointCodes: React.FC = () => {
       {/* Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Point Codes</CardTitle>
-          <CardDescription>View all generated point codes and their status</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Point Codes</CardTitle>
+              <CardDescription>View all generated point codes and their status</CardDescription>
+            </div>
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Generate Codes
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
