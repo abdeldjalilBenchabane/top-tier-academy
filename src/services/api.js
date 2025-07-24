@@ -397,7 +397,7 @@ export const structureAPI = {
     return data.map(year => ({
       id: year.id,
       name: year.name,
-      levelId: year.level_id
+      levelId: year.levelId || year.level_id // Handle both camelCase and snake_case
     }));
   },
   createYear: (yearData) => apiRequest('/years', {
@@ -416,7 +416,7 @@ export const structureAPI = {
     return data.map(speciality => ({
       id: speciality.id,
       name: speciality.name,
-      yearId: speciality.year_id
+      yearId: speciality.yearId || speciality.year_id // Handle both camelCase and snake_case
     }));
   },
   createSpeciality: (specialityData) => apiRequest('/specialities', {
@@ -435,8 +435,8 @@ export const structureAPI = {
     return data.map(material => ({
       id: material.id,
       name: material.name,
-      specialityId: material.speciality_id,
-      yearId: material.year_id,
+      specialityId: material.specialityId || material.speciality_id,
+      yearId: material.yearId || material.year_id,
       price: material.price
     }));
   },

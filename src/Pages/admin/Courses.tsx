@@ -158,6 +158,9 @@ const CoursesPage = () => {
         
         if (materialIds.length > 0) {
           filtered = filtered.filter(course => course.materialId && materialIds.includes(course.materialId));
+        } else {
+          // No materials for this speciality, show no courses
+          filtered = [];
         }
       }
       else if (selectedYear && selectedYear !== 'all') {
@@ -175,6 +178,9 @@ const CoursesPage = () => {
         
         if (materialIds.length > 0) {
           filtered = filtered.filter(course => course.materialId && materialIds.includes(course.materialId));
+        } else {
+          // No materials for this year, show no courses
+          filtered = [];
         }
       }
       else if (selectedLevel && selectedLevel !== 'all') {
@@ -196,6 +202,9 @@ const CoursesPage = () => {
         
         if (materialIds.length > 0) {
           filtered = filtered.filter(course => course.materialId && materialIds.includes(course.materialId));
+        } else {
+          // No materials for this level, show no courses
+          filtered = [];
         }
       }
     }
@@ -409,7 +418,20 @@ const CoursesPage = () => {
                   onValueChange={(value: 'all' | 'structure' | 'language') => {
                     setCourseType(value);
                     // Reset filters when changing course type
-                    if (value === 'language') {
+                    if (value === 'all') {
+                      // Reset all filters when switching to "All Courses"
+                      setSelectedLevel('');
+                      setSelectedYear('');
+                      setSelectedSpeciality('');
+                      setSelectedMaterialId('');
+                      setSelectedLanguage('');
+                      setSelectedLanguageLevel('');
+                      setCurrentLevel(null);
+                      setCurrentYear(null);
+                      setCurrentSpeciality(null);
+                      setCurrentMaterial(null);
+                      setCurrentLanguage(null);
+                    } else if (value === 'language') {
                       setSelectedLevel('');
                       setSelectedYear('');
                       setSelectedSpeciality('');
@@ -439,24 +461,25 @@ const CoursesPage = () => {
                         setSelectedLanguage(value);
                         setSelectedLanguageLevel(''); // Reset language level when language changes
                       }}
+                      disabled={courseType === 'all'}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select Language" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Languages</SelectItem>
-                        {languages.map((lang) => (
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Languages</SelectItem>
+                    {languages.map((lang) => (
                           <SelectItem key={`lang-${lang.id}`} value={lang.id}>
-                            {lang.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    
+                        {lang.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
                     <Select
                       value={selectedLanguageLevel}
                       onValueChange={(value) => setSelectedLanguageLevel(value)}
-                      disabled={!selectedLanguage || selectedLanguage === 'all'}
+                      disabled={courseType === 'all' || !selectedLanguage || selectedLanguage === 'all'}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder={selectedLanguage && selectedLanguage !== 'all' ? "Select Level" : "Select Language First"} />
@@ -476,35 +499,36 @@ const CoursesPage = () => {
                 {/* Educational Structure Filters - Only show for structure courses */}
                 {(courseType === 'all' || courseType === 'structure') && (
                   <>
-                    <Select
-                      value={selectedLevel}
-                      onValueChange={(value) => {
-                        setSelectedLevel(value);
-                        setCurrentLevel(levels.find(l => l.id === value) || null);
+                <Select
+                  value={selectedLevel}
+                  onValueChange={(value) => {
+                    setSelectedLevel(value);
+                    setCurrentLevel(levels.find(l => l.id === value) || null);
                         // Reset dependent filters
                         setSelectedYear('');
                         setSelectedSpeciality('');
                         setSelectedMaterialId('');
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Level" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Levels</SelectItem>
-                                            {levels.map((level) => (
+                  }}
+                  disabled={courseType === 'all'}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Levels</SelectItem>
+                    {levels.map((level) => (
                       <SelectItem key={`level-${level.id}`} value={level.id}>
                         {level.name}
                       </SelectItem>
                     ))}
-                      </SelectContent>
-                    </Select>
+                  </SelectContent>
+                </Select>
                 
-                    <Select
-                      value={selectedYear}
-                      onValueChange={(value) => {
-                        setSelectedYear(value);
-                        setCurrentYear(years.find(y => y.id === value) || null);
+                <Select
+                  value={selectedYear}
+                  onValueChange={(value) => {
+                    setSelectedYear(value);
+                    setCurrentYear(years.find(y => y.id === value) || null);
                         // Reset dependent filters
                         setSelectedSpeciality('');
                         setSelectedMaterialId('');
@@ -516,70 +540,65 @@ const CoursesPage = () => {
                              // Year has no specialities, materials will be shown directly
                            }
                          }
-                      }}
-                      disabled={!selectedLevel || selectedLevel === 'all'}
-                    >
-                      <SelectTrigger>
+                  }}
+                      disabled={courseType === 'all' || !selectedLevel || selectedLevel === 'all'}
+                >
+                  <SelectTrigger>
                         <SelectValue placeholder={selectedLevel && selectedLevel !== 'all' ? "Select Year" : "Select Level First"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Years</SelectItem>
-                        {getFilteredYears().map((year) => (
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Years</SelectItem>
+                    {getFilteredYears().map((year) => (
                           <SelectItem key={`year-${year.id}`} value={year.id}>
-                            {year.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    
-                    <Select
-                      value={selectedSpeciality}
-                      onValueChange={(value) => {
-                        setSelectedSpeciality(value);
-                        setCurrentSpeciality(specialities.find(s => s.id === value) || null);
+                        {year.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Select
+                  value={selectedSpeciality}
+                  onValueChange={(value) => {
+                    setSelectedSpeciality(value);
+                    setCurrentSpeciality(specialities.find(s => s.id === value) || null);
                         // Reset dependent filters
                         setSelectedMaterialId('');
-                      }}
-                      disabled={!selectedYear || selectedYear === 'all' || getFilteredSpecialities().length === 0}
-                    >
-                      <SelectTrigger>
+                  }}
+                      disabled={courseType === 'all' || !selectedYear || selectedYear === 'all'}
+                >
+                  <SelectTrigger>
                         <SelectValue placeholder={selectedYear && selectedYear !== 'all' ? "Select Speciality" : "Select Year First"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Specialities</SelectItem>
-                        {getFilteredSpecialities().map((speciality) => (
-                          <SelectItem key={`speciality-${speciality.id}`} value={speciality.id}>
-                            {speciality.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    
-                    <Select
-                      value={selectedMaterialId}
-                      onValueChange={(value) => {
-                        setSelectedMaterialId(value);
-                        setCurrentMaterial(materials.find(m => m.id === value) || null);
-                      }}
-                      disabled={getFilteredMaterials().length === 0}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={
-                          selectedSpeciality && selectedSpeciality !== 'all' ? "Select Material" :
-                          selectedYear && selectedYear !== 'all' ? "Select Material" :
-                          selectedLevel && selectedLevel !== 'all' ? "Select Material" :
-                          "Select Level/Year/Speciality First"
-                        } />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Materials</SelectItem>
-                        {getFilteredMaterials().map((material) => (
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Specialities</SelectItem>
+                    {getFilteredSpecialities().map((spec) => (
+                          <SelectItem key={`spec-${spec.id}`} value={spec.id}>
+                        {spec.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Select
+                  value={selectedMaterialId}
+                  onValueChange={(value) => {
+                    setSelectedMaterialId(value);
+                    setCurrentMaterial(materials.find(m => m.id === value) || null);
+                  }}
+                      disabled={courseType === 'all' || !selectedYear || selectedYear === 'all'}
+                >
+                  <SelectTrigger>
+                        <SelectValue placeholder={selectedYear && selectedYear !== 'all' ? "Select Material" : "Select Year First"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Materials</SelectItem>
+                    {getFilteredMaterials().map((material) => (
                           <SelectItem key={`material-${material.id}`} value={material.id}>
-                            {material.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                        {material.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                   </>
                 )}
               </div>
@@ -610,7 +629,7 @@ const CoursesPage = () => {
                 // Handle educational structure courses
                 let pathDisplay = null;
                 if (course.materialId) {
-                  const material = materials.find(m => m.id === course.materialId);
+                const material = materials.find(m => m.id === course.materialId);
                   if (material) {
                     let speciality = null;
                     let year = null;

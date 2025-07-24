@@ -14,8 +14,14 @@ const CourseCard = ({ course }) => {
   
   let path;
   if (course.material_name) {
-    // Education course path: "Material - Speciality"
-    path = course.speciality_name ? `${course.material_name} - ${course.speciality_name}` : course.material_name;
+    // Education course path: Show shorter path
+    if (course.speciality_name) {
+      // Show: "Speciality - Material"
+      path = `${course.speciality_name} - ${course.material_name}`;
+    } else {
+      // Show: Just "Material" (no speciality)
+      path = course.material_name;
+    }
   } else if (course.language_name && course.language_level_name) {
     // Language course path: "Language Level"
     path = `${course.language_name} ${course.language_level_name}`;
@@ -110,6 +116,12 @@ const CourseCard = ({ course }) => {
         <h3 className="text-xl font-bold text-blue-800 leading-tight hover:text-blue-600 transition-colors duration-300 text-right font-rowdies">
           {course.title}
         </h3>
+        {course.created_by_name && (
+          <div className="flex items-center justify-end gap-2 text-sm text-gray-600">
+            <span className="font-medium">الأستاذ:</span>
+            <span className="text-blue-600 font-semibold">{course.created_by_name}</span>
+          </div>
+        )}
         <p className="text-gray-600 text-sm leading-relaxed line-clamp-3 text-right font-poppins">
           {course.description}
         </p>

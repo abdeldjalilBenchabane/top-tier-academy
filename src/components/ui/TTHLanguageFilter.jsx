@@ -75,7 +75,7 @@ const LanguageFilter = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg transform rotate-3 hover:rotate-0 transition-transform duration-300">
-                  <FaFilter className="text-white text-sm sm:text-lg" />
+            <FaFilter className="text-white text-sm sm:text-lg" />
                 </div>
                 <div>
                   <h3 className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-purple-600 bg-clip-text text-transparent">
@@ -119,7 +119,7 @@ const LanguageFilter = ({
                   />
                   <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
-              </div>
+        </div>
 
               {/* Filters Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6 mb-6">
@@ -132,22 +132,22 @@ const LanguageFilter = ({
                     </span>
                   </label>
                   <div className="relative">
-                    <select
-                      value={selectedLanguage}
-                      onChange={handleLanguageChange}
+              <select
+                value={selectedLanguage}
+                onChange={handleLanguageChange}
                       className="appearance-none w-full bg-white/90 backdrop-blur-sm border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 text-sm lg:text-base font-semibold rounded-2xl py-3 lg:py-4 pr-4 pl-12 focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all duration-300 shadow-sm hover:shadow-md text-right cursor-pointer"
-                      dir="rtl"
-                    >
+                dir="rtl"
+              >
                       <option value="">جميع اللغات</option>
-                      {languageOptions.map(lang => (
-                        <option key={lang.value} value={lang.value}>{lang.label}</option>
-                      ))}
-                    </select>
+                {languageOptions.map(lang => (
+                  <option key={lang.value} value={lang.value}>{lang.label}</option>
+                ))}
+              </select>
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                       <FaChevronDown className="text-gray-400 group-hover:text-blue-500 transition-colors duration-200" />
                     </div>
-                  </div>
-                </div>
+            </div>
+          </div>
 
                 {/* Level Filter */}
                 <div className="group">
@@ -158,24 +158,24 @@ const LanguageFilter = ({
                     </span>
                   </label>
                   <div className="relative">
-                    <select
-                      value={selectedLevel}
-                      onChange={handleLevelChange}
+              <select
+                value={selectedLevel}
+                onChange={handleLevelChange}
                       disabled={!selectedLanguage}
                       className={`appearance-none w-full backdrop-blur-sm border-2 text-sm lg:text-base font-semibold rounded-2xl py-3 lg:py-4 pr-4 pl-12 focus:outline-none transition-all duration-300 shadow-sm text-right cursor-pointer ${
                         !selectedLanguage 
                           ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' 
                           : 'bg-white/90 border-gray-200 hover:border-green-300 focus:border-green-500 focus:ring-4 focus:ring-green-100 hover:shadow-md'
                       }`}
-                      dir="rtl"
-                    >
+                dir="rtl"
+              >
                       <option value="">
                         {selectedLanguage ? "جميع المستويات" : "اختر اللغة أولاً"}
                       </option>
-                      {levelOptions.map(level => (
-                        <option key={level.value} value={level.value}>{level.label}</option>
-                      ))}
-                    </select>
+                {levelOptions.map(level => (
+                  <option key={level.value} value={level.value}>{level.label}</option>
+                ))}
+              </select>
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                       <FaChevronDown className={`transition-colors duration-200 ${
                         !selectedLanguage ? 'text-gray-300' : 'text-gray-400 group-hover:text-green-500'

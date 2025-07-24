@@ -102,14 +102,16 @@ router.get('/', async (req, res) => {
         s.name as speciality_name,
         ll.name as language_level_name,
         l.name as language_name,
-        lvl.name as level_name,
-        y.name as year_name
+        COALESCE(sy.name, dy.name) as year_name,
+        COALESCE(sl.name, dl.name) as level_name
       FROM courses c
       LEFT JOIN users u ON c.created_by = u.id
       LEFT JOIN materials m ON c.material_id = m.id
       LEFT JOIN specialities s ON m.speciality_id = s.id
-      LEFT JOIN years y ON s.year_id = y.id
-      LEFT JOIN levels lvl ON y.level_id = lvl.id
+      LEFT JOIN years sy ON s.year_id = sy.id
+      LEFT JOIN levels sl ON sy.level_id = sl.id
+      LEFT JOIN years dy ON m.year_id = dy.id
+      LEFT JOIN levels dl ON dy.level_id = dl.id
       LEFT JOIN language_levels ll ON c.language_level_id = ll.id
       LEFT JOIN languages l ON ll.language_id = l.id
       LEFT JOIN course_covers cc ON c.id = cc.course_id
