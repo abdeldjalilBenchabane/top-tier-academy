@@ -31,7 +31,17 @@ This document tracks all database schema changes and migrations that have been a
 1. **Clone the repository** and navigate to the project directory
 2. **Install dependencies**: `npm install`
 3. **Set up environment variables** (copy from `.env.example`)
-4. **Run database migrations** in order:
+4. **Run database migrations** automatically:
+
+```bash
+# Navigate to backend folder
+cd backend
+
+# Run today's database changes (RECOMMENDED)
+node todays-migrations.js
+```
+
+**OR** run migrations manually in order:
 
 ```bash
 # Run all migration files in the backend folder
@@ -57,6 +67,24 @@ All migration scripts are located in the `backend/` folder and follow the naming
 - `update_*.js` - Updating existing data
 - `remove_*.js` - Removing columns/tables
 - `fix_*.js` - Fixing data inconsistencies
+
+### Today's Migration Script
+
+**`todays-migrations.js`** - This script runs today's database changes automatically:
+- **Adds language_level_id to courses table** (if not exists)
+- **Makes year_id nullable in materials table** for education structure flexibility
+- **Adds performance indexes** for better query performance
+- **Checks if changes already exist** before applying them
+- **Provides detailed progress feedback**
+- **Handles errors gracefully**
+
+**Features:**
+- ✅ Safe to run multiple times (idempotent)
+- ✅ Checks existing schema before making changes
+- ✅ Provides clear success/error messages
+- ✅ Focused on today's specific changes
+- ✅ Adds performance indexes automatically
+- ✅ Enables language level support and education structure flexibility
 
 ## Important Notes
 

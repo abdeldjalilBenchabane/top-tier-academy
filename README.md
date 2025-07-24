@@ -805,12 +805,19 @@ When you clone this repository or when database changes are made, you need to ru
 1. **Clone the repository** and navigate to the project directory
 2. **Install dependencies**: `npm install`
 3. **Set up environment variables** (copy from `.env.example`)
-4. **Run database migrations** in order:
+4. **Run database migrations** automatically:
 
 ```bash
 # Navigate to backend folder
 cd backend
 
+# Run today's database changes (RECOMMENDED)
+node todays-migrations.js
+```
+
+**OR** run migrations manually in order:
+
+```bash
 # Run all migration files in order
 node add_language_level_id_to_courses.js
 node create_language_course_prices_table.js
