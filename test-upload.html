@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Upload</title>
+</head>
+<body>
+    <h1>Test Live Session Upload</h1>
+    <form id="uploadForm">
+        <div>
+            <label>Title:</label>
+            <input type="text" name="title" value="Test Session" required>
+        </div>
+        <div>
+            <label>Description:</label>
+            <textarea name="description">Test description</textarea>
+        </div>
+        <div>
+            <label>Start Time:</label>
+            <input type="datetime-local" name="start_time" value="2024-12-25T10:00" required>
+        </div>
+        <div>
+            <label>Duration (minutes):</label>
+            <input type="number" name="duration" value="60" required>
+        </div>
+        <div>
+            <label>Price:</label>
+            <input type="number" name="price" value="100" required>
+        </div>
+        <div>
+            <label>Material ID:</label>
+            <input type="number" name="material_id" value="1">
+        </div>
+        <div>
+            <label>Cover Image:</label>
+            <input type="file" name="cover_image" accept="image/*">
+        </div>
+        <button type="submit">Create Session</button>
+    </form>
+
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/api/test-live-sessions', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('result').innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+            }
+        });
+    </script>
+</body>
+</html> 

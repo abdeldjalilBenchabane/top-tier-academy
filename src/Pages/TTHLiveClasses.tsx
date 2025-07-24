@@ -1,190 +1,225 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Filter, Plus, Video } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import LiveCard from '@/components/LiveCard';
-import NavBar from '@/components/NavBar';
-import Footer from '@/components/TTHFooter';
-import { api } from '@/lib/api';
+import React from "react";
+import Navbar from "../components/NavBar";
+import Footer from "../components/TTHFooter";
+import TTHLiveClassesSearchFilter from "../components/ui/TTHLiveClassesSearchFilter";
+import TTHLiveCard from "../components/ui/TTHLiveCard";
+import { Video } from "lucide-react";
+import { useLiveClasses } from "../hooks/TTHUseLiveClasses";
 
 const TTHLiveClasses = () => {
-  console.log('TTHLiveClasses mounted');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [liveEvents, setLiveEvents] = useState([]);
+  const {
+    selectedLevel,
+    selectedYear,
+    selectedSpeciality,
+    selectedMaterial,
+    levels,
+    years,
+    specialities,
+    materials,
+    hierarchyLoading,
+    liveSessionsByPath,
+    filteredSessions,
+    sessionsToShow,
+    loading,
+    initialLoading,
+    isFiltered,
+    handleLevelChange,
+    handleYearChange,
+    handleSpecialityChange,
+    handleMaterialChange,
+    handleSearch,
+    clearFilters,
+    refreshSessions
+  } = useLiveClasses();
 
-  useEffect(() => {
-    const fetchSessions = async () => {
-      try {
-        const data = await api.get('/live-sessions');
-        console.log('Réponse API /live-sessions:', data);
-        setLiveEvents(
-          data
-            .filter(session => session.status !== 'cancelled')
-            .map((session) => {
-              let status = session.status;
-              if (!status) {
-                const start = new Date(session.start_time);
-                const now = new Date();
-                if (session.is_ended) status = 'ended';
-                else if (now >= start) status = 'live';
-                else status = 'upcoming';
-              }
-              return {
-                id: session.id?.toString() || '',
-                title: session.title || '',
-                presenter: session.professor_name || session.professor_id?.toString() || 'أستاذ مباشر',
-                date: session.start_time ? new Date(session.start_time).toLocaleDateString('fr-FR') : '',
-                time: session.start_time ? new Date(session.start_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '',
-                price: session.price !== undefined && session.price !== null ? session.price : 0,
-                currency: session.currency ? session.currency : 'DA',
-                expectedViewers: session.expected_viewers ? session.expected_viewers : 0,
-                thumbnail: session.thumbnail ? session.thumbnail : '',
-                status,
-                isPaid: session.is_paid ? session.is_paid : false,
-                description: session.description ? session.description : '',
-              };
-            })
-        );
-      } catch (err) {
-        setLiveEvents([]);
-      }
-    };
-    fetchSessions();
-  }, []);
-
-  console.log('liveEvents:', liveEvents);
-
-  const filteredEvents = liveEvents.filter(event => {
-    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.presenter.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'all' ||
-      (filterStatus === 'live' && event.status === 'live') ||
-      (filterStatus === 'upcoming' && event.status === 'upcoming') ||
-      (filterStatus === 'paid' && event.isPaid);
-    return matchesSearch && matchesFilter;
-  });
+  // Handle session status changes
+  const handleSessionStatusChange = (sessionId: string, newStatus: string) => {
+    console.log(`🔄 Session ${sessionId} status changed to: ${newStatus}`);
+    // Refresh sessions to get updated data
+    if (refreshSessions) {
+      refreshSessions();
+    }
+  };
 
   return (
-    <div >
-      <NavBar />
-      <div className="min-h-screen  bg-blue-900 mt-[1px] " dir="rtl">
-        {/* Header */}
-        <div className="bg-black/20 backdrop-blur-sm border-b border-white/10  top-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 py-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
-                  <Video className="w-6 h-6 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50" dir="rtl">
+      <Navbar />
+      
+      <main className="flex-grow">
+        
+        <section className="relative overflow-hidden mt-[2px] bg-gradient-to-r from-blue-600 via-blue-700 to-purple-700">
+          {/* Background Pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 left-0 w-72 h-72 bg-white rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
+            <div className="absolute top-0 right-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-2000"></div>
+            <div className="absolute bottom-0 left-1/2 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-4000"></div>
+          </div>
+          
+          {/* Hero Content */}
+          <div className="relative z-10 container mx-auto px-4 sm:px-6 py-12 sm:py-16 lg:py-20">
+            <div className="max-w-4xl mx-auto text-center">
+              <h1 className="text-white text-3xl md:text-5xl lg:text-6xl font-bold font-nunito leading-tight mb-6">
+                <span className="block mb-2">انضم الى</span>
+                <span className="bg-gradient-to-r from-purple-300 to-purple-100 bg-clip-text text-transparent">
+                  نخبة من البث المباشر الفريد
+                </span>
+              </h1>
+              <p className="text-blue-100 text-lg md:text-xl lg:text-2xl font-bold font-poppins leading-relaxed mb-8">
+                حدد المرحلة الدراسية المناسبة لك للبث المباشر
+              </p>
+              
+              {/* Stats */}
+              <div className="flex flex-wrap gap-4 justify-center md:justify-end mt-8">
+                <div className="bg-white/20 backdrop-blur-sm rounded-full px-6 py-3 text-white">
+                  <span className="font-bold">50+</span> بث مباشر متاح
                 </div>
-                <h1 className="text-3xl font-bold text-white">منصة البث المباشر</h1>
-              </div>
-
-            </div>
-
-            {/* Search and Filters */}
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  type="text"
-                  placeholder="ابحث عن البث المباشر..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pr-12 bg-white/10 border-white/20 text-white placeholder-gray-400 focus:ring-purple-500"
-                />
-              </div>
-              <div className="flex  gap-2">
-                <Button
-                  variant={filterStatus === 'all' ? 'default' : 'outline'}
-                  onClick={() => setFilterStatus('all')}
-                  className={filterStatus === 'all' ? 'bg-purple-600 hover:bg-purple-700' : 'border-white/20 bg-white/15 text-white hover:bg-white/10'}
-                >
-                  الكل
-                </Button>
-                <Button
-                  variant={filterStatus === 'live' ? 'default' : 'outline'}
-                  onClick={() => setFilterStatus('live')}
-                  className={filterStatus === 'live' ? 'bg-red-600 hover:bg-red-700' : 'border-white/20 bg-white/15 text-white hover:bg-white/10'}
-                >
-                  مباشر
-                </Button>
-                <Button
-                  variant={filterStatus === 'upcoming' ? 'default' : 'outline'}
-                  onClick={() => setFilterStatus('upcoming')}
-                  className={filterStatus === 'upcoming' ? 'bg-blue-600 hover:bg-blue-700' : 'border-white/20 bg-white/15 text-white hover:bg-white/10'}
-                >
-                  قريباً
-                </Button>
-                <Button
-                  variant={filterStatus === 'paid' ? 'default' : 'outline'}
-                  onClick={() => setFilterStatus('paid')}
-                  className={filterStatus === 'paid' ? 'bg-cyan-500 hover:bg-cyan-600' : 'border-white/20 bg-white/15  text-white hover:bg-white/10'}
-                >
-                  مدفوع
-                </Button>
+                <div className="bg-white/20 backdrop-blur-sm rounded-full px-6 py-3 text-white">
+                  <span className="font-bold">500+</span> طالب
+                </div>
+                <div className="bg-white/20 backdrop-blur-sm rounded-full px-6 py-3 text-white">
+                  <span className="font-bold">⭐ 4.8</span> تقييم
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Main Content */}
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-              <div className="text-3xl font-bold text-white mb-2">
-                {liveEvents.filter(e => e.status === 'live').length}
-              </div>
-              <div className="text-gray-300">بث مباشر الآن</div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-              <div className="text-3xl font-bold text-white mb-2">
-                {liveEvents.filter(e => e.status === 'upcoming').length}
-              </div>
-              <div className="text-gray-300">بث قادم</div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-              <div className="text-3xl font-bold text-white mb-2">
-                {liveEvents.filter(e => e.isPaid).length}
-              </div>
-              <div className="text-gray-300">مدفوع</div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-              <div className="text-3xl font-bold text-white mb-2">
-                {liveEvents.reduce((sum, e) => sum + e.expectedViewers, 0).toLocaleString()}
-              </div>
-              <div className="text-gray-300">إجمالي المشاهدين المتوقع</div>
-            </div>
+        {/* Search Filter */}
+        <section className="py-8 bg-white shadow-sm">
+          <div className="container mx-auto px-4">
+            <TTHLiveClassesSearchFilter
+              selectedLevel={selectedLevel}
+              selectedYear={selectedYear}
+              selectedSpeciality={selectedSpeciality}
+              selectedMaterial={selectedMaterial}
+              levels={levels}
+              years={years}
+              specialities={specialities}
+              materials={materials}
+              hierarchyLoading={hierarchyLoading}
+              onLevelChange={handleLevelChange}
+              onYearChange={handleYearChange}
+              onSpecialityChange={handleSpecialityChange}
+              onMaterialChange={handleMaterialChange}
+              onSearch={handleSearch}
+              onClearFilters={clearFilters}
+            />
           </div>
+        </section>
 
-          {/* Live Events Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredEvents.map((event) => (
-              <LiveCard key={event.id} {...event} />
-            ))}
+        {/* Live Sessions Section */}
+        <section className="py-12 md:py-16">
+          <div className="container mx-auto px-4 space-y-16">
+            {initialLoading ? (
+              <div className="text-center py-16">
+                <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                </div>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">جاري تحميل البث المباشر...</h3>
+                <p className="text-gray-600">يرجى الانتظار</p>
+              </div>
+            ) : isFiltered ? (
+              // Show filtered results
+              <div>
+                <div className="text-center mb-12">
+                  <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold font-rowdies mb-4 relative">
+                    <span className="text-gray-800">نتائج البحث في </span>
+                    <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                      البث المباشر
+                    </span>
+                  </h2>
+                  <p className="text-gray-600 text-lg font-medium mb-4">
+                    تم العثور على {filteredSessions.length} بث مباشر
+                  </p>
+                  <button 
+                    onClick={clearFilters}
+                    className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-6 py-3 rounded-xl font-bold hover:from-gray-700 hover:to-gray-800 transition-all duration-300"
+                  >
+                    عرض جميع البث المباشر
+                  </button>
+                </div>
+
+                {loading ? (
+                  <div className="text-center py-16">
+                    <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">جاري البحث...</h3>
+                    <p className="text-gray-600">يرجى الانتظار بينما نبحث عن البث المباشر المناسب</p>
+                  </div>
+                ) : filteredSessions.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                    {filteredSessions.map((session) => (
+                      <TTHLiveCard 
+                        key={session.id} 
+                        session={session} 
+                        onStatusChange={handleSessionStatusChange}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-16">
+                    <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+                      <Video className="w-12 h-12 text-blue-500" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">لا توجد نتائج للبحث</h3>
+                    <p className="text-gray-600 mb-6">جرب تغيير الفلاتر أو العودة لاحقاً</p>
+                    <button 
+                      onClick={clearFilters}
+                      className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-bold hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
+                    >
+                      عرض جميع البث المباشر
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : Object.keys(liveSessionsByPath).length > 0 ? (
+              // Show all sessions grouped by path
+              Object.keys(liveSessionsByPath).map(pathName => (
+                liveSessionsByPath[pathName] && liveSessionsByPath[pathName].length > 0 && (
+                  <div key={pathName}>
+                    <div className="text-center mb-12">
+                      <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold font-rowdies mb-4 relative">
+                        <span className="text-gray-800">حصص </span>
+                        <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                          {pathName}
+                        </span>
+                      </h2>
+                    </div>
+                    <div 
+                      dir="rtl" 
+                      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 md:gap-8 justify-items-center"
+                    >
+                      {liveSessionsByPath[pathName].map((session, index) => (
+                        <div
+                          key={session.id}
+                          className="w-full max-w-sm"
+                          style={{ animationDelay: `${index * 100}ms` }}
+                        >
+                          <TTHLiveCard 
+                            session={session} 
+                            onStatusChange={handleSessionStatusChange}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              ))
+            ) : (
+              <div className="text-center py-16">
+                <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+                  <Video className="w-12 h-12 text-blue-500" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">لا توجد بث مباشر متاح حالياً</h3>
+                <p className="text-gray-600">سيتم إضافة بث مباشر جديد قريباً</p>
+              </div>
+            )}
           </div>
+        </section>
+      </main>
 
-          {filteredEvents.length === 0 && (
-            <div className="text-center py-12">
-              <div className="text-gray-400 text-lg mb-4">لا توجد نتائج مطابقة لبحثك</div>
-              <Button
-                onClick={() => {
-                  setSearchTerm('');
-                  setFilterStatus('all');
-                }}
-                variant="outline"
-                className="border-white/20 text-white hover:bg-white/10"
-              >
-                مسح الفلاتر
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-      <div className='mt-[1px]'>
-        <Footer />
-      </div>
+      <Footer />
     </div>
   );
 };

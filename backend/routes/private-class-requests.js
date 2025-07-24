@@ -1,5 +1,6 @@
 import express from 'express';
 import { query, getRows, getRow } from '../db.js';
+import pool from '../db.js';
 import { verifyToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -205,37 +206,50 @@ router.patch('/:requestId/status', verifyToken, async (req, res) => {
     if (!current) {
       return res.status(404).json({ error: 'Request not found' });
     }
-    let updateQuery = 'UPDATE private_class_requests SET status = $1, updated_at = CURRENT_TIMESTAMP';
-    let params = [status];
-    let paramIdx = 2;
+    
+    // Build update query dynamically based on what's being updated
+    let updateQuery = 'UPDATE private_class_requests SET updated_at = CURRENT_TIMESTAMP';
+    let params = [];
+    let paramIdx = 1;
+    
+    // Only update status if it's provided
+    if (status !== undefined) {
+      updateQuery += `, status = $${paramIdx}`;
+      params.push(status);
+      paramIdx++;
+    }
+    
     // If time is being set/updated, also set scheduled_at and agora_channel if not already set
-    let scheduledAt = current.scheduled_at;
-    let agoraChannel = current.agora_channel;
     if (time) {
       updateQuery += `, time = $${paramIdx}`;
       params.push(time);
       paramIdx++;
+      
       // Combine date and time into a timestamp (assume date is stored as YYYY-MM-DD and time as HH:mm - HH:mm)
       const dateStr = current.date;
       const startTime = time.split(' - ')[0];
       if (dateStr && startTime) {
-        scheduledAt = new Date(`${dateStr}T${startTime}:00`);
+        const scheduledAt = new Date(`${dateStr}T${startTime}:00`);
         updateQuery += `, scheduled_at = $${paramIdx}`;
         params.push(scheduledAt);
         paramIdx++;
       }
+      
       // Always set agora_channel
-      agoraChannel = `private_class_${requestId}`;
+      const agoraChannel = `private_class_${requestId}`;
       updateQuery += `, agora_channel = $${paramIdx}`;
       params.push(agoraChannel);
       paramIdx++;
     }
+    
     updateQuery += ' WHERE id = $' + paramIdx + ' RETURNING *';
     params.push(requestId);
+    
     const result = await query(updateQuery, params);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Request not found' });
     }
+    
     res.json({ 
       message: 'Request status updated successfully',
       request: result.rows[0]
@@ -246,24 +260,105 @@ router.patch('/:requestId/status', verifyToken, async (req, res) => {
   }
 });
 
-// Delete a private class request (only by the student who created it)
-router.delete('/:requestId', verifyToken, async (req, res) => {
+// Purchase private class (for students)
+router.post('/:requestId/purchase', verifyToken, async (req, res) => {
   try {
     const { requestId } = req.params;
     
-    const result = await query(`
-      DELETE FROM private_class_requests 
-      WHERE id = $1 AND student_id = $2
-      RETURNING *
-    `, [requestId, req.user.id]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Request not found or unauthorized' });
+    // Check if user is a student
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ error: 'Only students can purchase private classes' });
     }
     
-    res.json({ message: 'Request deleted successfully' });
+    // Fetch the request
+    const request = await getRow('SELECT * FROM private_class_requests WHERE id = $1', [requestId]);
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+    
+    // Check if the request belongs to this student
+    if (request.student_id !== req.user.id) {
+      return res.status(403).json({ error: 'You can only purchase your own requests' });
+    }
+    
+    // Check if request is confirmed
+    if (request.status !== 'مؤكد') {
+      return res.status(400).json({ error: 'Request must be confirmed before purchase' });
+    }
+    
+    // Check if already paid
+    if (request.payment_status === 'paid') {
+      return res.status(400).json({ error: 'Request is already paid' });
+    }
+    
+    // Get student's points balance
+    const studentPoints = await getRow('SELECT balance FROM user_points WHERE user_id = $1', [req.user.id]);
+    if (!studentPoints) {
+      return res.status(400).json({ error: 'No points balance found. Please purchase points first.' });
+    }
+    
+    // Calculate points needed (1 DZD = 1 point)
+    const pointsNeeded = Math.round(request.price_per_session || 1000);
+    
+    // Check if student has enough points
+    if (studentPoints.balance < pointsNeeded) {
+      return res.status(400).json({ 
+        error: `Insufficient points. You need ${pointsNeeded} points but have ${studentPoints.balance} points.`,
+        pointsNeeded,
+        currentBalance: studentPoints.balance
+      });
+    }
+    
+    // Start transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Deduct points from student
+      await client.query(
+        'UPDATE user_points SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+        [pointsNeeded, req.user.id]
+      );
+      
+      // Record the transaction
+      await client.query(`
+        INSERT INTO point_transactions (user_id, transaction_type, points, amount, status, metadata)
+        VALUES ($1, 'spend', $2, $3, 'completed', $4)
+      `, [req.user.id, pointsNeeded, request.price_per_session, JSON.stringify({
+        type: 'private_class_purchase',
+        request_id: requestId,
+        teacher_name: request.teacher_name,
+        subject: request.subject
+      })]);
+      
+      // Update request payment status
+      await client.query(`
+        UPDATE private_class_requests 
+        SET payment_status = 'paid', payment_date = CURRENT_TIMESTAMP, points_used = $1
+        WHERE id = $2
+      `, [pointsNeeded, requestId]);
+      
+      await client.query('COMMIT');
+      
+      // Get updated request
+      const updatedRequest = await getRow('SELECT * FROM private_class_requests WHERE id = $1', [requestId]);
+      
+      res.json({ 
+        message: 'Private class purchased successfully',
+        request: updatedRequest,
+        pointsDeducted: pointsNeeded,
+        newBalance: studentPoints.balance - pointsNeeded
+      });
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+    
   } catch (error) {
-    console.error('Error deleting private class request:', error);
+    console.error('Error purchasing private class:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -293,6 +388,28 @@ router.get('/:requestId/agora-info', verifyToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching Agora info:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete a private class request (only by the student who created it)
+router.delete('/:requestId', verifyToken, async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    
+    const result = await query(`
+      DELETE FROM private_class_requests 
+      WHERE id = $1 AND student_id = $2
+      RETURNING *
+    `, [requestId, req.user.id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Request not found or unauthorized' });
+    }
+    
+    res.json({ message: 'Request deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting private class request:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

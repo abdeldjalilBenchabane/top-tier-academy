@@ -169,7 +169,11 @@ export const usePrivateClasses = () => {
               createdAt: request.created_at,
               agora_channel: request.agora_channel,
               scheduled_at: request.scheduled_at,
-              hierarchy_path: request.hierarchy_path
+              hierarchy_path: request.hierarchy_path,
+              payment_status: request.payment_status,
+              payment_date: request.payment_date,
+              points_used: request.points_used,
+              price_per_session: request.price_per_session
             }));
           setMyPendingRequests(transformedRequests);
         }

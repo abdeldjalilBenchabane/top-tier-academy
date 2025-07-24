@@ -50,6 +50,11 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '..', 'public', 'uploads')));
 
+// Serve test upload page
+app.get('/test-upload', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'test-upload.html'));
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is running!' });

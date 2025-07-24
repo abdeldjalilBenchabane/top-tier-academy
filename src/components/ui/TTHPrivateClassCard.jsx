@@ -3,7 +3,7 @@ import { FaCalendarAlt, FaClock, FaBookOpen, FaEye, FaUserTie, FaChalkboardTeach
 import { formatDate } from '../../data/index';
 import { useAuth } from '../../contexts/AuthContext';
 
-const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionLoading, showActions, studentName, onEditTime, onJoinLive }) => {
+const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionLoading, showActions, studentName, onEditTime, onJoinLive, onPurchase }) => {
   const { isProfessor } = useAuth();
 
   // Countdown logic
@@ -205,16 +205,51 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
         {isProfessor && session.status === 'مؤكد' && (
           <>
             <div className="text-green-700 font-bold text-center mt-2">تم قبول الطلب</div>
+            {/* Show edit button always for professors */}
             <button
               className="w-full mt-2 px-4 py-2 bg-yellow-500 text-white rounded-lg font-bold hover:bg-yellow-600 transition"
               onClick={() => onEditTime && onEditTime(session)}
             >
               تعديل التوقيت
             </button>
+            
+            {/* Payment Status for Professors */}
+            <div className="mt-2 text-center">
+              {session.payment_status === 'paid' ? (
+                <div className="text-green-600 font-semibold text-sm">
+                  ✅ تم الدفع من الطالب ({session.points_used} نقطة)
+                </div>
+              ) : (
+                <div className="text-orange-600 font-semibold text-sm">
+                  ⏳ في انتظار دفع الطالب ({session.price_per_session} نقطة)
+                </div>
+              )}
+            </div>
           </>
         )}
         {!isProfessor && session.status === 'مؤكد' && (
-          <div className="text-green-700 font-bold text-center mt-2">تم قبول الطلب</div>
+          <>
+            <div className="text-green-700 font-bold text-center mt-2">تم قبول الطلب</div>
+            
+            {/* Payment Status and Purchase Button for Students */}
+            {session.payment_status === 'paid' ? (
+              <div className="text-green-600 font-semibold text-center mt-2">
+                ✅ تم الدفع بنجاح ({session.points_used} نقطة)
+              </div>
+            ) : (
+              <div className="text-center mt-2">
+                <div className="text-orange-600 font-semibold text-sm mb-2">
+                  💳 يجب الدفع: {session.price_per_session} نقطة
+                </div>
+                <button
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition"
+                  onClick={() => onPurchase && onPurchase(session)}
+                >
+                  شراء هذه الحصة الخاصة
+                </button>
+              </div>
+            )}
+          </>
         )}
         {isProfessor && session.status === 'مرفوض' && (
           <div className="text-red-700 font-bold text-center mt-2">تم رفض الطلب</div>
@@ -223,8 +258,9 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
         {/* Join/Start Live Button & Countdown */}
         {session.status === 'مؤكد' && (
           <div className="mt-4 flex flex-col items-center gap-2">
+            
             {/* Only show counter and button if time is selected */}
-            {session.time ? (
+            {session.time && session.time !== 'سيحدد الأستاذ التوقيت' ? (
               <>
                 {!canJoin && (
                   <div className="text-sm text-blue-600 font-semibold">الوقت المتبقي: {timeLeft}</div>

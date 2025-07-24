@@ -17,7 +17,8 @@ import {
   DollarSign,
   MessageCircle,
   TrendingUp,
-  Key
+  Key,
+  Shield
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -36,6 +37,7 @@ const Sidebar = () => {
     { name: 'Points', path: '/admin/points', icon: <DollarSign className="h-5 w-5" /> },
     { name: 'Point Codes', path: '/admin/point-codes', icon: <Key className="h-5 w-5" /> },
     { name: 'Point Transactions', path: '/admin/point-transactions', icon: <TrendingUp className="h-5 w-5" /> },
+    { name: 'Private Classes', path: '/admin/private-classes', icon: <Shield className="h-5 w-5" /> },
     { name: 'Private Class Settings', path: '/admin/private-class-settings', icon: <Settings className="h-5 w-5" /> },
     { name: 'Settings', path: '/admin/settings', icon: <Settings className="h-5 w-5" /> },
   ];
@@ -44,6 +46,8 @@ const Sidebar = () => {
     { name: 'Dashboard', path: '/professor/dashboard', icon: <Home className="h-5 w-5" /> },
     { name: 'My Courses', path: '/professor/courses', icon: <BookOpen className="h-5 w-5" /> },
     { name: 'Create Course', path: '/professor/create', icon: <FileText className="h-5 w-5" /> },
+    { name: 'Live Sessions', path: '/professor/live-sessions', icon: <Video className="h-5 w-5" /> },
+    { name: 'Create Live Session', path: '/professor/create-live-session', icon: <Video className="h-5 w-5" /> },
     { name: 'Create Quiz', path: '/professor/quiz', icon: <HelpCircle className="h-5 w-5" /> },
     { name: 'Quiz Results', path: '/professor/results', icon: <BarChart className="h-5 w-5" /> },
     { name: 'تعليقات الطلاب', path: '/professor/comments', icon: <MessageCircle className="h-5 w-5" /> },

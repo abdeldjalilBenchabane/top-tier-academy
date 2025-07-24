@@ -7,6 +7,7 @@ import { TooltipProvider } from './components/ui/tooltip';
 import { AuthProvider } from './contexts/AuthContext';
 import { AvatarProvider } from './contexts/AvatarContext';
 import AdminPointCodes from './Pages/admin/PointCodes';
+import PrivateClasses from './Pages/admin/PrivateClasses';
 
 
 // TTH Pages
@@ -51,12 +52,14 @@ import AdminPrivateClassSettings from './Pages/admin/PrivateClassSettings';
 import ProfessorDashboard from './Pages/professor/Dashboard';
 import ProfessorCourses from './Pages/professor/Courses';
 import ProfessorCreate from './Pages/professor/Create';
+import CreateLiveSessionPage from './Pages/professor/CreateLiveSession';
 import ProfessorSettings from './Pages/professor/Settings';
 import ProfessorCourseDetails from './Pages/professor/CourseDetails';
 import ProfessorComments from './Pages/professor/Comments';
 import CourseCommentsOverview from './Pages/professor/CourseCommentsOverview';
 import CourseComments from './Pages/professor/CourseComments';
 import ProfessorPrivateClasses from './Pages/professor/PrivateClasses';
+import LiveSessionsPage from './Pages/professor/LiveSessionsPage';
 // Admin components
 import UserManagement from './components/admin/UserManagement';
 import HomepageSlides from './components/admin/HomepageSlides';
@@ -137,6 +140,7 @@ const App: React.FC = () => {
                   <Route path="point-codes" element={<AdminPointCodes />} />
                   <Route path="point-transactions" element={<AdminPointTransactions />} />
                   <Route path="private-class-settings" element={<AdminPrivateClassSettings />} />
+                  <Route path="private-classes" element={<PrivateClasses />} />
                 </Route>
 
                 {/* Professor (protected) */}
@@ -145,6 +149,8 @@ const App: React.FC = () => {
                   <Route path="courses" element={<ProfessorCourses />} />
                   <Route path="courses/:id" element={<ProfessorCourseDetails />} />
                   <Route path="create" element={<ProfessorCreate />} />
+                  <Route path="create-live-session" element={<CreateLiveSessionPage />} />
+                  <Route path="live-sessions" element={<LiveSessionsPage />} />
                   <Route path="quiz" element={<QuizCreation />} />
                   <Route path="results" element={<QuizResults professorId="1" />} />
                   <Route path="settings" element={<ProfessorSettings />} />

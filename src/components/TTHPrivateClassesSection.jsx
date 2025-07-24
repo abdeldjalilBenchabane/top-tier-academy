@@ -9,6 +9,7 @@ const PrivateClassesSection = () => {
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
 
   // Fetch current user's pending requests
   useEffect(() => {
@@ -36,7 +37,11 @@ const PrivateClassesSection = () => {
               grade: request.grade,
               status: request.status,
               time: request.time,
-              createdAt: request.created_at
+              createdAt: request.created_at,
+              payment_status: request.payment_status,
+              payment_date: request.payment_date,
+              points_used: request.points_used,
+              price_per_session: request.price_per_session
             }));
           setMyPendingRequests(transformedRequests);
         }
@@ -57,6 +62,34 @@ const PrivateClassesSection = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedSession(null);
+  };
+
+  const handlePurchase = async (session) => {
+    setPurchaseLoading(true);
+    try {
+      const response = await fetch(`/api/private-class-requests/${session.id}/purchase`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        alert(`تم شراء الحصة بنجاح! تم خصم ${data.pointsDeducted} نقطة من رصيدك.`);
+        // Refresh the requests to show updated payment status
+        window.location.reload();
+      } else {
+        const errorData = await response.json();
+        alert(`خطأ في الشراء: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error purchasing private class:', error);
+      alert('حدث خطأ أثناء الشراء. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setPurchaseLoading(false);
+    }
   };
 
   return (
@@ -92,6 +125,7 @@ const PrivateClassesSection = () => {
               <PrivateClassCard
                 session={request}
                 onDetailsClick={handleDetailsClick}
+                onPurchase={handlePurchase}
               />
             </div>
           ))}

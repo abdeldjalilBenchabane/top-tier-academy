@@ -46,22 +46,31 @@ const ProfessorPrivateClasses = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        const transformed = data.requests.map(request => ({
-          id: request.id,
-          title: request.title,
-          sessions: `${request.sessions_count} حصص`,
-          description: request.description,
-          teacher: request.teacher_name,
-          date: request.date,
-          subject: request.subject,
-          grade: request.grade,
-          status: request.status,
-          time: request.time,
-          createdAt: request.created_at,
-          studentId: request.student_id,
-          studentName: request.student_name,
-          hierarchy_path: request.hierarchy_path
-        }));
+        const transformed = data.requests.map(request => {
+          return {
+            id: request.id,
+            title: request.title,
+            sessions: `${request.sessions_count} حصص`,
+            description: request.description,
+            teacher: request.teacher_name,
+            date: request.date,
+            subject: request.subject,
+            grade: request.grade,
+            status: request.status,
+            time: request.time || '',
+            createdAt: request.created_at,
+            studentId: request.student_id,
+            studentName: request.student_name,
+            hierarchy_path: request.hierarchy_path,
+            scheduled_at: request.scheduled_at,
+            agora_channel: request.agora_channel,
+            price_per_session: request.price_per_session,
+            session_duration: request.session_duration,
+            payment_status: request.payment_status,
+            payment_date: request.payment_date,
+            points_used: request.points_used
+          };
+        });
         setRequests(transformed);
       }
     } catch (error) {
@@ -154,6 +163,12 @@ const ProfessorPrivateClasses = () => {
     navigate(`/streaming/${channel}`);
   };
 
+  const handlePurchase = (session) => {
+    // This function will be handled by the student's component
+    // For professors, this is just a placeholder
+    console.log('Purchase requested for session:', session.id);
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6 text-blue-700">طلبات الحصص الخاصة الموجهة لي</h1>
@@ -186,6 +201,7 @@ const ProfessorPrivateClasses = () => {
                 onRefuse={handleRefuse}
                 onEditTime={handleEditTime}
                 onJoinLive={handleJoinLive}
+                onPurchase={handlePurchase}
                 actionLoading={actionLoading}
                 showActions={true}
                 studentName={request.studentName}

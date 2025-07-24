@@ -828,6 +828,27 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                                     if (socket && id) {
                                                         console.log('[DEBUG] Emitting end-stream', { id }); // [LIVE STREAM MODIF]
                                                         socket.emit('end-stream', id); // [LIVE STREAM MODIF]
+                                                        
+                                                        // Update session status in database
+                                                        try {
+                                                            const response = await fetch(`/api/live-sessions/${id}/end`, {
+                                                                method: 'PATCH',
+                                                                headers: {
+                                                                    'Content-Type': 'application/json',
+                                                                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                                                }
+                                                            });
+                                                            
+                                                            if (response.ok) {
+                                                                console.log('✅ Session status updated to ended');
+                                                                // Navigate back to professor dashboard
+                                                                navigate('/professor/live-sessions');
+                                                            } else {
+                                                                console.error('❌ Failed to update session status');
+                                                            }
+                                                        } catch (error) {
+                                                            console.error('❌ Error updating session status:', error);
+                                                        }
                                                     } else {
                                                         console.error('[DEBUG] end-stream NOT emitted', { socket, id }); // [LIVE STREAM MODIF]
                                                     }

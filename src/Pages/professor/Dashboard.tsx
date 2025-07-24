@@ -3,9 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/common/PageHeader';
 import DashboardStats from '@/components/common/DashboardStats';
-import LiveSessions from '@/components/professor/LiveSessions';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import QuizResults from '@/components/professor/QuizResults';
 
 const ProfessorDashboard = () => {
   const { user } = useAuth();
@@ -23,8 +21,6 @@ const ProfessorDashboard = () => {
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="live-sessions">Live Sessions</TabsTrigger>
-          <TabsTrigger value="quiz-results">Quiz Results</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview" className="space-y-6">
@@ -72,8 +68,17 @@ const ProfessorDashboard = () => {
                 >
                   View quiz results
                 </button>
-                <button className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-sm">
-                  Schedule live session
+                <button 
+                  onClick={() => navigate('/professor/create-live-session')}
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-sm"
+                >
+                  Create live session
+                </button>
+                <button 
+                  onClick={() => navigate('/professor/live-sessions')}
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-sm"
+                >
+                  View live sessions
                 </button>
                 <button className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-sm">
                   View student feedback
@@ -81,20 +86,6 @@ const ProfessorDashboard = () => {
               </div>
             </div>
           </div>
-        </TabsContent>
-        
-        <TabsContent value="live-sessions">
-          {user?.role === 'professor' && user?.id ? (
-            <LiveSessions professorId={user.id} />
-          ) : (
-            <div className="text-red-500">You must be logged in as a professor to view live sessions.</div>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="quiz-results">
-          {user?.role === 'professor' && user?.id ? (
-            <QuizResults professorId={user.id} />
-          ) : null}
         </TabsContent>
       </Tabs>
     </div>

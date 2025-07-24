@@ -67,6 +67,31 @@ const PrivateClasses = () => {
     navigate(`/streaming/${channel}`);
   };
 
+  const handlePurchase = async (session) => {
+    try {
+      const response = await fetch(`/api/private-class-requests/${session.id}/purchase`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        alert(`تم شراء الحصة بنجاح! تم خصم ${data.pointsDeducted} نقطة من رصيدك.`);
+        // Refresh the page to show updated payment status
+        window.location.reload();
+      } else {
+        const errorData = await response.json();
+        alert(`خطأ في الشراء: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error purchasing private class:', error);
+      alert('حدث خطأ أثناء الشراء. يرجى المحاولة مرة أخرى.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50" dir="rtl">
       <Navbar />
@@ -148,6 +173,7 @@ const PrivateClasses = () => {
                       session={request}
                       onDetailsClick={handleDetailsClick}
                       onJoinLive={handleJoinLive}
+                      onPurchase={handlePurchase}
                     />
                   </div>
                 ))}
@@ -202,6 +228,7 @@ const PrivateClasses = () => {
                       session={session}
                       onDetailsClick={handleDetailsClick}
                       onJoinLive={handleJoinLive}
+                      onPurchase={handlePurchase}
                     />
                   </div>
                 ))

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { api } from '@/lib/api';
 import { LiveSession } from '@/types';
 import { toast } from '@/lib/toast';
-import { Plus, Video, Calendar, Clock, Play, Bell } from 'lucide-react';
+import { Plus, Video, Calendar, Clock, Play, Bell, Timer, Zap } from 'lucide-react';
 import StatusControl from '@/components/live-sessions/StatusControl';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +26,8 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [sessionTimers, setSessionTimers] = useState<{[key: string]: string}>({});
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -41,10 +43,75 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
     isPaid: false,
   });
 
+  // Real-time timer effect
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Calculate timers for all sessions
+  useEffect(() => {
+    const timers: {[key: string]: string} = {};
+    
+    sessions.forEach(session => {
+      if (!session.start_time) {
+        timers[session.id] = '';
+        return;
+      }
+
+      const sessionTime = new Date(session.start_time);
+      const sessionEndTime = new Date(sessionTime.getTime() + (session.duration || 60) * 60 * 1000);
+      
+      // Check if session is manually ended
+      if (session.status === 'ended' || session.is_ended) {
+        timers[session.id] = 'منتهي';
+        return;
+      }
+
+      if (currentTime < sessionTime) {
+        // Session hasn't started yet
+        const timeDiff = sessionTime.getTime() - currentTime.getTime();
+        const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+        const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+        
+        if (hours > 0) {
+          timers[session.id] = `${hours}h ${minutes}m`;
+        } else if (minutes > 0) {
+          timers[session.id] = `${minutes}m ${seconds}s`;
+        } else {
+          timers[session.id] = `${seconds}s`;
+        }
+      } else if (currentTime >= sessionTime && currentTime <= sessionEndTime) {
+        // Session is live
+        timers[session.id] = 'مباشر الآن';
+      } else {
+        // Session has ended
+        timers[session.id] = 'منتهي';
+      }
+    });
+    
+    setSessionTimers(timers);
+  }, [currentTime, sessions]);
+
   useEffect(() => {
     if (!professorId) return;
     fetchSessions();
     fetchNotifications();
+  }, [professorId]);
+
+  // Refresh sessions every 30 seconds to get updated status
+  useEffect(() => {
+    if (!professorId) return;
+    
+    const refreshInterval = setInterval(() => {
+      fetchSessions();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(refreshInterval);
   }, [professorId]);
 
   const fetchSessions = async () => {
@@ -134,22 +201,41 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
   const getStatusColor = (status: LiveSession['status']) => {
     switch (status) {
       case 'scheduled': return 'default';
-      case 'live': return 'destructive';
+      case 'live': return 'default';
+      case 'upcoming': return 'default';
       case 'ended': return 'secondary';
       case 'cancelled': return 'outline';
       default: return 'default';
     }
   };
 
+  const getSessionStatus = (session: LiveSession) => {
+    if (!session.start_time) return 'scheduled';
+    
+    const sessionTime = new Date(session.start_time);
+    const sessionEndTime = new Date(sessionTime.getTime() + (session.duration || 60) * 60 * 1000);
+    
+    // Check if session is manually ended
+    if (session.status === 'ended' || session.is_ended) {
+      return 'ended';
+    }
+
+    if (currentTime < sessionTime) {
+      return 'upcoming';
+    } else if (currentTime >= sessionTime && currentTime <= sessionEndTime) {
+      return 'live';
+    } else {
+      return 'ended';
+    }
+  };
+
   const canStartSession = (session: LiveSession) => {
-    // const now = new Date();
-    // const scheduledTime = new Date(session.scheduledAt);
-    // const timeDiff = scheduledTime.getTime() - now.getTime();
-    // const minutesUntilStart = timeDiff / (1000 * 60);
-
-    // return session.status === 'scheduled' && minutesUntilStart <= 15;
-
-    return session.status === 'scheduled';
+    if (!session.start_time) return false;
+    const sessionTime = new Date(session.start_time);
+    const now = new Date();
+    const timeDiff = sessionTime.getTime() - now.getTime();
+    const minutesUntilStart = timeDiff / (1000 * 60);
+    return minutesUntilStart <= 15 && minutesUntilStart >= -session.duration;
   };
 
   // Helper to get status badge
@@ -328,22 +414,36 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-lg">{session.title}</CardTitle>
-                      {getApprovalStatusBadge(session)}
-                      <Badge variant={getStatusColor(session.status)}>
-                        {session.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : 'Unknown'}
-                      </Badge>
-                    </div>
+                                      <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg">{session.title}</CardTitle>
+                    {getApprovalStatusBadge(session)}
+                    <Badge variant={getStatusColor(getSessionStatus(session))}>
+                      {getSessionStatus(session) === 'live' ? 'مباشر الآن' : 
+                       getSessionStatus(session) === 'upcoming' ? 'قريباً' :
+                       getSessionStatus(session) === 'ended' ? 'منتهي' :
+                       session.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : 'Unknown'}
+                    </Badge>
+                  </div>
                     <CardDescription className="mt-1">
                       {session.description}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2 ml-4">
-                    {canStartSession(session) && (
+                    {getSessionStatus(session) === 'live' && (
                       <Button
                         onClick={() => handleStartSession(session.id)}
                         variant="default"
+                        className="bg-blue-600 hover:bg-blue-700 animate-pulse"
+                      >
+                        <Zap className="h-4 w-4 mr-2" />
+                        انضم للبث المباشر
+                      </Button>
+                    )}
+                    {getSessionStatus(session) === 'upcoming' && canStartSession(session) && (
+                      <Button
+                        onClick={() => handleStartSession(session.id)}
+                        variant="default"
+                        className="bg-green-600 hover:bg-green-700"
                       >
                         <Play className="h-4 w-4 mr-2" />
                         Start Live Session
@@ -369,6 +469,17 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                     <Clock className="h-4 w-4" />
                     {new Date(session.start_time || session.scheduledAt).toLocaleTimeString()} ({session.duration} min)
                   </div>
+                  {/* Timer Display */}
+                  {sessionTimers[session.id] && (
+                    <div className={`flex items-center gap-1 ${
+                      getSessionStatus(session) === 'live' ? 'text-blue-600 font-semibold' :
+                      getSessionStatus(session) === 'ended' ? 'text-gray-500' :
+                      'text-green-600 font-semibold'
+                    }`}>
+                      <Timer className="h-4 w-4" />
+                      <span className="font-mono">{sessionTimers[session.id]}</span>
+                    </div>
+                  )}
                 </div>
 
                 {session.meetingUrl && (
@@ -384,9 +495,14 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                   </div>
                 )}
 
-                {session.status === 'scheduled' && !canStartSession(session) && (
+                {getSessionStatus(session) === 'upcoming' && !canStartSession(session) && (
                   <div className="mt-2 text-sm text-gray-500">
-                    Session can be started 15 minutes before scheduled time
+                    يمكن بدء الجلسة قبل 15 دقيقة من الوقت المحدد
+                  </div>
+                )}
+                {getSessionStatus(session) === 'ended' && (
+                  <div className="mt-2 text-sm text-gray-500">
+                    انتهت هذه الجلسة
                   </div>
                 )}
               </CardContent>
