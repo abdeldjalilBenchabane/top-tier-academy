@@ -9,7 +9,6 @@ const PrivateClassesSection = () => {
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
-  const [purchaseLoading, setPurchaseLoading] = useState(false);
 
   // Fetch current user's pending requests
   useEffect(() => {
@@ -64,8 +63,17 @@ const PrivateClassesSection = () => {
     setSelectedSession(null);
   };
 
+  // Purchase loading state for individual sessions
+  const [purchaseLoading, setPurchaseLoading] = useState({});
+
   const handlePurchase = async (session) => {
-    setPurchaseLoading(true);
+    // Prevent double clicks
+    if (purchaseLoading[session.id]) {
+      return;
+    }
+    
+    setPurchaseLoading(prev => ({ ...prev, [session.id]: true }));
+    
     try {
       const response = await fetch(`/api/private-class-requests/${session.id}/purchase`, {
         method: 'POST',
@@ -88,7 +96,7 @@ const PrivateClassesSection = () => {
       console.error('Error purchasing private class:', error);
       alert('حدث خطأ أثناء الشراء. يرجى المحاولة مرة أخرى.');
     } finally {
-      setPurchaseLoading(false);
+      setPurchaseLoading(prev => ({ ...prev, [session.id]: false }));
     }
   };
 
@@ -126,6 +134,7 @@ const PrivateClassesSection = () => {
                 session={request}
                 onDetailsClick={handleDetailsClick}
                 onPurchase={handlePurchase}
+                purchaseLoading={purchaseLoading}
               />
             </div>
           ))}

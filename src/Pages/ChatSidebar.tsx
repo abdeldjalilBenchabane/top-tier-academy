@@ -44,30 +44,15 @@ const ChatSidebar: React.FC<Props> = ({
         }
     }, [input]);
 
-    // Detect overlay mode
-    const isOverlay = typeof window !== 'undefined' && document.querySelector('.chat-overlay-fullscreen');
-
     return (
-        <div
-            className={`bg-white/10 backdrop-blur-sm rounded-xl flex flex-col ${isOverlay ? 'chat-overlay-fullscreen-inner' : ''}`}
-            style={isOverlay ? {
-                background: 'rgba(30,30,60,0.70)', // 20% visibility
-                boxShadow: '0 2px 16px 0 rgba(0,0,0,0.25)',
-                padding: '12px',
-                height: '100%',
-                minHeight: 0,
-                borderRadius: '18px',
-                border: 'none',
-                maxWidth: 350,
-            } : { height: 600, padding: 16 }}
-        >
+        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 h-[600px] flex flex-col">
             <div className="flex items-center gap-2 mb-4 pb-4 border-b border-white/20">
                 <MessageSquare className="w-5 h-5" />
                 <h3 className="font-semibold">الدردشة المباشرة</h3>
                 {!chatEnabled && <span className="ml-2 text-xs text-red-400">الدردشة مغلقة من قبل الأستاذ</span>}
             </div>
 
-            <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-3 mb-4" style={isOverlay ? { minHeight: 0 } : {}}>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-3 mb-4">
                 {messages.length === 0 ? (
                     <div className="text-center text-gray-400 py-8">
                         <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -118,7 +103,7 @@ const ChatSidebar: React.FC<Props> = ({
                 <div className="text-xs text-yellow-400 mt-2 text-center">تم كتم الميكروفون من قبل الأستاذ</div>
             )}
             {/* Participants list for professor */}
-            {isProfessor && !isOverlay && (
+            {isProfessor && (
                 <div className="bg-white/10 rounded-xl p-4 mt-6">
                     <h3 className="font-bold mb-2 text-white">المشاركون</h3>
                     <ul>
@@ -131,6 +116,7 @@ const ChatSidebar: React.FC<Props> = ({
                 </div>
             )}
         </div>
+
     );
 };
 

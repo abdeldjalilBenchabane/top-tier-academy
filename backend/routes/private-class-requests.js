@@ -291,6 +291,12 @@ router.post('/:requestId/purchase', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'Request is already paid' });
     }
     
+    // Double-check payment status right before transaction to prevent race conditions
+    const currentRequest = await getRow('SELECT payment_status FROM private_class_requests WHERE id = $1', [requestId]);
+    if (currentRequest.payment_status === 'paid') {
+      return res.status(400).json({ error: 'Request is already paid' });
+    }
+    
     // Get student's points balance
     const studentPoints = await getRow('SELECT balance FROM user_points WHERE user_id = $1', [req.user.id]);
     if (!studentPoints) {

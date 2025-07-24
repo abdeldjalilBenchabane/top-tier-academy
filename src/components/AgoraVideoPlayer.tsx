@@ -287,7 +287,7 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
     }, [isLocalCameraEnabled, localVideoTrackRef]);
 
     // Helper to ensure video fills container correctly
-    const ensureVideoFullSize = useCallback((type: 'camera' | 'screen' = 'camera') => {
+    const ensureVideoFullSize = useCallback((type = 'camera') => {
         if (videoContainerRef.current) {
             const video = videoContainerRef.current.querySelector('video');
             if (video) {
@@ -296,8 +296,8 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
                 video.style.background = 'black';
                 video.style.touchAction = 'none';
                 video.style.userSelect = 'none';
-                video.style.webkitUserSelect = 'none';
-                (video.style as any).webkitTouchCallout = 'none';
+                video.style.WebkitUserSelect = 'none';
+                video.style.WebkitTouchCallout = 'none';
                 video.style.transform = 'none';
                 video.style.transition = 'none';
                 if (type === 'screen') {
@@ -311,17 +311,8 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
 
     // Patch play() calls to ensure video is always full size
     useEffect(() => {
-        ensureVideoFullSize('camera');
-    }, []);
-
-    // Ensure correct object-fit when screen sharing
-    useEffect(() => {
-        if (isScreenSharing) {
-            ensureVideoFullSize('screen');
-        } else {
-            ensureVideoFullSize('camera');
-        }
-    }, [isScreenSharing, ensureVideoFullSize]);
+        ensureVideoFullSize();
+    });
 
     useEffect(() => {
         mountedRef.current = true;

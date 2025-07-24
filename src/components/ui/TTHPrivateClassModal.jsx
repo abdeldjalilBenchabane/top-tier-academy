@@ -137,50 +137,28 @@ const PrivateClassModal = ({
                   />
                 </div>
 
+                {/* Date Input */}
                 <div>
-                  <label className="block text-gray-700 font-semibold mb-2 text-right">كم عدد الحصص المطلوبة؟</label>
+                  <label className="block text-gray-700 font-semibold mb-2 text-right">تاريخ الحصة</label>
                   <input
-                    type="number"
-                    value={requestForm.sessionsCount}
-                    onChange={(e) => onRequestFormChange('sessionsCount', e.target.value)}
-                    placeholder="مثال: 3"
-                    min="1"
-                    max="10"
+                    type="date"
+                    value={requestForm.dates?.[0] || ''}
+                    onChange={(e) => {
+                      const newDates = [e.target.value];
+                      onRequestFormChange('dates', newDates);
+                    }}
+                    min={new Date().toISOString().split('T')[0]}
                     className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
                     dir="rtl"
                   />
                 </div>
 
-                {/* Dynamic Date Inputs */}
-                {requestForm.sessionsCount && parseInt(requestForm.sessionsCount) > 0 && (
-                  <div className="space-y-3">
-                    <label className="block text-gray-700 font-semibold mb-2 text-right">مواعيد الحصص المطلوبة</label>
-                    {Array.from({ length: parseInt(requestForm.sessionsCount) }, (_, index) => (
-                      <div key={index} className="flex items-center gap-3">
-                        <label className="text-sm text-gray-600 font-medium whitespace-nowrap">
-                          الحصة {index + 1}:
-                        </label>
-                        <input
-                          type="date"
-                          value={requestForm.dates?.[index] || ''}
-                          onChange={(e) => {
-                            const newDates = [...(requestForm.dates || [])];
-                            newDates[index] = e.target.value;
-                            onRequestFormChange('dates', newDates);
-                          }}
-                          min={new Date().toISOString().split('T')[0]}
-                          className="flex-1 bg-white border-2 border-gray-200 rounded-xl py-2 px-3 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
-                          dir="rtl"
-                        />
-                      </div>
-                    ))}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
-                      <p className="text-sm text-blue-800 text-right">
-                        <strong>ملاحظة:</strong> سيختار الأستاذ التوقيت المناسب لكل يوم وسيرد عليك في أقرب وقت ممكن
-                      </p>
-                    </div>
-                  </div>
-                )}
+                {/* Note about session scheduling */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800 text-right">
+                    <strong>ملاحظة:</strong> سيختار الأستاذ التوقيت المناسب للحصة وسيرد عليك في أقرب وقت ممكن
+                  </p>
+                </div>
 
                 <div>
                   <label className="block text-gray-700 font-semibold mb-2 text-right">نص الطلب</label>

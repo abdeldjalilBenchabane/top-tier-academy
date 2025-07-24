@@ -120,18 +120,34 @@ export const usePrivateClasses = () => {
     const fetchTeachers = async () => {
       try {
         setLoading(true);
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          console.log('No token found, skipping teachers fetch');
+          setAvailableTeachers([]);
+          return;
+        }
+        
+        console.log('Fetching teachers with token:', token.substring(0, 20) + '...');
+        
         const response = await fetch('/api/users/teachers', {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${token}`
           }
         });
+        
+        console.log('Teachers response status:', response.status);
+        
         if (response.ok) {
           const data = await response.json();
           setAvailableTeachers(data.teachers || []);
         } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Teachers fetch failed:', response.status, errorData);
           setAvailableTeachers([]);
         }
       } catch (error) {
+        console.error('Teachers fetch error:', error);
         setAvailableTeachers([]);
       } finally {
         setLoading(false);
@@ -146,11 +162,24 @@ export const usePrivateClasses = () => {
       if (!user || isProfessor) return;
       try {
         setRequestsLoading(true);
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          console.log('No token found, skipping student requests fetch');
+          setMyPendingRequests([]);
+          return;
+        }
+        
+        console.log('Fetching student requests with token:', token.substring(0, 20) + '...');
+        
         const response = await fetch(`/api/private-class-requests/student/${user.id}`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${token}`
           }
         });
+        
+        console.log('Student requests response status:', response.status);
+        
         if (response.ok) {
           const data = await response.json();
           const transformedRequests = data.requests
@@ -176,9 +205,14 @@ export const usePrivateClasses = () => {
               price_per_session: request.price_per_session
             }));
           setMyPendingRequests(transformedRequests);
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Student requests fetch failed:', response.status, errorData);
+          setMyPendingRequests([]);
         }
       } catch (error) {
-        //
+        console.error('Student requests fetch error:', error);
+        setMyPendingRequests([]);
       } finally {
         setRequestsLoading(false);
       }
@@ -191,11 +225,24 @@ export const usePrivateClasses = () => {
     const fetchAllOrders = async () => {
       try {
         setAllOrdersLoading(true);
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          console.log('No token found, skipping all orders fetch');
+          setAllOrders([]);
+          return;
+        }
+        
+        console.log('Fetching all orders with token:', token.substring(0, 20) + '...');
+        
         const response = await fetch(`/api/private-class-requests`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${token}`
           }
         });
+        
+        console.log('All orders response status:', response.status);
+        
         if (response.ok) {
           const data = await response.json();
           const transformedOrders = data.requests.map(request => ({
@@ -216,6 +263,10 @@ export const usePrivateClasses = () => {
             hierarchy_path: request.hierarchy_path
           }));
           setAllOrders(transformedOrders);
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('All orders fetch failed:', response.status, errorData);
+          setAllOrders([]);
         }
       } catch (error) {
         //

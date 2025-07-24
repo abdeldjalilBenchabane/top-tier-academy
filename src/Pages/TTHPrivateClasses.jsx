@@ -67,7 +67,16 @@ const PrivateClasses = () => {
     navigate(`/streaming/${channel}`);
   };
 
+  const [purchaseLoading, setPurchaseLoading] = useState({});
+
   const handlePurchase = async (session) => {
+    // Prevent double clicks
+    if (purchaseLoading[session.id]) {
+      return;
+    }
+    
+    setPurchaseLoading(prev => ({ ...prev, [session.id]: true }));
+    
     try {
       const response = await fetch(`/api/private-class-requests/${session.id}/purchase`, {
         method: 'POST',
@@ -89,6 +98,8 @@ const PrivateClasses = () => {
     } catch (error) {
       console.error('Error purchasing private class:', error);
       alert('حدث خطأ أثناء الشراء. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setPurchaseLoading(prev => ({ ...prev, [session.id]: false }));
     }
   };
 
@@ -174,6 +185,7 @@ const PrivateClasses = () => {
                       onDetailsClick={handleDetailsClick}
                       onJoinLive={handleJoinLive}
                       onPurchase={handlePurchase}
+                      purchaseLoading={purchaseLoading}
                     />
                   </div>
                 ))}
@@ -229,6 +241,7 @@ const PrivateClasses = () => {
                       onDetailsClick={handleDetailsClick}
                       onJoinLive={handleJoinLive}
                       onPurchase={handlePurchase}
+                      purchaseLoading={purchaseLoading}
                     />
                   </div>
                 ))

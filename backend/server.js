@@ -12,12 +12,11 @@ import slidesRoutes from './routes/slides.js';
 import pointsRoutes from './routes/points.js';
 import paymentsRoutes from './routes/payments.js';
 import privateClassRequestsRoutes from './routes/private-class-requests.js';
+import privateClassSettingsRoutes from './routes/private-class-settings.js';
 import AgoraToken from 'agora-access-token';
 import hierarchyRoutes from './routes/hierarchy.routes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import pointCodesRoutes from './routes/pointCodes.js';
-import privateClassSettingsRoutes from './routes/private-class-settings.js';
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 
@@ -49,11 +48,6 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '..', 'public', 'uploads')));
-
-// Serve test upload page
-app.get('/test-upload', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'test-upload.html'));
-});
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -87,11 +81,10 @@ app.use('/api/slides', slidesRoutes);
 app.use('/api/points', pointsRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/private-class-requests', privateClassRequestsRoutes);
+app.use('/api/private-class-settings', privateClassSettingsRoutes);
 app.use('/api', liveSessionRoutes);
 app.use('/api', hierarchyRoutes);
 app.use('/api/structure', hierarchyRoutes); // <-- Add this line to alias structure endpoints
-app.use('/api/points', pointCodesRoutes);
-app.use('/api/private-class-settings', privateClassSettingsRoutes);
 
 // Socket.IO chat functionality
 io.on('connection', (socket) => {

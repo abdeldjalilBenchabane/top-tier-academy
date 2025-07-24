@@ -3,8 +3,11 @@ import { FaCalendarAlt, FaClock, FaBookOpen, FaEye, FaUserTie, FaChalkboardTeach
 import { formatDate } from '../../data/index';
 import { useAuth } from '../../contexts/AuthContext';
 
-const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionLoading, showActions, studentName, onEditTime, onJoinLive, onPurchase }) => {
-  const { isProfessor } = useAuth();
+const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionLoading, showActions, studentName, onEditTime, onJoinLive, onPurchase, purchaseLoading }) => {
+  const { isProfessor, user } = useAuth();
+  
+  // Check if this session belongs to the current user
+  const isMySession = session.studentId === user?.id || !session.studentId;
 
   // Countdown logic
   const [timeLeft, setTimeLeft] = useState('');
@@ -230,53 +233,82 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
         {!isProfessor && session.status === 'مؤكد' && (
           <>
             <div className="text-green-700 font-bold text-center mt-2">تم قبول الطلب</div>
-            
-            {/* Payment Status and Purchase Button for Students */}
-            {session.payment_status === 'paid' ? (
-              <div className="text-green-600 font-semibold text-center mt-2">
-                ✅ تم الدفع بنجاح ({session.points_used} نقطة)
-              </div>
-            ) : (
-              <div className="text-center mt-2">
-                <div className="text-orange-600 font-semibold text-sm mb-2">
-                  💳 يجب الدفع: {session.price_per_session} نقطة
-                </div>
-                <button
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition"
-                  onClick={() => onPurchase && onPurchase(session)}
-                >
-                  شراء هذه الحصة الخاصة
-                </button>
+          </>
+        )}
+        {/* Payment Button for Students - Show only for user's own sessions and when not paid */}
+        {!isProfessor && isMySession && session.payment_status !== 'paid' && (
+          <div className="text-center mt-2">
+            <div className="text-orange-600 font-semibold text-sm mb-2">
+              💳 سعر الحصة: {session.price_per_session} نقطة
+            </div>
+            <button
+              className={`w-full px-4 py-2 rounded-lg font-bold transition ${
+                session.status === 'مؤكد' && !purchaseLoading?.[session.id]
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-400 text-gray-600 cursor-not-allowed'
+              }`}
+              disabled={session.status !== 'مؤكد' || purchaseLoading?.[session.id]}
+              onClick={() => session.status === 'مؤكد' && !purchaseLoading?.[session.id] && onPurchase && onPurchase(session)}
+            >
+              {purchaseLoading?.[session.id] ? 'جاري الشراء...' : 'شراء هذه الحصة الخاصة'}
+            </button>
+            {session.status === 'في الانتظار' && (
+              <div className="text-xs text-gray-500 mt-1">
+                ⏳ سيتم تفعيل الدفع بعد قبول الأستاذ للطلب وتحديد التوقيت
               </div>
             )}
-          </>
+          </div>
+        )}
+        
+        {/* Payment Success Message - Show only after payment */}
+        {!isProfessor && isMySession && session.payment_status === 'paid' && (
+          <div className="text-center mt-2">
+            <div className="text-green-600 font-semibold text-sm">
+              ✅ تم الدفع بنجاح ({session.points_used} نقطة)
+            </div>
+          </div>
         )}
         {isProfessor && session.status === 'مرفوض' && (
           <div className="text-red-700 font-bold text-center mt-2">تم رفض الطلب</div>
         )}
 
-        {/* Join/Start Live Button & Countdown */}
-        {session.status === 'مؤكد' && (
+        {/* Join/Start Live Button & Countdown - Show for all sessions but enable only when confirmed and time selected */}
+        {(isProfessor || isMySession) && (
           <div className="mt-4 flex flex-col items-center gap-2">
             
-            {/* Only show counter and button if time is selected */}
-            {session.time && session.time !== 'سيحدد الأستاذ التوقيت' ? (
-              <>
-                {!canJoin && (
-                  <div className="text-sm text-blue-600 font-semibold">الوقت المتبقي: {timeLeft}</div>
-                )}
-                <button
-                  className={`w-full px-4 py-2 rounded-lg font-bold transition ${canJoin ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
-                  disabled={!canJoin}
-                  onClick={() => canJoin && onJoinLive && onJoinLive(session)}
-                >
-                  {isProfessor ? 'بدء البث المباشر' : 'دخول البث المباشر'}
-                </button>
-              </>
-            ) : (
+            {/* Show button for all sessions but disable if not confirmed, no time selected, or not paid */}
+            <button
+              className={`w-full px-4 py-2 rounded-lg font-bold transition ${
+                session.status === 'مؤكد' && session.time && session.time !== 'سيحدد الأستاذ التوقيت' && canJoin && (isProfessor || session.payment_status === 'paid')
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+              disabled={session.status !== 'مؤكد' || !session.time || session.time === 'سيحدد الأستاذ التوقيت' || !canJoin || (!isProfessor && session.payment_status !== 'paid')}
+              onClick={() => session.status === 'مؤكد' && session.time && session.time !== 'سيحدد الأستاذ التوقيت' && canJoin && (isProfessor || session.payment_status === 'paid') && onJoinLive && onJoinLive(session)}
+            >
+              {isProfessor ? 'بدء البث المباشر' : 'دخول البث المباشر'}
+            </button>
+            
+            {/* Show countdown only when confirmed and time is selected */}
+            {session.status === 'مؤكد' && session.time && session.time !== 'سيحدد الأستاذ التوقيت' && !canJoin && (
+              <div className="text-sm text-blue-600 font-semibold">الوقت المتبقي: {timeLeft}</div>
+            )}
+            
+
+            
+            {session.status === 'مؤكد' && (!session.time || session.time === 'سيحدد الأستاذ التوقيت') && (
               <div className="text-sm text-gray-500 font-semibold">لم يتم تحديد توقيت الحصة بعد</div>
             )}
           </div>
+        )}
+
+
+
+
+
+        {/* Show status for rejected requests - only for user's own sessions */}
+        {session.status === 'مرفوض' && !isProfessor && isMySession && (
+          <div className="text-red-700 font-bold text-center mt-2">تم رفض الطلب</div>
         )}
 
         {/* Action Button */}
