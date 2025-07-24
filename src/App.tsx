@@ -6,6 +6,7 @@ import { Toaster as Sonner } from './components/ui/sonner';
 import { TooltipProvider } from './components/ui/tooltip';
 import { AuthProvider } from './contexts/AuthContext';
 import { AvatarProvider } from './contexts/AvatarContext';
+import { PendingCountProvider } from './contexts/PendingCountContext';
 import AdminPointCodes from './Pages/admin/PointCodes';
 
 
@@ -84,7 +85,8 @@ const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <AvatarProvider>
-          <TooltipProvider>
+          <PendingCountProvider>
+            <TooltipProvider>
             <Toaster />
             <Sonner />
             <BrowserRouter>
@@ -159,6 +161,7 @@ const App: React.FC = () => {
               </Routes>
             </BrowserRouter>
           </TooltipProvider>
+        </PendingCountProvider>
         </AvatarProvider>
       </AuthProvider>
     </QueryClientProvider>

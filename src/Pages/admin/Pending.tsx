@@ -19,9 +19,11 @@ import { Inbox, User, Calendar, CheckCircle, XCircle } from 'lucide-react';
 import PathSelector from '@/components/admin/PathSelector';
 import { toast } from '@/lib/toast';
 import { useNavigate } from 'react-router-dom';
+import { usePendingCount } from '@/contexts/PendingCountContext';
 
 const PendingPage = () => {
   const navigate = useNavigate();
+  const { refreshPendingCount } = usePendingCount();
   const [pendingCourses, setPendingCourses] = useState<PendingCourse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState<PendingCourse | null>(null);
@@ -48,6 +50,7 @@ const PendingPage = () => {
     setShowPathSelector(false);
     setSelectedCourse(null);
     fetchPendingCourses();
+    refreshPendingCount(); // Refresh the sidebar count
     toast.success('Course processed successfully');
   };
 
