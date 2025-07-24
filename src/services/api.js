@@ -436,6 +436,7 @@ export const structureAPI = {
       id: material.id,
       name: material.name,
       specialityId: material.speciality_id,
+      yearId: material.year_id,
       price: material.price
     }));
   },

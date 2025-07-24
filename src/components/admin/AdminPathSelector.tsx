@@ -26,10 +26,10 @@ const AdminPathSelector = ({
   const [selectedLevelId, setSelectedLevelId] = useState<string>('');
   const [selectedYearId, setSelectedYearId] = useState<string>('');
   const [selectedSpecialityId, setSelectedSpecialityId] = useState<string>('');
-  const [materialName, setMaterialName] = useState('');
-  const [materialPrice, setMaterialPrice] = useState('');
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
+  const [materials, setMaterials] = useState<any[]>([]);
   
-  const [rootType, setRootType] = useState<'structure' | 'language' | ''>('');
+  const [rootType, setRootType] = useState<string>('');
   const [languages, setLanguages] = useState<Language[]>([]);
   const [languageLevels, setLanguageLevels] = useState<LanguageLevel[]>([]);
   const [selectedLanguageId, setSelectedLanguageId] = useState<string>('');
@@ -66,9 +66,9 @@ const AdminPathSelector = ({
           // Reset downstream selections
           setSelectedYearId('');
           setSelectedSpecialityId('');
-          setMaterialName('');
-          setMaterialPrice('');
+          setSelectedMaterialId('');
           setSpecialities([]);
+          setMaterials([]);
         } catch (error) {
           console.error(error);
           toast.error('Failed to fetch years');
@@ -79,33 +79,62 @@ const AdminPathSelector = ({
     }
   }, [selectedLevelId]);
 
-  // Load specialities when year is selected (only if year has speciality_id)
+  // Load specialities and materials when year is selected
   useEffect(() => {
     if (selectedYearId) {
-      const selectedYear = years.find(y => y.id === selectedYearId);
-      if (selectedYear && selectedYear.speciality_id) {
-        const fetchSpecialities = async () => {
-          try {
-            const data = await api.getSpecialities(selectedYearId);
-            setSpecialities(data);
-            // Reset material selection
-            setSelectedSpecialityId('');
-            setMaterialName('');
-            setMaterialPrice('');
-          } catch (error) {
-            console.error(error);
-            toast.error('Failed to fetch specialities');
-          }
-        };
+      const fetchSpecialities = async () => {
+        try {
+          const data = await api.getSpecialities(selectedYearId);
+          setSpecialities(data);
+          // Reset selections
+          setSelectedSpecialityId('');
+          setSelectedMaterialId('');
+        } catch (error) {
+          console.error(error);
+          toast.error('Failed to fetch specialities');
+        }
+      };
 
-        fetchSpecialities();
-      } else {
-        // If year doesn't have speciality_id, reset specialities
-        setSpecialities([]);
-        setSelectedSpecialityId('');
-      }
+      fetchSpecialities();
+    } else {
+      // Reset when no year is selected
+      setSpecialities([]);
+      setSelectedSpecialityId('');
+      setSelectedMaterialId('');
+      setMaterials([]);
     }
-  }, [selectedYearId, years]);
+  }, [selectedYearId]);
+
+  // Load materials when year or speciality is selected
+  useEffect(() => {
+    if (selectedYearId) {
+      const fetchMaterials = async () => {
+        try {
+          // Get all materials and filter for the year
+          const data = await api.getAllMaterials();
+          const yearMaterials = data.filter((material: any) => {
+            const matchesYear = material.year_id === selectedYearId;
+            const matchesSpeciality = selectedSpecialityId 
+              ? material.speciality_id === selectedSpecialityId 
+              : !material.speciality_id;
+            
+            return matchesYear && matchesSpeciality;
+          });
+          
+          setMaterials(yearMaterials);
+          setSelectedMaterialId('');
+        } catch (error) {
+          console.error(error);
+          toast.error('Failed to fetch materials');
+        }
+      };
+
+      fetchMaterials();
+    } else {
+      setMaterials([]);
+      setSelectedMaterialId('');
+    }
+  }, [selectedYearId, selectedSpecialityId]);
 
   // Load languages when root type is selected
   useEffect(() => {
@@ -144,20 +173,21 @@ const AdminPathSelector = ({
 
   const handleAssign = async () => {
     if (rootType === 'structure') {
-      if (!materialName.trim()) {
-        toast.error('Please enter a material name');
+      if (!selectedMaterialId) {
+        toast.error('Please select a material');
         return;
       }
       setIsSubmitting(true);
       try {
-        // Create material and assign to course
-        const materialData = {
-          name: materialName,
-          price: materialPrice ? parseFloat(materialPrice) : 0,
-          speciality_id: selectedSpecialityId || null
-        };
-        
-        await api.assignMaterialPathAdmin(course.id, materialData);
+        // Assign existing material to course
+        const selectedMaterial = materials.find(m => m.id === selectedMaterialId);
+        if (selectedMaterial) {
+          await api.assignMaterialPathAdmin(course.id, {
+            materialId: selectedMaterial.id,
+            speciality_id: selectedMaterial.speciality_id || null,
+            year_id: selectedYearId
+          });
+        }
         toast.success('Course path assigned successfully');
         onSuccess();
       } catch (error) {
@@ -242,7 +272,7 @@ const AdminPathSelector = ({
                   <SelectContent>
                     {years.map((year) => (
                       <SelectItem key={year.id} value={year.id}>
-                        {year.name} {year.speciality_id ? '(With Speciality)' : year.material_id ? '(With Material)' : ''}
+                        {year.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -251,47 +281,44 @@ const AdminPathSelector = ({
                   <div className="text-xs text-red-500 mt-1">No years available for the selected level.</div>
                 )}
               </div>
-              {/* Speciality Select - only show if selected year has speciality_id */}
-              {selectedYearId && years.find(y => y.id === selectedYearId)?.speciality_id && (
+              {/* Speciality Select - show if specialities exist */}
+              {selectedYearId && specialities.length > 0 && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Speciality</label>
-                  <Select value={selectedSpecialityId || ''} onValueChange={setSelectedSpecialityId} disabled={!selectedYearId || specialities.length === 0}>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Speciality (Optional)</label>
+                  <Select value={selectedSpecialityId || 'none'} onValueChange={(value) => setSelectedSpecialityId(value === 'none' ? '' : value)}>
                     <SelectTrigger>
-                      <SelectValue placeholder={selectedYearId ? "Select Speciality" : "Select Year First"} />
+                      <SelectValue placeholder="Select Speciality (or leave empty for direct materials)" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">Direct Materials (No Speciality)</SelectItem>
                       {specialities.map((speciality) => (
                         <SelectItem key={speciality.id} value={speciality.id}>{speciality.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {selectedYearId && specialities.length === 0 && (
-                    <div className="text-xs text-red-500 mt-1">No specialities available for the selected year.</div>
+                </div>
+              )}
+              {/* Material Select */}
+              {selectedYearId && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Material</label>
+                  <Select value={selectedMaterialId || ''} onValueChange={setSelectedMaterialId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Material" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {materials.map((material) => (
+                        <SelectItem key={material.id} value={material.id}>
+                          {material.name} ({material.price > 0 ? `${material.price} DZD` : 'Free'})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {materials.length === 0 && (
+                    <div className="text-xs text-red-500 mt-1">No materials available for the selected path.</div>
                   )}
                 </div>
               )}
-              {/* Material Name Input */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Material Name</label>
-                <Input
-                  placeholder="Enter material name (e.g., Algebra, Web Development)"
-                  value={materialName}
-                  onChange={(e) => setMaterialName(e.target.value)}
-                  required
-                />
-              </div>
-              {/* Material Price Input */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Material Price (Optional)</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  value={materialPrice}
-                  onChange={(e) => setMaterialPrice(e.target.value)}
-                />
-              </div>
             </>
           )}
           {/* Language Path */}

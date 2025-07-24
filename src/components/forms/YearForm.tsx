@@ -9,16 +9,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { structureAPI } from '@/services/api';
-import { Level, Speciality } from '@/types';
+import { Level } from '@/types';
 import { toast } from '@/lib/toast';
 
 interface YearFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
   preselectedLevelId?: string;
-  year?: { id: string; name: string; levelId: string; specialityId?: string; materialId?: string };
+  year?: { id: string; name: string; levelId: string };
   isEditing?: boolean;
 }
 
@@ -31,25 +30,16 @@ const YearForm = ({
 }: YearFormProps) => {
   const [name, setName] = useState(year?.name || '');
   const [levelId, setLevelId] = useState(year?.levelId || preselectedLevelId || '');
-  const [pathType, setPathType] = useState<'speciality' | 'material'>('speciality');
-  const [specialityId, setSpecialityId] = useState(year?.specialityId || '');
-  const [materialName, setMaterialName] = useState('');
-  const [materialPrice, setMaterialPrice] = useState('');
   
   const [levels, setLevels] = useState<Level[]>([]);
-  const [specialities, setSpecialities] = useState<Speciality[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [levelsData, specialitiesData] = await Promise.all([
-          structureAPI.getLevels(),
-          structureAPI.getSpecialities()
-        ]);
+        const levelsData = await structureAPI.getLevels();
         setLevels(levelsData);
-        setSpecialities(specialitiesData);
       } catch (error) {
         console.error(error);
         toast.error('Failed to fetch data');
@@ -60,18 +50,6 @@ const YearForm = ({
 
     fetchData();
   }, []);
-
-  // Set path type based on existing data
-  useEffect(() => {
-    if (year) {
-      if (year.specialityId) {
-        setPathType('speciality');
-        setSpecialityId(year.specialityId);
-      } else if (year.materialId) {
-        setPathType('material');
-      }
-    }
-  }, [year]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,31 +64,12 @@ const YearForm = ({
       return;
     }
     
-    if (pathType === 'speciality' && !specialityId) {
-      toast.error('Please select a speciality');
-      return;
-    }
-    
-    if (!materialName.trim()) {
-      toast.error('Please enter a material name');
-      return;
-    }
-    
-    const priceValue = materialPrice ? parseFloat(materialPrice) : 0;
-    if (materialPrice && (isNaN(priceValue) || priceValue < 0)) {
-      toast.error('Please enter a valid price');
-      return;
-    }
-    
     setIsSubmitting(true);
     
     try {
       const yearData = {
         name,
-        level_id: levelId,
-        speciality_id: pathType === 'speciality' ? specialityId : null,
-        material_name: materialName,
-        material_price: priceValue
+        level_id: levelId
       };
       
       if (isEditing && year) {
@@ -122,9 +81,6 @@ const YearForm = ({
       }
       
       setName('');
-      setSpecialityId('');
-      setMaterialName('');
-      setMaterialPrice('');
       onSuccess?.();
     } catch (error: any) {
       console.error(error);
@@ -168,74 +124,6 @@ const YearForm = ({
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
-        />
-      </div>
-      
-      <div className="space-y-2">
-        <Label>Education Path Type</Label>
-        <RadioGroup
-          value={pathType}
-          onValueChange={(value) => {
-            setPathType(value as 'speciality' | 'material');
-            setSpecialityId('');
-            setMaterialName('');
-            setMaterialPrice('');
-          }}
-          disabled={isEditing}
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="speciality" id="speciality" />
-            <Label htmlFor="speciality">With Speciality (Level → Year → Speciality → Create Material)</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="material" id="material" />
-            <Label htmlFor="material">Without Speciality (Level → Year → Create Material)</Label>
-          </div>
-        </RadioGroup>
-      </div>
-      
-      {pathType === 'speciality' && (
-        <div className="space-y-2">
-          <Label htmlFor="speciality-select">Speciality</Label>
-          <Select
-            value={specialityId}
-            onValueChange={setSpecialityId}
-          >
-            <SelectTrigger id="speciality-select">
-              <SelectValue placeholder="Select a speciality" />
-            </SelectTrigger>
-            <SelectContent>
-              {specialities.map((speciality) => (
-                <SelectItem key={speciality.id} value={speciality.id}>
-                  {speciality.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-      
-      <div className="space-y-2">
-        <Label htmlFor="material-name">Material Name</Label>
-        <Input
-          id="material-name"
-          placeholder="e.g. Algebra, Web Development, Physics"
-          value={materialName}
-          onChange={(e) => setMaterialName(e.target.value)}
-          required
-        />
-      </div>
-      
-      <div className="space-y-2">
-        <Label htmlFor="material-price">Material Price (Optional)</Label>
-        <Input
-          id="material-price"
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder="0.00"
-          value={materialPrice}
-          onChange={(e) => setMaterialPrice(e.target.value)}
         />
       </div>
       

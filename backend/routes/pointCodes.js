@@ -23,8 +23,8 @@ router.get('/codes', auth, requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT pc.*, u.email as used_by_email, u.name as used_by_name, pp.name as package_name
-       FROM point_codes pc
-       LEFT JOIN users u ON pc.used_by = u.id
+       FROM point_codes pc 
+       LEFT JOIN users u ON pc.used_by = u.id 
        LEFT JOIN point_packages pp ON pc.package_id = pp.id
        ORDER BY pc.created_at DESC`
     );

@@ -95,10 +95,10 @@ router.get('/', async (req, res) => {
     const { created_by, status, material_id, speciality_id } = req.query;
     let queryStr = `
       SELECT 
-        c.id, c.title, c.description, c.price, c.is_published, c.created_at,
-        c.approved_at, c.created_by, c.status, u.name as created_by_name,
-        m.name as material_name, m.price as material_price, m.speciality_id as speciality_id, cc.cover as cover_url,
-        c.language_level_id, c.material_id,
+        c.id, c.title, c.description, c.price, c.is_published as "isPublished", c.created_at as "createdAt",
+        c.approved_at as "approvedAt", c.created_by as "createdBy", c.status, u.name as created_by_name,
+        m.name as material_name, m.price as material_price, m.speciality_id as "specialityId", cc.cover as cover_url,
+        c.language_level_id as "languageLevelId", c.material_id as "materialId",
         s.name as speciality_name,
         ll.name as language_level_name,
         l.name as language_name,
@@ -551,10 +551,14 @@ router.put('/:id/assign-material', verifyToken, requireRole(['professor']), asyn
 router.put('/:id/create-material', verifyToken, requireRole(['professor']), async (req, res) => {
   try {
     const courseId = req.params.id;
-    const { name, price, speciality_id } = req.body;
+    const { name, price, speciality_id, year_id } = req.body;
     
     if (!name) {
       return res.status(400).json({ error: 'Material name is required' });
+    }
+    
+    if (!year_id) {
+      return res.status(400).json({ error: 'Year ID is required' });
     }
     
     // Check if course exists and belongs to the professor
@@ -571,6 +575,12 @@ router.put('/:id/create-material', verifyToken, requireRole(['professor']), asyn
       return res.status(400).json({ error: 'Can only assign paths to draft courses' });
     }
     
+    // Check if year exists
+    const year = await getRow('SELECT * FROM years WHERE id = $1', [year_id]);
+    if (!year) {
+      return res.status(400).json({ error: 'Year not found' });
+    }
+    
     // Check if speciality exists if provided
     if (speciality_id) {
       const speciality = await getRow('SELECT * FROM specialities WHERE id = $1', [speciality_id]);
@@ -584,10 +594,10 @@ router.put('/:id/create-material', verifyToken, requireRole(['professor']), asyn
     try {
       await client.query('BEGIN');
       
-      // Create the material
+      // Create the material with both year_id and speciality_id
       const materialResult = await client.query(
-        'INSERT INTO materials (name, speciality_id, price) VALUES ($1, $2, $3) RETURNING *',
-        [name, speciality_id || null, price || 0]
+        'INSERT INTO materials (name, year_id, speciality_id, price) VALUES ($1, $2, $3, $4) RETURNING *',
+        [name, year_id, speciality_id || null, price || 0]
       );
       
       const materialId = materialResult.rows[0].id;

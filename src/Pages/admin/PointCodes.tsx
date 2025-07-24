@@ -239,11 +239,11 @@ const AdminPointCodes: React.FC = () => {
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-yellow-600" />
-              <div>
+        <div>
                 <p className="text-sm text-gray-600">Total Revenue</p>
                 <p className="text-2xl font-bold">{revenue.toLocaleString()} DZD</p>
-              </div>
-            </div>
+        </div>
+        </div>
           </CardContent>
         </Card>
       </div>

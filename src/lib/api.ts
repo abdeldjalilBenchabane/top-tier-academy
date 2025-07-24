@@ -705,7 +705,7 @@ export const api = {
     }
     return;
   },
-  approveCourseWithMaterial: async (courseId: string, materialData: { name: string; price: number; speciality_id?: string | null }): Promise<void> => {
+  approveCourseWithMaterial: async (courseId: string, materialData: { name: string; price: number; speciality_id?: string | null; year_id: string }): Promise<void> => {
     const res = await fetch(`/api/courses/${courseId}/create-material`, {
       method: 'PUT',
       headers: {
@@ -1081,19 +1081,19 @@ export const api = {
   },
   
   // Admin functions to assign paths to approved courses without paths
-  assignMaterialPathAdmin: async (courseId: string, materialData: { name: string; price: number; speciality_id?: string | null }): Promise<void> => {
-    const res = await fetch(`/api/courses/${courseId}/create-material-admin`, {
+  assignMaterialPathAdmin: async (courseId: string, materialData: { materialId: string; speciality_id?: string | null; year_id?: string | null }): Promise<void> => {
+    const res = await fetch(`/api/courses/${courseId}/assign-material-admin`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
       },
-      body: JSON.stringify(materialData),
+      body: JSON.stringify({ material_id: materialData.materialId }),
       credentials: 'include'
     });
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to create material and assign path');
+      throw new Error(errorData.error || 'Failed to assign material path');
     }
     return;
   },

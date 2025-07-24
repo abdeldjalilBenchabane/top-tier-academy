@@ -1,5 +1,6 @@
 import express from 'express';
-import { query, getRow, getRows, pool } from '../db.js';
+import { query, getRow, getRows } from '../db.js';
+import pool from '../db.js';
 import { verifyToken, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -102,12 +103,9 @@ router.delete('/levels/:id', verifyToken, requireRole(['admin']), async (req, re
 router.get('/years', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
   try {
     const years = await getRows(`
-      SELECT y.*, l.name as level_name,
-             s.name as speciality_name, m.name as material_name
+      SELECT DISTINCT y.id, y.name, y.level_id as "levelId", l.name as level_name
       FROM years y 
       LEFT JOIN levels l ON y.level_id = l.id 
-      LEFT JOIN specialities s ON y.speciality_id = s.id
-      LEFT JOIN materials m ON y.material_id = m.id
       ORDER BY l.name, y.name
     `);
     res.json(years);
@@ -135,28 +133,16 @@ router.get('/levels/:levelId/years', verifyToken, requireRole(['admin', 'profess
 // POST /api/years → create new year
 router.post('/years', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { name, level_id, speciality_id, material_name, material_price } = req.body;
+    const { name, level_id } = req.body;
     
     if (!name || !level_id) {
       return res.status(400).json({ error: 'Year name and level are required' });
-    }
-    
-    if (!material_name) {
-      return res.status(400).json({ error: 'Material name is required' });
     }
     
     // Check if level exists
     const level = await getRow('SELECT id FROM levels WHERE id = $1', [level_id]);
     if (!level) {
       return res.status(400).json({ error: 'Level not found' });
-    }
-    
-    // Check if speciality exists if provided
-    if (speciality_id) {
-      const speciality = await getRow('SELECT id FROM specialities WHERE id = $1', [speciality_id]);
-      if (!speciality) {
-        return res.status(400).json({ error: 'Speciality not found' });
-      }
     }
     
     // Check if year already exists in this level
@@ -168,44 +154,13 @@ router.post('/years', verifyToken, requireRole(['admin']), async (req, res) => {
       return res.status(400).json({ error: 'Year with this name already exists in this level' });
     }
     
-    // Start transaction to create year and material
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      
-      // Create the material first
-      let materialResult;
-      if (speciality_id) {
-        // Create material under speciality
-        materialResult = await client.query(
-          'INSERT INTO materials (name, speciality_id, price) VALUES ($1, $2, $3) RETURNING *',
-          [material_name, speciality_id, material_price || 0]
-        );
-      } else {
-        // Create material directly (will be linked to year)
-        materialResult = await client.query(
-          'INSERT INTO materials (name, price) VALUES ($1, $2) RETURNING *',
-          [material_name, material_price || 0]
-        );
-      }
-      
-      const materialId = materialResult.rows[0].id;
-      
-      // Create the year
-      const yearResult = await client.query(
-        'INSERT INTO years (name, level_id, speciality_id, material_id) VALUES ($1, $2, $3, $4) RETURNING *',
-        [name, level_id, speciality_id || null, materialId]
-      );
-      
-      await client.query('COMMIT');
-      
-      res.status(201).json(yearResult.rows[0]);
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    // Create the year
+    const yearResult = await query(
+      'INSERT INTO years (name, level_id) VALUES ($1, $2) RETURNING *',
+      [name, level_id]
+    );
+    
+    res.status(201).json(yearResult.rows[0]);
   } catch (error) {
     console.error('Error creating year:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -216,7 +171,7 @@ router.post('/years', verifyToken, requireRole(['admin']), async (req, res) => {
 router.put('/years/:id', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, level_id, speciality_id, material_name, material_price } = req.body;
+    const { name, level_id } = req.body;
     
     // Check if year exists
     const existingYear = await getRow('SELECT id FROM years WHERE id = $1', [id]);
@@ -232,14 +187,6 @@ router.put('/years/:id', verifyToken, requireRole(['admin']), async (req, res) =
       }
     }
     
-    // Check if speciality exists if provided
-    if (speciality_id) {
-      const speciality = await getRow('SELECT id FROM specialities WHERE id = $1', [speciality_id]);
-      if (!speciality) {
-        return res.status(400).json({ error: 'Speciality not found' });
-      }
-    }
-    
     // Check if name conflicts
     if (name) {
       const nameConflict = await getRow(
@@ -251,20 +198,13 @@ router.put('/years/:id', verifyToken, requireRole(['admin']), async (req, res) =
       }
     }
     
-    // If material name is provided, update the material
-    if (material_name && existingYear.material_id) {
-      await query(
-        'UPDATE materials SET name = $1, price = $2 WHERE id = $3',
-        [material_name, material_price || 0, existingYear.material_id]
-      );
-    }
-    
-    const result = await query(
-      'UPDATE years SET name = COALESCE($1, name), level_id = COALESCE($2, level_id), speciality_id = $3 WHERE id = $4 RETURNING *',
-      [name, level_id, speciality_id || null, id]
+    // Update the year
+    const yearResult = await query(
+      'UPDATE years SET name = COALESCE($1, name), level_id = COALESCE($2, level_id) WHERE id = $4 RETURNING *',
+      [name, level_id, id]
     );
     
-    res.json(result.rows[0]);
+    res.json(yearResult.rows[0]);
   } catch (error) {
     console.error('Error updating year:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -291,13 +231,139 @@ router.delete('/years/:id', verifyToken, requireRole(['admin']), async (req, res
   }
 });
 
+// POST /api/years/:id/specialities → add speciality to year
+router.post('/years/:id/specialities', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Speciality name is required' });
+    }
+    
+    // Check if year exists
+    const year = await getRow('SELECT id FROM years WHERE id = $1', [id]);
+    if (!year) {
+      return res.status(404).json({ error: 'Year not found' });
+    }
+    
+    // Check if speciality already exists in this year
+    const existingSpeciality = await getRow(
+      'SELECT id FROM specialities WHERE name = $1 AND year_id = $2', 
+      [name, id]
+    );
+    if (existingSpeciality) {
+      return res.status(400).json({ error: 'Speciality with this name already exists in this year' });
+    }
+    
+    // Create the speciality
+    const result = await query(
+      'INSERT INTO specialities (name, year_id) VALUES ($1, $2) RETURNING *',
+      [name, id]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating speciality:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/years/:id/materials → add material to year
+router.post('/years/:id/materials', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, price, speciality_id } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Material name is required' });
+    }
+    
+    // Check if year exists
+    const year = await getRow('SELECT id FROM years WHERE id = $1', [id]);
+    if (!year) {
+      return res.status(404).json({ error: 'Year not found' });
+    }
+    
+    // If speciality_id is provided, check if it exists and belongs to this year
+    if (speciality_id) {
+      const speciality = await getRow(
+        'SELECT id FROM specialities WHERE id = $1 AND year_id = $2',
+        [speciality_id, id]
+      );
+      if (!speciality) {
+        return res.status(400).json({ error: 'Speciality not found or does not belong to this year' });
+      }
+    }
+    
+    // Check if material already exists in this year (and speciality if specified)
+    const existingMaterial = await getRow(
+      'SELECT id FROM materials WHERE name = $1 AND year_id = $2 AND (speciality_id = $3 OR (speciality_id IS NULL AND $3 IS NULL))', 
+      [name, id, speciality_id || null]
+    );
+    if (existingMaterial) {
+      return res.status(400).json({ error: 'Material with this name already exists in this year/speciality' });
+    }
+    
+    // Create the material
+    const result = await query(
+      'INSERT INTO materials (name, price, year_id, speciality_id) VALUES ($1, $2, $3, $4) RETURNING *',
+      [name, price || 0, id, speciality_id || null]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating material:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/years/:id/details → get year details with specialities and materials
+router.get('/years/:id/details', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get year with level info
+    const year = await getRow(`
+      SELECT y.*, l.name as level_name
+      FROM years y
+      LEFT JOIN levels l ON y.level_id = l.id
+      WHERE y.id = $1
+    `, [id]);
+    
+    if (!year) {
+      return res.status(404).json({ error: 'Year not found' });
+    }
+    
+    // Get specialities for this year
+    const specialities = await getRows(`
+      SELECT * FROM specialities WHERE year_id = $1 ORDER BY name
+    `, [id]);
+    
+    // Get materials for this year
+    const materials = await getRows(`
+      SELECT id, name, price, year_id as yearId, speciality_id as specialityId 
+      FROM materials WHERE year_id = $1 ORDER BY name
+    `, [id]);
+    
+    res.json({
+      year,
+      specialities,
+      materials
+    });
+  } catch (error) {
+    console.error('Error fetching year details:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ===== SPECIALITIES =====
 
 // GET /api/specialities → list all specialities
 router.get('/specialities', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
   try {
     const specialities = await getRows(`
-      SELECT s.*, y.name as year_name, l.name as level_name 
+      SELECT DISTINCT s.id, s.name, s.year_id as "yearId", y.name as year_name, l.name as level_name 
       FROM specialities s 
       LEFT JOIN years y ON s.year_id = y.id 
       LEFT JOIN levels l ON y.level_id = l.id 
@@ -427,12 +493,19 @@ router.delete('/specialities/:id', verifyToken, requireRole(['admin']), async (r
 router.get('/materials', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
   try {
     const materials = await getRows(`
-      SELECT m.*, s.name as speciality_name, y.name as year_name, l.name as level_name 
+      SELECT 
+        m.id, m.name, m.price, m.speciality_id as "specialityId", m.year_id as "yearId",
+        s.name as speciality_name,
+        COALESCE(sy.name, dy.name) as year_name,
+        COALESCE(sl.name, dl.name) as level_name,
+        COALESCE(sy.id, dy.id) as year_id
       FROM materials m 
       LEFT JOIN specialities s ON m.speciality_id = s.id 
-      LEFT JOIN years y ON s.year_id = y.id 
-      LEFT JOIN levels l ON y.level_id = l.id 
-      ORDER BY l.name, y.name, s.name, m.name
+      LEFT JOIN years sy ON s.year_id = sy.id 
+      LEFT JOIN levels sl ON sy.level_id = sl.id 
+      LEFT JOIN years dy ON m.year_id = dy.id 
+      LEFT JOIN levels dl ON dy.level_id = dl.id 
+      ORDER BY COALESCE(sl.name, dl.name), COALESCE(sy.name, dy.name), s.name, m.name
     `);
     res.json(materials);
   } catch (error) {

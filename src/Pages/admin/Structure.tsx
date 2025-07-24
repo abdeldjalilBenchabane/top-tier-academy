@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import LevelForm from '@/components/forms/LevelForm';
 import YearForm from '@/components/forms/YearForm';
+import YearDetails from '@/components/admin/YearDetails';
 import SpecialityForm from '@/components/forms/SpecialityForm';
 import MaterialForm from '@/components/forms/MaterialForm';
 import LanguageForm from '@/components/forms/LanguageForm';
@@ -93,6 +94,11 @@ const Structure = () => {
         languageLevels: languageLevelsData
       });
       
+      // Debug materials structure
+      if (materialsData.length > 0) {
+        console.log('Sample material structure:', materialsData[0]);
+      }
+      
       setLevels(levelsData);
       setYears(yearsData);
       setSpecialities(specialitiesData);
@@ -130,7 +136,13 @@ const Structure = () => {
   };
 
   const getMaterialsForYear = (yearId: string) => {
-    return materials.filter(material => material.yearId === yearId);
+    const directMaterials = materials.filter(material => material.yearId === yearId && !material.specialityId);
+    console.log(`Materials for year ${yearId}:`, {
+      allMaterials: materials.filter(m => m.yearId === yearId),
+      directMaterials: directMaterials,
+      yearId: yearId
+    });
+    return directMaterials;
   };
 
   const getLanguageLevelsForLanguage = (languageId: string) => {
@@ -572,9 +584,10 @@ const Structure = () => {
                                           </div>
                                   <AccordionContent>
                                     <div className="pl-4 border-l border-gray-200">
-                                      {/* Show specialities if year has speciality_id */}
-                                      {year.speciality_id ? (
-                                        getSpecialitiesForYear(year.id).length > 0 ? (
+                                      {/* Show Specialities */}
+                                      {getSpecialitiesForYear(year.id).length > 0 && (
+                                        <div className="mb-3">
+                                          <h4 className="text-xs font-medium text-gray-700 mb-2">Specialities:</h4>
                                           <ul className="space-y-1">
                                             {getSpecialitiesForYear(year.id).map(speciality => (
                                               <li key={speciality.id}>
@@ -636,22 +649,48 @@ const Structure = () => {
                                               </li>
                                             ))}
                                           </ul>
-                                        ) : (
-                                          <p className="text-sm text-gray-500 py-1">
-                                            No specialities defined
-                                          </p>
-                                        )
-                                      ) : (
-                                        /* Show materials directly if year has material_id */
-                                        year.material_id ? (
-                                          <div className="text-sm text-gray-600 py-2">
-                                            Direct Material: {materials.find(m => m.id === year.material_id)?.name || 'Unknown'}
-                                          </div>
-                                        ) : (
-                                          <p className="text-sm text-gray-500 py-1">
-                                            No path configured
-                                          </p>
-                                        )
+                                        </div>
+                                      )}
+
+                                      {/* Show Direct Materials */}
+                                      {getMaterialsForYear(year.id).length > 0 && (
+                                        <div>
+                                          <h4 className="text-xs font-medium text-gray-700 mb-2">Direct Materials:</h4>
+                                          <ul className="space-y-1">
+                                            {getMaterialsForYear(year.id).map(material => (
+                                              <li key={material.id}>
+                                                <div className="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-50">
+                                                  <div className="text-sm text-gray-600">{material.name}</div>
+                                                  <div className="flex items-center gap-1">
+                                                    <Button
+                                                      size="sm"
+                                                      variant="ghost"
+                                                      onClick={() => handleEditMaterial(material)}
+                                                      className="h-4 w-4 p-0 hover:bg-blue-100 hover:text-blue-600"
+                                                    >
+                                                      <Edit className="h-2 w-2" />
+                                                    </Button>
+                                                    <Button
+                                                      size="sm"
+                                                      variant="ghost"
+                                                      onClick={() => handleDeleteMaterial(material)}
+                                                      className="h-4 w-4 p-0 hover:bg-red-100 hover:text-red-600"
+                                                    >
+                                                      <Trash className="h-2 w-2" />
+                                                    </Button>
+                                                  </div>
+                                                </div>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+
+                                      {/* Show empty state if no content */}
+                                      {getSpecialitiesForYear(year.id).length === 0 && getMaterialsForYear(year.id).length === 0 && (
+                                        <p className="text-sm text-gray-500 py-1">
+                                          No content configured - click "View" to add specialities or materials
+                                        </p>
                                       )}
                                     </div>
                                   </AccordionContent>
@@ -879,84 +918,11 @@ const Structure = () => {
                   </CardContent>
                 </Card>
                 
-                {currentYear && (
-                  <Card>
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle>{currentYear.name}</CardTitle>
-                          <CardDescription>
-                            Year details and specialities
-                          </CardDescription>
-                        </div>
-                        <Button 
-                          variant="outline" 
-                          onClick={() => setShowForm('speciality')}
-                          size="sm"
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add Speciality
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    
-                    <CardContent>
-                      <div className="space-y-4">
-                        <h3 className="text-sm font-medium">Specialities in {currentYear.name}</h3>
-                        
-                        {getSpecialitiesForYear(currentYear.id).length > 0 ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {getSpecialitiesForYear(currentYear.id).map(speciality => (
-                              <Card key={speciality.id} className="overflow-hidden">
-                                <CardHeader className="p-4 pb-2">
-                                  <CardTitle className="text-base">{speciality.name}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-4 pt-2">
-                                  <p className="text-sm text-gray-500 mb-2">
-                                    {getMaterialsForSpeciality(speciality.id).length} materials
-                                  </p>
-                                </CardContent>
-                                <CardFooter className="p-4 pt-0 flex justify-end gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleSpecialityClick(speciality)}
-                                  >
-                                    View
-                                  </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleEditSpeciality(speciality)}
-                                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                      >
-                                        <Edit className="h-3 w-3" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleDeleteSpeciality(speciality)}
-                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                      >
-                                        <Trash className="h-3 w-3" />
-                                      </Button>
-                                </CardFooter>
-                              </Card>
-                            ))}
-                          </div>
-                        ) : (
-                          <EmptyState
-                            title="No Specialities Defined"
-                            description={`Add your first speciality to ${currentYear.name}`}
-                            action={{
-                              label: "Add Speciality",
-                              onClick: () => setShowForm('speciality')
-                            }}
-                          />
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
+                                {currentYear && (
+                  <YearDetails 
+                    yearId={currentYear.id} 
+                    onClose={() => setCurrentYear(null)} 
+                  />
                 )}
                 
                 {currentSpeciality && (

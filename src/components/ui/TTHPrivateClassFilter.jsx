@@ -95,12 +95,12 @@ const PrivateClassFilter = ({
               {hierarchyLoading ? (
                 <FaSpinner className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />
               ) : (
-                <FaChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-blue-500 transition-colors" />
+              <FaChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-blue-500 transition-colors" />
               )}
             </div>
+            </div>
           </div>
-        </div>
-
+          
         {/* Second Row - Year and Speciality */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 w-full">
           {/* Year */}
@@ -147,9 +147,9 @@ const PrivateClassFilter = ({
               </select>
               <FaChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-purple-500 transition-colors" />
             </div>
+            </div>
           </div>
-        </div>
-
+          
         {/* Third Row - Material only */}
         <div className="grid grid-cols-1 gap-4 sm:gap-6 w-full">
           {/* Material */}
