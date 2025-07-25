@@ -4,6 +4,12 @@ import { verifyToken, requireProfessor, requireStudent, requireRole } from '../m
 import AgoraToken from 'agora-access-token';
 import jwt from 'jsonwebtoken';
 import { getRow } from '../db.js';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;
 const router = express.Router();
@@ -14,11 +20,29 @@ router.post('/professors/:professorId/live-sessions', verifyToken, requireProfes
     console.log('[DEBUG] POST /professors/:professorId/live-sessions', {
         paramId: req.params.professorId,
         userId: req.user.id,
-        userRole: req.user.role
+        userRole: req.user.role,
+        body: req.body,
+        contentType: req.headers['content-type']
     });
-    const { title, start_time, duration, price } = req.body;
+    
+    // Handle both JSON and FormData
+    let title, start_time, duration, price, material_id, description;
+    
+    if (req.headers['content-type'] && req.headers['content-type'].includes('application/json')) {
+        // JSON request
+        ({ title, start_time, duration, price, material_id, description } = req.body);
+    } else {
+        // FormData request
+        title = req.body.title;
+        start_time = req.body.start_time;
+        duration = req.body.duration;
+        price = req.body.price;
+        material_id = req.body.material_id;
+        description = req.body.description;
+    }
+    
     const professor_id = req.user.id;
-    const professor_name = req.user.name || req.user.email || `ID ${professor_id}`;
+    const professor_name = req.user.name || `ID ${professor_id}`;
 
     if (parseInt(req.params.professorId, 10) !== professor_id) {
         return res.status(403).json({ error: "Forbidden: You can only create sessions for yourself." });
@@ -29,9 +53,26 @@ router.post('/professors/:professorId/live-sessions', verifyToken, requireProfes
     }
 
     try {
+        // Handle file upload if present
+        let cover_image_url = null;
+        if (req.files && req.files.cover_image) {
+            const file = req.files.cover_image;
+            const fileName = `live_session_${Date.now()}_${file.name}`;
+            const uploadPath = path.join(__dirname, '..', 'public', 'uploads', 'live-sessions', fileName);
+            
+            // Ensure directory exists
+            const uploadDir = path.dirname(uploadPath);
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+            
+            await file.mv(uploadPath);
+            cover_image_url = `/uploads/live-sessions/${fileName}`;
+        }
+
         const result = await pool.query(
-            'INSERT INTO live_sessions (professor_id, title, start_time, duration, price) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [professor_id, title, start_time, duration, price]
+            'INSERT INTO live_sessions (professor_id, professor_name, title, description, start_time, duration, price, material_id, cover_image_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+            [professor_id, professor_name, title, description, start_time, duration, price, material_id, cover_image_url]
         );
         const session = result.rows[0];
 
@@ -142,68 +183,121 @@ router.get('/live-sessions/:id', verifyToken, async (req, res) => {
     }
 });
 
-// POST /api/live-sessions/:sessionId/purchase → enregistre un achat pour un étudiant
+// POST /api/live-sessions/:sessionId/purchase → Purchase live session with points
 router.post('/live-sessions/:sessionId/purchase', verifyToken, requireStudent, async (req, res) => {
     const { sessionId } = req.params;
     const student_id = req.user.id;
-    const { amount_paid } = req.body; // This should be verified against the session price
-
-    if (!amount_paid) {
-        return res.status(400).json({ error: 'Missing required field: amount_paid' });
-    }
 
     try {
-        // First, get the session price to validate the amount paid
-        const sessionRes = await pool.query('SELECT price FROM live_sessions WHERE id = $1', [sessionId]);
+        // Get the session details
+        const sessionRes = await pool.query('SELECT * FROM live_sessions WHERE id = $1', [sessionId]);
         if (sessionRes.rows.length === 0) {
             return res.status(404).json({ error: 'Live session not found' });
         }
-        const sessionPrice = parseFloat(sessionRes.rows[0].price);
+        
+        const session = sessionRes.rows[0];
+        const pointsNeeded = Math.round(session.price); // 1 DZD = 1 point
 
-        if (parseFloat(amount_paid) !== sessionPrice) {
-            return res.status(400).json({ error: 'Incorrect payment amount.' });
-        }
-
-        const result = await pool.query(
-            'INSERT INTO purchases (session_id, student_id, amount_paid) VALUES ($1, $2, $3) RETURNING *',
-            [sessionId, student_id, amount_paid]
+        // Check if already purchased
+        const existingPurchase = await pool.query(
+            'SELECT * FROM purchases WHERE session_id = $1 AND student_id = $2',
+            [sessionId, student_id]
         );
-        res.status(201).json(result.rows[0]);
-    } catch (error) {
-        if (error.code === '23505') { // unique_violation
+        
+        if (existingPurchase.rows.length > 0) {
             return res.status(409).json({ error: 'You have already purchased this session.' });
         }
-        console.error('Error recording purchase:', error);
+
+        // Get student's points balance
+        const studentPoints = await pool.query('SELECT balance FROM user_points WHERE user_id = $1', [student_id]);
+        if (studentPoints.rows.length === 0) {
+            return res.status(400).json({ error: 'No points balance found. Please purchase points first.' });
+        }
+
+        const currentBalance = studentPoints.rows[0].balance;
+        if (currentBalance < pointsNeeded) {
+            return res.status(400).json({ 
+                error: `Insufficient points. You need ${pointsNeeded} points but have ${currentBalance} points.`,
+                pointsNeeded,
+                currentBalance
+            });
+        }
+
+        // Start transaction
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            
+            // Deduct points from student (using the trigger system)
+            await client.query(`
+                INSERT INTO point_transactions (user_id, transaction_type, points, amount, status, metadata)
+                VALUES ($1, 'spend', $2, $3, 'completed', $4)
+            `, [student_id, pointsNeeded, session.price, JSON.stringify({
+                type: 'live_session_purchase',
+                session_id: sessionId,
+                session_title: session.title,
+                professor_name: session.professor_name
+            })]);
+
+            // Record the purchase
+            await client.query(
+                'INSERT INTO purchases (session_id, student_id, amount_paid) VALUES ($1, $2, $3)',
+                [sessionId, student_id, session.price]
+            );
+
+            await client.query('COMMIT');
+
+            // Get updated balance
+            const newBalanceRes = await pool.query('SELECT balance FROM user_points WHERE user_id = $1', [student_id]);
+            const newBalance = newBalanceRes.rows[0].balance;
+
+            res.status(201).json({
+                message: 'Live session purchased successfully',
+                pointsDeducted: pointsNeeded,
+                newBalance: newBalance,
+                session: session
+            });
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Error purchasing live session:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-// GET /api/live-sessions/:sessionId/access?student_id=… → vérifie si l'étudiant peut accéder
+// GET /api/live-sessions/:sessionId/access → Check if user can access the session
 router.get('/live-sessions/:sessionId/access', verifyToken, async (req, res) => {
     const { sessionId } = req.params;
-    const { student_id } = req.query;
-
-    // Debug log
-    console.log('[DEBUG] Authenticated user:', req.user, 'student_id param:', student_id);
-
-    if (!student_id) {
-        return res.status(400).json({ error: 'Missing required query parameter: student_id' });
-    }
+    const userId = req.user.id;
 
     try {
-        // Only check that the session exists, do not check purchases or user
-        const sessionRes = await pool.query('SELECT start_time FROM live_sessions WHERE id = $1', [sessionId]);
-
+        // Get session details
+        const sessionRes = await pool.query('SELECT * FROM live_sessions WHERE id = $1', [sessionId]);
         if (sessionRes.rows.length === 0) {
             return res.status(404).json({ error: 'Live session not found' });
         }
 
-        const isLive = new Date() >= new Date(sessionRes.rows[0].start_time);
+        const session = sessionRes.rows[0];
+        const isLive = new Date() >= new Date(session.start_time);
+
+        // Check if user has purchased this session
+        const purchaseRes = await pool.query(
+            'SELECT * FROM purchases WHERE session_id = $1 AND student_id = $2',
+            [sessionId, userId]
+        );
+
+        const hasPurchased = purchaseRes.rows.length > 0;
+        const canAccess = hasPurchased; // Allow access if purchased, regardless of live status
 
         res.json({
-            can_access: true, // Always allow access
-            has_purchased: true, // Always true for compatibility
-            is_live: isLive
+            can_access: canAccess,
+            has_purchased: hasPurchased,
+            is_live: isLive,
+            session: session
         });
     } catch (error) {
         console.error('Error checking access:', error);

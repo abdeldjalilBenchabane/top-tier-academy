@@ -237,11 +237,11 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
         )}
         {/* Payment Button for Students - Show only for user's own sessions and when not paid */}
         {!isProfessor && isMySession && session.payment_status !== 'paid' && (
-          <div className="text-center mt-2">
-            <div className="text-orange-600 font-semibold text-sm mb-2">
+              <div className="text-center mt-2">
+                <div className="text-orange-600 font-semibold text-sm mb-2">
               💳 سعر الحصة: {session.price_per_session} نقطة
-            </div>
-            <button
+                </div>
+                <button
               className={`w-full px-4 py-2 rounded-lg font-bold transition ${
                 session.status === 'مؤكد' && !purchaseLoading?.[session.id]
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
@@ -249,9 +249,9 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
               }`}
               disabled={session.status !== 'مؤكد' || purchaseLoading?.[session.id]}
               onClick={() => session.status === 'مؤكد' && !purchaseLoading?.[session.id] && onPurchase && onPurchase(session)}
-            >
+                >
               {purchaseLoading?.[session.id] ? 'جاري الشراء...' : 'شراء هذه الحصة الخاصة'}
-            </button>
+                </button>
             {session.status === 'في الانتظار' && (
               <div className="text-xs text-gray-500 mt-1">
                 ⏳ سيتم تفعيل الدفع بعد قبول الأستاذ للطلب وتحديد التوقيت
@@ -277,7 +277,7 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
           <div className="mt-4 flex flex-col items-center gap-2">
             
             {/* Show button for all sessions but disable if not confirmed, no time selected, or not paid */}
-            <button
+                <button
               className={`w-full px-4 py-2 rounded-lg font-bold transition ${
                 session.status === 'مؤكد' && session.time && session.time !== 'سيحدد الأستاذ التوقيت' && canJoin && (isProfessor || session.payment_status === 'paid')
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
@@ -285,9 +285,9 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
               }`}
               disabled={session.status !== 'مؤكد' || !session.time || session.time === 'سيحدد الأستاذ التوقيت' || !canJoin || (!isProfessor && session.payment_status !== 'paid')}
               onClick={() => session.status === 'مؤكد' && session.time && session.time !== 'سيحدد الأستاذ التوقيت' && canJoin && (isProfessor || session.payment_status === 'paid') && onJoinLive && onJoinLive(session)}
-            >
-              {isProfessor ? 'بدء البث المباشر' : 'دخول البث المباشر'}
-            </button>
+                >
+                  {isProfessor ? 'بدء البث المباشر' : 'دخول البث المباشر'}
+                </button>
             
             {/* Show countdown only when confirmed and time is selected */}
             {session.status === 'مؤكد' && session.time && session.time !== 'سيحدد الأستاذ التوقيت' && !canJoin && (

@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { FaVideo, FaUser, FaClock, FaUsers, FaPlay, FaStop } from 'react-icons/fa';
+import { FaVideo, FaUser, FaClock, FaUsers, FaPlay, FaStop, FaShoppingCart, FaCheck } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 const TTHLiveCard = ({ session, onStatusChange }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [timeUntilStart, setTimeUntilStart] = useState('');
   const [sessionStatus, setSessionStatus] = useState('upcoming');
   const [isLive, setIsLive] = useState(false);
   const [isEnded, setIsEnded] = useState(false);
+  const [hasPurchased, setHasPurchased] = useState(false);
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [userPoints, setUserPoints] = useState(0);
   const formatTime = (timeString) => {
     if (!timeString) return '';
     try {
@@ -58,6 +63,43 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Check if user has purchased this session and get user points
+  useEffect(() => {
+    const checkPurchaseStatus = async () => {
+      if (!user) return;
+
+      try {
+        // Check if user has purchased this session
+        const accessResponse = await fetch(`/api/live-sessions/${session.id}/access`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (accessResponse.ok) {
+          const accessData = await accessResponse.json();
+          setHasPurchased(accessData.has_purchased);
+        }
+
+        // Get user points balance
+        const pointsResponse = await fetch('/api/points/balance', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (pointsResponse.ok) {
+          const pointsData = await pointsResponse.json();
+          setUserPoints(pointsData.balance || 0);
+        }
+      } catch (error) {
+        console.error('Error checking purchase status:', error);
+      }
+    };
+
+    checkPurchaseStatus();
+  }, [user, session.id]);
 
   // Calculate session status and countdown
   useEffect(() => {
@@ -135,8 +177,51 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
     }
   };
 
+  const handlePurchaseSession = async () => {
+    if (!user) {
+      alert('يجب تسجيل الدخول أولاً');
+      return;
+    }
+
+    if (userPoints < session.price) {
+      alert(`نقاطك غير كافية. تحتاج ${session.price} نقطة ولديك ${userPoints} نقطة.`);
+      return;
+    }
+
+    setIsPurchasing(true);
+    try {
+      const response = await fetch(`/api/live-sessions/${session.id}/purchase`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setHasPurchased(true);
+        setUserPoints(data.newBalance);
+        alert(`تم شراء البث المباشر بنجاح! تم خصم ${data.pointsDeducted} نقطة من رصيدك.`);
+      } else {
+        const errorData = await response.json();
+        alert(`خطأ في الشراء: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error purchasing session:', error);
+      alert('حدث خطأ أثناء الشراء. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
+
   const handleJoinSession = () => {
     const status = getSessionStatus();
+    
+    if (!hasPurchased) {
+      alert('يجب شراء هذا البث المباشر أولاً');
+      return;
+    }
     
     if (status === 'live') {
       // Session is live, navigate to streaming
@@ -151,28 +236,28 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
   };
 
   return (
-    <div className="bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden border border-white/30 group transform hover:scale-105">
+    <div className="bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-200 overflow-hidden border border-white/30 group transform hover:scale-102">
       {/* Cover Image - Always show image section */}
       <div className="relative h-48 overflow-hidden">
         <img
           src={session.cover_image || session.image || '/images/module_icon.png'}
           alt={session.title || 'Live Session'}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
           onError={(e) => {
             e.target.src = '/images/module_icon.png';
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
       </div>
       
       {/* Header with status */}
       <div className="p-6 relative">
         {/* Background pattern */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
         
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors duration-300">
+            <h3 className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors duration-200">
               {session.title || 'بث مباشر'}
             </h3>
             <span className={`px-3 py-1 rounded-full text-sm font-medium shadow-sm ${getStatusColor(getSessionStatus())}`}>
@@ -181,22 +266,22 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
           </div>
 
           {/* Description */}
-          <p className="text-gray-600 mb-4 line-clamp-2 group-hover:text-gray-700 transition-colors duration-300">
+          <p className="text-gray-600 mb-4 line-clamp-2 group-hover:text-gray-700 transition-colors duration-200">
             {session.description || 'انضم إلى هذا البث المباشر للتعلم مع أفضل الأساتذة'}
           </p>
 
           {/* Session details */}
           <div className="space-y-3 mb-6">
             {/* Teacher */}
-            <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-gray-600 transition-colors duration-300">
-              <FaUser className="text-blue-500 group-hover:text-blue-600 transition-colors duration-300" />
-              <span>الأستاذ: {session.professor_name || session.teacher || 'أستاذ مباشر'}</span>
+            <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-gray-600 transition-colors duration-200">
+              <FaUser className="text-blue-500 group-hover:text-blue-600 transition-colors duration-200" />
+              <span>الأستاذ: {session.professor_name || 'أستاذ مباشر'}</span>
             </div>
 
             {/* Time with countdown */}
             {session.start_time && (
-              <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-gray-600 transition-colors duration-300">
-                <FaClock className={`${isLive ? 'text-blue-500' : isEnded ? 'text-gray-500' : 'text-green-500'} group-hover:scale-110 transition-all duration-300`} />
+              <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-gray-600 transition-colors duration-200">
+                <FaClock className={`${isLive ? 'text-blue-500' : isEnded ? 'text-gray-500' : 'text-green-500'} group-hover:scale-110 transition-all duration-200`} />
                 <span className={`font-medium ${isLive ? 'text-blue-600' : isEnded ? 'text-gray-600' : 'text-green-600'}`}>
                   {timeUntilStart || formatTime(session.start_time)}
                 </span>
@@ -205,57 +290,90 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
 
             {/* Date */}
             {session.start_time && (
-              <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-gray-600 transition-colors duration-300">
-                <FaClock className="text-purple-500 group-hover:text-purple-600 transition-colors duration-300" />
+              <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-gray-600 transition-colors duration-200">
+                <FaClock className="text-purple-500 group-hover:text-purple-600 transition-colors duration-200" />
                 <span>{formatDate(session.start_time)}</span>
               </div>
             )}
 
             {/* Expected viewers */}
             {session.expected_viewers && (
-              <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-gray-600 transition-colors duration-300">
-                <FaUsers className="text-orange-500 group-hover:text-orange-600 transition-colors duration-300" />
+              <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-gray-600 transition-colors duration-200">
+                <FaUsers className="text-orange-500 group-hover:text-orange-600 transition-colors duration-200" />
                 <span>{session.expected_viewers} متوقع</span>
               </div>
             )}
           </div>
 
-          {/* Price if available */}
+          {/* Price and Points Info */}
           {session.price !== undefined && session.price !== null && (
-            <div className="mb-4 p-3 bg-white/30 backdrop-blur-sm rounded-xl border border-white/50 group-hover:bg-white/40 transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600 group-hover:text-gray-700 transition-colors duration-300">السعر:</span>
-                <span className="text-lg font-bold text-blue-600 group-hover:text-blue-700 transition-colors duration-300">
-                  {session.price} {session.currency || 'دج'}
-                </span>
+            <div className="mb-4 p-3 bg-white/30 backdrop-blur-sm rounded-xl border border-white/50 group-hover:bg-white/40 transition-all duration-200">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 group-hover:text-gray-700 transition-colors duration-200">السعر:</span>
+                  <span className="text-lg font-bold text-blue-600 group-hover:text-blue-700 transition-colors duration-200">
+                    {session.price} نقطة
+                  </span>
+                </div>
+                {user && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600 group-hover:text-gray-700 transition-colors duration-200">نقاطك:</span>
+                    <span className={`text-sm font-medium ${userPoints >= session.price ? 'text-blue-600' : 'text-gray-500'}`}>
+                      {userPoints} نقطة
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* Join button with live indicator */}
-          <button 
-            onClick={handleJoinSession}
-            className={`w-full py-3 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 group-hover:scale-[1.02] shadow-lg hover:shadow-xl transform hover:-translate-y-1 ${
-              isLive 
-                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 animate-pulse' 
-                : sessionStatus === 'upcoming'
-                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700'
-                : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed'
-            }`}
-            disabled={isEnded}
-          >
-            {isLive ? (
-              <FaPlay className="text-lg group-hover:scale-110 transition-transform duration-300 animate-pulse" />
-            ) : isEnded ? (
-              <FaStop className="text-lg group-hover:scale-110 transition-transform duration-300" />
-            ) : (
-              <FaVideo className="text-lg group-hover:scale-110 transition-transform duration-300" />
-            )}
-            <span>
-              {isLive ? 'انضم الآن - مباشر' : 
-               sessionStatus === 'upcoming' ? 'انضم الآن' : 'انتهى البث'}
-            </span>
-          </button>
+          {/* Purchase/Join button */}
+          {hasPurchased ? (
+            <button 
+              onClick={handleJoinSession}
+              className={`w-full py-3 rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2 group-hover:scale-[1.02] shadow-lg hover:shadow-xl transform hover:-translate-y-1 ${
+                isLive 
+                  ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 animate-pulse' 
+                  : sessionStatus === 'upcoming'
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700'
+                  : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed'
+              }`}
+              disabled={isEnded}
+            >
+              {isLive ? (
+                <FaPlay className="text-lg group-hover:scale-110 transition-transform duration-200 animate-pulse" />
+              ) : isEnded ? (
+                <FaStop className="text-lg group-hover:scale-110 transition-transform duration-200" />
+              ) : (
+                <FaCheck className="text-lg group-hover:scale-110 transition-transform duration-200" />
+              )}
+              <span>
+                {isLive ? 'انضم الآن - مباشر' : 
+                 sessionStatus === 'upcoming' ? 'تم الشراء - انتظار البداية' : 'انتهى البث'}
+              </span>
+            </button>
+          ) : (
+            <button 
+              onClick={handlePurchaseSession}
+              disabled={isPurchasing || isEnded || (user && userPoints < session.price)}
+              className={`w-full py-3 rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2 group-hover:scale-[1.02] shadow-lg hover:shadow-xl transform hover:-translate-y-1 ${
+                isPurchasing
+                  ? 'bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed'
+                  : isEnded
+                  ? 'bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed'
+                  : user && userPoints < session.price
+                  ? 'bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700'
+              }`}
+            >
+              <FaShoppingCart className="text-lg group-hover:scale-110 transition-transform duration-200" />
+              <span>
+                {isPurchasing ? 'جاري الشراء...' : 
+                 isEnded ? 'انتهى البث' :
+                 user && userPoints < session.price ? 'نقاط غير كافية' : 'شراء البث المباشر'}
+              </span>
+            </button>
+          )}
         </div>
       </div>
     </div>

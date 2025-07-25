@@ -466,9 +466,10 @@ router.get('/student/overview', verifyToken, requireRole(['student']), async (re
     const inProgressCourses = await getRow('SELECT COUNT(*) FROM student_courses WHERE student_id = $1 AND completed = FALSE', [studentId]);
     // Total hours
     const totalHours = await getRow('SELECT COALESCE(SUM(hours_spent),0) FROM student_courses WHERE student_id = $1', [studentId]);
-    // Upcoming live sessions
+    // Upcoming live sessions (only purchased by this student)
     const upcomingLives = await getRow(`SELECT COUNT(*) FROM live_sessions ls
-      WHERE ls.start_time > NOW() AND ls.is_approved = TRUE`);
+      JOIN purchases p ON ls.id = p.session_id
+      WHERE ls.start_time > NOW() AND ls.is_approved = TRUE AND p.student_id = $1`, [studentId]);
     res.json({
       totalCourses: Number(totalCourses.count),
       completedCourses: Number(completedCourses.count),

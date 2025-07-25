@@ -48,6 +48,19 @@ const StudentDashboard = () => {
     const navigate = useNavigate();
     const [editMode, setEditMode] = useState(false);
 
+    // Function to refresh student stats
+    const refreshStudentStats = async () => {
+        try {
+            const statsRes = await fetch('/api/users/student/overview', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const stats = await statsRes.json();
+            setStudentStats(stats);
+        } catch (error) {
+            console.error('Error refreshing student stats:', error);
+        }
+    };
+
     // Function to fetch private class requests
     const fetchPrivateClassRequests = useCallback(async () => {
         if (!user?.id) {
@@ -301,7 +314,7 @@ const StudentDashboard = () => {
                                     </Link>
                                 </CardContent>
                             </Card>
-                            <Card className="bg-gradient-to-r from-orange-500 to-orange-700 text-white">
+                            <Card className="bg-gradient-to-r from-orange-500 to-orange-700 text-white cursor-pointer hover:shadow-lg transition-all duration-300" onClick={() => navigate('/live-classes')}>
                                 <CardContent className="p-8">
                                     <div className="flex mt-2 items-center justify-between">
                                         <div>

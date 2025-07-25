@@ -320,13 +320,7 @@ router.post('/:requestId/purchase', verifyToken, async (req, res) => {
     try {
       await client.query('BEGIN');
       
-      // Deduct points from student
-      await client.query(
-        'UPDATE user_points SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
-        [pointsNeeded, req.user.id]
-      );
-      
-      // Record the transaction
+      // Record the transaction (the database trigger will automatically deduct points)
       await client.query(`
         INSERT INTO point_transactions (user_id, transaction_type, points, amount, status, metadata)
         VALUES ($1, 'spend', $2, $3, 'completed', $4)

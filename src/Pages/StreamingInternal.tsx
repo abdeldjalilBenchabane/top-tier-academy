@@ -459,27 +459,30 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         });
     };
 
-    // Remove access check for students
+    // Access check for students
     useEffect(() => {
         if (String(id).startsWith('private_class_')) {
             setCanAccess(true);
             setAccessChecked(true);
         } else {
-            // Original access check for normal live sessions
+            // Access check for normal live sessions
             const checkAccess = async () => {
                 if (user?.role === 'student' && id) {
                     try {
-                        const res = await fetch(`/api/live-sessions/${id}/access?student_id=${user.id}`, {
+                        const res = await fetch(`/api/live-sessions/${id}/access`, {
                             headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
                         });
                         const data = await res.json();
+                        console.log('[DEBUG] Access check result:', data);
                         setCanAccess(data.can_access);
                     } catch (err) {
+                        console.error('[DEBUG] Access check error:', err);
                         setCanAccess(false);
                     } finally {
                         setAccessChecked(true);
                     }
                 } else {
+                    setCanAccess(true); // Professors and admins can always access
                     setAccessChecked(true);
                 }
             };
