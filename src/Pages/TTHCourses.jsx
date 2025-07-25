@@ -12,7 +12,7 @@ export default function Courses() {
   const [availableLevels, setAvailableLevels] = useState([]);
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true); // Changed to true to show filters by default
   const [selectedGrade, setSelectedGrade] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
@@ -20,6 +20,7 @@ export default function Courses() {
   const [selectedYearId, setSelectedYearId] = useState('');
   const [selectedSpeciality, setSelectedSpeciality] = useState('');
   const [selectedMaterial, setSelectedMaterial] = useState('');
+  const [selectedProfessor, setSelectedProfessor] = useState(''); // Added professor filter state
   const [levels, setLevels] = useState([]);
   const [years, setYears] = useState([]);
   const [specialities, setSpecialities] = useState([]);
@@ -74,6 +75,19 @@ export default function Courses() {
 
         // Store all courses for filtering
         setAllCourses(allCourses);
+
+        // Debug: Log course data structure
+        console.log('=== COURSE DATA DEBUG ===');
+        console.log('Total courses:', allCourses.length);
+        console.log('Educational courses:', allCourses.filter(c => !c.language_level_id).length);
+        console.log('Language courses:', allCourses.filter(c => c.language_level_id).length);
+        console.log('Sample educational course:', allCourses.find(c => !c.language_level_id));
+        console.log('Courses with professor data:', allCourses.filter(c => c.createdBy && c.created_by_name).map(c => ({
+          title: c.title,
+          createdBy: c.createdBy,
+          created_by_name: c.created_by_name,
+          isEducational: !c.language_level_id
+        })));
 
         // Extract hierarchical data from courses for filters
         try {
@@ -145,7 +159,7 @@ export default function Courses() {
           // Extract professors from courses
           const professorMap = new Map();
           allCourses.forEach(course => {
-            if (course.created_by_name && course.createdBy) {
+            if (course.created_by_name && course.createdBy && !course.language_level_id) {
               professorMap.set(course.createdBy, {
                 id: course.createdBy,
                 name: course.created_by_name
@@ -155,6 +169,7 @@ export default function Courses() {
           const professorsData = Array.from(professorMap.values());
           setProfessors(professorsData);
           console.log('Extracted professors:', professorsData);
+          console.log('Sample course with professor data:', allCourses.find(c => c.createdBy && c.created_by_name));
         } catch (e) {
           console.error('Error extracting hierarchical data:', e);
         }
@@ -208,7 +223,7 @@ export default function Courses() {
   // Get courses with advanced filtering
   const getDisplayCourses = () => {
     // If advanced filters are active, use them
-    if (selectedLevelId || selectedYearId || selectedSpeciality || selectedMaterial) {
+    if (selectedLevelId || selectedYearId || selectedSpeciality || selectedMaterial || selectedProfessor) {
       const advancedFiltered = getAdvancedFilteredCourses();
       console.log('=== DISPLAY DEBUG ===');
       console.log('Advanced filtered courses for display:', advancedFiltered);
@@ -221,17 +236,28 @@ export default function Courses() {
           level_name: course.level_name,
           year_name: course.year_name,
           speciality_name: course.speciality_name,
-          material_name: course.material_name
+          material_name: course.material_name,
+          createdBy: course.createdBy,
+          created_by_name: course.created_by_name
         });
         
         let pathName = '';
         
-        if (course.speciality_name) {
-          // 4-path: Level > Year > Speciality > Material
-          pathName = `${course.level_name} - ${course.year_name}`;
+        // Handle cases where level_name or year_name might be missing
+        if (course.level_name && course.year_name) {
+          if (course.speciality_name) {
+            // 4-path: Level > Year > Speciality > Material
+            pathName = `${course.level_name} - ${course.year_name}`;
+          } else {
+            // 3-path: Level > Year > Material
+            pathName = `${course.level_name} - ${course.year_name}`;
+          }
+        } else if (course.level_name) {
+          // Only level available
+          pathName = `${course.level_name} - دورات أخرى`;
         } else {
-          // 3-path: Level > Year > Material
-          pathName = `${course.level_name} - ${course.year_name}`;
+          // No level or year info
+          pathName = 'دورات أخرى';
         }
         
         console.log('Generated path name:', pathName);
@@ -348,6 +374,52 @@ export default function Courses() {
     return materials;
   };
 
+  // Get filtered professors based on current filters
+  const getFilteredProfessors = () => {
+    let filtered = allCourses.filter(course => !course.language_level_id);
+
+    // Apply the same filters as in getAdvancedFilteredCourses
+    if (selectedLevelId && selectedLevelId !== 'all') {
+      filtered = filtered.filter(course => course.level_name === selectedLevelId);
+    }
+    if (selectedYearId && selectedYearId !== 'all') {
+      filtered = filtered.filter(course => course.year_name === selectedYearId);
+    }
+    if (selectedSpeciality && selectedSpeciality !== 'all') {
+      filtered = filtered.filter(course => course.speciality_name === selectedSpeciality);
+    }
+    if (selectedMaterial && selectedMaterial !== 'all') {
+      filtered = filtered.filter(course => course.material_name === selectedMaterial);
+    }
+
+    // Extract unique professors from filtered courses
+    const professorMap = new Map();
+    filtered.forEach(course => {
+      if (course.created_by_name && course.createdBy) {
+        professorMap.set(course.createdBy, {
+          id: course.createdBy,
+          name: course.created_by_name
+        });
+      }
+    });
+
+    return Array.from(professorMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  };
+
+  // Get all available professors (for independent professor filter)
+  const getAllProfessors = () => {
+    const professorMap = new Map();
+    allCourses.forEach(course => {
+      if (course.created_by_name && course.createdBy && !course.language_level_id) {
+        professorMap.set(course.createdBy, {
+          id: course.createdBy,
+          name: course.created_by_name
+        });
+      }
+    });
+    return Array.from(professorMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  };
+
   // Apply advanced filters to courses
   const getAdvancedFilteredCourses = () => {
     console.log('=== FILTERING DEBUG ===');
@@ -355,7 +427,8 @@ export default function Courses() {
       selectedLevelId,
       selectedYearId,
       selectedSpeciality,
-      selectedMaterial
+      selectedMaterial,
+      selectedProfessor
     });
 
     let filtered = allCourses.filter(course => !course.language_level_id); // Only educational courses
@@ -393,9 +466,55 @@ export default function Courses() {
       console.log('Courses after material filter:', filtered.map(c => ({ title: c.title, material: c.material_name })));
     }
 
+    // Filter by professor
+    if (selectedProfessor && selectedProfessor !== 'all') {
+      const beforeProfessor = filtered.length;
+      console.log('=== PROFESSOR FILTER DEBUG ===');
+      console.log('Selected professor ID:', selectedProfessor, 'Type:', typeof selectedProfessor);
+      console.log('Courses before professor filter:', filtered.map(c => ({ 
+        title: c.title, 
+        createdBy: c.createdBy, 
+        createdByType: typeof c.createdBy,
+        created_by_name: c.created_by_name,
+        matches: c.createdBy == selectedProfessor // Using == for type coercion
+      })));
+      
+      filtered = filtered.filter(course => course.createdBy == selectedProfessor); // Using == for type coercion
+      console.log(`Professor filter: ${beforeProfessor} -> ${filtered.length} courses`);
+      console.log('Courses after professor filter:', filtered.map(c => ({ title: c.title, professor: c.created_by_name })));
+    }
+
     console.log('Final filtered courses:', filtered);
     return filtered;
   };
+
+  // Test function to verify professor filtering
+  const testProfessorFilter = () => {
+    console.log('=== PROFESSOR FILTER TEST ===');
+    console.log('All courses count:', allCourses.length);
+    console.log('Educational courses count:', allCourses.filter(c => !c.language_level_id).length);
+    console.log('Courses with professor data:', allCourses.filter(c => c.createdBy && c.created_by_name && !c.language_level_id).length);
+    
+    const professors = getAllProfessors();
+    console.log('Available professors:', professors);
+    
+    if (professors.length > 0) {
+      const testProfessor = professors[0];
+      console.log('Testing with professor:', testProfessor);
+      
+      const coursesForProfessor = allCourses.filter(c => 
+        !c.language_level_id && c.createdBy == testProfessor.id
+      );
+      console.log('Courses for this professor:', coursesForProfessor.map(c => c.title));
+    }
+  };
+
+  // Call test function when component mounts
+  useEffect(() => {
+    if (allCourses.length > 0) {
+      testProfessorFilter();
+    }
+  }, [allCourses]);
 
   return (
     <div dir="rtl" className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 flex flex-col">
@@ -500,7 +619,7 @@ export default function Courses() {
                     <div className="relative z-10">
                       <div className="p-4 sm:p-6">
                         {/* Filters Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-6 mb-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 lg:gap-6 mb-6">
                           {/* Level Filter */}
                           <div className="group">
                             <label className="block text-gray-700 font-bold mb-3 text-sm lg:text-base text-right group-hover:text-blue-600 transition-colors duration-200">
@@ -617,7 +736,9 @@ export default function Courses() {
                             <div className="relative">
                               <select
                                 value={selectedMaterial}
-                                onChange={(e) => setSelectedMaterial(e.target.value)}
+                                onChange={(e) => {
+                                  setSelectedMaterial(e.target.value);
+                                }}
                                 disabled={(() => {
                                   const isDisabled = !selectedYearId;
                                   return isDisabled;
@@ -642,6 +763,38 @@ export default function Courses() {
                             </div>
                           </div>
 
+                          {/* Professor Filter */}
+                          <div className="group">
+                            <label className="block text-gray-700 font-bold mb-3 text-sm lg:text-base text-right group-hover:text-red-600 transition-colors duration-200">
+                              <span className="inline-flex items-center gap-2">
+                                <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                                الأستاذ
+                              </span>
+                            </label>
+                            <div className="relative">
+                              <select
+                                value={selectedProfessor}
+                                onChange={(e) => setSelectedProfessor(e.target.value)}
+                                className="appearance-none w-full bg-white/90 backdrop-blur-sm border-2 border-gray-200 hover:border-red-300 focus:border-red-500 text-sm lg:text-base font-semibold rounded-2xl py-3 lg:py-4 pr-4 pl-12 focus:outline-none focus:ring-4 focus:ring-red-100 transition-all duration-300 shadow-sm hover:shadow-md text-right cursor-pointer"
+                                dir="rtl"
+                              >
+                                <option value="">جميع الأساتذة</option>
+                                {getAllProfessors().length === 0 ? (
+                                  <option value="" disabled>لا يوجد أساتذة متاحون</option>
+                                ) : (
+                                  getAllProfessors().map(professor => (
+                                    <option key={professor.id} value={professor.id}>{professor.name}</option>
+                                  ))
+                                )}
+                              </select>
+                              <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <svg className="text-gray-400 group-hover:text-red-500 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+
                           {/* Action Buttons */}
                           <div className="sm:col-span-2 lg:col-span-3 xl:col-span-1 flex flex-col sm:flex-row xl:flex-col gap-3 xl:justify-end">
                             <button
@@ -651,6 +804,7 @@ export default function Courses() {
                                 setSelectedYearId('');
                                 setSelectedSpeciality('');
                                 setSelectedMaterial('');
+                                setSelectedProfessor('');
                               }}
                               className="flex items-center justify-center gap-2 text-white px-5 py-2 rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-blue-600 via-purple-600 to-purple-600 hover:from-blue-700 hover:via-purple-700 hover:to-purple-700 relative overflow-hidden group"
                             >
@@ -687,7 +841,12 @@ export default function Courses() {
                                 {selectedMaterial}
                               </span>
                             )}
-                            {!selectedLevelId && !selectedYearId && !selectedSpeciality && !selectedMaterial && (
+                            {selectedProfessor && (
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                {professors.find(p => p.id === selectedProfessor)?.name || selectedProfessor}
+                              </span>
+                            )}
+                            {!selectedLevelId && !selectedYearId && !selectedSpeciality && !selectedMaterial && !selectedProfessor && (
                               <span className="text-gray-500 text-xs">لم يتم تحديد أي فلاتر</span>
                             )}
                           </div>
