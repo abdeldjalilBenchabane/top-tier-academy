@@ -349,14 +349,14 @@ export const usePrivateClasses = () => {
       // Create multiple requests for each date
       const requests = [];
       for (let i = 0; i < sessionsCount; i++) {
-        const response = await fetch('/api/private-class-requests', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({
-            teacher_name: selectedTeacher,
+      const response = await fetch('/api/private-class-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          teacher_name: selectedTeacher,
             subject: subject,
             grade: grade,
             date: requestForm.dates[i],
@@ -368,16 +368,16 @@ export const usePrivateClasses = () => {
             year_id: parseInt(selectedYear),
             speciality_id: parseInt(selectedSpeciality),
             material_id: parseInt(selectedMaterial)
-          })
-        });
+        })
+      });
         
-        if (response.ok) {
-          const data = await response.json();
+      if (response.ok) {
+        const data = await response.json();
           requests.push(data.request);
-        } else {
-          const errorData = await response.json();
+      } else {
+        const errorData = await response.json();
           throw new Error(`خطأ في إرسال طلب الحصة ${i + 1}: ${errorData.error || 'حدث خطأ غير متوقع'}`);
-        }
+      }
       }
       
       // Add all new requests to the state
@@ -418,7 +418,7 @@ export const usePrivateClasses = () => {
       setSelectedSession(pendingRequest);
     } else {
       const session = allOrders.find(s => s.id === sessionId);
-      setSelectedSession(session);
+    setSelectedSession(session);
     }
     setIsModalOpen(true);
   };

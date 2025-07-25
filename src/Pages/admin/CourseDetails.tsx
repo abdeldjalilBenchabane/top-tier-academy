@@ -80,26 +80,81 @@ const CourseDetailsPage = () => {
             const materialsData = await api.getAllMaterials();
             const materialData = materialsData.find(m => m.id === courseData.materialId);
             setMaterial(materialData || null);
+            
             let specialityData = null;
+            let yearData = null;
+            let levelData = null;
+            
+            // Handle speciality if present
             if (courseData.specialityId) {
               const specialitiesData = await api.getAllSpecialities();
               specialityData = specialitiesData.find(s => s.id === courseData.specialityId);
               setSpeciality(specialityData || null);
+            } else if (materialData && materialData.speciality_id) {
+              // Material is linked to a speciality
+              const specialitiesData = await api.getAllSpecialities();
+              specialityData = specialitiesData.find(s => s.id === materialData.speciality_id);
+              setSpeciality(specialityData || null);
+            } else {
+              setSpeciality(null);
             }
+            
+            // Handle year - can come from course data or speciality
             if (courseData.yearId) {
               const yearsData = await api.getAllYears();
-              const yearData = yearsData.find(y => y.id === courseData.yearId);
+              yearData = yearsData.find(y => y.id === courseData.yearId);
               setYear(yearData || null);
             } else if (specialityData && specialityData.yearId) {
               const yearsData = await api.getAllYears();
-              const yearData = yearsData.find(y => y.id === specialityData.yearId);
+              yearData = yearsData.find(y => y.id === specialityData.yearId);
+              setYear(yearData || null);
+            } else if (materialData && materialData.year_id) {
+              // Material is directly linked to year
+              const yearsData = await api.getAllYears();
+              yearData = yearsData.find(y => y.id === materialData.year_id);
               setYear(yearData || null);
             }
+            
+            // Handle level - can come from course data or year
             if (courseData.levelId) {
               const levelsData = await api.getLevels();
-              const levelData = levelsData.find(l => l.id === courseData.levelId);
+              levelData = levelsData.find(l => l.id === courseData.levelId);
+              setLevel(levelData || null);
+            } else if (yearData && yearData.level_id) {
+              const levelsData = await api.getLevels();
+              levelData = levelsData.find(l => l.id === yearData.level_id);
               setLevel(levelData || null);
             }
+            
+            // Debug logging
+            console.log('Path loading debug:', {
+              courseData: {
+                levelId: courseData.levelId,
+                yearId: courseData.yearId,
+                specialityId: courseData.specialityId,
+                materialId: courseData.materialId
+              },
+              materialData: materialData ? {
+                id: materialData.id,
+                name: materialData.name,
+                year_id: materialData.year_id,
+                speciality_id: materialData.speciality_id
+              } : null,
+              specialityData: specialityData ? {
+                id: specialityData.id,
+                name: specialityData.name,
+                yearId: specialityData.yearId
+              } : null,
+              yearData: yearData ? {
+                id: yearData.id,
+                name: yearData.name,
+                level_id: yearData.level_id
+              } : null,
+              levelData: levelData ? {
+                id: levelData.id,
+                name: levelData.name
+              } : null
+            });
           }
           // If language_level_id, fetch and set language level and language
           if (courseData.language_level_id) {
@@ -360,7 +415,7 @@ const CourseDetailsPage = () => {
                     {year && <>{year.name}</>}
                     {year && speciality && <>&nbsp;&gt;&nbsp;</>}
                     {speciality && <>{speciality.name}</>}
-                    {speciality && material && <>&nbsp;&gt;&nbsp;</>}
+                      {(speciality || (!speciality && material)) && <>&nbsp;&gt;&nbsp;</>}
                     {material && <>{material.name}</>}
                         </>
                       )}

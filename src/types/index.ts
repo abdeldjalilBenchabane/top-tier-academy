@@ -30,7 +30,8 @@ export type Speciality = {
 export type Material = {
   id: string;
   name: string;
-  specialityId: string;
+  specialityId?: string | null;
+  yearId?: string | null;
   price?: number;
 };
 
@@ -73,6 +74,7 @@ export type Course = {
   description: string;
   sections: Section[];
   materialId?: string;
+  languageLevelId?: string;
   createdBy: string;
   createdAt: string;
   approvedAt?: string;

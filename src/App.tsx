@@ -6,6 +6,7 @@ import { Toaster as Sonner } from './components/ui/sonner';
 import { TooltipProvider } from './components/ui/tooltip';
 import { AuthProvider } from './contexts/AuthContext';
 import { AvatarProvider } from './contexts/AvatarContext';
+import { PendingCountProvider } from './contexts/PendingCountContext';
 import AdminPointCodes from './Pages/admin/PointCodes';
 import PrivateClasses from './Pages/admin/PrivateClasses';
 
@@ -48,6 +49,8 @@ import CourseFilesPage from './Pages/admin/CourseFiles';
 import AdminPoints from './Pages/admin/Points';
 import AdminPointTransactions from './Pages/admin/PointTransactions';
 import AdminPrivateClassSettings from './Pages/admin/PrivateClassSettings';
+import HomepageMaterials from './Pages/admin/HomepageMaterials';
+import FooterContent from './Pages/admin/FooterContent';
 // Professor
 import ProfessorDashboard from './Pages/professor/Dashboard';
 import ProfessorCourses from './Pages/professor/Courses';
@@ -87,7 +90,8 @@ const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <AvatarProvider>
-          <TooltipProvider>
+          <PendingCountProvider>
+            <TooltipProvider>
             <Toaster />
             <Sonner />
             <BrowserRouter>
@@ -141,6 +145,8 @@ const App: React.FC = () => {
                   <Route path="point-transactions" element={<AdminPointTransactions />} />
                   <Route path="private-class-settings" element={<AdminPrivateClassSettings />} />
                   <Route path="private-classes" element={<PrivateClasses />} />
+                  <Route path="homepage-materials" element={<HomepageMaterials />} />
+                  <Route path="footer-content" element={<FooterContent />} />
                 </Route>
 
                 {/* Professor (protected) */}
@@ -165,6 +171,7 @@ const App: React.FC = () => {
               </Routes>
             </BrowserRouter>
           </TooltipProvider>
+        </PendingCountProvider>
         </AvatarProvider>
       </AuthProvider>
     </QueryClientProvider>

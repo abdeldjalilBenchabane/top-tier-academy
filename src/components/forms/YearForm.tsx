@@ -30,24 +30,25 @@ const YearForm = ({
 }: YearFormProps) => {
   const [name, setName] = useState(year?.name || '');
   const [levelId, setLevelId] = useState(year?.levelId || preselectedLevelId || '');
+  
   const [levels, setLevels] = useState<Level[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const fetchLevels = async () => {
+    const fetchData = async () => {
       try {
-        const data = await structureAPI.getLevels();
-        setLevels(data);
+        const levelsData = await structureAPI.getLevels();
+        setLevels(levelsData);
       } catch (error) {
         console.error(error);
-        toast.error('Failed to fetch levels');
+        toast.error('Failed to fetch data');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchLevels();
+    fetchData();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,12 +67,17 @@ const YearForm = ({
     setIsSubmitting(true);
     
     try {
+      const yearData = {
+        name,
+        level_id: levelId
+      };
+      
       if (isEditing && year) {
-        await structureAPI.updateYear(year.id, { name, level_id: levelId });
+        await structureAPI.updateYear(year.id, yearData);
         toast.success('Year updated successfully');
       } else {
-        await structureAPI.createYear({ name, level_id: levelId });
-      toast.success('Year created successfully');
+        await structureAPI.createYear(yearData);
+        toast.success('Year created successfully');
       }
       
       setName('');
@@ -85,7 +91,7 @@ const YearForm = ({
   };
 
   if (isLoading) {
-    return <div className="py-4 text-center">Loading levels...</div>;
+    return <div className="py-4 text-center">Loading data...</div>;
   }
 
   return (

@@ -1,18 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { api } from '@/lib/api';
-import { Level, Year, Speciality, Material, Course, Language, LanguageLevel } from '@/types';
+import { Level, Year, Speciality, Language, LanguageLevel } from '@/types';
 import { toast } from '@/lib/toast';
 
 interface AdminPathSelectorProps {
-  course: Course;
+  course: any;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -26,15 +21,15 @@ const AdminPathSelector = ({
   const [levels, setLevels] = useState<Level[]>([]);
   const [years, setYears] = useState<Year[]>([]);
   const [specialities, setSpecialities] = useState<Speciality[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
   
   // Selected values
   const [selectedLevelId, setSelectedLevelId] = useState<string>('');
   const [selectedYearId, setSelectedYearId] = useState<string>('');
   const [selectedSpecialityId, setSelectedSpecialityId] = useState<string>('');
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
+  const [materials, setMaterials] = useState<any[]>([]);
   
-  const [rootType, setRootType] = useState<'structure' | 'language' | ''>('');
+  const [rootType, setRootType] = useState<string>('');
   const [languages, setLanguages] = useState<Language[]>([]);
   const [languageLevels, setLanguageLevels] = useState<LanguageLevel[]>([]);
   const [selectedLanguageId, setSelectedLanguageId] = useState<string>('');
@@ -68,47 +63,41 @@ const AdminPathSelector = ({
         try {
           const data = await api.getYears(selectedLevelId);
           setYears(data);
-        } catch (error) {
-          console.error(error);
-          toast.error('Failed to fetch years');
-        } finally {
-          // Always reset downstream selections
+          // Reset downstream selections
           setSelectedYearId('');
           setSelectedSpecialityId('');
           setSelectedMaterialId('');
           setSpecialities([]);
           setMaterials([]);
+        } catch (error) {
+          console.error(error);
+          toast.error('Failed to fetch years');
         }
       };
+
       fetchYears();
-    } else {
-      setYears([]);
-      setSelectedYearId('');
-      setSelectedSpecialityId('');
-      setSelectedMaterialId('');
-      setSpecialities([]);
-      setMaterials([]);
     }
   }, [selectedLevelId]);
 
-  // Load specialities when year is selected
+  // Load specialities and materials when year is selected
   useEffect(() => {
     if (selectedYearId) {
       const fetchSpecialities = async () => {
         try {
           const data = await api.getSpecialities(selectedYearId);
           setSpecialities(data);
+          // Reset selections
+          setSelectedSpecialityId('');
+          setSelectedMaterialId('');
         } catch (error) {
           console.error(error);
           toast.error('Failed to fetch specialities');
-        } finally {
-          setSelectedSpecialityId('');
-          setSelectedMaterialId('');
-          setMaterials([]);
         }
       };
+
       fetchSpecialities();
     } else {
+      // Reset when no year is selected
       setSpecialities([]);
       setSelectedSpecialityId('');
       setSelectedMaterialId('');
@@ -116,28 +105,38 @@ const AdminPathSelector = ({
     }
   }, [selectedYearId]);
 
-  // Load materials when speciality is selected
+  // Load materials when year or speciality is selected
   useEffect(() => {
-    if (selectedSpecialityId) {
+    if (selectedYearId) {
       const fetchMaterials = async () => {
         try {
-          const data = await api.getMaterials(selectedSpecialityId);
-          setMaterials(data);
+          // Get all materials and filter for the year
+          const data = await api.getAllMaterials();
+          const yearMaterials = data.filter((material: any) => {
+            const matchesYear = material.yearId === selectedYearId;
+            const matchesSpeciality = selectedSpecialityId 
+              ? material.specialityId === selectedSpecialityId 
+              : !material.specialityId;
+            
+            return matchesYear && matchesSpeciality;
+          });
+          
+          setMaterials(yearMaterials);
+          setSelectedMaterialId('');
         } catch (error) {
           console.error(error);
           toast.error('Failed to fetch materials');
-        } finally {
-          setSelectedMaterialId('');
         }
       };
+
       fetchMaterials();
     } else {
       setMaterials([]);
       setSelectedMaterialId('');
     }
-  }, [selectedSpecialityId]);
+  }, [selectedYearId, selectedSpecialityId]);
 
-  // Load languages if rootType is 'language'
+  // Load languages when root type is selected
   useEffect(() => {
     if (rootType === 'language') {
       const fetchLanguages = async () => {
@@ -145,47 +144,50 @@ const AdminPathSelector = ({
           const data = await api.getLanguages();
           setLanguages(data);
         } catch (error) {
+          console.error(error);
           toast.error('Failed to fetch languages');
         }
       };
+
       fetchLanguages();
-    } else {
-      setLanguages([]);
-      setSelectedLanguageId('');
-      setLanguageLevels([]);
-      setSelectedLanguageLevelId('');
     }
   }, [rootType]);
 
   // Load language levels when language is selected
   useEffect(() => {
-    if (rootType === 'language' && selectedLanguageId) {
-      const fetchLevels = async () => {
+    if (selectedLanguageId) {
+      const fetchLanguageLevels = async () => {
         try {
           const data = await api.getLanguageLevels(selectedLanguageId);
           setLanguageLevels(data);
-        } catch (error) {
-          toast.error('Failed to fetch language levels');
-        } finally {
           setSelectedLanguageLevelId('');
+        } catch (error) {
+          console.error(error);
+          toast.error('Failed to fetch language levels');
         }
       };
-      fetchLevels();
-    } else {
-      setLanguageLevels([]);
-      setSelectedLanguageLevelId('');
-    }
-  }, [rootType, selectedLanguageId]);
 
-  const handleAssignPath = async () => {
+      fetchLanguageLevels();
+    }
+  }, [selectedLanguageId]);
+
+  const handleAssign = async () => {
     if (rootType === 'structure') {
       if (!selectedMaterialId) {
-        toast.error('Please select a complete path for the course');
+        toast.error('Please select a material');
         return;
       }
       setIsSubmitting(true);
       try {
-        await api.assignMaterialPathAdmin(course.id, selectedMaterialId);
+        // Assign existing material to course
+        const selectedMaterial = materials.find(m => m.id === selectedMaterialId);
+        if (selectedMaterial) {
+          await api.assignMaterialPathAdmin(course.id, {
+            materialId: selectedMaterial.id,
+            speciality_id: selectedMaterial.specialityId || null,
+            year_id: selectedYearId
+          });
+        }
         toast.success('Course path assigned successfully');
         onSuccess();
       } catch (error) {
@@ -222,9 +224,9 @@ const AdminPathSelector = ({
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-lg font-medium">Assign Path to Approved Course</h3>
+        <h3 className="text-lg font-medium">Assign Course Path</h3>
         <p className="text-sm text-gray-500">
-          This course is approved but doesn't have a path assigned. Choose where to place "{course.title}" in the education hierarchy or languages.
+          Choose where to place "{course.title}" in the education hierarchy or languages.
         </p>
         
         <div className="space-y-4">
@@ -269,7 +271,9 @@ const AdminPathSelector = ({
                   </SelectTrigger>
                   <SelectContent>
                     {years.map((year) => (
-                      <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>
+                      <SelectItem key={year.id} value={year.id}>
+                        {year.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -277,48 +281,44 @@ const AdminPathSelector = ({
                   <div className="text-xs text-red-500 mt-1">No years available for the selected level.</div>
                 )}
               </div>
-              {/* Speciality Select */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Speciality</label>
-                <Select
-                  value={selectedSpecialityId || ''}
-                  onValueChange={setSelectedSpecialityId}
-                  disabled={!selectedYearId || specialities.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={selectedYearId ? "Select Speciality" : "Select Year First"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {specialities.map((speciality) => (
-                      <SelectItem key={speciality.id} value={speciality.id}>{speciality.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedYearId && specialities.length === 0 && (
-                  <div className="text-xs text-red-500 mt-1">No specialities available for the selected year.</div>
-                )}
-              </div>
+              {/* Speciality Select - show if specialities exist */}
+              {selectedYearId && specialities.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Speciality (Optional)</label>
+                  <Select value={selectedSpecialityId || 'none'} onValueChange={(value) => setSelectedSpecialityId(value === 'none' ? '' : value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Speciality (or leave empty for direct materials)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Direct Materials (No Speciality)</SelectItem>
+                      {specialities.map((speciality) => (
+                        <SelectItem key={speciality.id} value={speciality.id}>{speciality.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {/* Material Select */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Material</label>
-                <Select
-                  value={selectedMaterialId || ''}
-                  onValueChange={setSelectedMaterialId}
-                  disabled={!selectedSpecialityId || materials.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={selectedSpecialityId ? "Select Material" : "Select Speciality First"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {materials.map((material) => (
-                      <SelectItem key={material.id} value={material.id}>{material.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedSpecialityId && materials.length === 0 && (
-                  <div className="text-xs text-red-500 mt-1">No materials available for the selected speciality.</div>
-                )}
-              </div>
+              {selectedYearId && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Material</label>
+                  <Select value={selectedMaterialId || ''} onValueChange={setSelectedMaterialId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Material" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {materials.map((material) => (
+                        <SelectItem key={material.id} value={material.id}>
+                          {material.name} ({material.price > 0 ? `${material.price} DZD` : 'Free'})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {materials.length === 0 && (
+                    <div className="text-xs text-red-500 mt-1">No materials available for the selected path.</div>
+                  )}
+                </div>
+              )}
             </>
           )}
           {/* Language Path */}
@@ -332,35 +332,25 @@ const AdminPathSelector = ({
                     <SelectValue placeholder="Select Language" />
                   </SelectTrigger>
                   <SelectContent>
-                    {languages.map((lang) => (
-                      <SelectItem key={lang.id} value={lang.id}>{lang.name}</SelectItem>
+                    {languages.map((language) => (
+                      <SelectItem key={language.id} value={language.id}>{language.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {languages.length === 0 && (
-                  <div className="text-xs text-red-500 mt-1">No languages available. Please create a language first.</div>
-                )}
               </div>
               {/* Language Level Select */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Language Level</label>
-                <Select
-                  value={selectedLanguageLevelId || ''}
-                  onValueChange={setSelectedLanguageLevelId}
-                  disabled={!selectedLanguageId || languageLevels.length === 0}
-                >
+                <Select value={selectedLanguageLevelId || ''} onValueChange={setSelectedLanguageLevelId} disabled={!selectedLanguageId || languageLevels.length === 0}>
                   <SelectTrigger>
                     <SelectValue placeholder={selectedLanguageId ? "Select Level" : "Select Language First"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {languageLevels.map((lvl) => (
-                      <SelectItem key={lvl.id} value={lvl.id}>{lvl.name}</SelectItem>
+                    {languageLevels.map((level) => (
+                      <SelectItem key={level.id} value={level.id}>{level.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {selectedLanguageId && languageLevels.length === 0 && (
-                  <div className="text-xs text-red-500 mt-1">No levels available for the selected language.</div>
-                )}
               </div>
               {rootType === 'language' && selectedLanguageLevelId && (
                 <div className="space-y-2 mt-4">
@@ -393,7 +383,7 @@ const AdminPathSelector = ({
         
         <Button 
           type="button" 
-          onClick={handleAssignPath} 
+          onClick={handleAssign} 
           disabled={isSubmitting}
         >
           Assign Path

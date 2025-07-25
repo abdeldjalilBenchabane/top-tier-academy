@@ -74,11 +74,11 @@ const PrivateClassModal = ({
                   <div className="flex items-center gap-2">
                     <FaUserTie className="text-blue-600" />
                     <span className="text-gray-700">الأستاذ: <span className="font-semibold">{selectedTeacher || 'لم يتم الاختيار'}</span></span>
-                  </div>
+              </div>
                   <div className="flex items-center gap-2">
                     <FaCalendarAlt className="text-blue-600" />
                     <span className="text-gray-700">التاريخ: <span className="font-semibold">{selectedDate || 'لم يتم الاختيار'}</span></span>
-                  </div>
+              </div>
                   <div className="flex items-center gap-2">
                     <FaGraduationCap className="text-blue-600" />
                     <span className="text-gray-700">المرحلة: <span className="font-semibold">{getLevelName(selectedLevel) || 'لم يتم الاختيار'}</span></span>
@@ -90,12 +90,12 @@ const PrivateClassModal = ({
                   <div className="flex items-center gap-2">
                     <FaLayerGroup className="text-blue-600" />
                     <span className="text-gray-700">التخصص: <span className="font-semibold">{getSpecialityName(selectedSpeciality) || 'لم يتم الاختيار'}</span></span>
-                  </div>
+            </div>
                   <div className="flex items-center gap-2">
                     <FaBook className="text-blue-600" />
                     <span className="text-gray-700">المادة: <span className="font-semibold">{getMaterialName(selectedMaterial) || 'لم يتم الاختيار'}</span></span>
-                  </div>
-                </div>
+              </div>
+            </div>
               </div>
 
               {/* Pricing Information */}
@@ -135,7 +135,7 @@ const PrivateClassModal = ({
                     className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
                     dir="rtl"
                   />
-                </div>
+            </div>
 
                 {/* Date Input */}
                 <div>
@@ -151,7 +151,7 @@ const PrivateClassModal = ({
                     className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
                     dir="rtl"
                   />
-                </div>
+            </div>
 
                 {/* Note about session scheduling */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -170,17 +170,17 @@ const PrivateClassModal = ({
                     className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all resize-none"
                     dir="rtl"
                   />
-                </div>
+              </div>
+              </div>
               </div>
             </div>
-          </div>
 
           {/* Footer */}
           <div className="flex items-center justify-between p-6 border-t border-gray-200">
-            <button
-              onClick={onClose}
+              <button
+                onClick={onClose}
               className="px-6 py-3 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold transition-colors"
-            >
+              >
               إلغاء
             </button>
             <button
@@ -188,7 +188,7 @@ const PrivateClassModal = ({
               className="px-6 py-3 text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl font-semibold transition-all hover:shadow-lg"
             >
               إرسال الطلب
-            </button>
+              </button>
           </div>
         </div>
       </div>
@@ -287,15 +287,15 @@ const PrivateClassModal = ({
 
               {/* Additional Details */}
               <div className="space-y-4">
-                <div>
+          <div>
                   <h3 className="font-semibold text-gray-800 mb-2">المرحلة الدراسية</h3>
                   <p className="text-gray-600">{session.grade}</p>
-                </div>
+          </div>
 
-                <div>
+          <div>
                   <h3 className="font-semibold text-gray-800 mb-2">عدد الحصص</h3>
                   <p className="text-gray-600">{session.sessions}</p>
-                </div>
+          </div>
 
                 <div>
                   <h3 className="font-semibold text-gray-800 mb-2">وصف الطلب</h3>

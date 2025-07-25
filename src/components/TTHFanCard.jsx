@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { BookOpen, GraduationCap, ChevronLeft, ChevronRight } from "lucide-react"
 import { Card } from "./ui/Card"
 import { Button } from "./ui/Button"
@@ -6,8 +6,86 @@ import { Button } from "./ui/Button"
 export default function FanCard() {
 
   const [selectedCard, setSelectedCard] = useState("science")
-  const [selectedLanguage, setSelectedLanguage] = useState("french")
+  const [selectedLanguage, setSelectedLanguage] = useState("")
   const [selectedEducationLevel, setSelectedEducationLevel] = useState("high")
+  
+  // Dynamic data state
+  const [educationMaterials, setEducationMaterials] = useState([])
+  const [languageMaterials, setLanguageMaterials] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  // Fetch materials data
+  useEffect(() => {
+    const fetchMaterials = async () => {
+      try {
+        setLoading(true)
+        
+        // Fetch education materials
+        try {
+          const educationResponse = await fetch('/api/homepage-materials/education')
+          console.log('Education response:', educationResponse.status)
+          if (educationResponse.ok) {
+            const educationData = await educationResponse.json()
+            console.log('Education data:', educationData)
+            setEducationMaterials(educationData)
+          } else {
+            console.error('Education response not ok:', educationResponse.status, educationResponse.statusText)
+          }
+        } catch (error) {
+          console.error('Error fetching education materials:', error)
+        }
+        
+        // Fetch language materials
+        try {
+          const languageResponse = await fetch('/api/homepage-materials/languages')
+          console.log('Language response:', languageResponse.status)
+          if (languageResponse.ok) {
+            const languageData = await languageResponse.json()
+            console.log('Language data:', languageData)
+            setLanguageMaterials(languageData)
+          } else {
+            console.error('Language response not ok:', languageResponse.status, languageResponse.statusText)
+          }
+        } catch (error) {
+          console.error('Error fetching language materials:', error)
+        }
+      } catch (error) {
+        console.error('Error fetching materials:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchMaterials()
+  }, [])
+
+  // Helper functions to get filtered materials
+  const getEducationMaterialsByLevel = (levelType) => {
+    return educationMaterials.filter(material => material.level_type === levelType)
+  }
+
+  const getLanguageMaterialsByLevel = (levelType) => {
+    return languageMaterials.filter(material => material.level_type === levelType && material.name === selectedLanguage)
+  }
+
+  // Get unique languages from the database
+  const getUniqueLanguages = () => {
+    const uniqueLanguages = [...new Set(languageMaterials.map(material => material.name))]
+    return uniqueLanguages
+  }
+
+  // Set initial selected language when data loads
+  useEffect(() => {
+    console.log('Language materials changed:', languageMaterials)
+    console.log('Selected language:', selectedLanguage)
+    if (languageMaterials.length > 0 && !selectedLanguage) {
+      const uniqueLanguages = getUniqueLanguages()
+      console.log('Unique languages:', uniqueLanguages)
+      if (uniqueLanguages.length > 0) {
+        setSelectedLanguage(uniqueLanguages[0])
+      }
+    }
+  }, [languageMaterials, selectedLanguage])
 
   const cardData = {
     languages: {
@@ -19,120 +97,77 @@ export default function FanCard() {
           </div>
 
           <div className="flex justify-start gap-3 mb-4">
-            <Button
-              variant="outline"
-              onClick={() => setSelectedLanguage("french")}
-              className={`transition-all ${selectedLanguage === "french" ? "bg-blue-50 border-blue-300 text-blue-700" : ""
-                }`}
-            >
-              الفرنسية
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setSelectedLanguage("english")}
-              className={`transition-all ${selectedLanguage === "english" ? "bg-cyan-50 border-cyan-300 text-cyan-700" : ""
-                }`}
-            >
-              الإنجليزية
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setSelectedLanguage("spanish")}
-              className={`transition-all ${selectedLanguage === "spanish" ? "bg-orange-50 border-orange-500 text-amber-700" : ""
-                }`}
-            >
-              الإسبانية
-            </Button>
-
-
+            {loading ? (
+              <div className="text-gray-500">جاري التحميل...</div>
+            ) : getUniqueLanguages().length > 0 ? (
+              getUniqueLanguages().map((language, index) => {
+                const colors = [
+                  "bg-blue-50 border-blue-300 text-blue-700",
+                  "bg-cyan-50 border-cyan-300 text-cyan-700", 
+                  "bg-orange-50 border-orange-300 text-orange-700",
+                  "bg-green-50 border-green-300 text-green-700",
+                  "bg-purple-50 border-purple-300 text-purple-700"
+                ]
+                const colorClass = colors[index % colors.length]
+                
+                return (
+                  <Button
+                    key={language}
+                    variant="outline"
+                    onClick={() => setSelectedLanguage(language)}
+                    className={`transition-all ${selectedLanguage === language ? colorClass : ""}`}
+                  >
+                    {language}
+                  </Button>
+                )
+              })
+            ) : (
+              <div className="text-gray-500">لا توجد لغات متاحة</div>
+            )}
           </div>
 
-          {selectedLanguage === "french" && (
+          {selectedLanguage && (
             <div className="bg-blue-50 p-4 w-2/3 rounded-lg border border-blue-100">
-              <h4 className="font-bold text-blue-700 mb-2">الفرنسية</h4>
+              <h4 className="font-bold text-blue-700 mb-2">{selectedLanguage}</h4>
               <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-blue-600">مبتدئ</span>
-                  <div className="flex gap-2">
-                    <span className="font-medium text-blue-800">A1</span>
-                    <span className="font-medium text-blue-800">A2</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-blue-600">متوسط</span>
-                  <div className="flex gap-2">
-                    <span className="font-medium text-blue-800">B1</span>
-                    <span className="font-medium text-blue-800">B2</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-blue-600">متقدم</span>
-                  <div className="flex gap-2">
-                    <span className="font-medium text-blue-800">C1</span>
-                    <span className="font-medium text-blue-800">C2</span>
-                  </div>
-                </div>
+                {loading ? (
+                  <div className="text-center text-gray-500">جاري التحميل...</div>
+                ) : (
+                  <>
+                    {getLanguageMaterialsByLevel("beginner").map((material, index) => (
+                      <div key={material.id || index} className="flex justify-between items-center">
+                        <span className="text-blue-600">{material.name}</span>
+                        <div className="flex gap-2">
+                          <span className="font-medium text-blue-800">A1</span>
+                          <span className="font-medium text-blue-800">A2</span>
+                        </div>
+                      </div>
+                    ))}
+                    {getLanguageMaterialsByLevel("intermediate").map((material, index) => (
+                      <div key={material.id || index} className="flex justify-between items-center">
+                        <span className="text-blue-600">{material.name}</span>
+                        <div className="flex gap-2">
+                          <span className="font-medium text-blue-800">B1</span>
+                          <span className="font-medium text-blue-800">B2</span>
+                        </div>
+                      </div>
+                    ))}
+                    {getLanguageMaterialsByLevel("advanced").map((material, index) => (
+                      <div key={material.id || index} className="flex justify-between items-center">
+                        <span className="text-blue-600">{material.name}</span>
+                        <div className="flex gap-2">
+                          <span className="font-medium text-blue-800">C1</span>
+                          <span className="font-medium text-blue-800">C2</span>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             </div>
           )}
 
-          {selectedLanguage === "english" && (
-            <div className="bg-green-50 p-4 rounded-lg border w-2/3  border-green-100">
-              <h4 className="font-bold text-green-700 mb-2">الإنجليزية</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-green-600">مبتدئ</span>
-                  <div className="flex gap-2">
-                    <span className="font-medium text-green-800">A1</span>
-                    <span className="font-medium text-green-800">A2</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-green-600">متوسط</span>
-                  <div className="flex gap-2">
-                    <span className="font-medium text-green-800">B1</span>
-                    <span className="font-medium text-green-800">B2</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-green-600">متقدم</span>
-                  <div className="flex gap-2">
-                    <span className="font-medium text-green-800">C1</span>
-                    <span className="font-medium text-green-800">C2</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
-          {selectedLanguage === "spanish" && (
-            <div className="bg-amber-50 p-4 w-2/3 rounded-lg border border-amber-100">
-              <h4 className="font-bold text-amber-700 mb-2">الإسبانية</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-amber-600">مبتدئ</span>
-                  <div className="flex gap-2">
-                    <span className="font-medium text-amber-800">A1</span>
-                    <span className="font-medium text-amber-800">A2</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-amber-600">متوسط</span>
-                  <div className="flex gap-2">
-                    <span className="font-medium text-amber-800">B1</span>
-                    <span className="font-medium text-amber-800">B2</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-amber-600">متقدم</span>
-                  <div className="flex gap-2">
-                    <span className="font-medium text-amber-800">C1</span>
-                    <span className="font-medium text-amber-800">C2</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       ),
       icon: <BookOpen className="h-8 w-8" />,
@@ -179,34 +214,18 @@ export default function FanCard() {
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
               <h4 className="font-bold text-blue-700 mb-2">المرحلة الإبتدائية</h4>
               <div className="grid grid-cols-2 gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <span>اللغة العربية</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <span>الرياضيات</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <span>التربية الإسلامية</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <span>التربية العلمية</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <span>التربية المدنية</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <span>اللغة الفرنسية</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <span>اللغة الإنجليزية</span>
-                </div>
+                {loading ? (
+                  <div className="col-span-2 text-center text-gray-500">جاري التحميل...</div>
+                ) : getEducationMaterialsByLevel("primary").length > 0 ? (
+                  getEducationMaterialsByLevel("primary").map((material, index) => (
+                    <div key={material.id || index} className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                      <span>{material.name}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-2 text-center text-gray-500">لا توجد مواد متاحة</div>
+                )}
               </div>
             </div>
           )}
@@ -215,38 +234,18 @@ export default function FanCard() {
             <div className="bg-orange-50 p-4 rounded-lg border border-orange-100">
               <h4 className="font-bold text-orange-700 mb-2">المرحلة المتوسطة</h4>
               <div className="grid grid-cols-2 gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                  <span>اللغة العربية</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                  <span>الرياضيات</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                  <span>العلوم الطبيعية</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                  <span>الفيزياء</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                  <span>التاريخ والجغرافيا</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                  <span>اللغة الفرنسية</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                  <span>اللغة الإنجليزية</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                  <span>التربية الإسلامية</span>
-                </div>
+                {loading ? (
+                  <div className="col-span-2 text-center text-gray-500">جاري التحميل...</div>
+                ) : getEducationMaterialsByLevel("middle").length > 0 ? (
+                  getEducationMaterialsByLevel("middle").map((material, index) => (
+                    <div key={material.id || index} className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                      <span>{material.name}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-2 text-center text-gray-500">لا توجد مواد متاحة</div>
+                )}
               </div>
             </div>
           )}
@@ -255,46 +254,18 @@ export default function FanCard() {
             <div className="bg-cyan-50 p-4 rounded-lg border border-cyan-100">
               <h4 className="font-bold text-cyan-700 mb-2">المرحلة الثانوية</h4>
               <div className="grid grid-cols-2 gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-                  <span>اللغة العربية</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-                  <span>الرياضيات</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-                  <span>العلوم الطبيعية</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-                  <span>الفيزياء</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-                  <span>الكيمياء</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-                  <span>التاريخ والجغرافيا</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-                  <span>الفلسفة</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-                  <span>اللغة الفرنسية</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-                  <span>اللغة الإنجليزية</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-                  <span>العلوم الإسلامية</span>
-                </div>
+                {loading ? (
+                  <div className="col-span-2 text-center text-gray-500">جاري التحميل...</div>
+                ) : getEducationMaterialsByLevel("high").length > 0 ? (
+                  getEducationMaterialsByLevel("high").map((material, index) => (
+                    <div key={material.id || index} className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
+                      <span>{material.name}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-2 text-center text-gray-500">لا توجد مواد متاحة</div>
+                )}
               </div>
             </div>
           )}

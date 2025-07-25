@@ -275,15 +275,15 @@ const ProfessorPrivateClasses = () => {
                 } else {
                   // Fallback to original 48 slots if no settings
                   Array.from({ length: 48 }).map((_, i) => {
-                    const startHour = Math.floor(i / 2);
-                    const startMin = i % 2 === 0 ? '00' : '30';
-                    const endHour = Math.floor((i + 1) / 2) % 24;
-                    const endMin = (i + 1) % 2 === 0 ? '00' : '30';
-                    const pad = n => n.toString().padStart(2, '0');
-                    const label = `${pad(startHour)}:${startMin} - ${pad(endHour)}:${endMin}`;
+                const startHour = Math.floor(i / 2);
+                const startMin = i % 2 === 0 ? '00' : '30';
+                const endHour = Math.floor((i + 1) / 2) % 24;
+                const endMin = (i + 1) % 2 === 0 ? '00' : '30';
+                const pad = n => n.toString().padStart(2, '0');
+                const label = `${pad(startHour)}:${startMin} - ${pad(endHour)}:${endMin}`;
                     options.push(
-                      <option key={label} value={label}>{label}</option>
-                    );
+                  <option key={label} value={label}>{label}</option>
+                );
                   });
                 }
                 return options;

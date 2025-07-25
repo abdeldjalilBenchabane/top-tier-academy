@@ -95,21 +95,23 @@ router.get('/', async (req, res) => {
     const { created_by, status, material_id, speciality_id } = req.query;
     let queryStr = `
       SELECT 
-        c.id, c.title, c.description, c.price, c.is_published, c.created_at,
-        c.approved_at, c.created_by, c.status, u.name as created_by_name,
-        m.name as material_name, m.price as material_price, m.speciality_id as speciality_id, cc.cover as cover_url,
-        c.language_level_id, c.material_id,
+        c.id, c.title, c.description, c.price, c.is_published as "isPublished", c.created_at as "createdAt",
+        c.approved_at as "approvedAt", c.created_by as "createdBy", c.status, u.name as created_by_name,
+        m.name as material_name, m.price as material_price, m.speciality_id as "specialityId", cc.cover as cover_url,
+        c.language_level_id as "languageLevelId", c.material_id as "materialId",
         s.name as speciality_name,
         ll.name as language_level_name,
         l.name as language_name,
-        lvl.name as level_name,
-        y.name as year_name
+        COALESCE(sy.name, dy.name) as year_name,
+        COALESCE(sl.name, dl.name) as level_name
       FROM courses c
       LEFT JOIN users u ON c.created_by = u.id
       LEFT JOIN materials m ON c.material_id = m.id
       LEFT JOIN specialities s ON m.speciality_id = s.id
-      LEFT JOIN years y ON s.year_id = y.id
-      LEFT JOIN levels lvl ON y.level_id = lvl.id
+      LEFT JOIN years sy ON s.year_id = sy.id
+      LEFT JOIN levels sl ON sy.level_id = sl.id
+      LEFT JOIN years dy ON m.year_id = dy.id
+      LEFT JOIN levels dl ON dy.level_id = dl.id
       LEFT JOIN language_levels ll ON c.language_level_id = ll.id
       LEFT JOIN languages l ON ll.language_id = l.id
       LEFT JOIN course_covers cc ON c.id = cc.course_id
@@ -377,6 +379,77 @@ router.put('/:id/assign-material-admin', verifyToken, requireRole(['admin']), as
   }
 });
 
+// Add endpoint for admins to create material and assign to approved course
+router.put('/:id/create-material-admin', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    const { name, price, speciality_id } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Material name is required' });
+    }
+    
+    // Check if course exists
+    const course = await getRow('SELECT id, status, material_id FROM courses WHERE id = $1', [courseId]);
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    
+    // Only allow assigning to approved courses that don't have a material_id
+    if (course.status !== 'approved') {
+      return res.status(400).json({ error: 'Can only assign paths to approved courses' });
+    }
+    
+    if (course.material_id) {
+      return res.status(400).json({ error: 'Course already has a material path assigned' });
+    }
+    
+    // Check if speciality exists if provided
+    if (speciality_id) {
+      const speciality = await getRow('SELECT * FROM specialities WHERE id = $1', [speciality_id]);
+      if (!speciality) {
+        return res.status(400).json({ error: 'Speciality not found' });
+      }
+    }
+    
+    // Start transaction to create material and assign to course
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Create the material
+      const materialResult = await client.query(
+        'INSERT INTO materials (name, speciality_id, price) VALUES ($1, $2, $3) RETURNING *',
+        [name, speciality_id || null, price || 0]
+      );
+      
+      const materialId = materialResult.rows[0].id;
+      
+      // Update course with material_id
+      const courseResult = await client.query(
+        'UPDATE courses SET material_id = $1 WHERE id = $2 RETURNING *',
+        [materialId, courseId]
+      );
+      
+      await client.query('COMMIT');
+      
+      res.json({ 
+        message: 'Material created and course path assigned successfully', 
+        course: courseResult.rows[0],
+        material: materialResult.rows[0]
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error creating material and assigning to course (admin):', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Add endpoint for admins to assign language path to approved courses without path
 router.put('/:id/assign-language-admin', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
@@ -472,6 +545,86 @@ router.put('/:id/assign-material', verifyToken, requireRole(['professor']), asyn
     res.json({ message: 'Course path assigned successfully', course: result.rows[0] });
   } catch (error) {
     console.error('Error assigning material path:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add endpoint for professors to create material and assign to course
+router.put('/:id/create-material', verifyToken, requireRole(['professor']), async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    const { name, price, speciality_id, year_id } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Material name is required' });
+    }
+    
+    if (!year_id) {
+      return res.status(400).json({ error: 'Year ID is required' });
+    }
+    
+    // Check if course exists and belongs to the professor
+    const course = await getRow('SELECT id, created_by, status FROM courses WHERE id = $1', [courseId]);
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    
+    if (course.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'You can only assign paths to your own courses' });
+    }
+    
+    if (course.status !== 'draft') {
+      return res.status(400).json({ error: 'Can only assign paths to draft courses' });
+    }
+    
+    // Check if year exists
+    const year = await getRow('SELECT * FROM years WHERE id = $1', [year_id]);
+    if (!year) {
+      return res.status(400).json({ error: 'Year not found' });
+    }
+    
+    // Check if speciality exists if provided
+    if (speciality_id) {
+      const speciality = await getRow('SELECT * FROM specialities WHERE id = $1', [speciality_id]);
+      if (!speciality) {
+        return res.status(400).json({ error: 'Speciality not found' });
+      }
+    }
+    
+    // Start transaction to create material and assign to course
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Create the material with both year_id and speciality_id
+      const materialResult = await client.query(
+        'INSERT INTO materials (name, year_id, speciality_id, price) VALUES ($1, $2, $3, $4) RETURNING *',
+        [name, year_id, speciality_id || null, price || 0]
+      );
+      
+      const materialId = materialResult.rows[0].id;
+      
+      // Update course with material_id and set status to pending
+      const courseResult = await client.query(
+        'UPDATE courses SET material_id = $1, status = $2 WHERE id = $3 RETURNING *',
+        [materialId, 'pending', courseId]
+      );
+      
+      await client.query('COMMIT');
+      
+      res.json({ 
+        message: 'Material created and course path assigned successfully', 
+        course: courseResult.rows[0],
+        material: materialResult.rows[0]
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error creating material and assigning to course:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

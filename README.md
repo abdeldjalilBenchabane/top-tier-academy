@@ -793,3 +793,80 @@ CREATE TRIGGER trigger_update_user_points_balance
 ```
 
 **Run this SQL in your PostgreSQL database after deploying or updating the backend to ensure correct points logic.**
+
+## 🗄️ Database Migrations & Changes
+
+### For New Team Members / Friends
+
+When you clone this repository or when database changes are made, you need to run the migration scripts to update your database schema.
+
+#### Quick Setup for New Team Members:
+
+1. **Clone the repository** and navigate to the project directory
+2. **Install dependencies**: `npm install`
+3. **Set up environment variables** (copy from `.env.example`)
+4. **Run database migrations** automatically:
+
+```bash
+# Navigate to backend folder
+cd backend
+
+# Run today's database changes (RECOMMENDED)
+node todays-migrations.js
+```
+
+**OR** run migrations manually in order:
+
+```bash
+# Run all migration files in order
+node add_language_level_id_to_courses.js
+node create_language_course_prices_table.js
+node update-materials-year-null.js
+node fix-education-structure.js
+node remove-path-type-column.js
+```
+
+#### When Database Changes Are Made:
+
+1. **Check the `DATABASE_MIGRATIONS.md` file** for new migration scripts
+2. **Run new migration files** in chronological order
+3. **Test the application** to ensure everything works
+4. **Update the migration documentation** if you add new migrations
+
+#### Important Notes:
+
+- **Always backup your database** before running migrations
+- **Run migrations in order** as listed in `DATABASE_MIGRATIONS.md`
+- **Test thoroughly** after each migration
+- **Check for errors** in the console output
+- **Contact the team** if you encounter issues
+
+#### Migration Scripts Location:
+
+All migration scripts are located in the `backend/` folder and follow the naming convention:
+- `add_*.js` - Adding new columns/tables
+- `create_*.js` - Creating new tables
+- `update_*.js` - Updating existing data
+- `remove_*.js` - Removing columns/tables
+- `fix_*.js` - Fixing data inconsistencies
+
+#### Current Database Schema:
+
+**Key Tables:**
+- `courses` - Main courses table with language and material support
+- `languages` - Available languages
+- `language_levels` - Language proficiency levels
+- `language_course_prices` - Pricing for language courses
+- `materials` - Educational materials
+- `levels` - Educational levels (primary, secondary, etc.)
+- `years` - Academic years
+- `specialities` - Subject specializations
+- `users` - User accounts and profiles
+
+**Important Columns:**
+- `courses.language_level_id` - Links to language_levels table
+- `courses.material_id` - Links to materials table
+- `materials.year_id` - Direct link to years (can be null)
+- `materials.speciality_id` - Link to specialities (can be null)
+
+For detailed migration information, see `DATABASE_MIGRATIONS.md`.
