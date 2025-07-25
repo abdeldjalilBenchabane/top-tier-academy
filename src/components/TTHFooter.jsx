@@ -61,9 +61,13 @@ export default function Footer() {
 
                     {/* Section 1 : Logo + Description */}
                     <div>
-                        <h3 className="text-xl font-bold mb-4 text-blue-200">
-                            {getContent('platform', 'name', 'اسم المنصة')}
-                        </h3>
+                        <div className="mb-4">
+                            <img 
+                                src="/1.png" 
+                                alt="TTH Logo" 
+                                className="h-10 w-auto"
+                            />
+                        </div>
                         <p className="text-gray-200">
                             {getContent('platform', 'description', 'تحتاج دعم أكثر؟ اطلب حصة خاصة مع أستاذك المفضل')}
                         </p>

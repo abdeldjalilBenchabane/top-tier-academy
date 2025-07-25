@@ -29,8 +29,11 @@ const Navbar = () => {
     <header className="sticky top-0 z-30 w-full border-b bg-white">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link to="/" className="flex items-center">
-          <span className="text-xl font-bold text-blue-600">SchoolHouse</span>
-          <span className="ml-2 text-sm font-medium text-gray-600">Course Manager</span>
+          <img 
+            src="/2.svg" 
+            alt="SchoolHouse Logo" 
+            className="h-8 w-auto"
+          />
         </Link>
 
         <div className="flex items-center gap-4">

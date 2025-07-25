@@ -116,7 +116,13 @@ const Navbar = () => {
         <div className="flex items-center justify-between py-3 w-full">
 
           {/* Logo */}
-          <Link to="/" className="font-bold mr-6 text-xl md:text-2xl whitespace-nowrap hover:text-white/90 transition">TTH</Link>
+          <Link to="/" className="mr-6 hover:opacity-90 transition">
+            <img 
+              src="/1.png" 
+              alt="TTH Logo" 
+              className="h-8 md:h-10 w-auto"
+            />
+          </Link>
 
           {/* Desktop menu */}
           <div className="hidden custom:flex flex-1 items-center justify-start mr-16 gap-6">

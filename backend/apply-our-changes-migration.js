@@ -1,4 +1,4 @@
-git import pool from './db.js';
+ import pool from './db.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
