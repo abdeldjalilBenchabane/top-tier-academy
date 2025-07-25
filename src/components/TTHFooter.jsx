@@ -65,7 +65,7 @@ export default function Footer() {
                             <img 
                                 src="/1.png" 
                                 alt="TTH Logo" 
-                                className="h-10 w-auto"
+                                className="h-12 w-auto"
                             />
                         </div>
                         <p className="text-gray-200">
@@ -159,7 +159,14 @@ export default function Footer() {
 
                 {/* Copyright */}
                 <div className="border-t border-blue-200/30 pt-6 text-center text-gray-200">
-                    <p>© {new Date().getFullYear()} {getContent('copyright', 'company_name', 'اسم المنصة')}. {getContent('copyright', 'rights_text', 'جميع الحقوق محفوظة.')}</p>
+                    <div className="flex items-center justify-center gap-3 mb-2">
+                        <img 
+                            src="/1.png" 
+                            alt="TTH Logo" 
+                            className="h-8 w-auto"
+                        />
+                        <p>© {new Date().getFullYear()}. {getContent('copyright', 'rights_text', 'جميع الحقوق محفوظة.')}</p>
+                    </div>
                 </div>
             </div>
         </footer>

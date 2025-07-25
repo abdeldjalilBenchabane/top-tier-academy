@@ -9,6 +9,7 @@ import { AvatarProvider } from './contexts/AvatarContext';
 import { PendingCountProvider } from './contexts/PendingCountContext';
 import AdminPointCodes from './Pages/admin/PointCodes';
 import PrivateClasses from './Pages/admin/PrivateClasses';
+import PendingLiveSections from './Pages/admin/PendingLiveSections';
 
 
 // TTH Pages
@@ -55,7 +56,9 @@ import FooterContent from './Pages/admin/FooterContent';
 import ProfessorDashboard from './Pages/professor/Dashboard';
 import ProfessorCourses from './Pages/professor/Courses';
 import ProfessorCreate from './Pages/professor/Create';
-import CreateLiveSessionPage from './Pages/professor/CreateLiveSession';
+
+
+import LiveSectionsPage from './Pages/professor/LiveSections';
 import ProfessorSettings from './Pages/professor/Settings';
 import ProfessorCourseDetails from './Pages/professor/CourseDetails';
 import ProfessorComments from './Pages/professor/Comments';
@@ -147,6 +150,7 @@ const App: React.FC = () => {
                   <Route path="private-classes" element={<PrivateClasses />} />
                   <Route path="homepage-materials" element={<HomepageMaterials />} />
                   <Route path="footer-content" element={<FooterContent />} />
+                  <Route path="pending-live-sections" element={<PendingLiveSections />} />
                 </Route>
 
                 {/* Professor (protected) */}
@@ -155,7 +159,9 @@ const App: React.FC = () => {
                   <Route path="courses" element={<ProfessorCourses />} />
                   <Route path="courses/:id" element={<ProfessorCourseDetails />} />
                   <Route path="create" element={<ProfessorCreate />} />
-                  <Route path="create-live-session" element={<CreateLiveSessionPage />} />
+
+
+                  <Route path="live-sections" element={<LiveSectionsPage />} />
                   <Route path="live-sessions" element={<LiveSessionsPage />} />
                   <Route path="quiz" element={<QuizCreation />} />
                   <Route path="results" element={<QuizResults professorId="1" />} />
