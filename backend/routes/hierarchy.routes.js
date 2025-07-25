@@ -391,6 +391,23 @@ router.get('/years/:yearId/specialities', verifyToken, requireRole(['admin', 'pr
   }
 });
 
+// GET /api/years/:yearId/materials → list materials for a specific year (3-path)
+router.get('/years/:yearId/materials', verifyToken, requireRole(['admin', 'professor']), async (req, res) => {
+  const { yearId } = req.params;
+  try {
+    const materials = await getRows(`
+      SELECT id, name, price, year_id as "yearId", speciality_id as "specialityId"
+      FROM materials 
+      WHERE year_id = $1 
+      ORDER BY name
+    `, [yearId]);
+    res.json(materials);
+  } catch (error) {
+    console.error('Error fetching materials for year:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/specialities → create new speciality
 router.post('/specialities', verifyToken, requireRole(['admin']), async (req, res) => {
   try {

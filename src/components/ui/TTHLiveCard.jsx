@@ -240,7 +240,7 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
       {/* Cover Image - Always show image section */}
       <div className="relative h-48 overflow-hidden">
         <img
-          src={session.cover_image || session.image || '/images/module_icon.png'}
+          src={session.cover_image_url || session.cover_image || session.image || '/images/module_icon.png'}
           alt={session.title || 'Live Session'}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
           onError={(e) => {
