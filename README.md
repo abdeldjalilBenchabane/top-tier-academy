@@ -15,6 +15,30 @@ A comprehensive React + Vite + Tailwind CSS application with Express.js backend 
 - **Dynamic Slides System**: Admin-managed homepage slides with hero-style layout
 - **File Upload**: Image and video upload for slides
 
+### 🎥 Live Streaming System (You + Me)
+- **Agora RTC Integration**: Real-time video/audio streaming
+- **Live Session Management**: Professors can create and manage live sessions
+- **Purchase System**: Students can buy live sessions with points
+- **File Upload Support**: Cover images for live sessions
+- **Real-time Chat**: Socket.IO chat during live sessions
+- **Professor Controls**: Mute/unmute all students, individual student mic control
+- **Access Control**: Purchase verification before joining sessions
+- **Student Dashboard**: Shows purchased upcoming live sessions count
+- **Dynamic Role Switching**: Students can be promoted to host role to speak
+
+### 🎯 Student Dashboard Enhancements (You + Me)
+- **Live Sessions Count**: Shows purchased upcoming live sessions
+- **Clickable Cards**: Navigate to live classes from dashboard
+- **Real-time Stats**: Dynamic updates of session counts
+- **Purchase Integration**: Seamless integration with points system
+
+### 💰 Points System Integration (You + Me)
+- **Live Session Purchases**: Students buy sessions with points
+- **Double Purchase Prevention**: Prevents duplicate purchases
+- **Transaction History**: Complete audit trail of point transactions
+- **Database Triggers**: Automatic point balance updates
+- **Purchase Verification**: Backend validation of purchases
+
 ### Backend (Express.js + PostgreSQL)
 - **RESTful API**: Complete CRUD operations for users, courses, and slides
 - **JWT Authentication**: Secure token-based authentication
@@ -25,6 +49,56 @@ A comprehensive React + Vite + Tailwind CSS application with Express.js backend 
 - **CORS Support**: Cross-origin resource sharing enabled
 - **File Upload System**: Multer-based file uploads for slides
 - **Slides Analytics**: View and click tracking for slides
+
+### 🗄️ Database Enhancements (You + Me)
+- **Live Sessions Table**: Enhanced with description, cover images, professor names
+- **File Upload Support**: Express-fileupload middleware for live session covers
+- **Performance Indexes**: Optimized queries for live sessions and purchases
+- **Purchase System**: Complete transaction tracking with point deductions
+- **Student Dashboard**: Real-time statistics and session counting
+- **Socket.IO Integration**: Real-time communication for live streaming
+
+## 🔧 Technical Implementation Details (You + Me)
+
+### Live Streaming Architecture
+- **Agora RTC SDK**: Real-time video/audio streaming
+- **Socket.IO Server**: Real-time chat and control events
+- **Dynamic Role Management**: Students can switch between audience and host roles
+- **File Upload System**: Express-fileupload for cover images
+- **Purchase Verification**: Backend validation before session access
+
+### Database Schema Changes
+```sql
+-- Live Sessions Table Enhancements
+ALTER TABLE live_sessions ADD COLUMN description TEXT;
+ALTER TABLE live_sessions ADD COLUMN cover_image_url VARCHAR(500);
+ALTER TABLE live_sessions ADD COLUMN professor_name VARCHAR(255);
+ALTER TABLE live_sessions ADD COLUMN is_approved BOOLEAN DEFAULT FALSE;
+ALTER TABLE live_sessions ADD COLUMN status VARCHAR(50) DEFAULT 'scheduled';
+ALTER TABLE live_sessions ADD COLUMN meeting_url VARCHAR(500);
+
+-- Performance Indexes
+CREATE INDEX idx_live_sessions_professor_id ON live_sessions(professor_id);
+CREATE INDEX idx_live_sessions_start_time ON live_sessions(start_time);
+CREATE INDEX idx_live_sessions_is_approved ON live_sessions(is_approved);
+CREATE INDEX idx_purchases_session_id ON purchases(session_id);
+CREATE INDEX idx_purchases_student_id ON purchases(student_id);
+```
+
+### Key Features Implemented
+1. **Live Session Creation**: Professors can create sessions with cover images
+2. **Purchase System**: Students buy sessions with points
+3. **Access Control**: Verification before joining sessions
+4. **Real-time Chat**: Socket.IO chat during sessions
+5. **Professor Controls**: Mute/unmute functionality
+6. **Student Dashboard**: Real-time session counting
+7. **File Upload**: Cover image support for sessions
+
+### API Endpoints Added
+- `POST /api/professors/:id/live-sessions` - Create live session
+- `POST /api/live-sessions/:id/purchase` - Purchase session
+- `GET /api/live-sessions/:id/access` - Check access
+- `GET /api/users/student/overview` - Student dashboard stats
 
 ## 📧 Password Reset System
 
@@ -87,6 +161,44 @@ LOG_EMAILS=true
 - PostgreSQL database
 - npm or yarn package manager
 - Email service (Gmail, Mailtrap, or other SMTP provider)
+
+### Database Setup
+
+#### 1. Initial Database Setup
+```bash
+# Run the main schema
+psql -U your_username -d your_database -f schema.sql
+```
+
+#### 2. Apply Our Changes Migration (You + Me)
+```bash
+cd backend
+node apply-our-changes-migration.js
+```
+
+This migration adds the following columns to `live_sessions` table:
+- `description TEXT` - Session description
+- `cover_image_url VARCHAR(500)` - Cover image URL
+- `professor_name VARCHAR(255)` - Professor's name
+- `is_approved BOOLEAN DEFAULT FALSE` - Approval status
+- `status VARCHAR(50)` - Session status (scheduled, live, ended, etc.)
+- `meeting_url VARCHAR(500)` - Meeting URL
+
+#### 3. Apply Friend's Changes Migration
+```bash
+cd backend
+node create-homepage-materials-table.js
+node create-footer-content-table.js
+node update-materials-speciality-nullable.js
+node add-material-id-to-years.js
+node fix-education-structure.js
+node remove-path-type-column.js
+```
+
+#### 4. Install Additional Dependencies
+```bash
+npm install express-fileupload
+```
 
 ### Frontend Setup
 ```bash
