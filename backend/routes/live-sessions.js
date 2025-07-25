@@ -7,6 +7,7 @@ import { getRow } from '../db.js';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import multer from 'multer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,9 +15,58 @@ const __dirname = path.dirname(__filename);
 const { RtcTokenBuilder, RtcRole } = AgoraToken;
 const router = express.Router();
 
+// Configure multer for live session cover image uploads
+const liveSessionStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'live-sessions');
+    // Ensure directory exists
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const fileName = `live_session_${Date.now()}_${file.originalname}`;
+    cb(null, fileName);
+  }
+});
+
+const liveSessionUpload = multer({
+  storage: liveSessionStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  }
+});
+
+// Error handling middleware for multer
+const handleMulterError = (error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'File size too large. Maximum size is 5MB.' });
+    }
+    return res.status(400).json({ error: 'File upload error: ' + error.message });
+  }
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  next();
+};
+
 // POST /api/professors/:professorId/live-sessions → crée une session (titre, date, durée, prix)
 // Note: The professorId will be taken from the authenticated user token, not from the URL directly for security.
-router.post('/professors/:professorId/live-sessions', verifyToken, requireProfessor, async (req, res) => {
+router.post('/professors/:professorId/live-sessions', 
+  verifyToken, 
+  requireProfessor, 
+  liveSessionUpload.single('cover_image'),
+  handleMulterError,
+  async (req, res) => {
     console.log('[DEBUG] POST /professors/:professorId/live-sessions', {
         paramId: req.params.professorId,
         userId: req.user.id,
@@ -25,21 +75,8 @@ router.post('/professors/:professorId/live-sessions', verifyToken, requireProfes
         contentType: req.headers['content-type']
     });
     
-    // Handle both JSON and FormData
-    let title, start_time, duration, price, material_id, description;
-    
-    if (req.headers['content-type'] && req.headers['content-type'].includes('application/json')) {
-        // JSON request
-        ({ title, start_time, duration, price, material_id, description } = req.body);
-    } else {
-        // FormData request
-        title = req.body.title;
-        start_time = req.body.start_time;
-        duration = req.body.duration;
-        price = req.body.price;
-        material_id = req.body.material_id;
-        description = req.body.description;
-    }
+    // Extract data from request body (FormData)
+    const { title, start_time, duration, price, material_id, description } = req.body;
     
     const professor_id = req.user.id;
     const professor_name = req.user.name || `ID ${professor_id}`;
@@ -55,19 +92,8 @@ router.post('/professors/:professorId/live-sessions', verifyToken, requireProfes
     try {
         // Handle file upload if present
         let cover_image_url = null;
-        if (req.files && req.files.cover_image) {
-            const file = req.files.cover_image;
-            const fileName = `live_session_${Date.now()}_${file.name}`;
-            const uploadPath = path.join(__dirname, '..', 'public', 'uploads', 'live-sessions', fileName);
-            
-            // Ensure directory exists
-            const uploadDir = path.dirname(uploadPath);
-            if (!fs.existsSync(uploadDir)) {
-                fs.mkdirSync(uploadDir, { recursive: true });
-            }
-            
-            await file.mv(uploadPath);
-            cover_image_url = `/uploads/live-sessions/${fileName}`;
+        if (req.file) {
+            cover_image_url = `/uploads/live-sessions/${req.file.filename}`;
         }
 
         const result = await pool.query(

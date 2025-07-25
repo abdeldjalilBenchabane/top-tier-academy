@@ -84,35 +84,136 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
     }
   }, [selectedLevel, levels]);
 
-  // Fetch specialities when year changes
+  // Check year for specialities and materials when year changes
   useEffect(() => {
     if (selectedYear) {
-      const year = years.find(y => y.id === parseInt(selectedYear));
-      if (year) {
-        setSpecialities(year.specialities || []);
-        setSelectedSpeciality('');
-        setSelectedMaterial('');
-      }
+      checkYearStructure(selectedYear);
     } else {
       setSpecialities([]);
       setSelectedSpeciality('');
       setSelectedMaterial('');
+      setMaterials([]);
     }
-  }, [selectedYear, years]);
+  }, [selectedYear]);
 
-  // Fetch materials when speciality changes
+  // Function to check year structure and fetch appropriate data
+  const checkYearStructure = async (yearId: string) => {
+    try {
+      setHierarchyLoading(true);
+      
+      // Get auth token
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      // First, check if this year has specialities
+      const specialitiesResponse = await fetch(`/api/structure/years/${yearId}/specialities`, {
+        headers
+      });
+      
+      console.log('Specialities response status:', specialitiesResponse.status);
+      
+      if (specialitiesResponse.ok) {
+        const specialitiesData = await specialitiesResponse.json();
+        console.log('Specialities data:', specialitiesData);
+        
+        if (specialitiesData.length > 0) {
+          // Year has specialities - 4-path structure
+          console.log('Year has specialities:', specialitiesData);
+          setSpecialities(specialitiesData);
+          setSelectedSpeciality('');
+          setSelectedMaterial('');
+          setMaterials([]);
+        } else {
+          // Year has no specialities - check for materials directly
+          console.log('Year has no specialities, checking for materials...');
+          setSpecialities([]);
+          setSelectedSpeciality('');
+          await fetchMaterialsForYear(yearId);
+        }
+      } else {
+        console.error('Failed to fetch specialities:', specialitiesResponse.status, specialitiesResponse.statusText);
+        toast.error('Failed to load year structure');
+      }
+    } catch (error) {
+      console.error('Error checking year structure:', error);
+      toast.error('Failed to load year structure');
+    } finally {
+      setHierarchyLoading(false);
+    }
+  };
+
+  // Fetch materials when speciality changes (4-path)
   useEffect(() => {
     if (selectedSpeciality) {
-      const speciality = specialities.find(s => s.id === parseInt(selectedSpeciality));
-      if (speciality) {
-        setMaterials(speciality.materials || []);
-        setSelectedMaterial('');
-      }
+      fetchMaterialsForSpeciality(selectedSpeciality);
     } else {
       setMaterials([]);
       setSelectedMaterial('');
     }
-  }, [selectedSpeciality, specialities]);
+  }, [selectedSpeciality]);
+
+  // Function to fetch materials for a specific speciality
+  const fetchMaterialsForSpeciality = async (specialityId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      const response = await fetch(`/api/structure/specialities/${specialityId}/materials`, {
+        headers
+      });
+      
+      console.log('Materials for speciality response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Materials for speciality data:', data);
+        setMaterials(data);
+        setSelectedMaterial('');
+      } else {
+        console.error('Failed to fetch materials for speciality:', response.status, response.statusText);
+        toast.error('Failed to load materials for this speciality');
+      }
+    } catch (error) {
+      console.error('Error fetching materials for speciality:', error);
+      toast.error('Failed to load materials for this speciality');
+    }
+  };
+
+  // Function to fetch materials directly for a year (3-path)
+  const fetchMaterialsForYear = async (yearId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      const response = await fetch(`/api/structure/years/${yearId}/materials`, {
+        headers
+      });
+      
+      console.log('Materials for year response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Materials for year data:', data);
+        setMaterials(data);
+        setSelectedMaterial('');
+      } else {
+        console.error('Failed to fetch materials for year:', response.status, response.statusText);
+        toast.error('Failed to load materials for this year');
+      }
+    } catch (error) {
+      console.error('Error fetching materials for year:', error);
+      toast.error('Failed to load materials for this year');
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -134,8 +235,35 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
       return;
     }
 
-    if (!title || !description || !scheduledAt || !selectedMaterial) {
-      toast.error('Please fill in all required fields');
+    // Validate required fields based on path type
+    const hasSpecialities = specialities.length > 0;
+    const requiredFields = {
+      title: !title,
+      description: !description,
+      scheduledAt: !scheduledAt,
+      level: !selectedLevel,
+      year: !selectedYear,
+      speciality: hasSpecialities && !selectedSpeciality,
+      material: !selectedMaterial
+    };
+
+    const missingFields = Object.entries(requiredFields)
+      .filter(([_, isMissing]) => isMissing)
+      .map(([field]) => field);
+
+    if (missingFields.length > 0) {
+      const fieldNames = {
+        title: 'العنوان',
+        description: 'الوصف',
+        scheduledAt: 'التاريخ والوقت',
+        level: 'المرحلة الدراسية',
+        year: 'السنة الدراسية',
+        speciality: 'التخصص',
+        material: 'المادة الدراسية'
+      };
+      
+      const missingFieldNames = missingFields.map(field => fieldNames[field as keyof typeof fieldNames]).join('، ');
+      toast.error(`يرجى ملء الحقول المطلوبة: ${missingFieldNames}`);
       return;
     }
 
@@ -168,8 +296,19 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create live session');
+        let errorMessage = 'Failed to create live session';
+        
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          // If response is not JSON (like HTML error page), get text
+          const errorText = await response.text();
+          console.error('Server response (not JSON):', errorText);
+          errorMessage = `Server error: ${response.status} ${response.statusText}`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -300,11 +439,17 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
                     <SelectValue placeholder={hierarchyLoading ? "جاري التحميل..." : "اختر المرحلة"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {levels.map(level => (
-                      <SelectItem key={level.id} value={level.id.toString()}>
-                        {level.name}
-                      </SelectItem>
-                    ))}
+                    {levels.length > 0 ? (
+                      levels.map(level => (
+                        <SelectItem key={level.id} value={level.id.toString()}>
+                          {level.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        لا توجد مراحل دراسية متاحة
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -319,11 +464,17 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
                     <SelectValue placeholder="اختر السنة" />
                   </SelectTrigger>
                   <SelectContent>
-                    {years.map(year => (
-                      <SelectItem key={year.id} value={year.id.toString()}>
-                        {year.name}
-                      </SelectItem>
-                    ))}
+                    {years.length > 0 ? (
+                      years.map(year => (
+                        <SelectItem key={year.id} value={year.id.toString()}>
+                          {year.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        لا توجد سنوات دراسية متاحة
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -331,18 +482,34 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
               {/* Speciality */}
               <div>
                 <Label htmlFor="speciality" className="text-sm font-medium">
-                  التخصص *
+                  التخصص {specialities.length > 0 ? '*' : '(غير متوفر)'}
                 </Label>
-                <Select value={selectedSpeciality} onValueChange={setSelectedSpeciality} disabled={!selectedYear}>
+                <Select 
+                  value={selectedSpeciality} 
+                  onValueChange={setSelectedSpeciality} 
+                  disabled={!selectedYear || specialities.length === 0}
+                >
                   <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="اختر التخصص" />
+                    <SelectValue placeholder={
+                      !selectedYear 
+                        ? "اختر السنة أولاً" 
+                        : specialities.length === 0 
+                          ? "لا توجد تخصصات لهذه السنة" 
+                          : "اختر التخصص"
+                    } />
                   </SelectTrigger>
                   <SelectContent>
-                    {specialities.map(speciality => (
-                      <SelectItem key={speciality.id} value={speciality.id.toString()}>
-                        {speciality.name}
-                      </SelectItem>
-                    ))}
+                    {specialities.length > 0 ? (
+                      specialities.map(speciality => (
+                        <SelectItem key={speciality.id} value={speciality.id.toString()}>
+                          {speciality.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        لا توجد تخصصات متاحة
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -352,16 +519,32 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
                 <Label htmlFor="material" className="text-sm font-medium">
                   المادة الدراسية *
                 </Label>
-                <Select value={selectedMaterial} onValueChange={setSelectedMaterial} disabled={!selectedSpeciality}>
+                <Select 
+                  value={selectedMaterial} 
+                  onValueChange={setSelectedMaterial} 
+                  disabled={!selectedYear || (specialities.length > 0 && !selectedSpeciality)}
+                >
                   <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="اختر المادة" />
+                    <SelectValue placeholder={
+                      !selectedYear 
+                        ? "اختر السنة أولاً" 
+                        : specialities.length > 0 && !selectedSpeciality 
+                          ? "اختر التخصص أولاً" 
+                          : "اختر المادة"
+                    } />
                   </SelectTrigger>
                   <SelectContent>
-                    {materials.map(material => (
-                      <SelectItem key={material.id} value={material.id.toString()}>
-                        {material.name}
-                      </SelectItem>
-                    ))}
+                    {materials.length > 0 ? (
+                      materials.map(material => (
+                        <SelectItem key={material.id} value={material.id.toString()}>
+                          {material.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        لا توجد مواد دراسية متاحة
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -444,7 +627,16 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
         </Button>
         <Button
           type="submit"
-          disabled={isSubmitting || !title || !description || !scheduledAt || !selectedMaterial}
+          disabled={
+            isSubmitting || 
+            !title || 
+            !description || 
+            !scheduledAt || 
+            !selectedLevel ||
+            !selectedYear ||
+            (specialities.length > 0 && !selectedSpeciality) ||
+            !selectedMaterial
+          }
           className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
         >
           {isSubmitting ? 'جاري الإنشاء...' : 'إنشاء البث المباشر'}
