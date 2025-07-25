@@ -131,20 +131,30 @@ const LiveCard: React.FC<LiveCardProps> = ({
   return (
     <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl overflow-hidden hover:transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-2xl group">
       {/* Thumbnail */}
-      <div className="relative h-48 bg-gradient-to-br from-purple-600 to-blue-600 overflow-hidden">
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="absolute top-3 right-3">
-          {getStatusBadge()}
-        </div>
-        <div className="absolute top-3 left-3">
-          {isPaid && (
-            <Badge className="bg-cyan-500 text-white">
-              <CheckCircle className="w-3 h-3 mr-1" />
-              مدفوع
-            </Badge>
-          )}
-        </div>
-        <div className="absolute inset-0 flex items-center justify-center">
+      <div className="relative h-48 overflow-hidden">
+        {thumbnail ? (
+          <img
+            src={thumbnail}
+            alt={title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'flex';
+            }}
+          />
+        ) : null}
+        <div className={`absolute inset-0 ${thumbnail ? 'bg-black/20' : 'bg-gradient-to-br from-purple-600 to-blue-600'} flex items-center justify-center`}>
+          <div className="absolute top-3 right-3">
+            {getStatusBadge()}
+          </div>
+          <div className="absolute top-3 left-3">
+            {isPaid && (
+              <Badge className="bg-cyan-500 text-white">
+                <CheckCircle className="w-3 h-3 mr-1" />
+                مدفوع
+              </Badge>
+            )}
+          </div>
           <div className="text-center text-white">
             <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-2 mx-auto group-hover:scale-110 transition-transform">
               <Play className="w-8 h-8 text-white" />

@@ -610,7 +610,10 @@ router.get('/student/live-sessions', verifyToken, requireRole(['student']), asyn
       description: session.title,
       meetingLink: session.meeting_url || null,
       accessType: session.access_type,
-      price: session.price
+      price: session.price,
+      cover_image_url: session.cover_image_url, // Include cover image URL
+      start_time: session.start_time, // Include start time for proper formatting
+      professor_name: session.professor_name // Include professor name
     }));
 
     res.json(allSessions);
