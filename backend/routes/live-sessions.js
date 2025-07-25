@@ -18,7 +18,8 @@ const router = express.Router();
 // Configure multer for live session cover image uploads
 const liveSessionStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'live-sessions');
+    // Save to main public folder (outside backend)
+    const uploadDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'live-sessions');
     // Ensure directory exists
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });

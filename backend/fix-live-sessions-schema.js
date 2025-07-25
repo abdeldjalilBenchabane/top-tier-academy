@@ -58,12 +58,13 @@ async function fixLiveSessionsSchema() {
     // 4. Create uploads directory structure for live sessions
     console.log('\n📁 4. Creating uploads directory structure...');
     try {
-      const uploadsDir = path.join(__dirname, '..', 'public', 'uploads', 'live-sessions');
+      // Create directory in main public folder (outside backend)
+      const uploadsDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'live-sessions');
       if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
-        console.log('✅ Created uploads/live-sessions directory');
+        console.log('✅ Created public/uploads/live-sessions directory');
       } else {
-        console.log('ℹ️  uploads/live-sessions directory already exists');
+        console.log('ℹ️  public/uploads/live-sessions directory already exists');
       }
     } catch (error) {
       console.log('⚠️  Error creating uploads directory:', error.message);
