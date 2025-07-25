@@ -20,7 +20,8 @@ import {
   MessageCircle,
   TrendingUp,
   Key,
-  RefreshCw
+  RefreshCw,
+  Globe
 } from 'lucide-react';
 
 interface SidebarLink {
@@ -56,6 +57,7 @@ const Sidebar = () => {
     { name: 'Point Codes', path: '/admin/point-codes', icon: <Key className="h-5 w-5" /> },
     { name: 'Point Transactions', path: '/admin/point-transactions', icon: <TrendingUp className="h-5 w-5" /> },
     { name: 'Private Class Settings', path: '/admin/private-class-settings', icon: <Settings className="h-5 w-5" /> },
+    { name: 'Homepage Materials', path: '/admin/homepage-materials', icon: <Globe className="h-5 w-5" /> },
     { name: 'Settings', path: '/admin/settings', icon: <Settings className="h-5 w-5" /> },
   ];
 

@@ -48,6 +48,7 @@ import CourseFilesPage from './Pages/admin/CourseFiles';
 import AdminPoints from './Pages/admin/Points';
 import AdminPointTransactions from './Pages/admin/PointTransactions';
 import AdminPrivateClassSettings from './Pages/admin/PrivateClassSettings';
+import HomepageMaterials from './Pages/admin/HomepageMaterials';
 // Professor
 import ProfessorDashboard from './Pages/professor/Dashboard';
 import ProfessorCourses from './Pages/professor/Courses';
@@ -139,6 +140,7 @@ const App: React.FC = () => {
                   <Route path="point-codes" element={<AdminPointCodes />} />
                   <Route path="point-transactions" element={<AdminPointTransactions />} />
                   <Route path="private-class-settings" element={<AdminPrivateClassSettings />} />
+                  <Route path="homepage-materials" element={<HomepageMaterials />} />
                 </Route>
 
                 {/* Professor (protected) */}
