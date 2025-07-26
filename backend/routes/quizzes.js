@@ -4,16 +4,60 @@ import { verifyToken, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Get all courses for the logged-in professor
+// Get approved courses for the logged-in professor
 router.get('/professor/courses', verifyToken, requireRole(['professor']), async (req, res) => {
   try {
     const professorId = parseInt(req.user.id);
     const result = await pool.query(
-      'SELECT id, title FROM courses WHERE created_by = $1',
+      `SELECT c.id, c.title,
+              m.name as material_name,
+              s.name as speciality_name,
+              y.name as year_name,
+              l.name as level_name,
+              c.language_level_id,
+              lang.name as language_name,
+              ll.name as language_level_name
+       FROM courses c
+       LEFT JOIN materials m ON c.material_id = m.id
+       LEFT JOIN specialities s ON m.speciality_id = s.id
+       LEFT JOIN years y ON COALESCE(s.year_id, m.year_id) = y.id
+       LEFT JOIN levels l ON y.level_id = l.id
+       LEFT JOIN language_levels ll ON c.language_level_id = ll.id
+       LEFT JOIN languages lang ON ll.language_id = lang.id
+       WHERE c.created_by = $1 AND c.status = 'approved'
+       ORDER BY c.title ASC`,
       [professorId]
     );
-    res.json(result.rows);
+    
+    // Format the course path - handle different path types
+    const coursesWithPath = result.rows.map(course => {
+      let path = '';
+      
+      // Check if it's a language course (has language_level_id but no material_id)
+      if (course.language_level_id && !course.material_name) {
+        // 2-path: Language - Level
+        path = [course.language_name, course.language_level_name].filter(Boolean).join(' - ');
+      } else if (course.material_name && !course.speciality_name) {
+        // 3-path: Level - Year - Material (no speciality)
+        path = [course.level_name, course.year_name, course.material_name].filter(Boolean).join(' - ');
+      } else if (course.material_name && course.speciality_name) {
+        // 4-path: Level - Year - Speciality - Material
+        path = [course.level_name, course.year_name, course.speciality_name, course.material_name].filter(Boolean).join(' - ');
+      } else {
+        // Fallback: just show what we have
+        path = [course.level_name, course.year_name, course.speciality_name, course.material_name].filter(Boolean).join(' - ');
+      }
+      
+      return {
+        id: course.id,
+        title: course.title,
+        path: path
+      };
+    });
+    
+    res.json(coursesWithPath);
   } catch (err) {
+    console.error('Error fetching professor courses:', err);
     res.status(500).json({ error: 'Failed to fetch courses' });
   }
 });
@@ -545,6 +589,7 @@ router.get('/my-quizzes', verifyToken, requireRole(['professor']), async (req, r
           `SELECT qq.* FROM quiz_questions qq WHERE qq.quiz_id = $1 ORDER BY qq."order"`,
           [quiz.id]
         );
+        console.log(`Quiz ${quiz.id} - Found ${questionsResult.rows.length} questions:`, questionsResult.rows.map(q => ({ id: q.id, question: q.question_text, type: q.question_type })));
 
         const questions = await Promise.all(questionsResult.rows.map(async (q) => {
           let options = undefined;
@@ -563,7 +608,16 @@ router.get('/my-quizzes', verifyToken, requireRole(['professor']), async (req, r
               [q.id]
             );
             if (correctAnswerResult.rows.length > 0) {
-              correctAnswer = correctAnswerResult.rows[0].answer_text;
+              if (q.question_type === 'true-false') {
+                // Convert string to boolean for true/false questions
+                correctAnswer = correctAnswerResult.rows[0].answer_text === 'True';
+              } else if (q.question_type === 'multiple-choice') {
+                // For multiple choice, find the index of the correct answer
+                const correctIndex = options.findIndex(option => option === correctAnswerResult.rows[0].answer_text);
+                correctAnswer = correctIndex >= 0 ? correctIndex : 0;
+              } else {
+                correctAnswer = correctAnswerResult.rows[0].answer_text;
+              }
             }
           } else {
             // For short answer, get the correct answer
@@ -598,6 +652,150 @@ router.get('/my-quizzes', verifyToken, requireRole(['professor']), async (req, r
   } catch (err) {
     console.error('Error fetching my quizzes:', err);
     res.status(500).json({ error: 'Failed to fetch quizzes' });
+  }
+});
+
+// Update quiz
+router.put('/:id', verifyToken, requireRole(['professor']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const professorId = req.user.id;
+    const { title, description, course_id, questions, timeLimit, passingScore, maxAttempts } = req.body;
+    
+    // Check if quiz exists and belongs to professor
+    const quizResult = await pool.query(
+      'SELECT * FROM quizzes WHERE id = $1 AND created_by = $2',
+      [id, professorId]
+    );
+    
+    if (quizResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Quiz not found or access denied' });
+    }
+    
+    // Update quiz basic info
+    console.log('Update quiz parameters:', { title, description, course_id, timeLimit, passingScore, maxAttempts, id });
+    
+    // Handle null/undefined values
+    const updateParams = [
+      title || '',
+      description || '',
+      course_id || null,
+      timeLimit || null,
+      passingScore || 70,
+      maxAttempts || null,
+      id
+    ];
+    
+    console.log('Processed parameters:', updateParams);
+    
+    // Use a fresh query to avoid parameter count issues
+    const updateQuery = `
+      UPDATE quizzes SET 
+        title = $1, 
+        description = $2, 
+        course_id = $3, 
+        time_limit = $4, 
+        passing_score = $5, 
+        max_attempts = $6
+      WHERE id = $7
+    `;
+    
+    console.log('Update query:', updateQuery);
+    console.log('Parameters count:', updateParams.length);
+    
+    try {
+      await pool.query(updateQuery, updateParams);
+      console.log('✅ Quiz basic info updated successfully');
+    } catch (error) {
+      console.error('❌ Error updating quiz basic info:', error);
+      throw error;
+    }
+    
+    // Delete existing questions and answers
+    try {
+      await pool.query('DELETE FROM quiz_questions WHERE quiz_id = $1', [id]);
+      console.log('✅ Existing questions deleted successfully');
+    } catch (error) {
+      console.error('❌ Error deleting existing questions:', error);
+      throw error;
+    }
+    
+    // Insert new questions and answers
+    console.log('Inserting questions:', questions.length);
+    for (const question of questions) {
+      console.log('Inserting question:', question);
+      try {
+        const questionResult = await pool.query(
+          `INSERT INTO quiz_questions (quiz_id, question_text, question_type, points, explanation, "order") 
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+          [id, question.question, question.type, question.points, question.explanation || '', 1]
+        );
+        console.log('✅ Question inserted successfully, ID:', questionResult.rows[0].id);
+        
+        const questionId = questionResult.rows[0].id;
+        
+        if (question.type === 'multiple-choice' && question.options) {
+          console.log('Inserting multiple-choice answers for question:', questionId);
+          for (let i = 0; i < question.options.length; i++) {
+            const isCorrect = question.correctAnswer === i;
+            try {
+              await pool.query(
+                `INSERT INTO quiz_answers (question_id, answer_text, is_correct, "order") 
+                 VALUES ($1, $2, $3, $4)`,
+                [questionId, question.options[i], isCorrect, i + 1]
+              );
+              console.log(`✅ Answer ${i + 1} inserted:`, question.options[i], 'Correct:', isCorrect);
+            } catch (error) {
+              console.error(`❌ Error inserting answer ${i + 1}:`, error);
+              throw error;
+            }
+          }
+        } else if (question.type === 'true-false') {
+          console.log('Inserting true-false answers for question:', questionId);
+          try {
+            // Insert True answer
+            await pool.query(
+              `INSERT INTO quiz_answers (question_id, answer_text, is_correct, "order") 
+               VALUES ($1, $2, $3, $4)`,
+              [questionId, 'True', question.correctAnswer === true, 1]
+            );
+            
+            // Insert False answer
+            await pool.query(
+              `INSERT INTO quiz_answers (question_id, answer_text, is_correct, "order") 
+               VALUES ($1, $2, $3, $4)`,
+              [questionId, 'False', question.correctAnswer === false, 2]
+            );
+            
+            console.log('✅ True-false answers inserted successfully');
+          } catch (error) {
+            console.error('❌ Error inserting true-false answers:', error);
+            throw error;
+          }
+        } else if (question.type === 'short-answer') {
+          console.log('Inserting short-answer for question:', questionId);
+          try {
+            await pool.query(
+              `INSERT INTO quiz_answers (question_id, answer_text, is_correct, "order") 
+               VALUES ($1, $2, $3, $4)`,
+              [questionId, question.correctAnswer, true, 1]
+            );
+            console.log('✅ Short-answer inserted successfully');
+          } catch (error) {
+            console.error('❌ Error inserting short-answer:', error);
+            throw error;
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error inserting question:', error);
+        throw error;
+      }
+    }
+    
+    res.json({ message: 'Quiz updated successfully' });
+  } catch (err) {
+    console.error('Error updating quiz:', err);
+    res.status(500).json({ error: 'Failed to update quiz' });
   }
 });
 

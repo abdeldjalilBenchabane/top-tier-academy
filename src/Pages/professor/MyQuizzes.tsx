@@ -67,8 +67,8 @@ export default function MyQuizzes() {
   };
 
   const handleEditQuiz = (quiz: Quiz) => {
-    // Navigate to quiz creation page with quiz data
-    navigate('/professor/quiz', { state: { editQuiz: quiz } });
+    // Navigate to the dedicated edit page
+    navigate(`/professor/edit-quiz/${quiz.id}`);
   };
 
   const handleDeleteQuiz = (quiz: Quiz) => {

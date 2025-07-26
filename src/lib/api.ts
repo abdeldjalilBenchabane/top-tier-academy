@@ -853,7 +853,7 @@ export const api = {
   },
 
   // Get professor's courses for quiz creation
-  getProfessorCourses: async (): Promise<{ id: number; title: string }[]> => {
+  getProfessorCourses: async (): Promise<{ id: number; title: string; path: string }[]> => {
     const response = await fetch('/api/quizzes/professor/courses', {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -1044,6 +1044,19 @@ export const api = {
       createdAt: quiz.created_at,
       questions: quiz.questions || []
     }));
+  },
+
+  // Update quiz
+  updateQuiz: async (quizId: string, quizData: any): Promise<void> => {
+    const response = await fetch(`/api/quizzes/${quizId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify(quizData)
+    });
+    if (!response.ok) throw new Error('Failed to update quiz');
   },
 
   // Delete quiz

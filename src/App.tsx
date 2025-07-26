@@ -74,6 +74,7 @@ import QuizManagement from './components/admin/QuizManagement';
 import QuizCreation from './components/professor/QuizCreation';
 import QuizResults from './Pages/professor/QuizResults';
 import MyQuizzes from './Pages/professor/MyQuizzes';
+import EditQuiz from './Pages/professor/EditQuiz';
 import QuizTaking from './components/student/QuizTaking';
 
 
@@ -162,6 +163,7 @@ const App: React.FC = () => {
                   <Route path="create-live-session" element={<CreateLiveSessionPage />} />
                   <Route path="live-sessions" element={<LiveSessionsPage />} />
                   <Route path="quiz" element={<QuizCreation />} />
+                  <Route path="edit-quiz/:id" element={<EditQuiz />} />
                   <Route path="results" element={<QuizResults />} />
                   <Route path="my-quizzes" element={<MyQuizzes />} />
                   <Route path="settings" element={<ProfessorSettings />} />

@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,12 +7,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, Save } from 'lucide-react';
+import { Trash2, Plus, Save, ArrowLeft } from 'lucide-react';
 import { api } from '@/lib/api';
 import { QuizQuestion } from '@/types';
 import { toast } from '@/lib/toast';
 
-const QuizCreation = () => {
+const EditQuiz = () => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   
   const [quizData, setQuizData] = useState({
@@ -27,25 +27,86 @@ const QuizCreation = () => {
 
   const [questions, setQuestions] = useState<Omit<QuizQuestion, 'id'>[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [courses, setCourses] = useState<{ id: number; title: string; path: string }[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
 
-  // Fetch professor's courses on component mount
+  // Fetch quiz data and professor's courses on component mount
   useEffect(() => {
-    const fetchCourses = async () => {
+    const fetchData = async () => {
       try {
+        setIsLoading(true);
+        
+        // Fetch courses
         const coursesData = await api.getProfessorCourses();
-        console.log('Fetched courses for quiz creation:', coursesData);
+        console.log('Fetched courses for quiz editing:', coursesData);
         setCourses(coursesData);
-      } catch (error) {
-        console.error('Error fetching courses:', error);
-        toast.error('Failed to load courses');
-      } finally {
         setLoadingCourses(false);
+        
+        // Fetch quiz data
+        if (id) {
+          const quizData = await api.getMyQuizzes();
+          const quiz = quizData.find(q => q.id === id);
+          
+          if (quiz) {
+            // Find course_id by matching course title
+            const matchingCourse = coursesData.find(c => c.title === quiz.courseTitle);
+            const courseId = matchingCourse ? matchingCourse.id : 0;
+            
+            console.log('Matching course for title:', quiz.courseTitle, 'found:', matchingCourse);
+            
+            setQuizData({
+              title: quiz.title || '',
+              description: quiz.description || '',
+              course_id: courseId,
+              timeLimit: quiz.time_limit ? quiz.time_limit.toString() : (quiz.timeLimit ? quiz.timeLimit.toString() : ''),
+              passingScore: quiz.passing_score || quiz.passingScore || 70,
+              maxAttempts: quiz.max_attempts ? quiz.max_attempts.toString() : (quiz.maxAttempts ? quiz.maxAttempts.toString() : '')
+            });
+            console.log('Full quiz data:', quiz);
+            console.log('Quiz fields:', Object.keys(quiz));
+            console.log('Set quiz data with course_id:', quiz.course_id, 'type:', typeof quiz.course_id);
+            console.log('Available courses:', coursesData.map(c => ({ id: c.id, title: c.title, type: typeof c.id })));
+            console.log('Quiz course_id matches available course:', coursesData.some(c => c.id === parseInt(quiz.course_id)));
+            console.log('Questions loaded:', quiz.questions?.length || 0);
+            console.log('All questions:', quiz.questions);
+            
+            const mappedQuestions = quiz.questions?.map(q => {
+              console.log('Mapping question:', q);
+              
+              // Set default options for true/false questions
+              let options = q.options || [];
+              if (q.type === 'true-false' && (!options || options.length === 0)) {
+                options = ['True', 'False'];
+              }
+              
+              return {
+                question: q.question || '',
+                type: q.type,
+                options: options,
+                correctAnswer: q.type === 'true-false' ? (q.correctAnswer === true ? true : false) : q.correctAnswer,
+                points: q.points || 1,
+                explanation: q.explanation || ''
+              };
+            }) || [];
+            console.log('Mapped questions:', mappedQuestions);
+            setQuestions(mappedQuestions);
+          } else {
+            toast.error('Quiz not found');
+            navigate('/professor/my-quizzes');
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast.error('Failed to load quiz data');
+        navigate('/professor/my-quizzes');
+      } finally {
+        setIsLoading(false);
       }
     };
-    fetchCourses();
-  }, []);
+    
+    fetchData();
+  }, [id, navigate]);
 
   const addQuestion = () => {
     setQuestions([...questions, {
@@ -77,6 +138,14 @@ const QuizCreation = () => {
   };
 
   const handleSubmit = async () => {
+    console.log('Validation check:', {
+      title: quizData.title,
+      description: quizData.description,
+      course_id: quizData.course_id,
+      questionsLength: questions.length
+    });
+    console.log('Questions array:', questions);
+    
     if (!quizData.title || !quizData.description || !quizData.course_id || questions.length === 0) {
       toast.error('Please fill in all required fields, select a course, and add at least one question');
       return;
@@ -98,7 +167,7 @@ const QuizCreation = () => {
     setIsSubmitting(true);
 
     try {
-      await api.submitQuiz({
+      const updateData = {
         title: quizData.title,
         description: quizData.description,
         course_id: quizData.course_id,
@@ -109,35 +178,45 @@ const QuizCreation = () => {
         timeLimit: quizData.timeLimit ? parseInt(quizData.timeLimit) : undefined,
         passingScore: quizData.passingScore,
         maxAttempts: quizData.maxAttempts ? parseInt(quizData.maxAttempts) : undefined
-      });
-
-      toast.success('Quiz submitted for approval');
+      };
       
-      // Reset form
-      setQuizData({
-        title: '',
-        description: '',
-        course_id: 0,
-        timeLimit: '',
-        passingScore: 70,
-        maxAttempts: ''
-      });
-      setQuestions([]);
+      console.log('Sending update data to backend:', updateData);
+      
+      await api.updateQuiz(id!, updateData);
+
+      toast.success('Quiz updated successfully');
+      navigate('/professor/my-quizzes');
     } catch (error) {
-      console.error('Error submitting quiz:', error);
-      toast.error('Failed to submit quiz');
+      console.error('Error updating quiz:', error);
+      toast.error('Failed to update quiz');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="text-center">Loading quiz data...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Create Quiz</h2>
-        <p className="text-gray-600">
-          Create engaging quizzes for your students
-        </p>
+    <div className="container mx-auto py-8 space-y-6 max-w-4xl">
+      <div className="flex items-center gap-4">
+        <Button
+          variant="outline"
+          onClick={() => navigate('/professor/my-quizzes')}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to My Quizzes
+        </Button>
+        <div>
+          <h2 className="text-2xl font-bold">Edit Quiz</h2>
+          <p className="text-gray-600">Modify your existing quiz</p>
+        </div>
       </div>
 
       <Card>
@@ -172,14 +251,19 @@ const QuizCreation = () => {
             {loadingCourses ? (
               <div className="text-sm text-gray-500">Loading courses...</div>
             ) : courses.length === 0 ? (
-              <div className="text-sm text-red-500">No courses found. Please create a course first.</div>
+              <div className="text-sm text-red-500">No approved courses found. Please create and get approval for a course first.</div>
             ) : (
               <Select
                 value={quizData.course_id ? quizData.course_id.toString() : ''}
-                onValueChange={(value) => setQuizData({...quizData, course_id: parseInt(value)})}
+                onValueChange={(value) => {
+                  console.log('Course selected:', value);
+                  setQuizData({...quizData, course_id: parseInt(value)});
+                }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose a course for this quiz" />
+                  <SelectValue placeholder="Select a course">
+                    {quizData.course_id && courses.find(c => c.id === quizData.course_id)?.title}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {courses.map((course) => (
@@ -255,7 +339,7 @@ const QuizCreation = () => {
               <p>No questions added yet. Click "Add Question" to get started.</p>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
               {questions.map((question, questionIndex) => (
                 <Card key={questionIndex} className="border-l-4 border-l-blue-500">
                   <CardHeader>
@@ -381,18 +465,24 @@ const QuizCreation = () => {
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-4">
+        <Button
+          variant="outline"
+          onClick={() => navigate('/professor/my-quizzes')}
+        >
+          Cancel
+        </Button>
         <Button
           onClick={handleSubmit}
           disabled={isSubmitting || questions.length === 0}
           className="min-w-32"
         >
           {isSubmitting ? (
-            "Submitting..."
+            "Updating..."
           ) : (
             <>
               <Save className="h-4 w-4 mr-2" />
-              Submit Quiz
+              Update Quiz
             </>
           )}
         </Button>
@@ -401,4 +491,4 @@ const QuizCreation = () => {
   );
 };
 
-export default QuizCreation;
+export default EditQuiz; 
