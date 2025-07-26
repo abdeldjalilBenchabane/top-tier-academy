@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Play, Download, FileText, Star, Clock, Globe, CheckCircle, BookOpen, Award, Users, Calendar, Eye, X, Image as ImageIcon, Video as VideoIcon, FileText as FileTextIcon, ChevronLeft, ChevronRight, Lock } from "lucide-react";
+import { Play, Download, FileText, Star, Clock, Globe, CheckCircle, BookOpen, Award, Users, Calendar, Eye, X, Image as ImageIcon, Video as VideoIcon, FileText as FileTextIcon, ChevronLeft, ChevronRight, Lock, HelpCircle } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../lib/api';
 
 const levelLabels = {
     "primaire": "ابتدائي",
@@ -58,6 +59,10 @@ export default function CourseDetail() {
     const [showReplyForm, setShowReplyForm] = useState(null);
     const [replyText, setReplyText] = useState({});
 
+    // New state for quizzes
+    const [quizzes, setQuizzes] = useState([]);
+    const [loadingQuizzes, setLoadingQuizzes] = useState(false);
+
     const { user } = useAuth();
     const [hasAccess, setHasAccess] = useState(false);
     const [isPreview, setIsPreview] = useState(false);
@@ -94,6 +99,19 @@ export default function CourseDetail() {
                     setCurrentContent(content[0]);
                     setCurrentContentIndex(0);
                     updateMainPlayer(content[0]);
+                }
+
+                // Fetch quizzes for this course
+                try {
+                    setLoadingQuizzes(true);
+                    console.log('Fetching quizzes for course ID:', id);
+                    const quizzesData = await api.getCourseQuizzes(id);
+                    console.log('Fetched quizzes data:', quizzesData);
+                    setQuizzes(quizzesData);
+                } catch (error) {
+                    console.error('Error fetching quizzes:', error);
+                } finally {
+                    setLoadingQuizzes(false);
                 }
 
                 // Fetch related courses from the same material path
@@ -711,6 +729,7 @@ export default function CourseDetail() {
                                     {[
                                         { id: "curriculum", label: "المنهج" },
                                         { id: "overview", label: "نظرة عامة" },
+                                        { id: "quizzes", label: "الاختبارات" },
                                         { id: "reviews", label: "إسأل الاستاذ" }
                                     ].map((tab) => (
                                         <button
@@ -888,6 +907,77 @@ export default function CourseDetail() {
                                                 )}
                                             </div>
                                         ))}
+                                    </div>
+                                )}
+
+                                {activeTab === "quizzes" && (
+                                    <div className="space-y-6">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="text-xl font-bold text-blue-900 flex items-center gap-2">
+                                                <HelpCircle className="text-blue-600" size={24} />
+                                                اختبارات الدورة
+                                            </h3>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm text-gray-600">
+                                                    {loadingQuizzes ? 'جاري التحميل...' : `${quizzes.length} اختبار`}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {loadingQuizzes ? (
+                                            <div className="text-center py-8">
+                                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                                                <p className="text-gray-500">جاري تحميل الاختبارات...</p>
+                                            </div>
+                                        ) : quizzes.length === 0 ? (
+                                            <div className="text-center py-8">
+                                                <HelpCircle className="text-gray-400 mx-auto mb-4" size={48} />
+                                                <p className="text-gray-500">لا توجد اختبارات متاحة لهذه الدورة</p>
+                                            </div>
+                                        ) : (
+                                            <div className="grid gap-4">
+                                                {quizzes.map((quiz) => (
+                                                    <Card key={quiz.id} className="border border-gray-200 hover:shadow-md transition-shadow">
+                                                        <CardHeader>
+                                                            <CardTitle className="flex items-center justify-between">
+                                                                <span className="text-lg font-semibold text-gray-900">{quiz.title}</span>
+                                                                <div className="flex items-center gap-2">
+                                                                    {quiz.timeLimit && (
+                                                                        <span className="flex items-center gap-1 text-sm text-gray-600">
+                                                                            <Clock size={14} />
+                                                                            {quiz.timeLimit} دقيقة
+                                                                        </span>
+                                                                    )}
+                                                                    <span className="text-sm text-gray-600">
+                                                                        النجاح: {quiz.passingScore}%
+                                                                    </span>
+                                                                </div>
+                                                            </CardTitle>
+                                                        </CardHeader>
+                                                        <CardContent>
+                                                            <p className="text-gray-700 mb-4">{quiz.description}</p>
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-4 text-sm text-gray-600">
+                                                                    {quiz.maxAttempts && (
+                                                                        <span>المحاولات: {quiz.maxAttempts}</span>
+                                                                    )}
+                                                                    <span>تم الإنشاء: {new Date(quiz.createdAt).toLocaleDateString('ar-SA')}</span>
+                                                                </div>
+                                                                                          <Button 
+                            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                            onClick={() => {
+                              localStorage.setItem('currentCourseId', id);
+                              navigate(`/quiz/${quiz.id}`);
+                            }}
+                          >
+                            ابدأ الاختبار
+                          </Button>
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 

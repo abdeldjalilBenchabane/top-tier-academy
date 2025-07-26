@@ -7,7 +7,7 @@ export const useLiveClasses = () => {
   const [selectedSpeciality, setSelectedSpeciality] = useState('');
   const [selectedMaterial, setSelectedMaterial] = useState('');
   
-  // Hierarchy data state
+  // Dynamic hierarchy data state (extracted from live sessions)
   const [levels, setLevels] = useState([]);
   const [years, setYears] = useState([]);
   const [specialities, setSpecialities] = useState([]);
@@ -22,43 +22,236 @@ export const useLiveClasses = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [isFiltered, setIsFiltered] = useState(false);
 
-  // Fetch hierarchy data
-  useEffect(() => {
-    const fetchHierarchy = async () => {
-      try {
-        setHierarchyLoading(true);
-        const response = await fetch('/api/public/hierarchy');
-        if (response.ok) {
-          const data = await response.json();
-          setLevels(data);
-        }
-      } catch (error) {
-        console.error('Error fetching hierarchy:', error);
-      } finally {
-        setHierarchyLoading(false);
+  // Extract hierarchical data from live sessions
+  const extractHierarchyFromSessions = (sessions) => {
+    try {
+      console.log('=== EXTRACTING HIERARCHY FROM LIVE SESSIONS ===');
+      console.log('Total sessions:', sessions.length);
+      
+      // Debug: Log the first session to see its structure (only once)
+      if (sessions.length > 0 && !extractHierarchyFromSessions.hasLogged) {
+        console.log('Sample session structure:', sessions[0]);
+        console.log('Available fields:', Object.keys(sessions[0]));
+        extractHierarchyFromSessions.hasLogged = true;
       }
-    };
+      
+      // Extract levels from sessions (handle both 3-path and 4-path)
+      const levelMap = new Map();
+      console.log('🔍 Extracting levels from sessions...');
+      sessions.forEach((session, index) => {
+        const levelName = session.level_name;
+        console.log(`Session ${index + 1}: level_name = "${levelName}"`);
+        if (levelName) {
+          levelMap.set(levelName, {
+            id: levelName,
+            name: levelName
+          });
+        }
+      });
+      const levelsData = Array.from(levelMap.values());
+      console.log('🔍 Extracted levels:', levelsData);
+      
+      // If no levels found, create a default level for all sessions
+      if (levelsData.length === 0 && sessions.length > 0) {
+        console.log('🔍 No levels found in data, creating default level');
+        levelsData.push({
+          id: 'all',
+          name: 'جميع المراحل'
+        });
+      }
+      
+      setLevels(levelsData);
+      
+      // Only log once to avoid spam
+      if (!extractHierarchyFromSessions.hasLogged) {
+        console.log('Extracted levels:', levelsData);
+      }
 
-    fetchHierarchy();
-  }, []);
+              // Extract years from sessions (handle both 3-path and 4-path)
+        const yearMap = new Map();
+        sessions.forEach(session => {
+          const yearName = session.year_name;
+          const levelName = session.level_name;
+          if (yearName) {
+            yearMap.set(yearName, {
+              id: yearName,
+              name: yearName,
+              levelId: levelName
+            });
+          }
+        });
+      const yearsData = Array.from(yearMap.values());
+      
+      // If no years found, create a default year for all sessions
+      if (yearsData.length === 0 && sessions.length > 0) {
+        console.log('🔍 No years found in data, creating default year');
+        yearsData.push({
+          id: 'all',
+          name: 'جميع السنوات',
+          levelId: null
+        });
+      }
+      
+      setYears(yearsData);
+      
+      if (!extractHierarchyFromSessions.hasLogged) {
+        console.log('Extracted years:', yearsData);
+      }
+
+              // Extract specialities from sessions (handle both 3-path and 4-path)
+        const specialityMap = new Map();
+        sessions.forEach(session => {
+          const specialityName = session.speciality_name;
+          const yearName = session.year_name;
+          // Include specialities even if they're null (for 3-path sessions)
+          if (specialityName) {
+            specialityMap.set(specialityName, {
+              id: specialityName,
+              name: specialityName,
+              yearId: yearName
+            });
+          }
+        });
+      const specialitiesData = Array.from(specialityMap.values());
+      setSpecialities(specialitiesData);
+      
+      if (!extractHierarchyFromSessions.hasLogged) {
+        console.log('Extracted specialities:', specialitiesData);
+      }
+
+              // Extract materials from sessions (handle both 3-path and 4-path)
+        const materialMap = new Map();
+        sessions.forEach(session => {
+          const materialName = session.material_name;
+          const specialityName = session.speciality_name;
+          const yearName = session.year_name;
+          if (materialName) {
+            materialMap.set(materialName, {
+              id: materialName,
+              name: materialName,
+              specialityId: specialityName,
+              yearId: yearName
+            });
+          }
+        });
+      const materialsData = Array.from(materialMap.values());
+      
+      // If no materials found, create a default material for all sessions
+      if (materialsData.length === 0 && sessions.length > 0) {
+        console.log('🔍 No materials found in data, creating default material');
+        materialsData.push({
+          id: 'all',
+          name: 'جميع المواد',
+          specialityId: null,
+          yearId: null
+        });
+      }
+      
+      setMaterials(materialsData);
+      
+      if (!extractHierarchyFromSessions.hasLogged) {
+        console.log('Extracted materials:', materialsData);
+      }
+    } catch (error) {
+      console.error('Error extracting hierarchy from sessions:', error);
+    }
+  };
+
+  // Get all available data for independent filters (similar to TTHCourses)
+  const getAllYears = () => {
+    const yearMap = new Map();
+    allLiveSessions.forEach(session => {
+      const yearName = session.year_name;
+      const levelName = session.level_name;
+      if (yearName) {
+        yearMap.set(yearName, {
+          id: yearName,
+          name: yearName,
+          levelId: levelName
+        });
+      }
+    });
+    return Array.from(yearMap.values());
+  };
+
+  const getAllSpecialities = () => {
+    const specialityMap = new Map();
+    allLiveSessions.forEach(session => {
+      const specialityName = session.speciality_name;
+      const yearName = session.year_name;
+      const hasSpeciality = !!session.speciality_id; // Only include if session has speciality_id
+      if (specialityName && hasSpeciality) {
+        specialityMap.set(specialityName, {
+          id: specialityName,
+          name: specialityName,
+          yearId: yearName
+        });
+      }
+    });
+    return Array.from(specialityMap.values());
+  };
+
+  const getAllMaterials = () => {
+    const materialMap = new Map();
+    allLiveSessions.forEach(session => {
+      const materialName = session.material_name;
+      const specialityName = session.speciality_name;
+      const yearName = session.year_name;
+      if (materialName) {
+        materialMap.set(materialName, {
+          id: materialName,
+          name: materialName,
+          specialityId: specialityName,
+          yearId: yearName
+        });
+      }
+    });
+    return Array.from(materialMap.values());
+  };
 
   // Fetch all live sessions on page load
   useEffect(() => {
     const fetchAllLiveSessions = async () => {
       try {
         setInitialLoading(true);
+        setHierarchyLoading(true);
         const response = await fetch('/api/live-sessions');
         if (response.ok) {
-          const data = await response.json();
-          console.log('📡 Live sessions API response:', data);
-          const sessions = data.sessions || data || [];
-          console.log('📋 Processed sessions:', sessions);
+                  const data = await response.json();
+        console.log('📡 Live sessions API response:', data);
+        const sessions = data.sessions || data || [];
+        console.log('📋 Processed sessions:', sessions);
+        
+        // Log session count
+        if (sessions.length > 0) {
+          console.log('📋 Loaded', sessions.length, 'live sessions');
+        }
           setAllLiveSessions(sessions);
           
-          // Group sessions by material or show all together
+          // Extract hierarchical data from sessions
+          extractHierarchyFromSessions(sessions);
+          
+          // Group sessions by path (level + year)
           const groupedSessions = sessions.reduce((acc, session) => {
-            // For now, group all sessions under "Live Sessions" since we don't have level/year info
-            const pathName = 'البث المباشر';
+            let pathName = 'البث المباشر';
+            
+            // Use the same field name detection logic
+            const levelName = session.level_name || session.level || session.education_level || session.grade;
+            const yearName = session.year_name || session.year || session.academic_year || session.class_year;
+            const specialityName = session.speciality_name;
+            const hasSpeciality = !!session.speciality_id; // Check if session has speciality_id
+            
+            if (levelName && yearName && specialityName && hasSpeciality) {
+              // 4-path: Level - Year - Speciality
+              pathName = `${levelName} - ${yearName} - ${specialityName}`;
+            } else if (levelName && yearName) {
+              // 3-path: Level - Year (no speciality)
+              pathName = `${levelName} - ${yearName}`;
+            } else if (levelName) {
+              // 2-path: Level only
+              pathName = `${levelName} - بث مباشر`;
+            }
+            
             if (!acc[pathName]) {
               acc[pathName] = [];
             }
@@ -74,89 +267,183 @@ export const useLiveClasses = () => {
         setLiveSessionsByPath({});
       } finally {
         setInitialLoading(false);
+        setHierarchyLoading(false);
       }
     };
 
     fetchAllLiveSessions();
   }, []);
 
-  // Fetch years when level changes
-  useEffect(() => {
-    if (selectedLevel) {
-      const level = levels.find(l => l.id === parseInt(selectedLevel));
-      if (level) {
-        setYears(level.years || []);
-        setSelectedYear('');
-        setSelectedSpeciality('');
-        setSelectedMaterial('');
+  // Dynamic filtering functions (similar to TTHCourses)
+  const getFilteredYears = () => {
+    if (!selectedLevel || selectedLevel === 'all' || selectedLevel === '') return [];
+    
+    console.log('🔍 getFilteredYears called with selectedLevel:', selectedLevel);
+    console.log('🔍 Total sessions:', allLiveSessions.length);
+    
+    // Get unique years from sessions that belong to the selected level
+    const yearMap = new Map();
+    allLiveSessions.forEach((session, index) => {
+      const levelName = session.level_name;
+      const yearName = session.year_name;
+      console.log(`Session ${index + 1}: level_name = "${levelName}", year_name = "${yearName}"`);
+      if (levelName === selectedLevel && yearName) {
+        console.log(`✅ Match found: level "${levelName}" matches selectedLevel "${selectedLevel}"`);
+        yearMap.set(yearName, {
+          id: yearName,
+          name: yearName,
+          levelId: levelName
+        });
       }
-    } else {
-      setYears([]);
-      setSelectedYear('');
-      setSelectedSpeciality('');
-      setSelectedMaterial('');
-    }
-  }, [selectedLevel, levels]);
-
-  // Fetch specialities when year changes
-  useEffect(() => {
-    if (selectedYear) {
-      const year = years.find(y => y.id === parseInt(selectedYear));
-      if (year) {
-        setSpecialities(year.specialities || []);
-        setSelectedSpeciality('');
-        setSelectedMaterial('');
+    });
+    const years = Array.from(yearMap.values());
+    console.log('🔍 Filtered years:', years);
+    return years;
+  };
+  
+  const getFilteredSpecialities = () => {
+    if (!selectedYear || selectedYear === 'all' || selectedYear === '') return [];
+    
+    console.log('🔍 getFilteredSpecialities called with selectedLevel:', selectedLevel, 'selectedYear:', selectedYear);
+    
+    // Check if the selected year has any specialities by looking at actual session data
+    // BUT only for the selected level and year combination
+    const specialityMap = new Map();
+    allLiveSessions.forEach((session, index) => {
+      const levelName = session.level_name;
+      const yearName = session.year_name;
+      const specialityName = session.speciality_name;
+      const hasSpeciality = !!session.speciality_id; // Check if session has speciality_id
+      
+      console.log(`Session ${index + 1}: level="${levelName}", year="${yearName}", speciality="${specialityName}", hasSpeciality=${hasSpeciality}`);
+      
+      if (yearName === selectedYear && 
+          levelName === selectedLevel && 
+          specialityName && 
+          hasSpeciality) {
+        console.log(`✅ Speciality match found: "${specialityName}"`);
+        specialityMap.set(specialityName, {
+          id: specialityName,
+          name: specialityName,
+          yearId: yearName
+        });
       }
-    } else {
-      setSpecialities([]);
-      setSelectedSpeciality('');
-      setSelectedMaterial('');
-    }
-  }, [selectedYear, years]);
-
-  // Fetch materials when speciality changes
-  useEffect(() => {
-    if (selectedSpeciality) {
-      const speciality = specialities.find(s => s.id === parseInt(selectedSpeciality));
-      if (speciality) {
-        setMaterials(speciality.materials || []);
-        setSelectedMaterial('');
+    });
+    const specialities = Array.from(specialityMap.values());
+    console.log('🔍 Filtered specialities:', specialities);
+    return specialities;
+  };
+  
+  const getFilteredMaterials = () => {
+    if (!selectedYear || selectedYear === 'all' || selectedYear === '') return [];
+    
+    // Get materials for the selected year, but only for the selected level and year combination
+    const materialMap = new Map();
+    allLiveSessions.forEach(session => {
+      const levelName = session.level_name;
+      const yearName = session.year_name;
+      const materialName = session.material_name;
+      const specialityName = session.speciality_name;
+      const hasSpeciality = !!session.speciality_id; // Check if session has speciality_id
+      
+      if (yearName === selectedYear && 
+          levelName === selectedLevel && 
+          materialName) {
+        materialMap.set(materialName, {
+          id: materialName,
+          name: materialName,
+          specialityId: specialityName,
+          yearId: yearName,
+          hasSpeciality: hasSpeciality
+        });
       }
-    } else {
-      setMaterials([]);
-      setSelectedMaterial('');
+    });
+    const materials = Array.from(materialMap.values());
+    // Only log if there are materials to avoid spam
+    if (materials.length > 0) {
+      console.log(`Materials for level "${selectedLevel}" and year "${selectedYear}":`, materials);
     }
-  }, [selectedSpeciality, specialities]);
+    return materials;
+  };
 
-  // Filter handlers
-  const handleLevelChange = (e) => setSelectedLevel(e.target.value);
-  const handleYearChange = (e) => setSelectedYear(e.target.value);
-  const handleSpecialityChange = (e) => setSelectedSpeciality(e.target.value);
-  const handleMaterialChange = (e) => setSelectedMaterial(e.target.value);
+  // Filter handlers with dynamic filtering
+  const handleLevelChange = (e) => {
+    setSelectedLevel(e.target.value);
+    setSelectedYear('');
+    setSelectedSpeciality('');
+    setSelectedMaterial('');
+  };
+  
+  const handleYearChange = (e) => {
+    setSelectedYear(e.target.value);
+    setSelectedSpeciality('');
+    setSelectedMaterial('');
+  };
+  
+  const handleSpecialityChange = (e) => {
+    setSelectedSpeciality(e.target.value);
+    setSelectedMaterial('');
+  };
+  
+  const handleMaterialChange = (e) => {
+    setSelectedMaterial(e.target.value);
+  };
 
   const handleSearch = async () => {
     try {
       setLoading(true);
       setIsFiltered(true);
       
-      // Build search parameters
-      const searchParams = new URLSearchParams();
-      if (selectedLevel) searchParams.append('level', selectedLevel);
-      if (selectedYear) searchParams.append('year', selectedYear);
-      if (selectedSpeciality) searchParams.append('speciality', selectedSpeciality);
-      if (selectedMaterial) searchParams.append('material', selectedMaterial);
-
-      const response = await fetch(`/api/live-sessions/search?${searchParams.toString()}`);
-      if (response.ok) {
-        const data = await response.json();
-        const sessions = data.sessions || [];
-        setFilteredSessions(sessions);
-      } else {
-        console.error('Error searching live sessions');
-        setFilteredSessions([]);
+      // Advanced filtering (similar to TTHCourses)
+      let filtered = allLiveSessions;
+      
+      // Only log filtering details if there are active filters
+      const hasActiveFilters = selectedLevel || selectedYear || selectedSpeciality || selectedMaterial;
+      if (hasActiveFilters) {
+        console.log('=== LIVE SESSIONS FILTERING DEBUG ===');
+        console.log('Selected filters:', {
+          selectedLevel,
+          selectedYear,
+          selectedSpeciality,
+          selectedMaterial
+        });
+        console.log('Total sessions count:', filtered.length);
       }
+
+              // Filter by level (only if level is selected and exists and is not "all")
+        if (selectedLevel && selectedLevel !== 'all' && selectedLevel !== '') {
+          const beforeLevel = filtered.length;
+          filtered = filtered.filter(session => session.level_name === selectedLevel);
+          console.log(`Level filter: ${beforeLevel} -> ${filtered.length} sessions`);
+        }
+
+              // Filter by year (only if year is selected and exists)
+        if (selectedYear && selectedYear !== 'all' && selectedYear !== '') {
+          const beforeYear = filtered.length;
+          filtered = filtered.filter(session => session.year_name === selectedYear);
+          console.log(`Year filter: ${beforeYear} -> ${filtered.length} sessions`);
+        }
+
+              // Filter by speciality (only if speciality is selected and exists)
+        if (selectedSpeciality && selectedSpeciality !== 'all' && selectedSpeciality !== '') {
+          const beforeSpeciality = filtered.length;
+          filtered = filtered.filter(session => session.speciality_name === selectedSpeciality);
+          console.log(`Speciality filter: ${beforeSpeciality} -> ${filtered.length} sessions`);
+        }
+
+              // Filter by material (only if material is selected and exists)
+        if (selectedMaterial && selectedMaterial !== 'all' && selectedMaterial !== '') {
+          const beforeMaterial = filtered.length;
+          filtered = filtered.filter(session => session.material_name === selectedMaterial);
+          console.log(`Material filter: ${beforeMaterial} -> ${filtered.length} sessions`);
+        }
+
+      if (hasActiveFilters) {
+        console.log('Final filtered sessions:', filtered);
+      }
+      setFilteredSessions(filtered);
     } catch (error) {
-      console.error('Error searching live sessions:', error);
+      console.error('Error filtering live sessions:', error);
       setFilteredSessions([]);
     } finally {
       setLoading(false);
@@ -172,8 +459,16 @@ export const useLiveClasses = () => {
     setIsFiltered(false);
   };
 
-  // Refresh live sessions data
+  // Refresh live sessions data with debouncing
   const refreshSessions = async () => {
+    // Prevent multiple simultaneous refresh calls
+    if (refreshSessions.isRefreshing) {
+      console.log('🔄 Refresh already in progress, skipping...');
+      return;
+    }
+    
+    refreshSessions.isRefreshing = true;
+    
     try {
       const response = await fetch('/api/live-sessions');
       if (response.ok) {
@@ -182,9 +477,32 @@ export const useLiveClasses = () => {
         const sessions = data.sessions || data || [];
         setAllLiveSessions(sessions);
         
-        // Re-group sessions
+        // Extract hierarchical data from sessions
+        extractHierarchyFromSessions(sessions);
+        
+        // Re-group sessions by path (handle both 3-path and 4-path)
         const groupedSessions = sessions.reduce((acc, session) => {
-          const pathName = 'البث المباشر';
+          let pathName = 'البث المباشر';
+          
+          // Use the hierarchy fields from the API
+          const levelName = session.level_name;
+          const yearName = session.year_name;
+          const specialityName = session.speciality_name;
+          
+          // Create path name based on available hierarchy
+          const hasSpeciality = !!session.speciality_id; // Check if session has speciality_id
+          
+          if (levelName && yearName && specialityName && hasSpeciality) {
+            // 4-path: Level - Year - Speciality
+            pathName = `${levelName} - ${yearName} - ${specialityName}`;
+          } else if (levelName && yearName) {
+            // 3-path: Level - Year (no speciality)
+            pathName = `${levelName} - ${yearName}`;
+          } else if (levelName) {
+            // 2-path: Level only
+            pathName = `${levelName} - بث مباشر`;
+          }
+          
           if (!acc[pathName]) {
             acc[pathName] = [];
           }
@@ -196,6 +514,8 @@ export const useLiveClasses = () => {
       }
     } catch (error) {
       console.error('Error refreshing live sessions:', error);
+    } finally {
+      refreshSessions.isRefreshing = false;
     }
   };
 
@@ -225,6 +545,14 @@ export const useLiveClasses = () => {
     loading,
     initialLoading,
     isFiltered,
+    
+    // Dynamic filtering functions
+    getFilteredYears,
+    getFilteredSpecialities,
+    getFilteredMaterials,
+    getAllYears,
+    getAllSpecialities,
+    getAllMaterials,
     
     // Handlers
     handleLevelChange,

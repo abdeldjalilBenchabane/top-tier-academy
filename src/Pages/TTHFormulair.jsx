@@ -155,8 +155,7 @@ const Formulair = () => {
                                     disabled={Loading}
                                 >
                                     <option value="student">طالب</option>
-                                    <option value="professor">أستاذ</option>
-                                    <option value="admin">admin</option>
+                                    
                                 </select>
                             </div>
 

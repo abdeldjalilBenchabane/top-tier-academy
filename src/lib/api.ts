@@ -332,8 +332,14 @@ export const api = {
   },
 
   getUsers: async (): Promise<User[]> => {
-    await delay(500);
-    return mockData.users;
+    const res = await fetch('/api/users', {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch users');
+    return await res.json();
   },
   createUser: async (user: Omit<User, 'id'>): Promise<User> => {
     await delay(500);
@@ -422,7 +428,15 @@ export const api = {
   },
   updateLiveSession: async (sessionId: string, updates: Partial<LiveSession>): Promise<LiveSession> => {
     const token = localStorage.getItem('token');
-    const res = await fetch(`/api/live-sessions/${sessionId}`, {
+    
+    // Check if user is admin (for approval updates) or professor (for status updates)
+    const userRole = localStorage.getItem('userRole');
+    
+    // If updating approval status, use admin endpoint
+    const isApprovalUpdate = updates.isApproved !== undefined || updates.approvedAt !== undefined;
+    const endpoint = (userRole === 'admin' || isApprovalUpdate) ? `/api/live-sessions/${sessionId}/admin` : `/api/live-sessions/${sessionId}`;
+    
+    const res = await fetch(endpoint, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -468,8 +482,19 @@ export const api = {
     read: boolean;
     sessionId: string;
   }>> => {
-    await delay(500);
-    return mockData.notifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const token = getAuthToken();
+    if (!token) {
+      return []; // Return empty array if not authenticated
+    }
+    
+    const res = await fetch('/api/notifications', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch notifications');
+    return await res.json();
   },
 
   getLevels: async (): Promise<Level[]> => {
@@ -800,77 +825,298 @@ export const api = {
   },
 
   getPendingQuizzes: async (): Promise<PendingQuiz[]> => {
-    await delay(500);
-    return mockData.pendingQuizzes;
+    const response = await fetch('/api/quizzes/admin/quizzes', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    if (!response.ok) throw new Error('Failed to fetch pending quizzes');
+    const data = await response.json();
+    return data.map((quiz: any) => ({
+      id: quiz.id.toString(),
+      title: quiz.title,
+      description: quiz.description,
+      createdBy: quiz.created_by.toString(),
+      createdAt: quiz.created_at,
+      timeLimit: quiz.time_limit,
+      passingScore: quiz.passing_score,
+      maxAttempts: quiz.max_attempts,
+      status: quiz.status,
+      courseTitle: quiz.course_title,
+      professorName: quiz.professor_name,
+      questions: quiz.questions || [],
+      materialName: quiz.material_name,
+      specialityName: quiz.speciality_name,
+      yearName: quiz.year_name,
+      levelName: quiz.level_name
+    }));
+  },
+
+  // Get professor's courses for quiz creation
+  getProfessorCourses: async (): Promise<{ id: number; title: string; path: string }[]> => {
+    const response = await fetch('/api/quizzes/professor/courses', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    if (!response.ok) throw new Error('Failed to fetch courses');
+    return response.json();
   },
 
   submitQuiz: async (quizData: {
     title: string;
     description: string;
+    course_id: number;
     questions: QuizQuestion[];
     timeLimit?: number;
     passingScore: number;
     maxAttempts?: number;
-    createdBy: string;
   }): Promise<void> => {
-    await delay(500);
-
-    const newQuiz: PendingQuiz = {
-      id: String(Date.now()),
-      title: quizData.title,
-      description: quizData.description,
-      questions: quizData.questions,
-      createdBy: quizData.createdBy,
-      createdAt: new Date().toISOString(),
-      timeLimit: quizData.timeLimit,
-      passingScore: quizData.passingScore,
-      maxAttempts: quizData.maxAttempts,
-      status: 'pending'
-    };
-
-    mockData.pendingQuizzes.push(newQuiz);
+    const response = await fetch('/api/quizzes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({
+        title: quizData.title,
+        description: quizData.description,
+        course_id: quizData.course_id,
+        questions: quizData.questions,
+        time_limit: quizData.timeLimit,
+        passing_score: quizData.passingScore,
+        max_attempts: quizData.maxAttempts
+      })
+    });
+    if (!response.ok) throw new Error('Failed to submit quiz');
+    return response.json();
   },
 
-  approveQuiz: async (quizId: string, materialId: string): Promise<void> => {
-    await delay(500);
-
-    const pendingQuiz = mockData.pendingQuizzes.find(quiz => quiz.id === quizId);
-    if (!pendingQuiz) {
-      throw new Error('Quiz not found');
-    }
-
-    const approvedQuiz: Quiz & { materialId?: string } = {
-      id: quizId,
-      materialId: materialId,
-      title: pendingQuiz.title,
-      description: pendingQuiz.description,
-      questions: pendingQuiz.questions,
-      createdBy: pendingQuiz.createdBy,
-      createdAt: pendingQuiz.createdAt,
-      timeLimit: pendingQuiz.timeLimit,
-      passingScore: pendingQuiz.passingScore,
-      maxAttempts: pendingQuiz.maxAttempts,
-      isActive: true
-    };
-
-    mockData.quizzes.push(approvedQuiz);
-
-    pendingQuiz.status = 'approved';
-    pendingQuiz.approvedAt = new Date().toISOString();
-    pendingQuiz.materialId = materialId;
+  approveQuiz: async (quizId: string): Promise<void> => {
+    const response = await fetch(`/api/quizzes/admin/quizzes/${quizId}/approve`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    if (!response.ok) throw new Error('Failed to approve quiz');
   },
 
   rejectQuiz: async (quizId: string, reason: string): Promise<void> => {
-    await delay(500);
+    const response = await fetch(`/api/quizzes/admin/quizzes/${quizId}/reject`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({ reason })
+    });
+    if (!response.ok) throw new Error('Failed to reject quiz');
+  },
 
-    const pendingQuiz = mockData.pendingQuizzes.find(quiz => quiz.id === quizId);
-    if (!pendingQuiz) {
-      throw new Error('Quiz not found');
-    }
+  // Get approved quizzes for a course (students)
+  getCourseQuizzes: async (courseId: string): Promise<Quiz[]> => {
+    const response = await fetch(`/api/quizzes/courses/${courseId}/quizzes`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    if (!response.ok) throw new Error('Failed to fetch course quizzes');
+    const data = await response.json();
+    return data.map((quiz: any) => ({
+      id: quiz.id.toString(),
+      title: quiz.title,
+      description: quiz.description,
+      createdBy: quiz.created_by.toString(),
+      createdAt: quiz.created_at,
+      timeLimit: quiz.time_limit,
+      passingScore: quiz.passing_score,
+      maxAttempts: quiz.max_attempts,
+      isActive: quiz.is_active,
+      questions: quiz.questions || []
+    }));
+  },
 
-    pendingQuiz.status = 'rejected';
-    pendingQuiz.rejectionReason = reason;
-    pendingQuiz.rejectedAt = new Date().toISOString();
+  // Start a quiz attempt
+  startQuizAttempt: async (quizId: string): Promise<{ attemptId: string }> => {
+    const response = await fetch('/api/quizzes/attempts/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({ quizId })
+    });
+    if (!response.ok) throw new Error('Failed to start quiz attempt');
+    return response.json();
+  },
+
+  // Submit quiz answers
+  submitQuizAnswers: async (attemptId: string, answers: Array<{ questionId: string; answer: string }>): Promise<{
+    score: number;
+    totalPoints: number;
+    passed: boolean;
+    correctAnswers: number;
+    totalQuestions: number;
+  }> => {
+    const response = await fetch(`/api/quizzes/attempts/${attemptId}/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({ answers })
+    });
+    if (!response.ok) throw new Error('Failed to submit quiz answers');
+    return response.json();
+  },
+
+  // Get quiz attempt results
+  getQuizResults: async (attemptId: string): Promise<{
+    attempt: {
+      id: string;
+      quizTitle: string;
+      quizDescription: string;
+      score: number;
+      totalPoints: number;
+      passed: boolean;
+      startedAt: string;
+      completedAt: string;
+    };
+    answers: Array<{
+      questionId: string;
+      question: string;
+      type: string;
+      studentAnswer: string;
+      correctAnswer: string;
+      isCorrect: boolean;
+      points: number;
+      pointsEarned: number;
+      explanation: string;
+    }>;
+  }> => {
+    const response = await fetch(`/api/quizzes/attempts/${attemptId}/results`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    if (!response.ok) throw new Error('Failed to fetch quiz results');
+    return response.json();
+  },
+
+  // Get my quizzes (for professors)
+  getMyQuizzes: async (): Promise<Array<{
+    id: string;
+    title: string;
+    description: string;
+    courseTitle: string;
+    timeLimit: number;
+    passingScore: number;
+    maxAttempts: number;
+    isActive: boolean;
+    isApproved: boolean;
+    createdAt: string;
+    questions: Array<{
+      id: string;
+      question: string;
+      type: string;
+      points: number;
+      options?: string[];
+    }>;
+  }>> => {
+    const response = await fetch('/api/quizzes/my-quizzes', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    if (!response.ok) throw new Error('Failed to fetch my quizzes');
+    const data = await response.json();
+    return data.map((quiz: any) => ({
+      id: quiz.id.toString(),
+      title: quiz.title,
+      description: quiz.description,
+      courseTitle: quiz.course_title,
+      timeLimit: quiz.time_limit,
+      passingScore: quiz.passing_score,
+      maxAttempts: quiz.max_attempts,
+      isActive: quiz.is_active,
+      isApproved: quiz.is_approved || quiz.status === 'approved',
+      createdAt: quiz.created_at,
+      questions: quiz.questions || []
+    }));
+  },
+
+  // Update quiz
+  updateQuiz: async (quizId: string, quizData: any): Promise<void> => {
+    const response = await fetch(`/api/quizzes/${quizId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify(quizData)
+    });
+    if (!response.ok) throw new Error('Failed to update quiz');
+  },
+
+  // Delete quiz
+  deleteQuiz: async (quizId: string): Promise<void> => {
+    const response = await fetch(`/api/quizzes/${quizId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    if (!response.ok) throw new Error('Failed to delete quiz');
+  },
+
+  // Get professor quiz results
+  getProfessorQuizResults: async (): Promise<Array<{
+    id: string;
+    title: string;
+    courseTitle: string;
+    status: string;
+    totalAttempts: number;
+    averageScore: number;
+    passedAttempts: number;
+    attempts: Array<{
+      id: string;
+      studentName: string;
+      studentEmail: string;
+      score: number;
+      totalPoints: number;
+      passed: boolean;
+      startedAt: string;
+      completedAt: string;
+    }>;
+  }>> => {
+    const response = await fetch('/api/quizzes/professor/results', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    if (!response.ok) throw new Error('Failed to fetch professor results');
+    const data = await response.json();
+    
+    return data.map((quiz: any) => ({
+      id: quiz.id.toString(),
+      title: quiz.title,
+      courseTitle: quiz.course_title,
+      status: quiz.status,
+      totalAttempts: parseInt(quiz.total_attempts) || 0,
+      averageScore: parseFloat(quiz.average_score) || 0,
+      passedAttempts: parseInt(quiz.passed_attempts) || 0,
+              attempts: (quiz.attempts || []).map((attempt: any) => ({
+          id: attempt.id.toString(),
+          studentName: attempt.studentName,
+          studentEmail: attempt.studentEmail,
+          score: parseFloat(attempt.score) || 0,
+          totalPoints: parseInt(attempt.totalPoints) || 0,
+          passed: Boolean(attempt.passed),
+          startedAt: attempt.startedAt,
+          completedAt: attempt.completedAt
+        }))
+    }));
   },
 
   // Quiz results methods

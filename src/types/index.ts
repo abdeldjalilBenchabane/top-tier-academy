@@ -120,7 +120,7 @@ export type LiveSession = {
   id: string;
   title: string;
   description: string;
-  courseId: string;
+  courseId?: string;
   professorId: string;
   scheduledAt: string;
   duration: number;
@@ -134,6 +134,12 @@ export type LiveSession = {
   tags?: string[];
   isRecorded?: boolean;
   materialId?: string;
+  isApproved?: boolean;
+  approvedBy?: string;
+  approvedAt?: string;
+  agoraChannel?: string;
+  agoraToken?: string;
+  price?: number;
 };
 
 export type Breadcrumb = {
@@ -179,6 +185,12 @@ export type PendingQuiz = Omit<Quiz, "materialId" | "isActive"> & {
   approvedAt?: string;
   materialId?: string;
   reviewedBy?: string;
+  courseTitle?: string;
+  professorName?: string;
+  materialName?: string;
+  specialityName?: string;
+  yearName?: string;
+  levelName?: string;
 };
 
 export type QuizAttempt = {

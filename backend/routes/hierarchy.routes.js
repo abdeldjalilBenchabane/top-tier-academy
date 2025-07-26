@@ -924,6 +924,21 @@ router.get('/public/specialities/:specialityId/materials', async (req, res) => {
   }
 });
 
+// GET /api/public/years/:yearId/materials → list materials for a specific year (3-path, public)
+router.get('/public/years/:yearId/materials', async (req, res) => {
+  const { yearId } = req.params;
+  try {
+    const materials = await getRows(
+      'SELECT id, name, price, year_id as "yearId", speciality_id as "specialityId" FROM materials WHERE year_id = $1 ORDER BY name',
+      [yearId]
+    );
+    res.json(materials);
+  } catch (error) {
+    console.error('Error fetching materials for year:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/public/hierarchy → get complete hierarchy structure (public)
 router.get('/public/hierarchy', async (req, res) => {
   try {

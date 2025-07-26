@@ -6,7 +6,6 @@ import { LiveSession } from '@/types';
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { Play, Pause, Square, RotateCw, Ban, Archive } from 'lucide-react';
-import PathSelectorForSession from './PathSelectorForSession';
 
 interface StatusControlProps {
   session: LiveSession;
@@ -17,8 +16,7 @@ interface StatusControlProps {
 
 const StatusControl = ({ session, onStatusUpdate, userRole, isOwner = false }: StatusControlProps) => {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [selectedStatus, setSelectedStatus] = React.useState<LiveSession['status']>(session.status || 'scheduled');
-  const [showPathSelector, setShowPathSelector] = React.useState(false);
+  const [selectedStatus, setSelectedStatus] = React.useState<LiveSession['status']>(session.status);
 
   const handleStatusChange = async (newStatus: LiveSession['status']) => {
     try {
@@ -31,18 +29,16 @@ const StatusControl = ({ session, onStatusUpdate, userRole, isOwner = false }: S
     }
   };
 
-  const handleSaveToLibrary = () => {
-    setShowPathSelector(true);
-  };
-
-  const handlePathSelectionSuccess = () => {
+  const handleSaveToLibrary = async () => {
+    try {
+      await api.saveLiveSessionToLibrary(session.id);
+      toast.success('Session saved to library successfully');
     setIsDialogOpen(false);
-    setShowPathSelector(false);
     onStatusUpdate();
-  };
-
-  const handlePathSelectionCancel = () => {
-    setShowPathSelector(false);
+    } catch (error) {
+      console.error('Failed to save session to library:', error);
+      toast.error('Failed to save session to library');
+    }
   };
 
   const getStatusIcon = (status: LiveSession['status']) => {
@@ -87,7 +83,7 @@ const StatusControl = ({ session, onStatusUpdate, userRole, isOwner = false }: S
             <SelectValue>
               <div className="flex items-center gap-2">
                 {getStatusIcon(selectedStatus)}
-                <span className="capitalize">{selectedStatus ? selectedStatus.replace('_', ' ') : 'Unknown'}</span>
+                <span className="capitalize">{selectedStatus.replace('_', ' ')}</span>
               </div>
             </SelectValue>
           </SelectTrigger>
@@ -120,33 +116,24 @@ const StatusControl = ({ session, onStatusUpdate, userRole, isOwner = false }: S
             <DialogHeader>
               <DialogTitle>Save Session to Library</DialogTitle>
               <DialogDescription>
-                Choose where to place "{session.title}" in the educational structure.
+                Save "{session.title}" to the course library as recorded content.
               </DialogDescription>
             </DialogHeader>
 
-            {showPathSelector ? (
-              <PathSelectorForSession
-                session={session}
-                onSuccess={handlePathSelectionSuccess}
-                onCancel={handlePathSelectionCancel}
-              />
-            ) : (
-              <>
                 <div className="py-4">
                   <p className="text-sm text-gray-600">
-                    This will save the live session to the course library, making it available as a recorded session for students. You'll need to select the appropriate educational path for this session.
+                This will save the live session to the course library, making it available as a recorded session for students.
                   </p>
                 </div>
+            
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
                   <Button onClick={handleSaveToLibrary}>
-                    Continue
+                Save to Library
                   </Button>
                 </DialogFooter>
-              </>
-            )}
           </DialogContent>
         </Dialog>
       )}

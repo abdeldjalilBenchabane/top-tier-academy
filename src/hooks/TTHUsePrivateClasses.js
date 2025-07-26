@@ -85,35 +85,129 @@ export const usePrivateClasses = () => {
     }
   }, [selectedLevel, levels]);
 
-  // Fetch specialities when year changes
+  // Smart 3-path/4-path logic: Check year structure when year changes
   useEffect(() => {
     if (selectedYear) {
-      const year = years.find(y => y.id === parseInt(selectedYear));
-      if (year) {
-        setSpecialities(year.specialities || []);
-        setSelectedSpeciality('');
-        setSelectedMaterial('');
-      }
+      checkYearStructure(selectedYear);
     } else {
       setSpecialities([]);
       setSelectedSpeciality('');
+      setMaterials([]);
       setSelectedMaterial('');
     }
-  }, [selectedYear, years]);
+  }, [selectedYear]);
 
-  // Fetch materials when speciality changes
+  // Fetch materials when speciality changes (4-path)
   useEffect(() => {
     if (selectedSpeciality) {
-      const speciality = specialities.find(s => s.id === parseInt(selectedSpeciality));
-      if (speciality) {
-        setMaterials(speciality.materials || []);
-        setSelectedMaterial('');
-      }
+      fetchMaterialsForSpeciality(selectedSpeciality);
     } else {
       setMaterials([]);
       setSelectedMaterial('');
     }
   }, [selectedSpeciality, specialities]);
+
+  // Helper function to check year structure (3-path vs 4-path)
+  const checkYearStructure = async (yearId) => {
+    try {
+      setHierarchyLoading(true);
+      
+      // First, check if this year has specialities
+      const specialitiesResponse = await fetch(`/api/public/years/${yearId}/specialities`);
+      
+      console.log('Specialities response status:', specialitiesResponse.status);
+      
+      if (specialitiesResponse.ok) {
+        const specialitiesData = await specialitiesResponse.json();
+        console.log('Specialities data:', specialitiesData);
+        
+        if (specialitiesData.length > 0) {
+          // Year has specialities - 4-path structure
+          console.log('Year has specialities:', specialitiesData);
+          setSpecialities(specialitiesData);
+          setSelectedSpeciality('');
+          setSelectedMaterial('');
+          setMaterials([]);
+        } else {
+          // Year has no specialities - check for materials directly
+          console.log('Year has no specialities, checking for materials...');
+          setSpecialities([]);
+          setSelectedSpeciality('');
+          await fetchMaterialsForYear(yearId);
+        }
+      } else {
+        console.error('Failed to fetch specialities:', specialitiesResponse.status, specialitiesResponse.statusText);
+        // Fallback to empty specialities
+        setSpecialities([]);
+        setSelectedSpeciality('');
+        await fetchMaterialsForYear(yearId);
+      }
+    } catch (error) {
+      console.error('Error checking year structure:', error);
+      // Fallback to empty specialities
+      setSpecialities([]);
+      setSelectedSpeciality('');
+      await fetchMaterialsForYear(yearId);
+    } finally {
+      setHierarchyLoading(false);
+    }
+  };
+
+  // Helper function to fetch materials for a speciality (4-path)
+  const fetchMaterialsForSpeciality = async (specialityId) => {
+    try {
+      setHierarchyLoading(true);
+      
+      const response = await fetch(`/api/public/specialities/${specialityId}/materials`);
+      
+      console.log('Materials for speciality response status:', response.status);
+      
+      if (response.ok) {
+        const materialsData = await response.json();
+        console.log('Materials for speciality data:', materialsData);
+        setMaterials(materialsData);
+        setSelectedMaterial('');
+      } else {
+        console.error('Failed to fetch materials for speciality:', response.status, response.statusText);
+        setMaterials([]);
+        setSelectedMaterial('');
+      }
+    } catch (error) {
+      console.error('Error fetching materials for speciality:', error);
+      setMaterials([]);
+      setSelectedMaterial('');
+    } finally {
+      setHierarchyLoading(false);
+    }
+  };
+
+  // Helper function to fetch materials for a year (3-path)
+  const fetchMaterialsForYear = async (yearId) => {
+    try {
+      setHierarchyLoading(true);
+      
+      const response = await fetch(`/api/public/years/${yearId}/materials`);
+      
+      console.log('Materials for year response status:', response.status);
+      
+      if (response.ok) {
+        const materialsData = await response.json();
+        console.log('Materials for year data:', materialsData);
+        setMaterials(materialsData);
+        setSelectedMaterial('');
+      } else {
+        console.error('Failed to fetch materials for year:', response.status, response.statusText);
+        setMaterials([]);
+        setSelectedMaterial('');
+      }
+    } catch (error) {
+      console.error('Error fetching materials for year:', error);
+      setMaterials([]);
+      setSelectedMaterial('');
+    } finally {
+      setHierarchyLoading(false);
+    }
+  };
 
   // Fetch real teachers from database
   useEffect(() => {
@@ -156,9 +250,8 @@ export const usePrivateClasses = () => {
     fetchTeachers();
   }, []);
 
-  // Fetch current user's pending requests
-  useEffect(() => {
-    const fetchRequests = async () => {
+  // Function to refresh requests data
+  const refreshRequests = async () => {
       if (!user || isProfessor) return;
       try {
         setRequestsLoading(true);
@@ -170,7 +263,7 @@ export const usePrivateClasses = () => {
           return;
         }
         
-        console.log('Fetching student requests with token:', token.substring(0, 20) + '...');
+      console.log('Refreshing student requests with token:', token.substring(0, 20) + '...');
         
         const response = await fetch(`/api/private-class-requests/student/${user.id}`, {
           headers: {
@@ -178,7 +271,7 @@ export const usePrivateClasses = () => {
           }
         });
         
-        console.log('Student requests response status:', response.status);
+      console.log('Student requests refresh response status:', response.status);
         
         if (response.ok) {
           const data = await response.json();
@@ -207,22 +300,24 @@ export const usePrivateClasses = () => {
           setMyPendingRequests(transformedRequests);
         } else {
           const errorData = await response.json().catch(() => ({}));
-          console.error('Student requests fetch failed:', response.status, errorData);
+        console.error('Student requests refresh failed:', response.status, errorData);
           setMyPendingRequests([]);
         }
       } catch (error) {
-        console.error('Student requests fetch error:', error);
+      console.error('Student requests refresh error:', error);
         setMyPendingRequests([]);
       } finally {
         setRequestsLoading(false);
       }
     };
-    fetchRequests();
+
+  // Fetch current user's pending requests
+  useEffect(() => {
+    refreshRequests();
   }, [user, isProfessor]);
 
-  // Fetch all orders for the grid
-  useEffect(() => {
-    const fetchAllOrders = async () => {
+  // Function to refresh all orders data
+  const refreshAllOrders = async () => {
       try {
         setAllOrdersLoading(true);
         const token = localStorage.getItem('token');
@@ -233,7 +328,7 @@ export const usePrivateClasses = () => {
           return;
         }
         
-        console.log('Fetching all orders with token:', token.substring(0, 20) + '...');
+      console.log('Refreshing all orders with token:', token.substring(0, 20) + '...');
         
         const response = await fetch(`/api/private-class-requests`, {
           headers: {
@@ -241,7 +336,7 @@ export const usePrivateClasses = () => {
           }
         });
         
-        console.log('All orders response status:', response.status);
+      console.log('All orders refresh response status:', response.status);
         
         if (response.ok) {
           const data = await response.json();
@@ -260,21 +355,29 @@ export const usePrivateClasses = () => {
             studentId: request.student_id,
             agora_channel: request.agora_channel,
             scheduled_at: request.scheduled_at,
-            hierarchy_path: request.hierarchy_path
+          hierarchy_path: request.hierarchy_path,
+          payment_status: request.payment_status,
+          payment_date: request.payment_date,
+          points_used: request.points_used,
+          price_per_session: request.price_per_session
           }));
           setAllOrders(transformedOrders);
         } else {
           const errorData = await response.json().catch(() => ({}));
-          console.error('All orders fetch failed:', response.status, errorData);
+        console.error('All orders refresh failed:', response.status, errorData);
           setAllOrders([]);
         }
       } catch (error) {
-        //
+      console.error('All orders refresh error:', error);
+      setAllOrders([]);
       } finally {
         setAllOrdersLoading(false);
       }
     };
-    fetchAllOrders();
+
+  // Fetch all orders for the grid
+  useEffect(() => {
+    refreshAllOrders();
   }, []);
 
   const handleLevelChange = (e) => {
@@ -397,8 +500,11 @@ export const usePrivateClasses = () => {
         hierarchy_path: request.hierarchy_path
       }));
       
-      setMyPendingRequests(prev => [...newRequests, ...prev]);
-      setAllOrders(prev => [...newRequests, ...prev]);
+      // Refresh both datasets to get the latest state from the server
+      await Promise.all([
+        refreshRequests(),
+        refreshAllOrders()
+      ]);
       closeRequestModal();
       setSelectedTeacher('');
       setSelectedLevel('');
@@ -465,6 +571,8 @@ export const usePrivateClasses = () => {
     handleRequestFormChange,
     handleSubmitRequest,
     handleDetailsClick,
-    closeModal
+    closeModal,
+    refreshRequests,
+    refreshAllOrders
   };
 }; 

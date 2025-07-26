@@ -21,6 +21,8 @@ import { fileURLToPath } from 'url';
 import pointCodesRoutes from './routes/pointCodes.js';
 import homepageMaterialsRoutes from './routes/homepage-materials.js';
 import footerContentRoutes from './routes/footer-content.js';
+import notificationsRoutes from './routes/notifications.js';
+import quizzesRoutes from './routes/quizzes.js';
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 
@@ -93,6 +95,8 @@ app.use('/api/structure', hierarchyRoutes); // <-- Add this line to alias struct
 app.use('/api/points', pointCodesRoutes);
 app.use('/api/homepage-materials', homepageMaterialsRoutes);
 app.use('/api/footer-content', footerContentRoutes);
+app.use('/api', notificationsRoutes);
+app.use('/api/quizzes', quizzesRoutes);
 
 // Socket.IO chat functionality
 io.on('connection', (socket) => {
@@ -234,7 +238,13 @@ io.on('connection', (socket) => {
     console.log('[DEBUG] end-stream event received', { roomId }); // [LIVE STREAM MODIF]
     const roomSockets = io.sockets.adapter.rooms.get(roomId);
     console.log('[DEBUG] Sockets in room before stream-ended:', roomSockets ? Array.from(roomSockets) : []); // [LIVE STREAM MODIF]
+    
+    // Emit stream-ended to all users in the room
     io.to(roomId).emit('stream-ended', { roomId }); // [LIVE STREAM MODIF]
+    
+    // Emit specific event to the professor who ended the stream
+    socket.emit('stream-ended-professor', { roomId }); // [LIVE STREAM MODIF]
+    
     // (Optionnel) : la mise à jour du statut du live se fait via l'API REST
   });
 

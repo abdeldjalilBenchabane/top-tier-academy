@@ -38,8 +38,8 @@ const PrivateClassFilter = ({
           </h3>
         </div>
 
-        {/* First Row - Teacher and Level */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 w-full">
+        {/* First Row - Teacher, Level, Year */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 w-full">
           {/* Teacher Filter - Only show if not a professor */}
           {!isProfessor && (
             <div className="relative w-full group">
@@ -98,11 +98,8 @@ const PrivateClassFilter = ({
               <FaChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-blue-500 transition-colors" />
               )}
             </div>
-            </div>
           </div>
-          
-        {/* Second Row - Year and Speciality */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 w-full">
+
           {/* Year */}
           <div className="relative w-full group">
             <label className="block text-gray-700 font-bold mb-2 pr-1 text-sm sm:text-base text-right group-hover:text-green-600 transition-colors">
@@ -117,7 +114,14 @@ const PrivateClassFilter = ({
                 className="appearance-none w-full bg-white border-2 border-gray-200 text-sm sm:text-base font-bold font-poppins rounded-xl py-3 pr-4 pl-10 focus:outline-none focus:ring-2 focus:ring-green-300 focus:border-green-400 transition-all duration-300 shadow-sm text-right group-hover:border-green-300 group-hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 dir="rtl"
               >
-                <option value="">اختر السنة</option>
+                <option value="">
+                  {!selectedLevel 
+                    ? "اختر المرحلة أولاً" 
+                    : hierarchyLoading 
+                      ? "جاري التحميل..." 
+                      : "اختر السنة"
+                  }
+                </option>
                 {years.map(year => (
                   <option key={year.id} value={year.id}>{year.name}</option>
                 ))}
@@ -125,33 +129,78 @@ const PrivateClassFilter = ({
               <FaChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-green-500 transition-colors" />
             </div>
           </div>
+        </div>
           
-          {/* Speciality */}
-          <div className="relative w-full group">
-            <label className="block text-gray-700 font-bold mb-2 pr-1 text-sm sm:text-base text-right group-hover:text-purple-600 transition-colors">
-              <FaLayerGroup className="inline mr-2" />
-              التخصص
-            </label>
-            <div className="relative flex items-center">
-              <select
-                value={selectedSpeciality}
-                onChange={onSpecialityChange}
-                disabled={!selectedYear || hierarchyLoading}
-                className="appearance-none w-full bg-white border-2 border-gray-200 text-sm sm:text-base font-bold font-poppins rounded-xl py-3 pr-4 pl-10 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition-all duration-300 shadow-sm text-right group-hover:border-purple-300 group-hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                dir="rtl"
-              >
-                <option value="">اختر التخصص</option>
-                {specialities.map(speciality => (
-                  <option key={speciality.id} value={speciality.id}>{speciality.name}</option>
-                ))}
-              </select>
-              <FaChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-purple-500 transition-colors" />
+        {/* Second Row - Speciality and Material */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 w-full">
+          {/* Speciality - Only show if specialities exist */}
+          {specialities.length > 0 ? (
+            <div className="relative w-full group">
+              <label className="block text-gray-700 font-bold mb-2 pr-1 text-sm sm:text-base text-right group-hover:text-purple-600 transition-colors">
+                <FaLayerGroup className="inline mr-2" />
+                التخصص
+              </label>
+              <div className="relative flex items-center">
+                <select
+                  value={selectedSpeciality}
+                  onChange={onSpecialityChange}
+                  disabled={!selectedYear || hierarchyLoading}
+                  className="appearance-none w-full bg-white border-2 border-gray-200 text-sm sm:text-base font-bold font-poppins rounded-xl py-3 pr-4 pl-10 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition-all duration-300 shadow-sm text-right group-hover:border-purple-300 group-hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  dir="rtl"
+                >
+                  <option value="">
+                    {!selectedYear 
+                      ? "اختر السنة أولاً" 
+                      : hierarchyLoading 
+                        ? "جاري التحميل..." 
+                        : "اختر التخصص"
+                    }
+                  </option>
+                  {specialities.map(speciality => (
+                    <option key={speciality.id} value={speciality.id}>{speciality.name}</option>
+                  ))}
+                </select>
+                <FaChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-purple-500 transition-colors" />
+              </div>
             </div>
+          ) : selectedYear && !hierarchyLoading ? (
+            <div className="relative w-full group">
+              <label className="block text-gray-700 font-bold mb-2 pr-1 text-sm sm:text-base text-right">
+                <FaLayerGroup className="inline mr-2" />
+                التخصص
+              </label>
+              <div className="relative flex items-center">
+                <select
+                  value=""
+                  disabled={true}
+                  className="appearance-none w-full bg-gray-100 border-2 border-gray-200 text-sm sm:text-base font-bold font-poppins rounded-xl py-3 pr-4 pl-10 text-gray-500 text-right cursor-not-allowed"
+                  dir="rtl"
+                >
+                  <option value="">لا توجد تخصصات لهذه السنة</option>
+                </select>
+                <FaLayerGroup className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="relative w-full group">
+              <label className="block text-gray-700 font-bold mb-2 pr-1 text-sm sm:text-base text-right">
+                <FaLayerGroup className="inline mr-2" />
+                التخصص
+              </label>
+              <div className="relative flex items-center">
+                <select
+                  value=""
+                  disabled={true}
+                  className="appearance-none w-full bg-gray-100 border-2 border-gray-200 text-sm sm:text-base font-bold font-poppins rounded-xl py-3 pr-4 pl-10 text-gray-500 text-right cursor-not-allowed"
+                  dir="rtl"
+                >
+                  <option value="">اختر السنة أولاً</option>
+                </select>
+                <FaLayerGroup className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+          )}
           
-        {/* Third Row - Material only */}
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 w-full">
           {/* Material */}
           <div className="relative w-full group">
             <label className="block text-gray-700 font-bold mb-2 pr-1 text-sm sm:text-base text-right group-hover:text-indigo-600 transition-colors">
@@ -162,11 +211,26 @@ const PrivateClassFilter = ({
               <select
                 value={selectedMaterial}
                 onChange={onMaterialChange}
-                disabled={!selectedSpeciality || hierarchyLoading}
+                disabled={
+                  !selectedYear || 
+                  hierarchyLoading || 
+                  (specialities.length > 0 && !selectedSpeciality)
+                }
                 className="appearance-none w-full bg-white border-2 border-gray-200 text-sm sm:text-base font-bold font-poppins rounded-xl py-3 pr-4 pl-10 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 transition-all duration-300 shadow-sm text-right group-hover:border-indigo-300 group-hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 dir="rtl"
               >
-                <option value="">اختر المادة</option>
+                <option value="">
+                  {!selectedYear 
+                    ? "اختر السنة أولاً" 
+                    : specialities.length > 0 && !selectedSpeciality
+                      ? "اختر التخصص أولاً"
+                      : hierarchyLoading 
+                        ? "جاري التحميل..." 
+                        : materials.length === 0
+                          ? "لا توجد مواد متاحة"
+                          : "اختر المادة"
+                  }
+                </option>
                 {materials.map(material => (
                   <option key={material.id} value={material.id}>{material.name}</option>
                 ))}

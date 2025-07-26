@@ -240,9 +240,25 @@ router.put('/live-sessions/:id', verifyToken, requireProfessor, (req, res, next)
 // GET /api/live-sessions/pending → liste toutes les sessions en attente d'approbation (admin)
 router.get('/live-sessions/pending', verifyToken, requireRole(['admin']), async (req, res) => {
     try {
-        const result = await pool.query(
-            'SELECT * FROM live_sessions WHERE is_approved = FALSE AND is_rejected = FALSE ORDER BY start_time ASC'
-        );
+        const result = await pool.query(`
+            SELECT 
+                ls.*,
+                m.name as material_name,
+                m.speciality_id,
+                m.year_id,
+                s.name as speciality_name,
+                COALESCE(y1.name, y2.name) as year_name,
+                COALESCE(l1.name, l2.name) as level_name
+            FROM live_sessions ls
+            LEFT JOIN materials m ON ls.material_id = m.id
+            LEFT JOIN specialities s ON m.speciality_id = s.id
+            LEFT JOIN years y1 ON s.year_id = y1.id
+            LEFT JOIN levels l1 ON y1.level_id = l1.id
+            LEFT JOIN years y2 ON m.year_id = y2.id
+            LEFT JOIN levels l2 ON y2.level_id = l2.id
+            WHERE ls.is_approved = FALSE AND ls.is_rejected = FALSE 
+            ORDER BY ls.start_time ASC
+        `);
         res.json(result.rows);
     } catch (error) {
         console.error('Error fetching pending live sessions:', error);
@@ -255,11 +271,44 @@ router.get('/live-sessions', async (req, res) => {
     try {
         let result;
         if (req.query.all === 'true') {
-            result = await pool.query('SELECT * FROM live_sessions ORDER BY start_time DESC');
+            result = await pool.query(`
+                SELECT 
+                    ls.*,
+                    m.name as material_name,
+                    m.speciality_id,
+                    m.year_id,
+                    s.name as speciality_name,
+                    COALESCE(y1.name, y2.name) as year_name,
+                    COALESCE(l1.name, l2.name) as level_name
+                FROM live_sessions ls
+                LEFT JOIN materials m ON ls.material_id = m.id
+                LEFT JOIN specialities s ON m.speciality_id = s.id
+                LEFT JOIN years y1 ON s.year_id = y1.id
+                LEFT JOIN levels l1 ON y1.level_id = l1.id
+                LEFT JOIN years y2 ON m.year_id = y2.id
+                LEFT JOIN levels l2 ON y2.level_id = l2.id
+                ORDER BY ls.start_time DESC
+            `);
         } else {
-            result = await pool.query(
-                'SELECT * FROM live_sessions WHERE is_approved = TRUE ORDER BY start_time DESC'
-            );
+            result = await pool.query(`
+                SELECT 
+                    ls.*,
+                    m.name as material_name,
+                    m.speciality_id,
+                    m.year_id,
+                    s.name as speciality_name,
+                    COALESCE(y1.name, y2.name) as year_name,
+                    COALESCE(l1.name, l2.name) as level_name
+                FROM live_sessions ls
+                LEFT JOIN materials m ON ls.material_id = m.id
+                LEFT JOIN specialities s ON m.speciality_id = s.id
+                LEFT JOIN years y1 ON s.year_id = y1.id
+                LEFT JOIN levels l1 ON y1.level_id = l1.id
+                LEFT JOIN years y2 ON m.year_id = y2.id
+                LEFT JOIN levels l2 ON y2.level_id = l2.id
+                WHERE ls.is_approved = TRUE 
+                ORDER BY ls.start_time DESC
+            `);
         }
 
         // If user is authenticated, check their purchase status for each session
@@ -316,7 +365,24 @@ router.get('/live-sessions/:id', verifyToken, async (req, res) => {
                 // Add any other fields your frontend expects
             });
         }
-        const result = await pool.query('SELECT * FROM live_sessions WHERE id = $1', [id]);
+        const result = await pool.query(`
+            SELECT 
+                ls.*,
+                m.name as material_name,
+                m.speciality_id,
+                m.year_id,
+                s.name as speciality_name,
+                COALESCE(y1.name, y2.name) as year_name,
+                COALESCE(l1.name, l2.name) as level_name
+            FROM live_sessions ls
+            LEFT JOIN materials m ON ls.material_id = m.id
+            LEFT JOIN specialities s ON m.speciality_id = s.id
+            LEFT JOIN years y1 ON s.year_id = y1.id
+            LEFT JOIN levels l1 ON y1.level_id = l1.id
+            LEFT JOIN years y2 ON m.year_id = y2.id
+            LEFT JOIN levels l2 ON y2.level_id = l2.id
+            WHERE ls.id = $1
+        `, [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Live session not found' });
         }
@@ -334,7 +400,24 @@ router.post('/live-sessions/:sessionId/purchase', verifyToken, requireStudent, a
 
     try {
         // Get the session details
-        const sessionRes = await pool.query('SELECT * FROM live_sessions WHERE id = $1', [sessionId]);
+        const sessionRes = await pool.query(`
+            SELECT 
+                ls.*,
+                m.name as material_name,
+                m.speciality_id,
+                m.year_id,
+                s.name as speciality_name,
+                COALESCE(y1.name, y2.name) as year_name,
+                COALESCE(l1.name, l2.name) as level_name
+            FROM live_sessions ls
+            LEFT JOIN materials m ON ls.material_id = m.id
+            LEFT JOIN specialities s ON m.speciality_id = s.id
+            LEFT JOIN years y1 ON s.year_id = y1.id
+            LEFT JOIN levels l1 ON y1.level_id = l1.id
+            LEFT JOIN years y2 ON m.year_id = y2.id
+            LEFT JOIN levels l2 ON y2.level_id = l2.id
+            WHERE ls.id = $1
+        `, [sessionId]);
         if (sessionRes.rows.length === 0) {
             return res.status(404).json({ error: 'Live session not found' });
         }
@@ -420,7 +503,24 @@ router.get('/live-sessions/:sessionId/access', verifyToken, async (req, res) => 
 
     try {
         // Get session details
-        const sessionRes = await pool.query('SELECT * FROM live_sections WHERE id = $1', [sessionId]);
+        const sessionRes = await pool.query(`
+            SELECT 
+                ls.*,
+                m.name as material_name,
+                m.speciality_id,
+                m.year_id,
+                s.name as speciality_name,
+                COALESCE(y1.name, y2.name) as year_name,
+                COALESCE(l1.name, l2.name) as level_name
+            FROM live_sessions ls
+            LEFT JOIN materials m ON ls.material_id = m.id
+            LEFT JOIN specialities s ON m.speciality_id = s.id
+            LEFT JOIN years y1 ON s.year_id = y1.id
+            LEFT JOIN levels l1 ON y1.level_id = l1.id
+            LEFT JOIN years y2 ON m.year_id = y2.id
+            LEFT JOIN levels l2 ON y2.level_id = l2.id
+            WHERE ls.id = $1
+        `, [sessionId]);
         if (sessionRes.rows.length === 0) {
             return res.status(404).json({ error: 'Live section not found' });
         }
@@ -579,10 +679,25 @@ router.get('/professors/:professorId/live-sessions', verifyToken, requireProfess
     }
 
     try {
-        const result = await pool.query(
-            'SELECT * FROM live_sessions WHERE professor_id = $1 ORDER BY start_time DESC',
-            [professor_id]
-        );
+        const result = await pool.query(`
+            SELECT 
+                ls.*,
+                m.name as material_name,
+                m.speciality_id,
+                m.year_id,
+                s.name as speciality_name,
+                COALESCE(y1.name, y2.name) as year_name,
+                COALESCE(l1.name, l2.name) as level_name
+            FROM live_sessions ls
+            LEFT JOIN materials m ON ls.material_id = m.id
+            LEFT JOIN specialities s ON m.speciality_id = s.id
+            LEFT JOIN years y1 ON s.year_id = y1.id
+            LEFT JOIN levels l1 ON y1.level_id = l1.id
+            LEFT JOIN years y2 ON m.year_id = y2.id
+            LEFT JOIN levels l2 ON y2.level_id = l2.id
+            WHERE ls.professor_id = $1 
+            ORDER BY ls.start_time DESC
+        `, [professor_id]);
         res.json(result.rows);
     } catch (error) {
         console.error('Error fetching professor live sessions:', error);
@@ -610,6 +725,83 @@ router.patch('/live-sessions/:sessionId', verifyToken, requireProfessor, async (
         res.json(result.rows[0]);
     } catch (error) {
         console.error('Error updating live session status:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// PATCH /api/live-sessions/:sessionId/admin → admin update endpoint for approval and other fields
+router.patch('/live-sessions/:sessionId/admin', verifyToken, requireRole(['admin']), async (req, res) => {
+    const { sessionId } = req.params;
+    const updates = req.body;
+
+    try {
+        // Build dynamic update query
+        const updateFields = [];
+        const updateValues = [];
+        let paramCount = 1;
+
+        // Handle different update fields
+        if (updates.isApproved !== undefined) {
+            updateFields.push(`is_approved = $${paramCount++}`);
+            updateValues.push(updates.isApproved);
+        }
+        
+        if (updates.approvedAt !== undefined) {
+            updateFields.push(`approved_at = $${paramCount++}`);
+            updateValues.push(updates.approvedAt);
+        }
+        
+        if (updates.status !== undefined) {
+            updateFields.push(`status = $${paramCount++}`);
+            updateValues.push(updates.status);
+        }
+        
+        if (updates.attendeesCount !== undefined) {
+            updateFields.push(`attendees_count = $${paramCount++}`);
+            updateValues.push(updates.attendeesCount);
+        }
+        
+        if (updates.recordingUrl !== undefined) {
+            updateFields.push(`recording_url = $${paramCount++}`);
+            updateValues.push(updates.recordingUrl);
+        }
+        
+        if (updates.isRecorded !== undefined) {
+            updateFields.push(`is_recorded = $${paramCount++}`);
+            updateValues.push(updates.isRecorded);
+        }
+
+        if (updateFields.length === 0) {
+            return res.status(400).json({ error: 'No valid fields to update' });
+        }
+
+        // Add session ID to values
+        updateValues.push(sessionId);
+
+        const query = `
+            UPDATE live_sessions 
+            SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $${paramCount}
+            RETURNING *
+        `;
+
+        const result = await pool.query(query, updateValues);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Live session not found' });
+        }
+
+        // If approving, set approved_by to current admin
+        if (updates.isApproved === true) {
+            await pool.query(
+                'UPDATE live_sessions SET approved_by = $1 WHERE id = $2',
+                [req.user.id, sessionId]
+            );
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error updating live session (admin):', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

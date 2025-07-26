@@ -72,10 +72,14 @@ import HomepageSlides from './components/admin/HomepageSlides';
 import EnhancedHomepageSlides from './components/admin/EnhancedHomepageSlides';
 import LiveSessionApprovals from './Pages/admin/LiveSessionApprovals';
 import LiveSessionDetails from './Pages/LiveSessionDetails';
+import LiveSessionsOverview from './components/admin/LiveSessionsOverview';
 import QuizManagement from './components/admin/QuizManagement';
 // Professor components
 import QuizCreation from './components/professor/QuizCreation';
-import QuizResults from './components/professor/QuizResults';
+import QuizResults from './Pages/professor/QuizResults';
+import MyQuizzes from './Pages/professor/MyQuizzes';
+import EditQuiz from './Pages/professor/EditQuiz';
+import QuizTaking from './components/student/QuizTaking';
 
 
 const queryClient = new QueryClient({
@@ -123,6 +127,7 @@ const App: React.FC = () => {
                 <Route path="/points/success" element={<PointsSuccess />} />
                 <Route path="/points/failure" element={<PointsFailure />} />
                 <Route path="/points/history" element={<PointsHistory />} />
+                <Route path="/quiz/:quizId" element={<QuizTaking />} />
 
 
                 {/* Schoolhouse public */}
@@ -143,7 +148,7 @@ const App: React.FC = () => {
                   <Route path="users" element={<UserManagement />} />
                   <Route path="slides" element={<HomepageSlides />} />
                   <Route path="enhanced-slides" element={<EnhancedHomepageSlides />} />
-                  <Route path="live-sessions" element={<LiveSessionApprovals />} />
+                  <Route path="live-sessions" element={<LiveSessionsOverview />} />
                   <Route path="settings" element={<AdminSettings />} />
                   <Route path="points" element={<AdminPoints />} />
                   <Route path="point-codes" element={<AdminPointCodes />} />
@@ -166,7 +171,9 @@ const App: React.FC = () => {
                   <Route path="live-sessions" element={<LiveSessionsPage />} />
                   <Route path="create-live-session" element={<CreateLiveSessionPage />} />
                   <Route path="quiz" element={<QuizCreation />} />
-                  <Route path="results" element={<QuizResults professorId="1" />} />
+                  <Route path="edit-quiz/:id" element={<EditQuiz />} />
+                  <Route path="results" element={<QuizResults />} />
+                  <Route path="my-quizzes" element={<MyQuizzes />} />
                   <Route path="settings" element={<ProfessorSettings />} />
                   <Route path="comments" element={<CourseCommentsOverview />} />
                   <Route path="comments/:courseId" element={<CourseComments />} />

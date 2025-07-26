@@ -10,9 +10,8 @@ const PrivateClassesSection = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
 
-  // Fetch current user's pending requests
-  useEffect(() => {
-    const fetchRequests = async () => {
+  // Function to refresh requests data
+  const refreshRequests = async () => {
       if (!user) return;
       try {
         setRequestsLoading(true);
@@ -50,7 +49,10 @@ const PrivateClassesSection = () => {
         setRequestsLoading(false);
       }
     };
-    fetchRequests();
+
+  // Fetch current user's pending requests
+  useEffect(() => {
+    refreshRequests();
   }, [user]);
 
   const handleDetailsClick = (session) => {
@@ -87,7 +89,12 @@ const PrivateClassesSection = () => {
         const data = await response.json();
         alert(`تم شراء الحصة بنجاح! تم خصم ${data.pointsDeducted} نقطة من رصيدك.`);
         // Refresh the requests to show updated payment status
-        window.location.reload();
+        await refreshRequests();
+        
+        // Trigger points update event to refresh navbar
+        window.dispatchEvent(new CustomEvent('pointsUpdated', { 
+          detail: { points: data.newBalance } 
+        }));
       } else {
         const errorData = await response.json();
         alert(`خطأ في الشراء: ${errorData.error}`);

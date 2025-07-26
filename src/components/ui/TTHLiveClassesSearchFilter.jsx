@@ -16,7 +16,13 @@ const TTHLiveClassesSearchFilter = ({
   onSpecialityChange,
   onMaterialChange,
   onSearch,
-  onClearFilters
+  onClearFilters,
+  getFilteredYears,
+  getFilteredSpecialities,
+  getFilteredMaterials,
+  getAllYears,
+  getAllSpecialities,
+  getAllMaterials
 }) => {
   const hasActiveFilters = selectedLevel || selectedYear || selectedSpeciality || selectedMaterial;
 
@@ -69,10 +75,15 @@ const TTHLiveClassesSearchFilter = ({
                 <option value="">
                   {hierarchyLoading ? 'جاري التحميل...' : 'اختر المرحلة'}
                 </option>
-                {!hierarchyLoading && levels.map(level => (
+                {!hierarchyLoading && levels.length === 0 ? (
+                  <option value="" disabled>لا توجد مراحل متاحة</option>
+                ) : (
+                  levels.map(level => (
                   <option key={level.id} value={level.id}>{level.name}</option>
-                ))}
+                  ))
+                )}
               </select>
+
               <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                 {hierarchyLoading ? (
                   <FaSpinner className="text-gray-400 animate-spin" />
@@ -95,12 +106,12 @@ const TTHLiveClassesSearchFilter = ({
               <select
                 value={selectedYear}
                 onChange={onYearChange}
-                disabled={!selectedLevel || hierarchyLoading}
+                disabled={hierarchyLoading}
                 className="appearance-none w-full bg-white/90 backdrop-blur-sm border-2 border-gray-200 hover:border-green-300 focus:border-green-500 text-sm lg:text-base font-semibold rounded-2xl py-3 lg:py-4 pr-4 pl-12 focus:outline-none focus:ring-4 focus:ring-green-100 transition-all duration-300 shadow-sm hover:shadow-md text-right cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 dir="rtl"
               >
                 <option value="">اختر السنة</option>
-                {years.map(year => (
+                {(selectedLevel ? getFilteredYears() : getAllYears()).map(year => (
                   <option key={year.id} value={year.id}>{year.name}</option>
                 ))}
               </select>
@@ -127,9 +138,13 @@ const TTHLiveClassesSearchFilter = ({
                 dir="rtl"
               >
                 <option value="">اختر التخصص</option>
-                {specialities.map(speciality => (
+                {(selectedLevel && selectedYear ? getFilteredSpecialities() : getAllSpecialities()).length === 0 ? (
+                  <option value="" disabled>لا توجد تخصصات متاحة (3-path)</option>
+                ) : (
+                  (selectedLevel && selectedYear ? getFilteredSpecialities() : getAllSpecialities()).map(speciality => (
                   <option key={speciality.id} value={speciality.id}>{speciality.name}</option>
-                ))}
+                  ))
+                )}
               </select>
               <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                 <FaChevronDown className="text-gray-400 group-hover:text-purple-500 transition-colors duration-200" />
@@ -149,14 +164,18 @@ const TTHLiveClassesSearchFilter = ({
               <select
                 value={selectedMaterial}
                 onChange={onMaterialChange}
-                disabled={!selectedSpeciality || hierarchyLoading}
+                disabled={!selectedYear || hierarchyLoading}
                 className="appearance-none w-full bg-white/90 backdrop-blur-sm border-2 border-gray-200 hover:border-indigo-300 focus:border-indigo-500 text-sm lg:text-base font-semibold rounded-2xl py-3 lg:py-4 pr-4 pl-12 focus:outline-none focus:ring-4 focus:ring-indigo-100 transition-all duration-300 shadow-sm hover:shadow-md text-right cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 dir="rtl"
               >
                 <option value="">اختر المادة</option>
-                {materials.map(material => (
+                {(selectedLevel && selectedYear ? getFilteredMaterials() : getAllMaterials()).length === 0 ? (
+                  <option value="" disabled>لا توجد مواد متاحة</option>
+                ) : (
+                  (selectedLevel && selectedYear ? getFilteredMaterials() : getAllMaterials()).map(material => (
                   <option key={material.id} value={material.id}>{material.name}</option>
-                ))}
+                  ))
+                )}
               </select>
               <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                 <FaChevronDown className="text-gray-400 group-hover:text-indigo-500 transition-colors duration-200" />

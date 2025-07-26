@@ -22,9 +22,28 @@ import {
   FileVideo,
   Eye,
   TrendingUp,
-  Archive
+  Archive,
+  ExternalLink,
+  MoreHorizontal,
+  Edit,
+  Trash2
 } from 'lucide-react';
-import StatusControl from '@/components/live-sessions/StatusControl';
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const LiveSessionsOverview = () => {
   const [sessions, setSessions] = useState<LiveSession[]>([]);
@@ -32,6 +51,10 @@ const LiveSessionsOverview = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedApproval, setSelectedApproval] = useState<string>('all');
+  const [approvingSession, setApprovingSession] = useState<string | null>(null);
+  const [rejectingSession, setRejectingSession] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -39,15 +62,43 @@ const LiveSessionsOverview = () => {
 
   const fetchData = async () => {
     try {
-      const [sessionsData, usersData, notificationsData] = await Promise.all([
+      // Fetch sessions and users first (these are required)
+      const [sessionsData, usersData] = await Promise.all([
         api.get('/live-sessions?all=true'),
-        api.getUsers(),
-        api.getNotifications()
+        api.getUsers()
       ]);
       
-      setSessions(sessionsData);
+      // Transform sessions data to fix date formatting and add proper professor names
+      const transformedSessions = sessionsData.map(session => ({
+        ...session,
+        scheduledAt: session.start_time || session.scheduled_at || session.scheduledAt,
+        createdAt: session.created_at || session.createdAt,
+        updatedAt: session.updated_at || session.updatedAt,
+        professorId: session.professor_id || session.professorId,
+        materialId: session.material_id || session.materialId,
+        attendeesCount: session.attendees_count || session.attendeesCount || 0,
+        maxAttendees: session.max_attendees || session.maxAttendees || 100,
+        isApproved: session.is_approved || session.isApproved || false,
+        approvedBy: session.approved_by || session.approvedBy,
+        approvedAt: session.approved_at || session.approvedAt,
+        isRecorded: session.is_recorded || session.isRecorded || false,
+        recordingUrl: session.recording_url || session.recordingUrl,
+        meetingUrl: session.meeting_url || session.meetingUrl,
+        agoraChannel: session.agora_channel || session.agoraChannel,
+        agoraToken: session.agora_token || session.agoraToken
+      }));
+      
+      setSessions(transformedSessions);
       setProfessors(usersData.filter(user => user.role === 'professor'));
+      
+      // Try to fetch notifications (optional)
+      try {
+        const notificationsData = await api.getNotifications();
       setNotifications(notificationsData);
+      } catch (notifError) {
+        console.warn('Failed to fetch notifications:', notifError);
+        setNotifications([]); // Set empty array as fallback
+      }
     } catch (error) {
       console.error('Failed to fetch data:', error);
       toast.error('Failed to load live sessions data');
@@ -98,7 +149,9 @@ const LiveSessionsOverview = () => {
       technical_issues: sessions.filter(s => s.status === 'technical_issues').length,
       total: sessions.length,
       totalAttendees: sessions.reduce((sum, s) => sum + (s.attendeesCount || 0), 0),
-      recordedSessions: sessions.filter(s => s.isRecorded && s.recordingUrl).length
+      recordedSessions: sessions.filter(s => s.isRecorded && s.recordingUrl).length,
+      approved: sessions.filter(s => s.isApproved === true).length,
+      pending: sessions.filter(s => s.isApproved === false).length
     };
     return counts;
   };
@@ -118,29 +171,144 @@ const LiveSessionsOverview = () => {
     return sessions.filter(s => s.status === 'ended' && s.recordingUrl);
   };
 
+  const getFilteredSessions = () => {
+    let filtered = sessions;
+    
+    // Filter by status
+    if (selectedStatus !== 'all') {
+      filtered = filtered.filter(s => s.status === selectedStatus);
+    }
+    
+    // Filter by approval status
+    if (selectedApproval !== 'all') {
+      if (selectedApproval === 'approved') {
+        filtered = filtered.filter(s => s.isApproved === true);
+      } else if (selectedApproval === 'pending') {
+        filtered = filtered.filter(s => s.isApproved === false);
+      }
+    }
+    
+    return filtered;
+  };
+
   const recentNotifications = notifications
     .filter(n => n.type === 'live_session_scheduled' || n.type === 'live_session_started')
     .slice(0, 5);
 
+  const handleJoinSession = (session: LiveSession) => {
+    if (session.meetingUrl) {
+      window.open(session.meetingUrl, '_blank');
+    }
+  };
+
+  const handleViewRecording = (session: LiveSession) => {
+    if (session.recordingUrl) {
+      window.open(session.recordingUrl, '_blank');
+    }
+  };
+
+  const handleApproveSession = async (session: LiveSession) => {
+    setApprovingSession(session.id);
+    try {
+      const response = await api.updateLiveSession(session.id, { 
+        isApproved: true,
+        approvedAt: new Date().toISOString()
+      });
+      
+      if (response) {
+        toast.success('Session approved successfully');
+        fetchData(); // Refresh data
+      }
+    } catch (error) {
+      console.error('Failed to approve session:', error);
+      toast.error('Failed to approve session');
+    } finally {
+      setApprovingSession(null);
+    }
+  };
+
+  const handleRejectSession = async (session: LiveSession) => {
+    setRejectingSession(session.id);
+    try {
+      const response = await api.updateLiveSession(session.id, { 
+        isApproved: false,
+        status: 'cancelled'
+      });
+      
+      if (response) {
+        toast.success('Session rejected successfully');
+        fetchData(); // Refresh data
+      }
+    } catch (error) {
+      console.error('Failed to reject session:', error);
+      toast.error('Failed to reject session');
+    } finally {
+      setRejectingSession(null);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'Not scheduled';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Invalid Date';
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
+  };
+
+  const formatTime = (dateString: string) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return '';
+    }
+  };
+
   if (isLoading) {
-    return <div className="py-8 text-center">Loading live sessions overview...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading live sessions overview...</p>
+        </div>
+      </div>
+    );
   }
 
   const statusCounts = getStatusCounts();
   const upcomingSessions = getUpcomingSessions();
   const activeSessions = getActiveSessions();
   const savedSessions = getSavedSessions();
+  const filteredSessions = getFilteredSessions();
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
       <div>
-        <h2 className="text-2xl font-bold">Live Sessions Overview</h2>
-        <p className="text-gray-600">Monitor all live sessions across the platform</p>
+          <h2 className="text-3xl font-bold tracking-tight">Live Sessions Overview</h2>
+          <p className="text-muted-foreground">Monitor and manage all live sessions across the platform</p>
+        </div>
+        <Button onClick={fetchData} variant="outline" size="sm">
+          <RotateCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
       </div>
 
       {/* Enhanced Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
             <Video className="h-4 w-4 text-muted-foreground" />
@@ -151,7 +319,7 @@ const LiveSessionsOverview = () => {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
             <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
@@ -162,7 +330,7 @@ const LiveSessionsOverview = () => {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Attendees</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -173,7 +341,7 @@ const LiveSessionsOverview = () => {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Recorded Sessions</CardTitle>
             <FileVideo className="h-4 w-4 text-muted-foreground" />
@@ -192,41 +360,49 @@ const LiveSessionsOverview = () => {
           <CardDescription>Current status distribution of all sessions</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-            <div className="text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-4">
+            <div className="text-center p-3 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors cursor-pointer" onClick={() => setSelectedStatus('scheduled')}>
               <div className="text-lg font-semibold text-blue-600">{statusCounts.scheduled}</div>
               <div className="text-xs text-gray-500">Scheduled</div>
             </div>
-            <div className="text-center">
+            <div className="text-center p-3 rounded-lg bg-red-50 hover:bg-red-100 transition-colors cursor-pointer" onClick={() => setSelectedStatus('live')}>
               <div className="text-lg font-semibold text-red-600">{statusCounts.live}</div>
               <div className="text-xs text-gray-500">Live</div>
             </div>
-            <div className="text-center">
+            <div className="text-center p-3 rounded-lg bg-orange-50 hover:bg-orange-100 transition-colors cursor-pointer" onClick={() => setSelectedStatus('starting')}>
               <div className="text-lg font-semibold text-orange-600">{statusCounts.starting}</div>
               <div className="text-xs text-gray-500">Starting</div>
             </div>
-            <div className="text-center">
+            <div className="text-center p-3 rounded-lg bg-yellow-50 hover:bg-yellow-100 transition-colors cursor-pointer" onClick={() => setSelectedStatus('paused')}>
               <div className="text-lg font-semibold text-yellow-600">{statusCounts.paused}</div>
               <div className="text-xs text-gray-500">Paused</div>
             </div>
-            <div className="text-center">
+            <div className="text-center p-3 rounded-lg bg-green-50 hover:bg-green-100 transition-colors cursor-pointer" onClick={() => setSelectedStatus('ended')}>
               <div className="text-lg font-semibold text-green-600">{statusCounts.ended}</div>
               <div className="text-xs text-gray-500">Ended</div>
             </div>
-            <div className="text-center">
+            <div className="text-center p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => setSelectedStatus('cancelled')}>
               <div className="text-lg font-semibold text-gray-600">{statusCounts.cancelled}</div>
               <div className="text-xs text-gray-500">Cancelled</div>
             </div>
-            <div className="text-center">
+            <div className="text-center p-3 rounded-lg bg-red-100 hover:bg-red-200 transition-colors cursor-pointer" onClick={() => setSelectedStatus('technical_issues')}>
               <div className="text-lg font-semibold text-red-800">{statusCounts.technical_issues}</div>
               <div className="text-xs text-gray-500">Issues</div>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-green-100 hover:bg-green-200 transition-colors cursor-pointer" onClick={() => setSelectedApproval('approved')}>
+              <div className="text-lg font-semibold text-green-800">{statusCounts.approved}</div>
+              <div className="text-xs text-gray-500">Approved</div>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-yellow-100 hover:bg-yellow-200 transition-colors cursor-pointer" onClick={() => setSelectedApproval('pending')}>
+              <div className="text-lg font-semibold text-yellow-800">{statusCounts.pending}</div>
+              <div className="text-xs text-gray-500">Pending</div>
             </div>
           </div>
         </CardContent>
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="all-sessions">All Sessions</TabsTrigger>
           <TabsTrigger value="saved-library">Saved Library</TabsTrigger>
@@ -244,10 +420,14 @@ const LiveSessionsOverview = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               {activeSessions.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-4">No active sessions</p>
+                <div className="text-center py-8">
+                  <Play className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900">No active sessions</h3>
+                  <p className="mt-1 text-sm text-gray-500">There are currently no live or starting sessions.</p>
+                </div>
               ) : (
                 activeSessions.map((session) => (
-                  <div key={session.id} className="border rounded-lg p-4 bg-red-50">
+                  <div key={session.id} className="border rounded-lg p-4 bg-red-50 hover:bg-red-100 transition-colors">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
                         <h4 className="font-medium">{session.title}</h4>
@@ -261,7 +441,7 @@ const LiveSessionsOverview = () => {
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <div className="flex items-center gap-1">
                         <UsersIcon className="h-3 w-3" />
-                        {session.attendeesCount}/{session.maxAttendees}
+                        {session.attendeesCount || 0}/{session.maxAttendees || 0}
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
@@ -274,6 +454,14 @@ const LiveSessionsOverview = () => {
                         </div>
                       )}
                     </div>
+                    {session.meetingUrl && (
+                      <div className="mt-3">
+                        <Button size="sm" variant="outline" onClick={() => handleJoinSession(session)}>
+                          <ExternalLink className="h-3 w-3 mr-2" />
+                          Join Session
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -291,10 +479,14 @@ const LiveSessionsOverview = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               {upcomingSessions.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-4">No upcoming sessions</p>
+                <div className="text-center py-8">
+                  <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900">No upcoming sessions</h3>
+                  <p className="mt-1 text-sm text-gray-500">There are no scheduled sessions in the near future.</p>
+                </div>
               ) : (
                 upcomingSessions.map((session) => (
-                  <div key={session.id} className="border rounded-lg p-3">
+                  <div key={session.id} className="border rounded-lg p-3 hover:bg-gray-50 transition-colors">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
                         <h4 className="font-medium text-sm">{session.title}</h4>
@@ -317,26 +509,76 @@ const LiveSessionsOverview = () => {
         <TabsContent value="all-sessions" className="space-y-6">
           <Card>
             <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
               <CardTitle>All Sessions</CardTitle>
               <CardDescription>Complete overview of all live sessions with management controls</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                      <SelectItem value="live">Live</SelectItem>
+                      <SelectItem value="starting">Starting</SelectItem>
+                      <SelectItem value="paused">Paused</SelectItem>
+                      <SelectItem value="ended">Ended</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="technical_issues">Technical Issues</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select value={selectedApproval} onValueChange={setSelectedApproval}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Filter by approval" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Approval</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
+              <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Session</TableHead>
                     <TableHead>Professor</TableHead>
                     <TableHead>Status</TableHead>
+                            <TableHead>Approval</TableHead>
                     <TableHead>Scheduled</TableHead>
                     <TableHead>Attendees</TableHead>
                     <TableHead>Duration</TableHead>
                     <TableHead>Recording</TableHead>
-                    <TableHead>Actions</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sessions.map((session) => (
-                    <TableRow key={session.id}>
+                    {filteredSessions.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8">
+                          <div className="text-center">
+                            <Video className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                            <h3 className="text-lg font-medium text-gray-900">No sessions found</h3>
+                            <p className="mt-1 text-sm text-gray-500">
+                              {selectedStatus === 'all' 
+                                ? 'No live sessions have been created yet.' 
+                                : `No sessions with status "${selectedStatus}" found.`
+                              }
+                            </p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredSessions.map((session) => (
+                        <TableRow key={session.id} className="hover:bg-gray-50">
                       <TableCell>
                         <div>
                           <div className="font-medium">{session.title}</div>
@@ -367,12 +609,30 @@ const LiveSessionsOverview = () => {
                           {session.status.charAt(0).toUpperCase() + session.status.slice(1).replace('_', ' ')}
                         </Badge>
                       </TableCell>
+                          <TableCell>
+                            {session.isApproved ? (
+                              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                <CheckCircle className="h-2 w-2 mr-1" />
+                                Approved
+                              </Badge>
+                            ) : session.status === 'scheduled' ? (
+                              <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200">
+                                <Clock className="h-2 w-2 mr-1" />
+                                Pending
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs bg-gray-50 text-gray-700 border-gray-200">
+                                <XCircle className="h-2 w-2 mr-1" />
+                                Not Required
+                              </Badge>
+                            )}
+                          </TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          {new Date(session.scheduledAt).toLocaleDateString()}
+                              {formatDate(session.scheduledAt)}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {new Date(session.scheduledAt).toLocaleTimeString()}
+                              {formatTime(session.scheduledAt)}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -394,7 +654,7 @@ const LiveSessionsOverview = () => {
                       <TableCell>
                         {session.isRecorded ? (
                           session.recordingUrl ? (
-                            <Button size="sm" variant="outline" className="h-6 text-xs">
+                                <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => handleViewRecording(session)}>
                               <Eye className="h-3 w-3 mr-1" />
                               View
                             </Button>
@@ -408,24 +668,79 @@ const LiveSessionsOverview = () => {
                           <span className="text-xs text-gray-400">No recording</span>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2 items-center">
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
                           {session.meetingUrl && (
-                            <Button size="sm" variant="outline" className="h-6 text-xs">
+                                <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => handleJoinSession(session)}>
+                                  <ExternalLink className="h-3 w-3 mr-1" />
                               Join
                             </Button>
                           )}
-                          <StatusControl
-                            session={session}
-                            onStatusUpdate={fetchData}
-                            userRole="admin"
-                          />
+                              
+                              {/* Approval buttons for pending sessions */}
+                              {!session.isApproved && session.status === 'scheduled' && (
+                                <div className="flex items-center gap-1">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    disabled={approvingSession === session.id || rejectingSession === session.id}
+                                    className="h-7 px-3 text-xs bg-green-50 text-green-700 hover:bg-green-100 border-green-200 hover:border-green-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={() => handleApproveSession(session)}
+                                  >
+                                    {approvingSession === session.id ? (
+                                      <RotateCw className="h-3 w-3 mr-1 animate-spin" />
+                                    ) : (
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                    )}
+                                    {approvingSession === session.id ? 'Approving...' : 'Approve'}
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    disabled={approvingSession === session.id || rejectingSession === session.id}
+                                    className="h-7 px-3 text-xs bg-red-50 text-red-700 hover:bg-red-100 border-red-200 hover:border-red-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={() => handleRejectSession(session)}
+                                  >
+                                    {rejectingSession === session.id ? (
+                                      <RotateCw className="h-3 w-3 mr-1 animate-spin" />
+                                    ) : (
+                                      <XCircle className="h-3 w-3 mr-1" />
+                                    )}
+                                    {rejectingSession === session.id ? 'Rejecting...' : 'Reject'}
+                                  </Button>
+                                </div>
+                              )}
+                              
+
+                              
+
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="h-6 w-6 p-0">
+                                    <MoreHorizontal className="h-3 w-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit Session
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="text-red-600">
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Session
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                      ))
+                    )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -453,7 +768,7 @@ const LiveSessionsOverview = () => {
               ) : (
                 <div className="grid gap-4">
                   {savedSessions.map((session) => (
-                    <Card key={session.id} className="border-green-200 bg-green-50">
+                    <Card key={session.id} className="border-green-200 bg-green-50 hover:bg-green-100 transition-colors">
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -469,7 +784,7 @@ const LiveSessionsOverview = () => {
                           </div>
                           <div className="flex items-center gap-2">
                             {session.recordingUrl && (
-                              <Button size="sm" variant="outline">
+                              <Button size="sm" variant="outline" onClick={() => handleViewRecording(session)}>
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Recording
                               </Button>
@@ -525,10 +840,16 @@ const LiveSessionsOverview = () => {
         </CardHeader>
         <CardContent className="space-y-3">
           {recentNotifications.length === 0 ? (
-            <p className="text-sm text-gray-500">No recent notifications</p>
+            <div className="text-center py-8">
+              <div className="h-12 w-12 bg-gray-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                <Clock className="h-6 w-6 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900">No recent activity</h3>
+              <p className="mt-1 text-sm text-gray-500">No notifications to display at the moment.</p>
+            </div>
           ) : (
             recentNotifications.map((notification) => (
-              <div key={notification.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+              <div key={notification.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                 <div className="h-2 w-2 bg-blue-500 rounded-full mt-2 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium">{notification.message}</p>
