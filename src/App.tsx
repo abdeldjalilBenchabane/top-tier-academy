@@ -68,6 +68,7 @@ import UserManagement from './components/admin/UserManagement';
 import HomepageSlides from './components/admin/HomepageSlides';
 import EnhancedHomepageSlides from './components/admin/EnhancedHomepageSlides';
 import LiveSessionApprovals from './Pages/admin/LiveSessionApprovals';
+import LiveSessionsOverview from './components/admin/LiveSessionsOverview';
 import QuizManagement from './components/admin/QuizManagement';
 // Professor components
 import QuizCreation from './components/professor/QuizCreation';
@@ -138,7 +139,7 @@ const App: React.FC = () => {
                   <Route path="users" element={<UserManagement />} />
                   <Route path="slides" element={<HomepageSlides />} />
                   <Route path="enhanced-slides" element={<EnhancedHomepageSlides />} />
-                  <Route path="live-sessions" element={<LiveSessionApprovals />} />
+                  <Route path="live-sessions" element={<LiveSessionsOverview />} />
                   <Route path="settings" element={<AdminSettings />} />
                   <Route path="points" element={<AdminPoints />} />
                   <Route path="point-codes" element={<AdminPointCodes />} />
