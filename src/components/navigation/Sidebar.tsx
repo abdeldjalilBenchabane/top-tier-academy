@@ -70,6 +70,7 @@ const Sidebar = () => {
     { name: 'My Courses', path: '/professor/courses', icon: <BookOpen className="h-5 w-5" /> },
     { name: 'Create Course', path: '/professor/create', icon: <FileText className="h-5 w-5" /> },
     { name: 'Live Sessions', path: '/professor/live-sessions', icon: <Video className="h-5 w-5" /> },
+    { name: 'Create Live Session', path: '/professor/create-live-session', icon: <Video className="h-5 w-5" /> },
     { name: 'Live Sections', path: '/professor/live-sections', icon: <Video className="h-5 w-5" /> },
     { name: 'Create Quiz', path: '/professor/quiz', icon: <HelpCircle className="h-5 w-5" /> },
     { name: 'Quiz Results', path: '/professor/results', icon: <BarChart className="h-5 w-5" /> },

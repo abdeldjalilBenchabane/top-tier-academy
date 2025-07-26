@@ -2,17 +2,23 @@ import React, { useEffect, useState } from "react";
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 import CourseCard from "../components/ui/TTHCourseCard";
+import LiveSectionCard from "../components/ui/TTHLiveSectionCard";
 import LanguageFilter from "../components/ui/TTHLanguageFilter";
 import { languageCourses } from "../data";
 import { pointsAPI } from '@/services/api';
 
 export default function Languages() {
   const [courses, setCourses] = useState([]);
+  const [liveSections, setLiveSections] = useState([]);
   const [filteredCourses, setFilteredCourses] = useState([]);
+  const [filteredLiveSections, setFilteredLiveSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [languages, setLanguages] = useState([]);
   const [languageLevels, setLanguageLevels] = useState([]);
   const [professors, setProfessors] = useState([]);
+  const [liveLanguages, setLiveLanguages] = useState([]);
+  const [liveLanguageLevels, setLiveLanguageLevels] = useState([]);
+  const [liveProfessors, setLiveProfessors] = useState([]);
   
   // Filter states
   const [selectedLanguage, setSelectedLanguage] = useState('');
@@ -21,6 +27,7 @@ export default function Languages() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLanguageFilter, setSelectedLanguageFilter] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all'); // 'all' or 'live'
 
   useEffect(() => {
     async function fetchData() {
@@ -40,12 +47,34 @@ export default function Languages() {
           (course.status === 'approved' || course.status === 'pending')
         );
 
-        // Extract language and level data from courses instead of making separate API calls
+        // Fetch live sections
+        let languageLiveSections = [];
+        try {
+          const liveSectionsRes = await fetch('/api/live-sections/approved');
+          if (liveSectionsRes.ok) {
+            const liveSectionsData = await liveSectionsRes.json();
+            console.log('LIVE SECTIONS DATA', liveSectionsData);
+            
+            // Filter for language live sections
+            languageLiveSections = liveSectionsData.filter(section => 
+              section.language_id !== null && 
+              section.language_id !== undefined && 
+              section.language_id !== '' &&
+              section.status === 'approved'
+            );
+          } else {
+            console.warn('Failed to fetch live sections:', liveSectionsRes.status);
+          }
+        } catch (error) {
+          console.warn('Error fetching live sections:', error);
+        }
+
+        // Extract language and level data from courses only (for regular courses filter)
         let languagesData = [];
         let languageLevelsData = [];
         let professorsData = [];
         
-        // Extract unique languages and levels from the courses data
+        // Extract unique languages and levels from the courses data only
         const languageMap = new Map();
         const levelMap = new Map();
         const professorMap = new Map();
@@ -82,16 +111,62 @@ export default function Languages() {
         languageLevelsData = Array.from(levelMap.values());
         professorsData = Array.from(professorMap.values());
 
+        // Extract language and level data from live sections only (for live sections filter)
+        const liveLanguageMap = new Map();
+        const liveLevelMap = new Map();
+        const liveProfessorMap = new Map();
+        
+        languageLiveSections.forEach(section => {
+          // Extract language info from live section data
+          if (section.language_name) {
+            liveLanguageMap.set(section.language_name, {
+              id: section.language_name,
+              name: section.language_name,
+              code: section.language_name.toLowerCase()
+            });
+          }
+          
+          // Extract level info from live section data
+          if (section.language_level_name) {
+            liveLevelMap.set(section.language_level_name, {
+              id: section.language_level_name,
+              name: section.language_level_name,
+              language_id: section.language_name
+            });
+          }
+          
+          // Extract professor info from live section data
+          if (section.professor_name && section.professor_id) {
+            liveProfessorMap.set(section.professor_id, {
+              id: section.professor_id,
+              name: section.professor_name
+            });
+          }
+        });
+        
+        const liveLanguagesData = Array.from(liveLanguageMap.values());
+        const liveLanguageLevelsData = Array.from(liveLevelMap.values());
+        const liveProfessorsData = Array.from(liveProfessorMap.values());
+
         console.log('Languages data:', languagesData);
+        console.log('Live Languages data:', liveLanguagesData);
         console.log('Language levels data:', languageLevelsData);
         console.log('Professors data:', professorsData);
         console.log('Sample course:', languageCourses[0]);
+        console.log('Sample live section:', languageLiveSections[0]);
         console.log('All language courses:', languageCourses.map(c => ({ 
           id: c.id, 
           title: c.title, 
           createdBy: c.createdBy, 
           created_by_name: c.created_by_name,
           language_name: c.language_name 
+        })));
+        console.log('All language live sections:', languageLiveSections.map(s => ({ 
+          id: s.id, 
+          title: s.title, 
+          professor_id: s.professor_id, 
+          professor_name: s.professor_name,
+          language_name: s.language_name 
         })));
 
         // Fetch language course prices
@@ -122,10 +197,15 @@ export default function Languages() {
         }));
 
         setCourses(languageCourses);
+        setLiveSections(languageLiveSections);
         setFilteredCourses(languageCourses);
+        setFilteredLiveSections(languageLiveSections);
         setLanguages(Array.isArray(languagesData) ? languagesData : []);
         setLanguageLevels(Array.isArray(languageLevelsData) ? languageLevelsData : []);
         setProfessors(Array.isArray(professorsData) ? professorsData : []);
+        setLiveLanguages(Array.isArray(liveLanguagesData) ? liveLanguagesData : []);
+        setLiveLanguageLevels(Array.isArray(liveLanguageLevelsData) ? liveLanguageLevelsData : []);
+        setLiveProfessors(Array.isArray(liveProfessorsData) ? liveProfessorsData : []);
 
       } catch (e) {
         console.error('Error fetching data:', e);
@@ -141,8 +221,14 @@ export default function Languages() {
     fetchData();
   }, []);
 
-  // Apply filters whenever filter states change
+  // Apply filters whenever filter states change (for regular courses)
   useEffect(() => {
+    // Only apply filters if we're in the 'all' filter mode
+    if (activeFilter !== 'all') {
+      setFilteredCourses(courses);
+      return;
+    }
+
     let filtered = [...courses];
 
     // Filter by language
@@ -176,7 +262,45 @@ export default function Languages() {
     }
 
     setFilteredCourses(filtered);
-  }, [courses, selectedLanguage, selectedLevel, selectedProfessor, searchTerm, languages, languageLevels]);
+  }, [courses, selectedLanguage, selectedLevel, selectedProfessor, searchTerm, languages, languageLevels, activeFilter]);
+
+  // Apply filters for live sections
+  useEffect(() => {
+    // Only apply filters if we're in the 'live' filter mode
+    if (activeFilter !== 'live') {
+      setFilteredLiveSections(liveSections);
+      return;
+    }
+
+    let filtered = [...liveSections];
+
+    // Filter by language
+    if (selectedLanguage) {
+      filtered = filtered.filter(section => section.language_name === selectedLanguage);
+    }
+
+    // Filter by level (only if language is selected)
+    if (selectedLevel && selectedLanguage) {
+      filtered = filtered.filter(section => section.language_level_name === selectedLevel);
+    }
+
+    // Filter by professor
+    if (selectedProfessor) {
+      filtered = filtered.filter(section => {
+        return String(section.professor_id) === String(selectedProfessor);
+      });
+    }
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(section => 
+        section.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        section.description.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    setFilteredLiveSections(filtered);
+  }, [liveSections, selectedLanguage, selectedLevel, selectedProfessor, searchTerm, liveLanguages, liveLanguageLevels, activeFilter]);
 
   // Group courses by language
   const groupCoursesByLanguage = () => {
@@ -200,6 +324,28 @@ export default function Languages() {
 
   const groupedCourses = groupCoursesByLanguage();
 
+  // Group live sections by language
+  const groupLiveSectionsByLanguage = () => {
+    const grouped = {};
+    
+    if (!Array.isArray(filteredLiveSections)) {
+      return grouped;
+    }
+    
+    filteredLiveSections.forEach(section => {
+      const languageName = section.language_name || 'Unknown Language';
+      
+      if (!grouped[languageName]) {
+        grouped[languageName] = [];
+      }
+      grouped[languageName].push(section);
+    });
+
+    return grouped;
+  };
+
+  const groupedLiveSections = groupLiveSectionsByLanguage();
+
   // Filter courses by selected language for the button filter
   const getFilteredCoursesByLanguage = () => {
     if (!selectedLanguageFilter) {
@@ -210,6 +356,22 @@ export default function Languages() {
     Object.keys(groupedCourses).forEach(languageName => {
       if (languageName === selectedLanguageFilter) {
         filtered[languageName] = groupedCourses[languageName];
+      }
+    });
+    
+    return filtered;
+  };
+
+  // Filter live sections by selected language for the button filter
+  const getFilteredLiveSectionsByLanguage = () => {
+    if (!selectedLanguageFilter) {
+      return groupedLiveSections;
+    }
+    
+    const filtered = {};
+    Object.keys(groupedLiveSections).forEach(languageName => {
+      if (languageName === selectedLanguageFilter) {
+        filtered[languageName] = groupedLiveSections[languageName];
       }
     });
     
@@ -338,7 +500,7 @@ export default function Languages() {
                                 dir="rtl"
                               >
                                 <option value="">جميع اللغات</option>
-                                {languages.map((language) => (
+                                {(activeFilter === 'all' ? languages : liveLanguages).map((language) => (
                                   <option key={language.id} value={language.name}>
                                     {language.name}
                                   </option>
@@ -369,7 +531,7 @@ export default function Languages() {
                                 dir="rtl"
                               >
                                 <option value="">جميع المستويات</option>
-                                {languageLevels
+                                {(activeFilter === 'all' ? languageLevels : liveLanguageLevels)
                                   .filter(level => !selectedLanguage || level.language_id === selectedLanguage)
                                   .map((level) => (
                                     <option key={level.id} value={level.name}>
@@ -401,7 +563,7 @@ export default function Languages() {
                                 dir="rtl"
                               >
                                 <option value="">جميع الأساتذة</option>
-                                {professors.map((professor) => (
+                                {(activeFilter === 'all' ? professors : liveProfessors).map((professor) => (
                                   <option key={professor.id} value={professor.id}>
                                     {professor.name}
                                   </option>
@@ -432,7 +594,7 @@ export default function Languages() {
                             )}
                             {selectedProfessor && (
                               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                {professors.find(p => p.id === selectedProfessor)?.name || selectedProfessor}
+                                {(activeFilter === 'all' ? professors : liveProfessors).find(p => p.id === selectedProfessor)?.name || selectedProfessor}
                               </span>
                             )}
                             {!selectedLanguage && !selectedLevel && !selectedProfessor && (
@@ -455,52 +617,136 @@ export default function Languages() {
         )}
 
         {/* Language Filter Section */}
-        {!loading && Object.keys(groupedCourses).length > 0 && (
+        {!loading && (Object.keys(groupedCourses).length > 0 || Object.keys(groupedLiveSections).length > 0) && (
           <section className="py-8 bg-white shadow-sm">
             <div className="container mx-auto px-4">
-              <div className="flex flex-wrap justify-center gap-4">
+              {/* Main Filter Buttons */}
+              <div className="flex flex-wrap justify-center gap-4 mb-6">
                 <button
-                  onClick={() => handleLanguageFilter(null)}
+                  onClick={() => setActiveFilter('all')}
                   className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
-                    selectedLanguageFilter === null 
+                    activeFilter === 'all' 
                       ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
                       : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
                   }`}
                 >
                   جميع اللغات
-                  {selectedLanguageFilter === null && (
+                  {activeFilter === 'all' && (
                     <span className="ml-2 bg-white/20 px-2 py-1 rounded-full text-xs">
                       {Object.values(groupedCourses).flat().length}
                     </span>
                   )}
                 </button>
                 
-                {Object.keys(groupedCourses).map((languageName) => {
-                  const languageCourseCount = groupedCourses[languageName].length;
-                  
-                  return (
-                    <button
-                      key={languageName}
-                      onClick={() => handleLanguageFilter(languageName)}
-                      className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
-                        selectedLanguageFilter === languageName 
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
-                          : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
-                      }`}
-                    >
-                      {languageName}
-                      <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
-                        selectedLanguageFilter === languageName 
-                          ? 'bg-white/20' 
-                          : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {languageCourseCount}
-                      </span>
-                    </button>
-                  );
-                })}
+                <button
+                  onClick={() => setActiveFilter('live')}
+                  className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
+                    activeFilter === 'live' 
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
+                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
+                  }`}
+                >
+                  لغات لايف
+                  {activeFilter === 'live' && (
+                    <span className="ml-2 bg-white/20 px-2 py-1 rounded-full text-xs">
+                      {Object.values(groupedLiveSections).flat().length}
+                    </span>
+                  )}
+                </button>
               </div>
-        </div>
+
+              {/* Language Specific Filter Buttons */}
+              {activeFilter === 'all' && Object.keys(groupedCourses).length > 0 && (
+                <div className="flex flex-wrap justify-center gap-4">
+                  <button
+                    onClick={() => handleLanguageFilter(null)}
+                    className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
+                      selectedLanguageFilter === null 
+                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
+                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
+                    }`}
+                  >
+                    جميع اللغات
+                    {selectedLanguageFilter === null && (
+                      <span className="ml-2 bg-white/20 px-2 py-1 rounded-full text-xs">
+                        {Object.values(groupedCourses).flat().length}
+                      </span>
+                    )}
+                  </button>
+                  
+                  {Object.keys(groupedCourses).map((languageName) => {
+                    const languageCourseCount = groupedCourses[languageName].length;
+                    
+                    return (
+                      <button
+                        key={languageName}
+                        onClick={() => handleLanguageFilter(languageName)}
+                        className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
+                          selectedLanguageFilter === languageName 
+                            ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
+                            : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
+                        }`}
+                      >
+                        {languageName}
+                        <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
+                          selectedLanguageFilter === languageName 
+                            ? 'bg-white/20' 
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {languageCourseCount}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Live Language Specific Filter Buttons */}
+              {activeFilter === 'live' && Object.keys(groupedLiveSections).length > 0 && (
+                <div className="flex flex-wrap justify-center gap-4">
+                  <button
+                    onClick={() => handleLanguageFilter(null)}
+                    className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
+                      selectedLanguageFilter === null 
+                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
+                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
+                    }`}
+                  >
+                    جميع اللغات
+                    {selectedLanguageFilter === null && (
+                      <span className="ml-2 bg-white/20 px-2 py-1 rounded-full text-xs">
+                        {Object.values(groupedLiveSections).flat().length}
+                      </span>
+                    )}
+                  </button>
+                  
+                  {Object.keys(groupedLiveSections).map((languageName) => {
+                    const languageLiveSectionCount = groupedLiveSections[languageName].length;
+                    
+                    return (
+                      <button
+                        key={languageName}
+                        onClick={() => handleLanguageFilter(languageName)}
+                        className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
+                          selectedLanguageFilter === languageName 
+                            ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
+                            : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
+                        }`}
+                      >
+                        {languageName}
+                        <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
+                          selectedLanguageFilter === languageName 
+                            ? 'bg-white/20' 
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {languageLiveSectionCount}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </section>
         )}
 
@@ -510,19 +756,24 @@ export default function Languages() {
         <div className="relative">
           {loading ? (
             <div className="text-center py-16">Loading...</div>
-          ) : filteredCourses.length === 0 ? (
+          ) : (activeFilter === 'all' && filteredCourses.length === 0) || (activeFilter === 'live' && filteredLiveSections.length === 0) ? (
             <div className="text-center py-16">
               <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
                 <svg className="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-2">لا توجد دورات لغات متاحة حالياً</h3>
-              <p className="text-gray-600">سيتم إضافة دورات جديدة قريباً</p>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">
+                {activeFilter === 'all' ? 'لا توجد دورات لغات متاحة حالياً' : 'لا توجد جلسات لايف متاحة حالياً'}
+              </h3>
+              <p className="text-gray-600">
+                {activeFilter === 'all' ? 'سيتم إضافة دورات جديدة قريباً' : 'سيتم إضافة جلسات لايف جديدة قريباً'}
+              </p>
             </div>
           ) : (
             <div className="space-y-12">
-              {Object.entries(getFilteredCoursesByLanguage()).map(([languageName, languageCourses]) => (
+              {/* Show Regular Courses */}
+              {activeFilter === 'all' && Object.entries(getFilteredCoursesByLanguage()).map(([languageName, languageCourses]) => (
                 <div key={languageName} className="space-y-6">
                   {/* Language Header */}
                   <div className="text-center">
@@ -533,15 +784,33 @@ export default function Languages() {
                   {/* Courses Grid for this language */}
                   <div dir="rtl" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-8 justify-items-center relative z-10">
                     {languageCourses.map((course) => (
-              <CourseCard
-                key={course.id}
-                course={course}
-              />
+                      <CourseCard
+                        key={course.id}
+                        course={course}
+                      />
                     ))}
                   </div>
                 </div>
-            ))}
-          </div>
+              ))}
+
+              {/* Show Live Sections */}
+              {activeFilter === 'live' && Object.entries(getFilteredLiveSectionsByLanguage()).map(([languageName, languageLiveSections]) => (
+                <div key={languageName} className="space-y-6">
+                  {/* Language Header */}
+                  <div className="text-center">
+                    <h3 className="text-2xl font-bold text-gray-800 mb-2">{languageName}</h3>
+                    <p className="text-gray-600">{languageLiveSections.length} جلسة لايف متاحة</p>
+                  </div>
+                  
+                  {/* Live Sections Grid for this language */}
+                  <div dir="rtl" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-8 justify-items-center relative z-10">
+                    {languageLiveSections.map((section) => (
+                      <LiveSectionCard key={section.id} section={section} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </main>

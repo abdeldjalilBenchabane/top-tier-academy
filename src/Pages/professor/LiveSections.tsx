@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Clock, CheckCircle, XCircle, Video, Calendar, FileText, Plus, Layers, ArrowLeft } from 'lucide-react';
 import { toast as toastLib } from '@/lib/toast';
 import LiveSectionForm from '@/components/forms/LiveSectionForm';
-import PathSelector from '@/components/admin/PathSelector';
+import LiveSectionPathSelector from '@/components/admin/LiveSectionPathSelector';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 interface LiveSection {
@@ -21,6 +21,9 @@ interface LiveSection {
   price: number;
   cover_url?: string;
   status: 'draft' | 'pending' | 'approved' | 'rejected';
+  scheduled_date?: string;
+  scheduled_time?: string;
+  duration_minutes?: number;
   createdAt: string;
   updatedAt: string;
   live_sessions_count: number;
@@ -34,6 +37,7 @@ const ProfessorLiveSections = () => {
   const [activeTab, setActiveTab] = useState('drafts');
   const [showForm, setShowForm] = useState(false);
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editingSectionData, setEditingSectionData] = useState<any>(null);
   const [showPathSelector, setShowPathSelector] = useState(false);
   const [selectedDraftSection, setSelectedDraftSection] = useState<LiveSection | null>(null);
 
@@ -43,12 +47,19 @@ const ProfessorLiveSections = () => {
       console.log('[ProfessorLiveSections] user:', user);
       if (!user) return;
       
-      // For now, we'll start with empty data
-      // In the future, this would be: const res = await fetch(`/api/live-sections?created_by=${user.id}`);
-      const mockData: LiveSection[] = [];
+      const response = await fetch(`/api/professors/${user.id}/live-sections`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
       
-      setLiveSections(mockData);
-      console.log('[ProfessorLiveSections] setLiveSections:', mockData);
+      if (!response.ok) {
+        throw new Error('Failed to fetch live sections');
+      }
+      
+      const data = await response.json();
+      setLiveSections(data);
+      console.log('[ProfessorLiveSections] setLiveSections:', data);
     } catch (error) {
       console.error('Failed to fetch live sections:', error);
       toastLib.error('Failed to load live section data');
@@ -103,9 +114,47 @@ const ProfessorLiveSections = () => {
     setShowForm(true);
   };
 
-  const handleEditSection = (sectionId: string) => {
-    setEditingSectionId(sectionId);
-    setShowForm(true);
+  const handleEditSection = async (sectionId: string) => {
+    try {
+      // Fetch the live section details including live sessions
+      const response = await fetch(`/api/live-sections/${sectionId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch live section details');
+      }
+      
+      const sectionData = await response.json();
+      
+      // Fetch live sessions for this section
+      const sessionsResponse = await fetch(`/api/live-sections/${sectionId}/sessions`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      let liveSessions = [];
+      if (sessionsResponse.ok) {
+        const sessionsData = await sessionsResponse.json();
+        liveSessions = sessionsData;
+      }
+      
+      const editingSection = {
+        ...sectionData,
+        live_sessions: liveSessions
+      };
+      
+      setEditingSectionId(sectionId);
+      setShowForm(true);
+      // Pass the editing section data to the form
+      setEditingSectionData(editingSection);
+    } catch (error) {
+      console.error('Error fetching live section details:', error);
+      toastLib.error('Failed to load live section details');
+    }
   };
 
   const handleFormSuccess = (sectionData?: any) => {
@@ -135,6 +184,7 @@ const ProfessorLiveSections = () => {
   const handleFormCancel = () => {
     setShowForm(false);
     setEditingSectionId(null);
+    setEditingSectionData(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -193,6 +243,7 @@ const ProfessorLiveSections = () => {
             <LiveSectionForm 
               onSuccess={handleFormSuccess}
               onCancel={handleFormCancel}
+              editingSection={editingSectionData}
             />
           </CardContent>
         </Card>
@@ -267,7 +318,7 @@ const ProfessorLiveSections = () => {
                 {liveSections
                   .filter(section => section.status === 'draft')
                   .map(section => (
-                    <Card key={section.id} className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleEditSection(section.id)}>
+                    <Card key={`draft-${section.id}`} className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleEditSection(section.id)}>
                       <CardHeader className="pb-2">
                         {section.cover_url && (
                           <img
@@ -305,9 +356,28 @@ const ProfessorLiveSections = () => {
                             <span>{section.live_sessions_count} sessions</span>
                           </div>
                         </div>
-                        <div className="flex items-center text-sm font-medium text-green-600">
-                          <span>{section.price} دج</span>
-                        </div>
+                        
+                        {/* Live Session Info */}
+                        {section.scheduled_date && (
+                          <div className="space-y-1 mb-2">
+                            <div className="flex items-center text-xs text-gray-500">
+                              <Calendar className="h-3.5 w-3.5 mr-1" />
+                              <span>التاريخ: {new Date(section.scheduled_date).toLocaleDateString('ar-SA')}</span>
+                            </div>
+                            {section.scheduled_time && (
+                              <div className="flex items-center text-xs text-gray-500">
+                                <Clock className="h-3.5 w-3.5 mr-1" />
+                                <span>الوقت: {section.scheduled_time}</span>
+                              </div>
+                            )}
+                            {section.duration_minutes && (
+                              <div className="flex items-center text-xs text-gray-500">
+                                <Video className="h-3.5 w-3.5 mr-1" />
+                                <span>المدة: {section.duration_minutes} دقيقة</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </CardContent>
                       <CardFooter className="pt-2 flex flex-col gap-2">
                         <Button variant="outline" size="sm" className="w-full" onClick={(e) => { e.stopPropagation(); handleEditSection(section.id); }}>
@@ -336,7 +406,7 @@ const ProfessorLiveSections = () => {
                 {liveSections
                   .filter(section => section.status === 'pending')
                   .map(section => (
-                    <Card key={section.id} className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleEditSection(section.id)}>
+                    <Card key={`pending-${section.id}`} className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleEditSection(section.id)}>
                       <CardHeader className="pb-2">
                         {section.cover_url && (
                           <img
@@ -374,6 +444,29 @@ const ProfessorLiveSections = () => {
                             <span>{section.live_sessions_count} sessions</span>
                           </div>
                         </div>
+                        
+                        {/* Live Session Info */}
+                        {section.scheduled_date && (
+                          <div className="space-y-1 mb-2">
+                            <div className="flex items-center text-xs text-gray-500">
+                              <Calendar className="h-3.5 w-3.5 mr-1" />
+                              <span>التاريخ: {new Date(section.scheduled_date).toLocaleDateString('ar-SA')}</span>
+                            </div>
+                            {section.scheduled_time && (
+                              <div className="flex items-center text-xs text-gray-500">
+                                <Clock className="h-3.5 w-3.5 mr-1" />
+                                <span>الوقت: {section.scheduled_time}</span>
+                              </div>
+                            )}
+                            {section.duration_minutes && (
+                              <div className="flex items-center text-xs text-gray-500">
+                                <Video className="h-3.5 w-3.5 mr-1" />
+                                <span>المدة: {section.duration_minutes} دقيقة</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
                         <div className="flex items-center text-sm font-medium text-green-600">
                           <span>{section.price} دج</span>
                         </div>
@@ -401,7 +494,7 @@ const ProfessorLiveSections = () => {
                 {liveSections
                   .filter(section => section.status === 'rejected')
                   .map(section => (
-                    <Card key={section.id} className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleEditSection(section.id)}>
+                    <Card key={`rejected-${section.id}`} className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleEditSection(section.id)}>
                       <CardHeader className="pb-2">
                         {section.cover_url && (
                           <img
@@ -438,9 +531,6 @@ const ProfessorLiveSections = () => {
                             <Video className="h-3.5 w-3.5 mr-1" />
                             <span>{section.live_sessions_count} sessions</span>
                           </div>
-                        </div>
-                        <div className="flex items-center text-sm font-medium text-green-600">
-                          <span>{section.price} دج</span>
                         </div>
                       </CardContent>
                       <CardFooter className="pt-2">
@@ -466,7 +556,7 @@ const ProfessorLiveSections = () => {
                 {liveSections
                   .filter(section => section.status === 'approved')
                   .map(section => (
-                    <Card key={section.id} className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleEditSection(section.id)}>
+                    <Card key={`approved-${section.id}`} className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleEditSection(section.id)}>
                       <CardHeader className="pb-2">
                         {section.cover_url && (
                           <img
@@ -503,9 +593,6 @@ const ProfessorLiveSections = () => {
                             <Video className="h-3.5 w-3.5 mr-1" />
                             <span>{section.live_sessions_count} sessions</span>
                           </div>
-                        </div>
-                        <div className="flex items-center text-sm font-medium text-green-600">
-                          <span>{section.price} دج</span>
                         </div>
                       </CardContent>
                       <CardFooter className="pt-2">
@@ -537,16 +624,18 @@ const ProfessorLiveSections = () => {
             </DialogDescription>
           </DialogHeader>
           {selectedDraftSection && (
-            <PathSelector
-              pendingCourse={selectedDraftSection}
+            <LiveSectionPathSelector
+              pendingSection={selectedDraftSection}
               onSuccess={() => { 
-                setShowPathSelector(false); 
-                setSelectedDraftSection(null); 
-                fetchLiveSections(); 
-                setActiveTab('pending');
-                toastLib.success('Live section path assigned successfully! Live section is now pending admin approval.');
+                setShowPathSelector(false);
+                setSelectedDraftSection(null);
+                fetchLiveSections(); // Refresh the list
+                toastLib.success('Path assigned successfully!');
               }}
-              onCancel={() => { setShowPathSelector(false); setSelectedDraftSection(null); }}
+              onCancel={() => {
+                setShowPathSelector(false);
+                setSelectedDraftSection(null);
+              }}
             />
           )}
         </DialogContent>

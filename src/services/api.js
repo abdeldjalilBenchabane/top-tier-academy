@@ -221,6 +221,12 @@ export const pointsAPI = {
     body: JSON.stringify({ courseId }),
   }),
 
+  // Buy a live session with points
+  buyLiveSession: (sessionId) => apiRequest('/points/buy-live-session', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId }),
+  }),
+
   // Get my own point transaction history
   getMyTransactions: () => apiRequest('/points/transactions/me'),
 

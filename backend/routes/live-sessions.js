@@ -77,7 +77,25 @@ router.post('/professors/:professorId/live-sessions',
     });
     
     // Extract data from request body (FormData)
-    const { title, start_time, duration, price, material_id, description } = req.body;
+    const { title, start_time, duration, price, material_id, description, section_id } = req.body;
+    
+    console.log('[DEBUG] Extracted data:', {
+        title,
+        start_time,
+        duration,
+        price,
+        material_id,
+        description,
+        section_id
+    });
+    
+    console.log('[DEBUG] start_time type and value:', {
+        type: typeof start_time,
+        value: start_time,
+        isNull: start_time === null,
+        isUndefined: start_time === undefined,
+        isEmpty: start_time === ''
+    });
     
     const professor_id = req.user.id;
     const professor_name = req.user.name || `ID ${professor_id}`;
@@ -93,15 +111,41 @@ router.post('/professors/:professorId/live-sessions',
     try {
         // Handle file upload if present
         let cover_image_url = null;
-        if (req.file) {
-            cover_image_url = `/uploads/live-sessions/${req.file.filename}`;
+        if (req.files && req.files.length > 0) {
+            const coverFile = req.files.find(f => f.fieldname === 'cover_image');
+            if (coverFile) {
+                cover_image_url = `/uploads/live-sessions/${coverFile.filename}`;
+            }
         }
 
         const result = await pool.query(
-            'INSERT INTO live_sessions (professor_id, professor_name, title, description, start_time, duration, price, material_id, cover_image_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-            [professor_id, professor_name, title, description, start_time, duration, price, material_id, cover_image_url]
+            'INSERT INTO live_sessions (professor_id, professor_name, title, description, start_time, duration, price, material_id, cover_image_url, section_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+            [professor_id, professor_name, title, description, start_time, duration, price, material_id, cover_image_url, section_id || null]
         );
         const session = result.rows[0];
+
+        console.log('[DEBUG] Created live session:', {
+            id: session.id,
+            title: session.title,
+            section_id: session.section_id,
+            start_time: session.start_time,
+            start_time_type: typeof session.start_time,
+            description: session.description,
+            duration: session.duration
+        });
+        
+        console.log('[DEBUG] Insert values used:', {
+            professor_id,
+            professor_name,
+            title,
+            description,
+            start_time,
+            duration,
+            price,
+            material_id,
+            cover_image_url,
+            section_id: section_id || null
+        });
 
         // Notify all admins
         const adminsRes = await pool.query('SELECT id FROM users WHERE role = $1', ['admin']);
@@ -116,6 +160,79 @@ router.post('/professors/:professorId/live-sessions',
         res.status(201).json(session);
     } catch (error) {
         console.error('Error creating live session:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// PUT /api/live-sessions/:id → update a live session
+router.put('/live-sessions/:id', verifyToken, requireProfessor, (req, res, next) => {
+  // Use multer.any() to accept all files
+  liveSessionUpload.any()(req, res, (err) => {
+    if (err) {
+      return handleMulterError(err, req, res, next);
+    }
+    next();
+  });
+}, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { title, description, start_time, duration, price } = req.body;
+        
+        const professor_id = req.user.id;
+
+        // Check if the session belongs to the professor
+        const sessionCheck = await pool.query(
+            'SELECT professor_id FROM live_sessions WHERE id = $1',
+            [id]
+        );
+
+        if (sessionCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Live session not found' });
+        }
+
+        if (sessionCheck.rows[0].professor_id != professor_id) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        if (!title || !start_time || !duration || !price) {
+            return res.status(400).json({ error: 'Missing required fields: title, start_time, duration, price' });
+        }
+
+        // Handle file upload if present
+        let cover_image_url = null;
+        if (req.files && req.files.length > 0) {
+            const coverFile = req.files.find(f => f.fieldname === 'cover_image');
+            if (coverFile) {
+                cover_image_url = `/uploads/live-sessions/${coverFile.filename}`;
+            }
+        }
+
+        const updateFields = ['title = $1', 'description = $2', 'start_time = $3', 'duration = $4', 'price = $5'];
+        const updateValues = [title, description, start_time, duration, price];
+        let paramIndex = 6;
+
+        if (cover_image_url) {
+            updateFields.push(`cover_image_url = $${paramIndex}`);
+            updateValues.push(cover_image_url);
+            paramIndex++;
+        }
+
+        updateFields.push('updated_at = CURRENT_TIMESTAMP');
+
+        const query = `
+            UPDATE live_sessions 
+            SET ${updateFields.join(', ')}
+            WHERE id = $${paramIndex}
+            RETURNING *
+        `;
+        updateValues.push(id);
+
+        const result = await pool.query(query, updateValues);
+        const session = result.rows[0];
+
+        res.json(session);
+    } catch (error) {
+        console.error('Error updating live session:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -303,27 +420,27 @@ router.get('/live-sessions/:sessionId/access', verifyToken, async (req, res) => 
 
     try {
         // Get session details
-        const sessionRes = await pool.query('SELECT * FROM live_sessions WHERE id = $1', [sessionId]);
+        const sessionRes = await pool.query('SELECT * FROM live_sections WHERE id = $1', [sessionId]);
         if (sessionRes.rows.length === 0) {
-            return res.status(404).json({ error: 'Live session not found' });
+            return res.status(404).json({ error: 'Live section not found' });
         }
 
         const session = sessionRes.rows[0];
-        const isLive = new Date() >= new Date(session.start_time);
+        const isLive = true; // Live sections are always considered "live"
 
-        // Check if user has purchased this session
-        const purchaseRes = await pool.query(
-            'SELECT * FROM purchases WHERE session_id = $1 AND student_id = $2',
-            [sessionId, userId]
-        );
+            // Check if user has purchased this session (using live_section_purchases table)
+    const purchaseRes = await pool.query(
+      'SELECT * FROM live_section_purchases WHERE live_section_id = $1 AND student_id = $2',
+      [sessionId, userId]
+    );
 
         const hasPurchased = purchaseRes.rows.length > 0;
         const canAccess = hasPurchased; // Allow access if purchased, regardless of live status
 
         res.json({
-            can_access: canAccess,
-            has_purchased: hasPurchased,
-            is_live: isLive,
+            canAccess: canAccess,
+            hasPurchased: hasPurchased,
+            isLive: isLive,
             session: session
         });
     } catch (error) {

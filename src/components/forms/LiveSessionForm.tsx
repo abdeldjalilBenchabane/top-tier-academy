@@ -113,32 +113,24 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
         headers
       });
       
-      console.log('Specialities response status:', specialitiesResponse.status);
-      
       if (specialitiesResponse.ok) {
         const specialitiesData = await specialitiesResponse.json();
-        console.log('Specialities data:', specialitiesData);
-        
         if (specialitiesData.length > 0) {
           // Year has specialities - 4-path structure
-          console.log('Year has specialities:', specialitiesData);
           setSpecialities(specialitiesData);
           setSelectedSpeciality('');
           setSelectedMaterial('');
           setMaterials([]);
         } else {
           // Year has no specialities - check for materials directly
-          console.log('Year has no specialities, checking for materials...');
           setSpecialities([]);
           setSelectedSpeciality('');
           await fetchMaterialsForYear(yearId);
         }
       } else {
-        console.error('Failed to fetch specialities:', specialitiesResponse.status, specialitiesResponse.statusText);
         toast.error('Failed to load year structure');
       }
     } catch (error) {
-      console.error('Error checking year structure:', error);
       toast.error('Failed to load year structure');
     } finally {
       setHierarchyLoading(false);
@@ -168,19 +160,14 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
         headers
       });
       
-      console.log('Materials for speciality response status:', response.status);
-      
       if (response.ok) {
         const data = await response.json();
-        console.log('Materials for speciality data:', data);
         setMaterials(data);
         setSelectedMaterial('');
       } else {
-        console.error('Failed to fetch materials for speciality:', response.status, response.statusText);
         toast.error('Failed to load materials for this speciality');
       }
     } catch (error) {
-      console.error('Error fetching materials for speciality:', error);
       toast.error('Failed to load materials for this speciality');
     }
   };
@@ -198,19 +185,14 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
         headers
       });
       
-      console.log('Materials for year response status:', response.status);
-      
       if (response.ok) {
         const data = await response.json();
-        console.log('Materials for year data:', data);
         setMaterials(data);
         setSelectedMaterial('');
       } else {
-        console.error('Failed to fetch materials for year:', response.status, response.statusText);
         toast.error('Failed to load materials for this year');
       }
     } catch (error) {
-      console.error('Error fetching materials for year:', error);
       toast.error('Failed to load materials for this year');
     }
   };
@@ -282,10 +264,7 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
       
       if (coverImage) {
         formData.append('cover_image', coverImage);
-        console.log('📸 Adding image to form data:', coverImage.name);
       }
-
-      console.log('📤 Sending form data with image');
 
       const response = await fetch(`/api/professors/${user.id}/live-sessions`, {
         method: 'POST',
@@ -304,21 +283,17 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
         } catch (parseError) {
           // If response is not JSON (like HTML error page), get text
           const errorText = await response.text();
-          console.error('Server response (not JSON):', errorText);
           errorMessage = `Server error: ${response.status} ${response.statusText}`;
         }
         
         throw new Error(errorMessage);
       }
 
-      const result = await response.json();
       toast.success('Live session created successfully!');
-      
       if (onSuccess) {
         onSuccess();
       }
     } catch (error) {
-      console.error('Error creating live session:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to create live session');
     } finally {
       setIsSubmitting(false);

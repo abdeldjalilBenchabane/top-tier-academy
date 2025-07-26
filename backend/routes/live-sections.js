@@ -4,6 +4,7 @@ import pool from '../db.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import multer from 'multer';
 
 const router = express.Router();
 
@@ -11,8 +12,62 @@ const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Configure multer for live section file uploads
+const liveSectionStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '..', '..', '..', 'public', 'uploads', 'live-sections');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const liveSectionUpload = multer({
+  storage: liveSectionStorage,
+  fileFilter: (req, file, cb) => {
+    console.log('Live section file upload attempt:', {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    });
+    
+    // Allow images for covers
+    if (file.fieldname === 'cover_image') {
+      const allowedImageTypes = /jpeg|jpg|png|gif|webp/;
+      const extname = allowedImageTypes.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = allowedImageTypes.test(file.mimetype);
+      
+      if (extname && mimetype) {
+        return cb(null, true);
+      } else {
+        return cb(new Error('Only image files (jpeg, jpg, png, gif, webp) are allowed for covers!'));
+      }
+    }
+    
+    return cb(null, true);
+  }
+});
+
+// Error handling middleware for multer
+const handleUploadError = (error, req, res, next) => {
+  console.error('Upload error:', error);
+  
+  if (error instanceof multer.MulterError) {
+    return res.status(400).json({ error: error.message });
+  } else if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  next();
+};
+
 // Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, '../public/uploads/live-sections');
+const uploadsDir = path.join(__dirname, '..', '..', '..', 'public', 'uploads', 'live-sections');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -59,8 +114,18 @@ router.get('/professors/:professorId/live-sections', verifyToken, requireProfess
 });
 
 // Create a new live section
-router.post('/professors/:professorId/live-sections', verifyToken, requireProfessor, async (req, res) => {
+router.post('/professors/:professorId/live-sections', 
+  verifyToken, 
+  requireProfessor, 
+  liveSectionUpload.single('cover_image'),
+  handleUploadError,
+  async (req, res) => {
   try {
+    console.log('[DEBUG] Creating live section...');
+    console.log('[DEBUG] Request body:', req.body);
+    console.log('[DEBUG] Request file:', req.file);
+    console.log('[DEBUG] User:', req.user);
+    
     const { professorId } = req.params;
     
     // Verify the professor is creating their own section
@@ -68,57 +133,38 @@ router.post('/professors/:professorId/live-sections', verifyToken, requireProfes
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    const { title, description, price } = req.body;
+    const { title, description, price, scheduled_date, scheduled_time, duration_minutes } = req.body;
+    
+    console.log('[DEBUG] Extracted data:', { title, description, price, scheduled_date, scheduled_time, duration_minutes });
     
     if (!title || !description || !price) {
       return res.status(400).json({ error: 'Title, description, and price are required' });
     }
 
     const query = `
-      INSERT INTO live_sections (professor_id, title, description, price, status)
-      VALUES ($1, $2, $3, $4, 'draft')
+      INSERT INTO live_sections (professor_id, title, description, price, scheduled_date, scheduled_time, duration_minutes, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft')
       RETURNING *
     `;
 
-    const result = await pool.query(query, [professorId, title, description, price]);
+    const result = await pool.query(query, [professorId, title, description, price, scheduled_date, scheduled_time, duration_minutes]);
+    
+    console.log('[DEBUG] Live section created:', result.rows[0]);
+    
+    // Handle cover upload if present
+    let cover_image_url = null;
+    if (req.file) {
+      cover_image_url = `/uploads/live-sections/${req.file.filename}`;
+      await pool.query(
+        'UPDATE live_sections SET cover_image_url = $1 WHERE id = $2',
+        [cover_image_url, result.rows[0].id]
+      );
+      result.rows[0].cover_image_url = cover_image_url;
+    }
+    
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating live section:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Update a live section
-router.put('/live-sections/:sectionId', verifyToken, requireProfessor, async (req, res) => {
-  try {
-    const { sectionId } = req.params;
-    const { title, description, price } = req.body;
-
-    // Check if the section belongs to the professor
-    const sectionCheck = await pool.query(
-      'SELECT professor_id FROM live_sections WHERE id = $1',
-      [sectionId]
-    );
-
-    if (sectionCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'Live section not found' });
-    }
-
-    if (sectionCheck.rows[0].professor_id != req.user.id) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    const query = `
-      UPDATE live_sections 
-      SET title = $1, description = $2, price = $3, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $4
-      RETURNING *
-    `;
-
-    const result = await pool.query(query, [title, description, price, sectionId]);
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error('Error updating live section:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -158,8 +204,7 @@ router.post('/live-sections/:sectionId/assign-path', verifyToken, requireProfess
 
     let updateFields = {
       root_type: rootType,
-      status: 'pending',
-      updated_at: 'CURRENT_TIMESTAMP'
+      status: 'pending'
     };
 
     if (rootType === 'education') {
@@ -185,7 +230,7 @@ router.post('/live-sections/:sectionId/assign-path', verifyToken, requireProfess
 
     const query = `
       UPDATE live_sections 
-      SET ${setClause}
+      SET ${setClause}, updated_at = CURRENT_TIMESTAMP
       WHERE id = $1
       RETURNING *
     `;
@@ -196,6 +241,41 @@ router.post('/live-sections/:sectionId/assign-path', verifyToken, requireProfess
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error assigning path to live section:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin: Get all live sections (pending and rejected)
+router.get('/admin/live-sections/all', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        ls.*,
+        l.name as level_name,
+        y.name as year_name,
+        s.name as speciality_name,
+        m.name as material_name,
+        lang.name as language_name,
+        ll.name as language_level_name,
+        u.name as professor_name,
+        u.email as professor_email,
+        (SELECT COUNT(*) FROM live_sessions WHERE section_id = ls.id) as live_sessions_count
+      FROM live_sections ls
+      LEFT JOIN levels l ON ls.level_id = l.id
+      LEFT JOIN years y ON ls.year_id = y.id
+      LEFT JOIN specialities s ON ls.speciality_id = s.id
+      LEFT JOIN materials m ON ls.material_id = m.id
+      LEFT JOIN languages lang ON ls.language_id = lang.id
+      LEFT JOIN language_levels ll ON ls.language_level_id = ll.id
+      LEFT JOIN users u ON ls.professor_id = u.id
+      WHERE ls.status IN ('pending', 'rejected')
+      ORDER BY ls.created_at ASC
+    `;
+
+    const result = await pool.query(query);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching live sections:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -294,7 +374,7 @@ router.post('/admin/live-sections/:sectionId/reject', verifyToken, requireAdmin,
     const query = `
       UPDATE live_sections 
       SET status = 'rejected', approved_by = $1, rejected_reason = $2, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
+      WHERE id = $3
       RETURNING *
     `;
 
@@ -306,8 +386,111 @@ router.post('/admin/live-sections/:sectionId/reject', verifyToken, requireAdmin,
   }
 });
 
+// GET /api/live-sections/approved → fetch all approved live sections for public display
+router.get('/live-sections/approved', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                ls.*,
+                l.name as language_name,
+                ll.name as language_level_name,
+                u.name as professor_name,
+                u.email as professor_email,
+                (SELECT COUNT(*) FROM live_sessions WHERE section_id = ls.id) as live_sessions_count
+            FROM live_sections ls
+            LEFT JOIN languages l ON ls.language_id = l.id
+            LEFT JOIN language_levels ll ON ls.language_level_id = ll.id
+            LEFT JOIN users u ON ls.professor_id = u.id
+            WHERE ls.status = 'approved'
+            ORDER BY ls.created_at DESC
+        `;
+        const result = await pool.query(query);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching approved live sections:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Check if user can access a live section (purchase status)
+router.get('/live-sections/:sectionId/access', verifyToken, async (req, res) => {
+  try {
+    const { sectionId } = req.params;
+    const userId = req.user.id;
+
+    // Check if user has purchased this live section (using live_section_purchases table)
+    const purchaseRes = await pool.query(
+      'SELECT * FROM live_section_purchases WHERE live_section_id = $1 AND student_id = $2',
+      [sectionId, userId]
+    );
+
+    const hasPurchased = purchaseRes.rows.length > 0;
+
+    res.json({
+      canAccess: hasPurchased,
+      hasPurchased: hasPurchased,
+      isLive: true
+    });
+  } catch (error) {
+    console.error('Error checking live section access:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update a live section
+router.put('/live-sections/:sectionId', 
+  verifyToken, 
+  requireProfessor, 
+  liveSectionUpload.single('cover_image'),
+  handleUploadError,
+  async (req, res) => {
+  try {
+    
+    const { sectionId } = req.params;
+    const { title, description, price } = req.body;
+
+    // Check if the section belongs to the professor
+    const sectionCheck = await pool.query(
+      'SELECT professor_id FROM live_sections WHERE id = $1',
+      [sectionId]
+    );
+
+    if (sectionCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Live section not found' });
+    }
+
+    if (sectionCheck.rows[0].professor_id != req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const query = `
+      UPDATE live_sections 
+      SET title = $1, description = $2, price = $3, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $4
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, [title, description, price, sectionId]);
+    
+    // Handle cover upload if present
+    if (req.file) {
+      const coverUrl = `/uploads/live-sections/${req.file.filename}`;
+      await pool.query(
+        'UPDATE live_sections SET cover_image_url = $1 WHERE id = $2',
+        [coverUrl, sectionId]
+      );
+      result.rows[0].cover_image_url = coverUrl;
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating live section:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get a single live section by ID
-router.get('/live-sections/:sectionId', verifyToken, async (req, res) => {
+router.get('/live-sections/:sectionId', async (req, res) => {
   try {
     const { sectionId } = req.params;
 
@@ -346,6 +529,59 @@ router.get('/live-sections/:sectionId', verifyToken, async (req, res) => {
   }
 });
 
+// Get live sessions for a specific section
+router.get('/live-sections/:sectionId/sessions', async (req, res) => {
+  console.log('[DEBUG] 🔥 ENDPOINT HIT: /live-sections/:sectionId/sessions');
+  console.log('[DEBUG] Section ID:', req.params.sectionId);
+  
+  try {
+    const { sectionId } = req.params;
+    console.log('[DEBUG] Fetching sessions for section:', sectionId);
+
+    const query = `
+      SELECT 
+        id,
+        title,
+        description,
+        start_time,
+        duration,
+        price,
+        cover_image_url,
+        created_at,
+        updated_at,
+        status
+      FROM live_sessions 
+      WHERE section_id = $1
+      ORDER BY start_time ASC
+    `;
+
+    const result = await pool.query(query, [sectionId]);
+    console.log('[DEBUG] Database result:', result.rows);
+    console.log('[DEBUG] First session start_time:', result.rows[0]?.start_time);
+    
+    // Convert Date objects to ISO strings for proper JSON serialization
+    const processedRows = result.rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      scheduledAt: row.start_time ? row.start_time.toISOString() : null,
+      duration: row.duration,
+      price: row.price,
+      cover_image_url: row.cover_image_url,
+      created_at: row.created_at ? row.created_at.toISOString() : null,
+      updated_at: row.updated_at ? row.updated_at.toISOString() : null,
+      status: row.status
+    }));
+    
+    console.log('[DEBUG] Processed rows:', processedRows);
+    
+    res.json(processedRows);
+  } catch (error) {
+    console.error('Error fetching live sessions for section:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Delete a live section (only if it's in draft status)
 router.delete('/live-sections/:sectionId', verifyToken, requireProfessor, async (req, res) => {
   try {
@@ -377,4 +613,4 @@ router.delete('/live-sections/:sectionId', verifyToken, requireProfessor, async 
   }
 });
 
-export default router; 
+export default router;

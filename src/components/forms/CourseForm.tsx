@@ -29,6 +29,7 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
   const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [price, setPrice] = useState('');
   const [sections, setSections] = useState<Section[]>([
     {
       id: `section_${Date.now()}`,
@@ -208,6 +209,7 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
       // Add basic course data
       formData.append('title', title);
       formData.append('description', description);
+      formData.append('price', price || '0');
       formData.append('sections', JSON.stringify(validSections));
       
       // Add cover file if selected
@@ -232,6 +234,7 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
       // Reset form
       setTitle('');
       setDescription('');
+      setPrice('');
       setSections([{ id: `section_${Date.now()}`, title: '', blocks: [] }]);
       setUploadedFiles({});
       setCoverFile(null);
@@ -375,6 +378,19 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
             placeholder="Describe your course"
             className="min-h-[100px]"
             required
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="course-price">Course Price (Optional)</Label>
+          <Input
+            id="course-price"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="Enter course price (e.g., 99.99)"
+            type="number"
+            step="0.01"
+            min="0"
           />
         </div>
 

@@ -431,6 +431,77 @@ router.post('/buy-course', auth, async (req, res) => {
   }
 });
 
+// Buy a live session with points
+router.post('/buy-live-session', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { sessionId } = req.body;
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Session ID is required' });
+    }
+
+    // Check if live section exists and get price
+    const sectionRes = await pool.query('SELECT id, price FROM live_sections WHERE id = $1', [sessionId]);
+    if (sectionRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Live section not found' });
+    }
+    const section = sectionRes.rows[0];
+    const price = parseInt(section.price);
+
+    if (!price || price <= 0) {
+      return res.status(400).json({ error: 'Invalid live section price' });
+    }
+
+                        // Check if already purchased (using live_section_purchases table)
+                    const purchasedRes = await pool.query('SELECT id FROM live_section_purchases WHERE student_id = $1 AND live_section_id = $2', [userId, sessionId]);
+                    if (purchasedRes.rows.length > 0) {
+                      return res.status(409).json({ error: 'You have already purchased this live session.' });
+                    }
+
+    // Get user points
+    const pointsRes = await pool.query('SELECT balance FROM user_points WHERE user_id = $1', [userId]);
+    const balance = pointsRes.rows[0]?.balance || 0;
+    
+    if (balance < price) {
+      return res.status(400).json({ error: 'Not enough points' });
+    }
+
+    // Deduct points and record purchase in a transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Deduct points
+      await client.query(
+        'UPDATE user_points SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+        [price, userId]
+      );
+      
+                            // Record purchase (using live_section_purchases table)
+                      await client.query(
+                        'INSERT INTO live_section_purchases (student_id, live_section_id, points_spent) VALUES ($1, $2, $3)',
+                        [userId, sessionId, price]
+                      );
+      
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+    
+    // Get new balance
+    const newPointsRes = await pool.query('SELECT balance FROM user_points WHERE user_id = $1', [userId]);
+    const newBalance = newPointsRes.rows[0]?.balance || 0;
+    
+    res.json({ success: true, newBalance, message: 'Live session purchased successfully' });
+  } catch (error) {
+    console.error('Error buying live session with points:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get all point transactions for a user (admin only)
 router.post('/transactions/log', auth, async (req, res) => {
   try {

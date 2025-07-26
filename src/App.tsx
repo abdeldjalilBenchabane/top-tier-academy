@@ -9,7 +9,6 @@ import { AvatarProvider } from './contexts/AvatarContext';
 import { PendingCountProvider } from './contexts/PendingCountContext';
 import AdminPointCodes from './Pages/admin/PointCodes';
 import PrivateClasses from './Pages/admin/PrivateClasses';
-import PendingLiveSections from './Pages/admin/PendingLiveSections';
 
 
 // TTH Pages
@@ -66,11 +65,13 @@ import CourseCommentsOverview from './Pages/professor/CourseCommentsOverview';
 import CourseComments from './Pages/professor/CourseComments';
 import ProfessorPrivateClasses from './Pages/professor/PrivateClasses';
 import LiveSessionsPage from './Pages/professor/LiveSessionsPage';
+import CreateLiveSessionPage from './Pages/professor/CreateLiveSession';
 // Admin components
 import UserManagement from './components/admin/UserManagement';
 import HomepageSlides from './components/admin/HomepageSlides';
 import EnhancedHomepageSlides from './components/admin/EnhancedHomepageSlides';
 import LiveSessionApprovals from './Pages/admin/LiveSessionApprovals';
+import LiveSessionDetails from './Pages/LiveSessionDetails';
 import QuizManagement from './components/admin/QuizManagement';
 // Professor components
 import QuizCreation from './components/professor/QuizCreation';
@@ -116,6 +117,7 @@ const App: React.FC = () => {
                 <Route path="/TTHTeacherProfile" element={<TTHTeacherProfile />} />
                 <Route path="/profile" element={<TTHStudentDashboard />} />
                 <Route path="/coursesList/courses/:id" element={<TTHCourseDetail />} />
+                <Route path="/TTHLanguages/livesection/:id" element={<LiveSessionDetails />} />
                 <Route path="/TTHStudentDashboard" element={<TTHStudentDashboard />} />
                 <Route path="/points" element={<PointsPurchase />} />
                 <Route path="/points/success" element={<PointsSuccess />} />
@@ -150,7 +152,6 @@ const App: React.FC = () => {
                   <Route path="private-classes" element={<PrivateClasses />} />
                   <Route path="homepage-materials" element={<HomepageMaterials />} />
                   <Route path="footer-content" element={<FooterContent />} />
-                  <Route path="pending-live-sections" element={<PendingLiveSections />} />
                 </Route>
 
                 {/* Professor (protected) */}
@@ -163,6 +164,7 @@ const App: React.FC = () => {
 
                   <Route path="live-sections" element={<LiveSectionsPage />} />
                   <Route path="live-sessions" element={<LiveSessionsPage />} />
+                  <Route path="create-live-session" element={<CreateLiveSessionPage />} />
                   <Route path="quiz" element={<QuizCreation />} />
                   <Route path="results" element={<QuizResults professorId="1" />} />
                   <Route path="settings" element={<ProfessorSettings />} />

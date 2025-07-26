@@ -18,7 +18,6 @@ import AgoraToken from 'agora-access-token';
 import hierarchyRoutes from './routes/hierarchy.routes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fileUpload from 'express-fileupload';
 import pointCodesRoutes from './routes/pointCodes.js';
 import homepageMaterialsRoutes from './routes/homepage-materials.js';
 import footerContentRoutes from './routes/footer-content.js';
@@ -50,10 +49,6 @@ const __dirname = path.dirname(__filename);
 app.use(cors({ origin: '*' }));     // En dev : '*' ; en prod, remplace par ton domaine
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(fileUpload({
-  createParentPath: true,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-}));
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '..', 'public', 'uploads')));
