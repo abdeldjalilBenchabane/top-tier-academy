@@ -126,28 +126,32 @@ router.post('/professors/:professorId/live-sections',
     console.log('[DEBUG] Request file:', req.file);
     console.log('[DEBUG] User:', req.user);
     
-    const { professorId } = req.params;
-    
-    // Verify the professor is creating their own section
-    if (req.user.id != professorId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
+    const { title, description, price, level_id, year_id, speciality_id, material_id, language_id, language_level_id } = req.body;
+    const professor_id = req.user.id;
+    const professor_name = req.user.name;
 
-    const { title, description, price, scheduled_date, scheduled_time, duration_minutes } = req.body;
-    
-    console.log('[DEBUG] Extracted data:', { title, description, price, scheduled_date, scheduled_time, duration_minutes });
-    
+    // Validate required fields
     if (!title || !description || !price) {
       return res.status(400).json({ error: 'Title, description, and price are required' });
     }
 
+    // Get telegram_channel from request body (optional)
+    const telegram_channel = req.body.telegram_channel || null;
+
     const query = `
-      INSERT INTO live_sections (professor_id, title, description, price, scheduled_date, scheduled_time, duration_minutes, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft')
+      INSERT INTO live_sections (
+        professor_id, professor_name, title, description, price, 
+        level_id, year_id, speciality_id, material_id, language_id, language_level_id,
+        telegram_channel, status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING *
     `;
 
-    const result = await pool.query(query, [professorId, title, description, price, scheduled_date, scheduled_time, duration_minutes]);
+    const result = await pool.query(query, [
+      professor_id, professor_name, title, description, price,
+      level_id, year_id, speciality_id, material_id, language_id, language_level_id,
+      telegram_channel, 'draft'
+    ]);
     
     console.log('[DEBUG] Live section created:', result.rows[0]);
     
@@ -447,7 +451,7 @@ router.put('/live-sections/:sectionId',
   try {
     
     const { sectionId } = req.params;
-    const { title, description, price } = req.body;
+    const { title, description, price, telegram_channel } = req.body;
 
     // Check if the section belongs to the professor
     const sectionCheck = await pool.query(
@@ -465,12 +469,12 @@ router.put('/live-sections/:sectionId',
 
     const query = `
       UPDATE live_sections 
-      SET title = $1, description = $2, price = $3, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $4
+      SET title = $1, description = $2, price = $3, telegram_channel = $4, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $5
       RETURNING *
     `;
 
-    const result = await pool.query(query, [title, description, price, sectionId]);
+    const result = await pool.query(query, [title, description, price, telegram_channel, sectionId]);
     
     // Handle cover upload if present
     if (req.file) {

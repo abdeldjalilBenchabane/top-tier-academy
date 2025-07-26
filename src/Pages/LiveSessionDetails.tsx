@@ -7,6 +7,17 @@ import Footer from '../components/TTHFooter';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { toast } from '@/lib/toast';
 
+// Telegram icon component
+const TelegramIcon = ({ className }: { className?: string }) => (
+  <svg 
+    className={className} 
+    viewBox="0 0 24 24" 
+    fill="currentColor"
+  >
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.05-.2-.06-.06-.14-.04-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06-.01.13-.02.2z"/>
+  </svg>
+);
+
 interface LiveSection {
   id: number;
   title: string;
@@ -18,6 +29,7 @@ interface LiveSection {
   scheduled_date?: string;
   scheduled_time?: string;
   duration_minutes?: number;
+  telegram_channel?: string;
   created_at: string;
   updated_at: string;
 }
@@ -136,18 +148,25 @@ const LiveSessionDetails = () => {
 
   // Helper function to handle joining session
   const handleJoinSession = (session: LiveSession) => {
+    console.log('[DEBUG] Join session clicked:', {
+      sessionId: session.id,
+      user: user?.id,
+      hasPurchased: hasPurchased,
+      isLoggedIn: !!user
+    });
+    
     if (!user) {
       toast.error('يجب تسجيل الدخول للانضمام إلى الجلسة المباشرة');
       return;
     }
     
-    if (!hasPurchased) {
-      toast.error('يجب شراء الجلسة المباشرة أولاً');
-      return;
+    // Check if there's a Telegram channel link
+    if (liveSection?.telegram_channel) {
+      console.log('[DEBUG] Opening Telegram channel:', liveSection.telegram_channel);
+      window.open(liveSection.telegram_channel, '_blank');
+    } else {
+      toast.error('لا يوجد رابط قناة تليجرام متاح');
     }
-    
-    // Navigate to streaming page
-    navigate(`/streaming/${session.id}`);
   };
 
   // Helper function to safely parse dates
@@ -257,15 +276,21 @@ const LiveSessionDetails = () => {
     if (!user) return;
     
     try {
+      console.log('[DEBUG] Checking purchase status for section:', id, 'User:', user.id);
       const response = await fetch(`/api/live-sections/${id}/access`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
       
+      console.log('[DEBUG] Purchase status response:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('[DEBUG] Purchase status data:', data);
         setHasPurchased(data.hasPurchased);
+      } else {
+        console.error('[DEBUG] Purchase status check failed:', response.status);
       }
     } catch (error) {
       console.error('Error checking purchase status:', error);
@@ -533,19 +558,21 @@ const LiveSessionDetails = () => {
               <CardContent className="p-6">
                 <div className="space-y-4">
                   <div className="flex items-center pt-4 gap-3">
-                    {hasPurchased ? (
-                      <button
-                        onClick={handleJoinSession}
-                        className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-lg font-bold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 flex items-center justify-center shadow-lg hover:shadow-xl transform hover:scale-105"
-                      >
-                        <Video className="w-5 h-5 ml-2" />
-                        انضم الآن
-                      </button>
-                    ) : (
+                    {/* Telegram Channel Button - Always visible */}
+                    <button
+                      onClick={handleJoinSession}
+                      className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-lg font-bold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 flex items-center justify-center shadow-lg hover:shadow-xl transform hover:scale-105"
+                    >
+                      <TelegramIcon className="w-5 h-5 ml-2" />
+                      {liveSection?.telegram_channel ? 'Join Telegram Channel' : 'Telegram Channel'}
+                    </button>
+                    
+                    {/* Purchase Button - Only show if not purchased */}
+                    {!hasPurchased && (
                       <button
                         onClick={handlePurchase}
                         disabled={purchaseLoading}
-                        className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-lg font-bold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center shadow-lg hover:shadow-xl transform hover:scale-105"
+                        className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 px-4 rounded-lg font-bold hover:from-green-700 hover:to-emerald-700 transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center shadow-lg hover:shadow-xl transform hover:scale-105"
                       >
                         {purchaseLoading ? (
                           <>

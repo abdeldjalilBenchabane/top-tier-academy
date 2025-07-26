@@ -50,6 +50,7 @@ interface LiveSectionFormProps {
     description: string;
     price: number;
     cover_image_url?: string;
+    telegram_channel?: string;
     live_sessions?: Array<{
       id: string;
       title: string;
@@ -65,6 +66,7 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
   const [title, setTitle] = useState(editingSection?.title || '');
   const [description, setDescription] = useState(editingSection?.description || '');
   const [price, setPrice] = useState(editingSection?.price || 500);
+  const [telegramChannel, setTelegramChannel] = useState(editingSection?.telegram_channel || '');
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [existingCoverUrl, setExistingCoverUrl] = useState(editingSection?.cover_image_url || '');
   const [sections, setSections] = useState<LiveSection[]>(() => {
@@ -261,6 +263,7 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
       formData.append('title', title);
       formData.append('description', description);
       formData.append('price', price.toString());
+      formData.append('telegram_channel', telegramChannel);
       
       if (coverFile) {
         formData.append('cover_image', coverFile);
@@ -582,6 +585,22 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
               </div>
             )}
           </div>
+        </div>
+
+        <div>
+          <Label htmlFor="telegram-channel">Telegram Channel (Optional)</Label>
+          <Input
+            id="telegram-channel"
+            type="url"
+            placeholder="https://t.me/yourchannel"
+            value={telegramChannel}
+            onChange={(e) => setTelegramChannel(e.target.value)}
+            className="mt-1"
+            disabled={!!editingSection}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Add your Telegram channel link for students to join
+          </p>
         </div>
       </div>
       

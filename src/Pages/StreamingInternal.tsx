@@ -468,19 +468,25 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
             // Access check for normal live sessions
             const checkAccess = async () => {
                 if (user?.role === 'student' && id) {
-                    try {
-                        const res = await fetch(`/api/live-sessions/${id}/access`, {
-                            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                        });
-                        const data = await res.json();
-                        console.log('[DEBUG] Access check result:', data);
-                        setCanAccess(data.can_access);
-                    } catch (err) {
-                        console.error('[DEBUG] Access check error:', err);
-                        setCanAccess(false);
-                    } finally {
-                        setAccessChecked(true);
-                    }
+                    // Bypass access check for direct access
+                    console.log('[DEBUG] Bypassing access check for student');
+                    setCanAccess(true);
+                    setAccessChecked(true);
+                    
+                    // Original access check code (commented out)
+                    // try {
+                    //     const res = await fetch(`/api/live-sessions/${id}/access`, {
+                    //         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                    //     });
+                    //     const data = await res.json();
+                    //     console.log('[DEBUG] Access check result:', data);
+                    //     setCanAccess(data.can_access);
+                    // } catch (err) {
+                    //     console.error('[DEBUG] Access check error:', err);
+                    //     setCanAccess(false);
+                    // } finally {
+                    //     setAccessChecked(true);
+                    // }
                 } else {
                     setCanAccess(true); // Professors and admins can always access
                     setAccessChecked(true);
