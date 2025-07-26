@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaVideo, FaUser, FaClock, FaUsers, FaPlay, FaStop, FaShoppingCart, FaCheck } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -14,6 +14,7 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
   const [hasPurchased, setHasPurchased] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [userPoints, setUserPoints] = useState(0);
+  const prevSessionStatus = useRef(sessionStatus);
   const formatTime = (timeString) => {
     if (!timeString) return '';
     try {
@@ -154,8 +155,9 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
       setTimeUntilStart('منتهي');
     }
 
-    // Notify parent component of status change
-    if (onStatusChange) {
+    // Only notify parent component of status change when status actually changes
+    if (onStatusChange && sessionStatus !== prevSessionStatus.current) {
+      prevSessionStatus.current = sessionStatus;
       onStatusChange(session.id, sessionStatus);
     }
   }, [currentTime, session.start_time, session.duration, session.status, session.is_ended, onStatusChange]);
@@ -203,6 +205,11 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
         setHasPurchased(true);
         setUserPoints(data.newBalance);
         alert(`تم شراء البث المباشر بنجاح! تم خصم ${data.pointsDeducted} نقطة من رصيدك.`);
+        
+        // Trigger points update event to refresh navbar
+        window.dispatchEvent(new CustomEvent('pointsUpdated', { 
+          detail: { points: data.newBalance } 
+        }));
       } else {
         const errorData = await response.json();
         alert(`خطأ في الشراء: ${errorData.error}`);

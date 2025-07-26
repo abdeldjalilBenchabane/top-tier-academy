@@ -10,47 +10,49 @@ const PrivateClassesSection = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
 
+  // Function to refresh requests data
+  const refreshRequests = async () => {
+    if (!user) return;
+    try {
+      setRequestsLoading(true);
+      const response = await fetch(`/api/private-class-requests/student/${user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const transformedRequests = data.requests
+          .filter(request => request.status !== 'مرفوض')
+          .map(request => ({
+            id: request.id,
+            title: request.title,
+            sessions: `${request.sessions_count} حصص`,
+            description: request.description,
+            teacher: request.teacher_name,
+            date: request.date,
+            subject: request.subject,
+            grade: request.grade,
+            status: request.status,
+            time: request.time,
+            createdAt: request.created_at,
+            payment_status: request.payment_status,
+            payment_date: request.payment_date,
+            points_used: request.points_used,
+            price_per_session: request.price_per_session
+          }));
+        setMyPendingRequests(transformedRequests);
+      }
+    } catch (error) {
+      console.error('Error fetching requests:', error);
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
   // Fetch current user's pending requests
   useEffect(() => {
-    const fetchRequests = async () => {
-      if (!user) return;
-      try {
-        setRequestsLoading(true);
-        const response = await fetch(`/api/private-class-requests/student/${user.id}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const transformedRequests = data.requests
-            .filter(request => request.status !== 'مرفوض')
-            .map(request => ({
-              id: request.id,
-              title: request.title,
-              sessions: `${request.sessions_count} حصص`,
-              description: request.description,
-              teacher: request.teacher_name,
-              date: request.date,
-              subject: request.subject,
-              grade: request.grade,
-              status: request.status,
-              time: request.time,
-              createdAt: request.created_at,
-              payment_status: request.payment_status,
-              payment_date: request.payment_date,
-              points_used: request.points_used,
-              price_per_session: request.price_per_session
-            }));
-          setMyPendingRequests(transformedRequests);
-        }
-      } catch (error) {
-        console.error('Error fetching requests:', error);
-      } finally {
-        setRequestsLoading(false);
-      }
-    };
-    fetchRequests();
+    refreshRequests();
   }, [user]);
 
   const handleDetailsClick = (session) => {
@@ -87,7 +89,12 @@ const PrivateClassesSection = () => {
         const data = await response.json();
         alert(`تم شراء الحصة بنجاح! تم خصم ${data.pointsDeducted} نقطة من رصيدك.`);
         // Refresh the requests to show updated payment status
-        window.location.reload();
+        await refreshRequests();
+        
+        // Trigger points update event to refresh navbar
+        window.dispatchEvent(new CustomEvent('pointsUpdated', { 
+          detail: { points: data.newBalance } 
+        }));
       } else {
         const errorData = await response.json();
         alert(`خطأ في الشراء: ${errorData.error}`);

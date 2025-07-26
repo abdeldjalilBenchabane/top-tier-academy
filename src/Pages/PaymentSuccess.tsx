@@ -25,6 +25,14 @@ const PaymentSuccess: React.FC = () => {
     try {
       const response = await paymentsAPI.getTransactionStatus(transactionId!);
       setTransaction(response.transaction);
+      
+      // If transaction is completed, update user points in navbar
+      if (response.transaction.status === 'completed') {
+        // Trigger a custom event to update navbar points
+        window.dispatchEvent(new CustomEvent('pointsUpdated', {
+          detail: { points: response.transaction.points }
+        }));
+      }
     } catch (error) {
       console.error('Error fetching transaction:', error);
     } finally {

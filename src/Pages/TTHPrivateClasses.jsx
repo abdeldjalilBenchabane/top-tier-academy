@@ -49,7 +49,9 @@ const PrivateClasses = () => {
     handleLevelChange,
     handleSpecialityChange,
     handleMaterialChange,
-    pricingSettings
+    pricingSettings,
+    refreshRequests,
+    refreshAllOrders
   } = usePrivateClasses();
 
   const navigate = useNavigate();
@@ -89,8 +91,17 @@ const PrivateClasses = () => {
       if (response.ok) {
         const data = await response.json();
         alert(`تم شراء الحصة بنجاح! تم خصم ${data.pointsDeducted} نقطة من رصيدك.`);
-        // Refresh the page to show updated payment status
-        window.location.reload();
+        
+        // Refresh both datasets to get the latest state from the server
+        await Promise.all([
+          refreshRequests(),
+          refreshAllOrders()
+        ]);
+        
+        // Trigger points update event to refresh navbar
+        window.dispatchEvent(new CustomEvent('pointsUpdated', { 
+          detail: { points: data.newBalance } 
+        }));
       } else {
         const errorData = await response.json();
         alert(`خطأ في الشراء: ${errorData.error}`);
@@ -154,13 +165,30 @@ const PrivateClasses = () => {
         {/* Pending Requests Section - Only for students */}
         {!isProfessor && (
           <div className="mb-8 sm:mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-full flex items-center justify-center">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-800">طلباتك</h2>
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">طلباتك</h2>
+              <button
+                onClick={async () => {
+                  await Promise.all([
+                    refreshRequests(),
+                    refreshAllOrders()
+                  ]);
+                }}
+                disabled={requestsLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className={`w-4 h-4 ${requestsLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                تحديث
+              </button>
             </div>
             
             {requestsLoading ? (

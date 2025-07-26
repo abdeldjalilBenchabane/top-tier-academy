@@ -17,12 +17,19 @@ const TTHLiveClasses = () => {
     specialities,
     materials,
     hierarchyLoading,
+    allLiveSessions,
     liveSessionsByPath,
     filteredSessions,
     sessionsToShow,
     loading,
     initialLoading,
     isFiltered,
+    getFilteredYears,
+    getFilteredSpecialities,
+    getFilteredMaterials,
+    getAllYears,
+    getAllSpecialities,
+    getAllMaterials,
     handleLevelChange,
     handleYearChange,
     handleSpecialityChange,
@@ -32,12 +39,17 @@ const TTHLiveClasses = () => {
     refreshSessions
   } = useLiveClasses();
 
-  // Handle session status changes
+  // Handle session status changes with debouncing
   const handleSessionStatusChange = (sessionId: string, newStatus: string) => {
     console.log(`🔄 Session ${sessionId} status changed to: ${newStatus}`);
-    // Refresh sessions to get updated data
-    if (refreshSessions) {
-      refreshSessions();
+    // Only refresh if the status change is significant (live/ended)
+    if (newStatus === 'live' || newStatus === 'ended') {
+      // Debounce the refresh to prevent excessive API calls
+      setTimeout(() => {
+        if (refreshSessions) {
+          refreshSessions();
+        }
+      }, 2000); // Wait 2 seconds before refreshing
     }
   };
 
@@ -87,6 +99,7 @@ const TTHLiveClasses = () => {
         {/* Search Filter */}
         <section className="py-8 bg-white shadow-sm">
           <div className="container mx-auto px-4">
+
             <TTHLiveClassesSearchFilter
               selectedLevel={selectedLevel}
               selectedYear={selectedYear}
@@ -103,6 +116,12 @@ const TTHLiveClasses = () => {
               onMaterialChange={handleMaterialChange}
               onSearch={handleSearch}
               onClearFilters={clearFilters}
+              getFilteredYears={getFilteredYears}
+              getFilteredSpecialities={getFilteredSpecialities}
+              getFilteredMaterials={getFilteredMaterials}
+              getAllYears={getAllYears}
+              getAllSpecialities={getAllSpecialities}
+              getAllMaterials={getAllMaterials}
             />
           </div>
         </section>
@@ -173,7 +192,7 @@ const TTHLiveClasses = () => {
                   </div>
                 )}
               </div>
-            ) : Object.keys(liveSessionsByPath).length > 0 ? (
+            ) : allLiveSessions.length > 0 ? (
               // Show all sessions grouped by path
               Object.keys(liveSessionsByPath).map(pathName => (
                 liveSessionsByPath[pathName] && liveSessionsByPath[pathName].length > 0 && (

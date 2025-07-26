@@ -140,6 +140,12 @@ const PointsPurchase: React.FC = () => {
       });
       setRedeemCode('');
       fetchPointsBalance();
+      
+      // Trigger points update event to refresh navbar
+      window.dispatchEvent(new CustomEvent('pointsUpdated', { 
+        detail: { points: data.newBalance || data.balance } 
+      }));
+      
       if (typeof window.refreshUserPoints === 'function') {
         window.refreshUserPoints();
       }
