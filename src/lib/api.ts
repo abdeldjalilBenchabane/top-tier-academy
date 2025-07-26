@@ -332,8 +332,14 @@ export const api = {
   },
 
   getUsers: async (): Promise<User[]> => {
-    await delay(500);
-    return mockData.users;
+    const res = await fetch('/api/users', {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch users');
+    return await res.json();
   },
   createUser: async (user: Omit<User, 'id'>): Promise<User> => {
     await delay(500);
@@ -422,7 +428,15 @@ export const api = {
   },
   updateLiveSession: async (sessionId: string, updates: Partial<LiveSession>): Promise<LiveSession> => {
     const token = localStorage.getItem('token');
-    const res = await fetch(`/api/live-sessions/${sessionId}`, {
+    
+    // Check if user is admin (for approval updates) or professor (for status updates)
+    const userRole = localStorage.getItem('userRole');
+    
+    // If updating approval status, use admin endpoint
+    const isApprovalUpdate = updates.isApproved !== undefined || updates.approvedAt !== undefined;
+    const endpoint = (userRole === 'admin' || isApprovalUpdate) ? `/api/live-sessions/${sessionId}/admin` : `/api/live-sessions/${sessionId}`;
+    
+    const res = await fetch(endpoint, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -468,8 +482,19 @@ export const api = {
     read: boolean;
     sessionId: string;
   }>> => {
-    await delay(500);
-    return mockData.notifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const token = getAuthToken();
+    if (!token) {
+      return []; // Return empty array if not authenticated
+    }
+    
+    const res = await fetch('/api/notifications', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch notifications');
+    return await res.json();
   },
 
   getLevels: async (): Promise<Level[]> => {

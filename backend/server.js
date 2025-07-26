@@ -20,6 +20,7 @@ import { fileURLToPath } from 'url';
 import pointCodesRoutes from './routes/pointCodes.js';
 import homepageMaterialsRoutes from './routes/homepage-materials.js';
 import footerContentRoutes from './routes/footer-content.js';
+import notificationsRoutes from './routes/notifications.js';
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 
@@ -91,6 +92,7 @@ app.use('/api/structure', hierarchyRoutes); // <-- Add this line to alias struct
 app.use('/api/points', pointCodesRoutes);
 app.use('/api/homepage-materials', homepageMaterialsRoutes);
 app.use('/api/footer-content', footerContentRoutes);
+app.use('/api', notificationsRoutes);
 
 // Socket.IO chat functionality
 io.on('connection', (socket) => {

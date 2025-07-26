@@ -28,7 +28,7 @@ import {
   Edit,
   Trash2
 } from 'lucide-react';
-import StatusControl from '@/components/live-sessions/StatusControl';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,6 +52,9 @@ const LiveSessionsOverview = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedApproval, setSelectedApproval] = useState<string>('all');
+  const [approvingSession, setApprovingSession] = useState<string | null>(null);
+  const [rejectingSession, setRejectingSession] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -59,15 +62,43 @@ const LiveSessionsOverview = () => {
 
   const fetchData = async () => {
     try {
-      const [sessionsData, usersData, notificationsData] = await Promise.all([
+      // Fetch sessions and users first (these are required)
+      const [sessionsData, usersData] = await Promise.all([
         api.get('/live-sessions?all=true'),
-        api.getUsers(),
-        api.getNotifications()
+        api.getUsers()
       ]);
       
-      setSessions(sessionsData);
+      // Transform sessions data to fix date formatting and add proper professor names
+      const transformedSessions = sessionsData.map(session => ({
+        ...session,
+        scheduledAt: session.start_time || session.scheduled_at || session.scheduledAt,
+        createdAt: session.created_at || session.createdAt,
+        updatedAt: session.updated_at || session.updatedAt,
+        professorId: session.professor_id || session.professorId,
+        materialId: session.material_id || session.materialId,
+        attendeesCount: session.attendees_count || session.attendeesCount || 0,
+        maxAttendees: session.max_attendees || session.maxAttendees || 100,
+        isApproved: session.is_approved || session.isApproved || false,
+        approvedBy: session.approved_by || session.approvedBy,
+        approvedAt: session.approved_at || session.approvedAt,
+        isRecorded: session.is_recorded || session.isRecorded || false,
+        recordingUrl: session.recording_url || session.recordingUrl,
+        meetingUrl: session.meeting_url || session.meetingUrl,
+        agoraChannel: session.agora_channel || session.agoraChannel,
+        agoraToken: session.agora_token || session.agoraToken
+      }));
+      
+      setSessions(transformedSessions);
       setProfessors(usersData.filter(user => user.role === 'professor'));
-      setNotifications(notificationsData);
+      
+      // Try to fetch notifications (optional)
+      try {
+        const notificationsData = await api.getNotifications();
+        setNotifications(notificationsData);
+      } catch (notifError) {
+        console.warn('Failed to fetch notifications:', notifError);
+        setNotifications([]); // Set empty array as fallback
+      }
     } catch (error) {
       console.error('Failed to fetch data:', error);
       toast.error('Failed to load live sessions data');
@@ -118,7 +149,9 @@ const LiveSessionsOverview = () => {
       technical_issues: sessions.filter(s => s.status === 'technical_issues').length,
       total: sessions.length,
       totalAttendees: sessions.reduce((sum, s) => sum + (s.attendeesCount || 0), 0),
-      recordedSessions: sessions.filter(s => s.isRecorded && s.recordingUrl).length
+      recordedSessions: sessions.filter(s => s.isRecorded && s.recordingUrl).length,
+      approved: sessions.filter(s => s.isApproved === true).length,
+      pending: sessions.filter(s => s.isApproved === false).length
     };
     return counts;
   };
@@ -139,8 +172,23 @@ const LiveSessionsOverview = () => {
   };
 
   const getFilteredSessions = () => {
-    if (selectedStatus === 'all') return sessions;
-    return sessions.filter(s => s.status === selectedStatus);
+    let filtered = sessions;
+    
+    // Filter by status
+    if (selectedStatus !== 'all') {
+      filtered = filtered.filter(s => s.status === selectedStatus);
+    }
+    
+    // Filter by approval status
+    if (selectedApproval !== 'all') {
+      if (selectedApproval === 'approved') {
+        filtered = filtered.filter(s => s.isApproved === true);
+      } else if (selectedApproval === 'pending') {
+        filtered = filtered.filter(s => s.isApproved === false);
+      }
+    }
+    
+    return filtered;
   };
 
   const recentNotifications = notifications
@@ -156,6 +204,75 @@ const LiveSessionsOverview = () => {
   const handleViewRecording = (session: LiveSession) => {
     if (session.recordingUrl) {
       window.open(session.recordingUrl, '_blank');
+    }
+  };
+
+  const handleApproveSession = async (session: LiveSession) => {
+    setApprovingSession(session.id);
+    try {
+      const response = await api.updateLiveSession(session.id, { 
+        isApproved: true,
+        approvedAt: new Date().toISOString()
+      });
+      
+      if (response) {
+        toast.success('Session approved successfully');
+        fetchData(); // Refresh data
+      }
+    } catch (error) {
+      console.error('Failed to approve session:', error);
+      toast.error('Failed to approve session');
+    } finally {
+      setApprovingSession(null);
+    }
+  };
+
+  const handleRejectSession = async (session: LiveSession) => {
+    setRejectingSession(session.id);
+    try {
+      const response = await api.updateLiveSession(session.id, { 
+        isApproved: false,
+        status: 'cancelled'
+      });
+      
+      if (response) {
+        toast.success('Session rejected successfully');
+        fetchData(); // Refresh data
+      }
+    } catch (error) {
+      console.error('Failed to reject session:', error);
+      toast.error('Failed to reject session');
+    } finally {
+      setRejectingSession(null);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'Not scheduled';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Invalid Date';
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
+  };
+
+  const formatTime = (dateString: string) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return '';
     }
   };
 
@@ -243,7 +360,7 @@ const LiveSessionsOverview = () => {
           <CardDescription>Current status distribution of all sessions</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-4">
             <div className="text-center p-3 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors cursor-pointer" onClick={() => setSelectedStatus('scheduled')}>
               <div className="text-lg font-semibold text-blue-600">{statusCounts.scheduled}</div>
               <div className="text-xs text-gray-500">Scheduled</div>
@@ -271,6 +388,14 @@ const LiveSessionsOverview = () => {
             <div className="text-center p-3 rounded-lg bg-red-100 hover:bg-red-200 transition-colors cursor-pointer" onClick={() => setSelectedStatus('technical_issues')}>
               <div className="text-lg font-semibold text-red-800">{statusCounts.technical_issues}</div>
               <div className="text-xs text-gray-500">Issues</div>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-green-100 hover:bg-green-200 transition-colors cursor-pointer" onClick={() => setSelectedApproval('approved')}>
+              <div className="text-lg font-semibold text-green-800">{statusCounts.approved}</div>
+              <div className="text-xs text-gray-500">Approved</div>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-yellow-100 hover:bg-yellow-200 transition-colors cursor-pointer" onClick={() => setSelectedApproval('pending')}>
+              <div className="text-lg font-semibold text-yellow-800">{statusCounts.pending}</div>
+              <div className="text-xs text-gray-500">Pending</div>
             </div>
           </div>
         </CardContent>
@@ -405,24 +530,36 @@ const LiveSessionsOverview = () => {
                       <SelectItem value="technical_issues">Technical Issues</SelectItem>
                     </SelectContent>
                   </Select>
+                  
+                  <Select value={selectedApproval} onValueChange={setSelectedApproval}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Filter by approval" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Approval</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Session</TableHead>
-                      <TableHead>Professor</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Scheduled</TableHead>
-                      <TableHead>Attendees</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead>Recording</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                                          <TableHeader>
+                          <TableRow>
+                            <TableHead>Session</TableHead>
+                            <TableHead>Professor</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Approval</TableHead>
+                            <TableHead>Scheduled</TableHead>
+                            <TableHead>Attendees</TableHead>
+                            <TableHead>Duration</TableHead>
+                            <TableHead>Recording</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
                   <TableBody>
                     {filteredSessions.length === 0 ? (
                       <TableRow>
@@ -473,11 +610,29 @@ const LiveSessionsOverview = () => {
                             </Badge>
                           </TableCell>
                           <TableCell>
+                            {session.isApproved ? (
+                              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                <CheckCircle className="h-2 w-2 mr-1" />
+                                Approved
+                              </Badge>
+                            ) : session.status === 'scheduled' ? (
+                              <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200">
+                                <Clock className="h-2 w-2 mr-1" />
+                                Pending
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs bg-gray-50 text-gray-700 border-gray-200">
+                                <XCircle className="h-2 w-2 mr-1" />
+                                Not Required
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
                             <div className="text-sm">
-                              {new Date(session.scheduledAt).toLocaleDateString()}
+                              {formatDate(session.scheduledAt)}
                             </div>
                             <div className="text-xs text-gray-500">
-                              {new Date(session.scheduledAt).toLocaleTimeString()}
+                              {formatTime(session.scheduledAt)}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -521,11 +676,44 @@ const LiveSessionsOverview = () => {
                                   Join
                                 </Button>
                               )}
-                              <StatusControl
-                                session={session}
-                                onStatusUpdate={fetchData}
-                                userRole="admin"
-                              />
+                              
+                              {/* Approval buttons for pending sessions */}
+                              {!session.isApproved && session.status === 'scheduled' && (
+                                <div className="flex items-center gap-1">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    disabled={approvingSession === session.id || rejectingSession === session.id}
+                                    className="h-7 px-3 text-xs bg-green-50 text-green-700 hover:bg-green-100 border-green-200 hover:border-green-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={() => handleApproveSession(session)}
+                                  >
+                                    {approvingSession === session.id ? (
+                                      <RotateCw className="h-3 w-3 mr-1 animate-spin" />
+                                    ) : (
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                    )}
+                                    {approvingSession === session.id ? 'Approving...' : 'Approve'}
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    disabled={approvingSession === session.id || rejectingSession === session.id}
+                                    className="h-7 px-3 text-xs bg-red-50 text-red-700 hover:bg-red-100 border-red-200 hover:border-red-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={() => handleRejectSession(session)}
+                                  >
+                                    {rejectingSession === session.id ? (
+                                      <RotateCw className="h-3 w-3 mr-1 animate-spin" />
+                                    ) : (
+                                      <XCircle className="h-3 w-3 mr-1" />
+                                    )}
+                                    {rejectingSession === session.id ? 'Rejecting...' : 'Reject'}
+                                  </Button>
+                                </div>
+                              )}
+                              
+
+                              
+
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" className="h-6 w-6 p-0">

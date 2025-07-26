@@ -612,4 +612,81 @@ router.patch('/live-sessions/:sessionId', verifyToken, requireProfessor, async (
     }
 });
 
+// PATCH /api/live-sessions/:sessionId/admin → admin update endpoint for approval and other fields
+router.patch('/live-sessions/:sessionId/admin', verifyToken, requireRole(['admin']), async (req, res) => {
+    const { sessionId } = req.params;
+    const updates = req.body;
+
+    try {
+        // Build dynamic update query
+        const updateFields = [];
+        const updateValues = [];
+        let paramCount = 1;
+
+        // Handle different update fields
+        if (updates.isApproved !== undefined) {
+            updateFields.push(`is_approved = $${paramCount++}`);
+            updateValues.push(updates.isApproved);
+        }
+        
+        if (updates.approvedAt !== undefined) {
+            updateFields.push(`approved_at = $${paramCount++}`);
+            updateValues.push(updates.approvedAt);
+        }
+        
+        if (updates.status !== undefined) {
+            updateFields.push(`status = $${paramCount++}`);
+            updateValues.push(updates.status);
+        }
+        
+        if (updates.attendeesCount !== undefined) {
+            updateFields.push(`attendees_count = $${paramCount++}`);
+            updateValues.push(updates.attendeesCount);
+        }
+        
+        if (updates.recordingUrl !== undefined) {
+            updateFields.push(`recording_url = $${paramCount++}`);
+            updateValues.push(updates.recordingUrl);
+        }
+        
+        if (updates.isRecorded !== undefined) {
+            updateFields.push(`is_recorded = $${paramCount++}`);
+            updateValues.push(updates.isRecorded);
+        }
+
+        if (updateFields.length === 0) {
+            return res.status(400).json({ error: 'No valid fields to update' });
+        }
+
+        // Add session ID to values
+        updateValues.push(sessionId);
+
+        const query = `
+            UPDATE live_sessions 
+            SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $${paramCount}
+            RETURNING *
+        `;
+
+        const result = await pool.query(query, updateValues);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Live session not found' });
+        }
+
+        // If approving, set approved_by to current admin
+        if (updates.isApproved === true) {
+            await pool.query(
+                'UPDATE live_sessions SET approved_by = $1 WHERE id = $2',
+                [req.user.id, sessionId]
+            );
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error updating live session (admin):', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 export default router;
