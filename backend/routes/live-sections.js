@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
 // Configure multer for live section file uploads
 const liveSectionStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '..', '..', '..', 'public', 'uploads', 'live-sections');
+    const uploadDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'live-sections');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -67,7 +67,7 @@ const handleUploadError = (error, req, res, next) => {
 };
 
 // Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, '..', '..', '..', 'public', 'uploads', 'live-sections');
+const uploadsDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'live-sections');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -121,11 +121,6 @@ router.post('/professors/:professorId/live-sections',
   handleUploadError,
   async (req, res) => {
   try {
-    console.log('[DEBUG] Creating live section...');
-    console.log('[DEBUG] Request body:', req.body);
-    console.log('[DEBUG] Request file:', req.file);
-    console.log('[DEBUG] User:', req.user);
-    
     const { title, description, price, level_id, year_id, speciality_id, material_id, language_id, language_level_id } = req.body;
     const professor_id = req.user.id;
     const professor_name = req.user.name;
@@ -140,25 +135,22 @@ router.post('/professors/:professorId/live-sections',
 
     const query = `
       INSERT INTO live_sections (
-        professor_id, professor_name, title, description, price, 
-        level_id, year_id, speciality_id, material_id, language_id, language_level_id,
-        telegram_channel, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        professor_id, title, description, price, 
+        level_id, year_id, speciality_id, material_id, 
+        language_id, language_level_id, telegram_channel
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `;
 
     const result = await pool.query(query, [
-      professor_id, professor_name, title, description, price,
-      level_id, year_id, speciality_id, material_id, language_id, language_level_id,
-      telegram_channel, 'draft'
+      professor_id, title, description, price,
+      level_id || null, year_id || null, speciality_id || null, material_id || null,
+      language_id || null, language_level_id || null, telegram_channel
     ]);
-    
-    console.log('[DEBUG] Live section created:', result.rows[0]);
-    
+
     // Handle cover upload if present
-    let cover_image_url = null;
     if (req.file) {
-      cover_image_url = `/uploads/live-sections/${req.file.filename}`;
+      let cover_image_url = `/uploads/live-sections/${req.file.filename}`;
       await pool.query(
         'UPDATE live_sections SET cover_image_url = $1 WHERE id = $2',
         [cover_image_url, result.rows[0].id]
@@ -535,12 +527,8 @@ router.get('/live-sections/:sectionId', async (req, res) => {
 
 // Get live sessions for a specific section
 router.get('/live-sections/:sectionId/sessions', async (req, res) => {
-  console.log('[DEBUG] 🔥 ENDPOINT HIT: /live-sections/:sectionId/sessions');
-  console.log('[DEBUG] Section ID:', req.params.sectionId);
-  
   try {
     const { sectionId } = req.params;
-    console.log('[DEBUG] Fetching sessions for section:', sectionId);
 
     const query = `
       SELECT 
@@ -560,8 +548,6 @@ router.get('/live-sections/:sectionId/sessions', async (req, res) => {
     `;
 
     const result = await pool.query(query, [sectionId]);
-    console.log('[DEBUG] Database result:', result.rows);
-    console.log('[DEBUG] First session start_time:', result.rows[0]?.start_time);
     
     // Convert Date objects to ISO strings for proper JSON serialization
     const processedRows = result.rows.map(row => ({
@@ -572,13 +558,11 @@ router.get('/live-sections/:sectionId/sessions', async (req, res) => {
       duration: row.duration,
       price: row.price,
       cover_image_url: row.cover_image_url,
-      created_at: row.created_at ? row.created_at.toISOString() : null,
-      updated_at: row.updated_at ? row.updated_at.toISOString() : null,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
       status: row.status
     }));
-    
-    console.log('[DEBUG] Processed rows:', processedRows);
-    
+
     res.json(processedRows);
   } catch (error) {
     console.error('Error fetching live sessions for section:', error);

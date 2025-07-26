@@ -69,6 +69,7 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
   const [telegramChannel, setTelegramChannel] = useState(editingSection?.telegram_channel || '');
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [existingCoverUrl, setExistingCoverUrl] = useState(editingSection?.cover_image_url || '');
+  
   const [sections, setSections] = useState<LiveSection[]>(() => {
     if (editingSection?.live_sessions && editingSection.live_sessions.length > 0) {
       // Convert existing live sessions to blocks, keeping their real IDs
@@ -86,13 +87,6 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
             console.error('[DEBUG] Error formatting date:', session.scheduledAt, error);
           }
         }
-        
-        console.log('[DEBUG] Converting session:', {
-          id: session.id,
-          title: session.title,
-          originalScheduledAt: session.scheduledAt,
-          formattedScheduledAt: formattedScheduledAt
-        });
         
         return {
           id: session.id, // Keep the real database ID
@@ -152,8 +146,6 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(10, 0, 0, 0);
     const defaultDateTime = tomorrow.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:MM
-    
-    console.log('[DEBUG] Adding live session block with default date:', defaultDateTime);
     
     setSections(
       sections.map(section => {
@@ -225,12 +217,6 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('[DEBUG] LiveSectionForm handleSubmit started');
-    console.log('[DEBUG] User:', user);
-    console.log('[DEBUG] Form data:', { title, description, price });
-    console.log('[DEBUG] Sections:', sections);
-    console.log('[DEBUG] All blocks:', sections.flatMap(section => section.blocks));
-    
     if (!user) {
       toast.error('You must be logged in to create a live section');
       return;
@@ -256,7 +242,6 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
     setIsSubmitting(true);
     
     try {
-      console.log('[DEBUG] Creating live section...');
       
       // Create or update the live section first
       const formData = new FormData();
@@ -274,8 +259,6 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
         ? `/api/live-sections/${editingSection.id}`
         : `/api/professors/${user?.id}/live-sections`;
 
-      console.log('[DEBUG] Live section request:', { method, url });
-
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -284,8 +267,6 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
         body: formData
       });
 
-      console.log('[DEBUG] Live section response status:', response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
         console.error('[DEBUG] Live section error response:', errorText);
@@ -293,27 +274,19 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
       }
 
       const sectionData = await response.json();
-      console.log('[DEBUG] Live section created:', sectionData);
       
       // Create individual live sessions using the same logic as LiveSessionForm
-      console.log('[DEBUG] Creating live sessions...');
       
       // Filter out existing sessions (they already exist in the database)
       const newBlocks = allBlocks.filter(block => {
         // If we're in edit mode and the block has a numeric ID, it's an existing session
         if (editingSection && !isNaN(Number(block.id))) {
-          console.log('[DEBUG] Skipping existing session:', block.id);
           return false;
         }
         return true;
       });
       
-      console.log('[DEBUG] New blocks to create:', newBlocks);
-      console.log('[DEBUG] Block scheduledAt values:', newBlocks.map(b => ({ id: b.id, scheduledAt: b.scheduledAt, type: typeof b.scheduledAt })));
-      
       const promises = newBlocks.map(async (block) => {
-        console.log('[DEBUG] Creating live session for block:', block);
-        console.log('[DEBUG] Block scheduledAt:', block.scheduledAt, 'Type:', typeof block.scheduledAt);
         
         const sessionFormData = new FormData();
         sessionFormData.append('title', block.title);
@@ -326,9 +299,6 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
         // Add section_id to associate with the live section
         sessionFormData.append('section_id', sectionData.id);
         
-        console.log('[DEBUG] Session FormData section_id:', sectionData.id);
-        console.log('[DEBUG] Session FormData start_time:', block.scheduledAt);
-        
         if (coverFile) {
           sessionFormData.append('cover_image', coverFile);
         }
@@ -340,8 +310,6 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
           },
           body: sessionFormData
         });
-
-        console.log('[DEBUG] Live session response status:', sessionResponse.status);
 
         if (!sessionResponse.ok) {
           let errorMessage = 'Failed to create live session';
@@ -357,15 +325,12 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
         }
 
         const sessionResult = await sessionResponse.json();
-        console.log('[DEBUG] Live session created:', sessionResult);
         return sessionResult;
       });
 
       if (promises.length > 0) {
         await Promise.all(promises);
-        console.log('[DEBUG] All new live sessions created successfully');
       } else {
-        console.log('[DEBUG] No new live sessions to create');
       }
       
       toast.success(editingSection ? 'تم تحديث القسم المباشر بنجاح!' : 'تم إنشاء القسم المباشر بنجاح!');
@@ -416,7 +381,6 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
               type="datetime-local"
               value={block.scheduledAt || ''}
               onChange={(e) => {
-                console.log('[DEBUG] Date input changed:', e.target.value);
                 updateLiveSessionBlock(section.id, block.id, { scheduledAt: e.target.value });
               }}
               className="mt-1"
@@ -455,8 +419,6 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
             placeholder="Enter live section title"
             className="mt-1"
             required
-            readOnly={!!editingSection}
-            disabled={!!editingSection}
           />
         </div>
 
@@ -468,26 +430,22 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Enter live section description"
             className="mt-1"
-            rows={3}
             required
-            readOnly={!!editingSection}
-            disabled={!!editingSection}
           />
         </div>
 
         <div>
           <Label htmlFor="price">السعر (دج)</Label>
-          <Input
-            id="price"
-            type="number"
-            value={price}
-            onChange={(e) => setPrice(parseInt(e.target.value) || 0)}
-            className="mt-1"
-            min="0"
-            required
-            readOnly={!!editingSection}
-            disabled={!!editingSection}
-          />
+            <Input
+              id="price"
+              type="number"
+              value={price}
+              onChange={(e) => setPrice(parseFloat(e.target.value) || 0)}
+              placeholder="0"
+              className="mt-1"
+              min="0"
+              required
+            />
         </div>
 
         <div>
@@ -513,22 +471,20 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
                   </p>
                 </div>
                 
-                {!editingSection && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => {
-                      setCoverFile(null);
-                      if (coverInputRef.current) {
-                        coverInputRef.current.value = '';
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => {
+                    setCoverFile(null);
+                    if (coverInputRef.current) {
+                      coverInputRef.current.value = '';
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             ) : existingCoverUrl ? (
               <div className="flex items-center gap-3 p-3 border rounded-lg">
@@ -545,22 +501,20 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
                   <p className="text-xs text-gray-500">Click to replace</p>
                 </div>
                 
-                {!editingSection && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => {
-                      setExistingCoverUrl('');
-                      if (coverInputRef.current) {
-                        coverInputRef.current.value = '';
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => {
+                    setExistingCoverUrl('');
+                    if (coverInputRef.current) {
+                      coverInputRef.current.value = '';
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             ) : (
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
@@ -571,17 +525,14 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
                   accept="image/*"
                   onChange={handleCoverUpload}
                   className="hidden"
-                  disabled={!!editingSection}
                 />
-                {!editingSection && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => coverInputRef.current?.click()}
-                  >
-                    Choose Cover Image
-                  </Button>
-                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => coverInputRef.current?.click()}
+                >
+                  Choose Cover Image
+                </Button>
               </div>
             )}
           </div>
@@ -596,7 +547,6 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
             value={telegramChannel}
             onChange={(e) => setTelegramChannel(e.target.value)}
             className="mt-1"
-            disabled={!!editingSection}
           />
           <p className="text-xs text-gray-500 mt-1">
             Add your Telegram channel link for students to join
