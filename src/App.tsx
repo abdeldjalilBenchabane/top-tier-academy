@@ -72,7 +72,9 @@ import LiveSessionsOverview from './components/admin/LiveSessionsOverview';
 import QuizManagement from './components/admin/QuizManagement';
 // Professor components
 import QuizCreation from './components/professor/QuizCreation';
-import QuizResults from './components/professor/QuizResults';
+import QuizResults from './Pages/professor/QuizResults';
+import MyQuizzes from './Pages/professor/MyQuizzes';
+import QuizTaking from './components/student/QuizTaking';
 
 
 const queryClient = new QueryClient({
@@ -119,6 +121,7 @@ const App: React.FC = () => {
                 <Route path="/points/success" element={<PointsSuccess />} />
                 <Route path="/points/failure" element={<PointsFailure />} />
                 <Route path="/points/history" element={<PointsHistory />} />
+                <Route path="/quiz/:quizId" element={<QuizTaking />} />
 
 
                 {/* Schoolhouse public */}
@@ -159,7 +162,8 @@ const App: React.FC = () => {
                   <Route path="create-live-session" element={<CreateLiveSessionPage />} />
                   <Route path="live-sessions" element={<LiveSessionsPage />} />
                   <Route path="quiz" element={<QuizCreation />} />
-                  <Route path="results" element={<QuizResults professorId="1" />} />
+                  <Route path="results" element={<QuizResults />} />
+                  <Route path="my-quizzes" element={<MyQuizzes />} />
                   <Route path="settings" element={<ProfessorSettings />} />
                   <Route path="comments" element={<CourseCommentsOverview />} />
                   <Route path="comments/:courseId" element={<CourseComments />} />

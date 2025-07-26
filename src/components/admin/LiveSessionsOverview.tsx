@@ -94,7 +94,7 @@ const LiveSessionsOverview = () => {
       // Try to fetch notifications (optional)
       try {
         const notificationsData = await api.getNotifications();
-        setNotifications(notificationsData);
+      setNotifications(notificationsData);
       } catch (notifError) {
         console.warn('Failed to fetch notifications:', notifError);
         setNotifications([]); // Set empty array as fallback
@@ -296,7 +296,7 @@ const LiveSessionsOverview = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
+      <div>
           <h2 className="text-3xl font-bold tracking-tight">Live Sessions Overview</h2>
           <p className="text-muted-foreground">Monitor and manage all live sessions across the platform</p>
         </div>
@@ -511,8 +511,8 @@ const LiveSessionsOverview = () => {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>All Sessions</CardTitle>
-                  <CardDescription>Complete overview of all live sessions with management controls</CardDescription>
+              <CardTitle>All Sessions</CardTitle>
+              <CardDescription>Complete overview of all live sessions with management controls</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
                   <Select value={selectedStatus} onValueChange={setSelectedStatus}>
@@ -546,21 +546,21 @@ const LiveSessionsOverview = () => {
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
-                <Table>
-                                          <TableHeader>
-                          <TableRow>
-                            <TableHead>Session</TableHead>
-                            <TableHead>Professor</TableHead>
-                            <TableHead>Status</TableHead>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Session</TableHead>
+                    <TableHead>Professor</TableHead>
+                    <TableHead>Status</TableHead>
                             <TableHead>Approval</TableHead>
-                            <TableHead>Scheduled</TableHead>
-                            <TableHead>Attendees</TableHead>
-                            <TableHead>Duration</TableHead>
-                            <TableHead>Recording</TableHead>
+                    <TableHead>Scheduled</TableHead>
+                    <TableHead>Attendees</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Recording</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                  <TableBody>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                     {filteredSessions.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-8">
@@ -579,36 +579,36 @@ const LiveSessionsOverview = () => {
                     ) : (
                       filteredSessions.map((session) => (
                         <TableRow key={session.id} className="hover:bg-gray-50">
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{session.title}</div>
-                              <div className="text-sm text-gray-500 truncate max-w-48">
-                                {session.description}
-                              </div>
-                              {session.tags && session.tags.length > 0 && (
-                                <div className="flex gap-1 mt-1">
-                                  {session.tags.slice(0, 2).map((tag) => (
-                                    <Badge key={tag} variant="outline" className="text-xs">
-                                      <Tag className="h-2 w-2 mr-1" />
-                                      {tag}
-                                    </Badge>
-                                  ))}
-                                  {session.tags.length > 2 && (
-                                    <span className="text-xs text-gray-400">+{session.tags.length - 2}</span>
-                                  )}
-                                </div>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{session.title}</div>
+                          <div className="text-sm text-gray-500 truncate max-w-48">
+                            {session.description}
+                          </div>
+                          {session.tags && session.tags.length > 0 && (
+                            <div className="flex gap-1 mt-1">
+                              {session.tags.slice(0, 2).map((tag) => (
+                                <Badge key={tag} variant="outline" className="text-xs">
+                                  <Tag className="h-2 w-2 mr-1" />
+                                  {tag}
+                                </Badge>
+                              ))}
+                              {session.tags.length > 2 && (
+                                <span className="text-xs text-gray-400">+{session.tags.length - 2}</span>
                               )}
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">{getProfessorName(session.professorId)}</div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={getStatusColor(session.status)} className="flex items-center gap-1 w-fit">
-                              {getStatusIcon(session.status)}
-                              {session.status.charAt(0).toUpperCase() + session.status.slice(1).replace('_', ' ')}
-                            </Badge>
-                          </TableCell>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">{getProfessorName(session.professorId)}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusColor(session.status)} className="flex items-center gap-1 w-fit">
+                          {getStatusIcon(session.status)}
+                          {session.status.charAt(0).toUpperCase() + session.status.slice(1).replace('_', ' ')}
+                        </Badge>
+                      </TableCell>
                           <TableCell>
                             {session.isApproved ? (
                               <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
@@ -627,55 +627,55 @@ const LiveSessionsOverview = () => {
                               </Badge>
                             )}
                           </TableCell>
-                          <TableCell>
-                            <div className="text-sm">
+                      <TableCell>
+                        <div className="text-sm">
                               {formatDate(session.scheduledAt)}
-                            </div>
-                            <div className="text-xs text-gray-500">
+                        </div>
+                        <div className="text-xs text-gray-500">
                               {formatTime(session.scheduledAt)}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">
-                              {session.attendeesCount || 0}/{session.maxAttendees || 0}
-                            </div>
-                            {session.attendeesCount && session.maxAttendees && (
-                              <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
-                                <div 
-                                  className="bg-blue-600 h-1.5 rounded-full" 
-                                  style={{width: `${Math.min((session.attendeesCount / session.maxAttendees) * 100, 100)}%`}}
-                                ></div>
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">{session.duration}m</div>
-                          </TableCell>
-                          <TableCell>
-                            {session.isRecorded ? (
-                              session.recordingUrl ? (
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {session.attendeesCount || 0}/{session.maxAttendees || 0}
+                        </div>
+                        {session.attendeesCount && session.maxAttendees && (
+                          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                            <div 
+                              className="bg-blue-600 h-1.5 rounded-full" 
+                              style={{width: `${Math.min((session.attendeesCount / session.maxAttendees) * 100, 100)}%`}}
+                            ></div>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">{session.duration}m</div>
+                      </TableCell>
+                      <TableCell>
+                        {session.isRecorded ? (
+                          session.recordingUrl ? (
                                 <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => handleViewRecording(session)}>
-                                  <Eye className="h-3 w-3 mr-1" />
-                                  View
-                                </Button>
-                              ) : (
-                                <Badge variant="outline" className="text-xs">
-                                  <FileVideo className="h-2 w-2 mr-1" />
-                                  Recording
-                                </Badge>
-                              )
-                            ) : (
-                              <span className="text-xs text-gray-400">No recording</span>
-                            )}
-                          </TableCell>
+                              <Eye className="h-3 w-3 mr-1" />
+                              View
+                            </Button>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              <FileVideo className="h-2 w-2 mr-1" />
+                              Recording
+                            </Badge>
+                          )
+                        ) : (
+                          <span className="text-xs text-gray-400">No recording</span>
+                        )}
+                      </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
-                              {session.meetingUrl && (
+                          {session.meetingUrl && (
                                 <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => handleJoinSession(session)}>
                                   <ExternalLink className="h-3 w-3 mr-1" />
-                                  Join
-                                </Button>
-                              )}
+                              Join
+                            </Button>
+                          )}
                               
                               {/* Approval buttons for pending sessions */}
                               {!session.isApproved && session.status === 'scheduled' && (
@@ -733,13 +733,13 @@ const LiveSessionsOverview = () => {
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                       ))
                     )}
-                  </TableBody>
-                </Table>
+                </TableBody>
+              </Table>
               </div>
             </CardContent>
           </Card>

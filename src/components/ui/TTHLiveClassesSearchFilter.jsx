@@ -79,7 +79,7 @@ const TTHLiveClassesSearchFilter = ({
                   <option value="" disabled>لا توجد مراحل متاحة</option>
                 ) : (
                   levels.map(level => (
-                    <option key={level.id} value={level.id}>{level.name}</option>
+                  <option key={level.id} value={level.id}>{level.name}</option>
                   ))
                 )}
               </select>
@@ -142,7 +142,7 @@ const TTHLiveClassesSearchFilter = ({
                   <option value="" disabled>لا توجد تخصصات متاحة (3-path)</option>
                 ) : (
                   (selectedLevel && selectedYear ? getFilteredSpecialities() : getAllSpecialities()).map(speciality => (
-                    <option key={speciality.id} value={speciality.id}>{speciality.name}</option>
+                  <option key={speciality.id} value={speciality.id}>{speciality.name}</option>
                   ))
                 )}
               </select>
@@ -173,7 +173,7 @@ const TTHLiveClassesSearchFilter = ({
                   <option value="" disabled>لا توجد مواد متاحة</option>
                 ) : (
                   (selectedLevel && selectedYear ? getFilteredMaterials() : getAllMaterials()).map(material => (
-                    <option key={material.id} value={material.id}>{material.name}</option>
+                  <option key={material.id} value={material.id}>{material.name}</option>
                   ))
                 )}
               </select>

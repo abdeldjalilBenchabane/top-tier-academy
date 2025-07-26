@@ -252,32 +252,95 @@ export const usePrivateClasses = () => {
 
   // Function to refresh requests data
   const refreshRequests = async () => {
-    if (!user || isProfessor) return;
-    try {
-      setRequestsLoading(true);
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        console.log('No token found, skipping student requests fetch');
-        setMyPendingRequests([]);
-        return;
-      }
-      
-      console.log('Refreshing student requests with token:', token.substring(0, 20) + '...');
-      
-      const response = await fetch(`/api/private-class-requests/student/${user.id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      if (!user || isProfessor) return;
+      try {
+        setRequestsLoading(true);
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          console.log('No token found, skipping student requests fetch');
+          setMyPendingRequests([]);
+          return;
         }
-      });
-      
+        
+      console.log('Refreshing student requests with token:', token.substring(0, 20) + '...');
+        
+        const response = await fetch(`/api/private-class-requests/student/${user.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
       console.log('Student requests refresh response status:', response.status);
-      
-      if (response.ok) {
-        const data = await response.json();
-        const transformedRequests = data.requests
-          .filter(request => request.status !== 'مرفوض')
-          .map(request => ({
+        
+        if (response.ok) {
+          const data = await response.json();
+          const transformedRequests = data.requests
+            .filter(request => request.status !== 'مرفوض')
+            .map(request => ({
+              id: request.id,
+              title: request.title,
+              sessions: `${request.sessions_count} حصص`,
+              description: request.description,
+              teacher: request.teacher_name,
+              date: request.date,
+              subject: request.subject,
+              grade: request.grade,
+              status: request.status,
+              time: request.time,
+              createdAt: request.created_at,
+              agora_channel: request.agora_channel,
+              scheduled_at: request.scheduled_at,
+              hierarchy_path: request.hierarchy_path,
+              payment_status: request.payment_status,
+              payment_date: request.payment_date,
+              points_used: request.points_used,
+              price_per_session: request.price_per_session
+            }));
+          setMyPendingRequests(transformedRequests);
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+        console.error('Student requests refresh failed:', response.status, errorData);
+          setMyPendingRequests([]);
+        }
+      } catch (error) {
+      console.error('Student requests refresh error:', error);
+        setMyPendingRequests([]);
+      } finally {
+        setRequestsLoading(false);
+      }
+    };
+
+  // Fetch current user's pending requests
+  useEffect(() => {
+    refreshRequests();
+  }, [user, isProfessor]);
+
+  // Function to refresh all orders data
+  const refreshAllOrders = async () => {
+      try {
+        setAllOrdersLoading(true);
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          console.log('No token found, skipping all orders fetch');
+          setAllOrders([]);
+          return;
+        }
+        
+      console.log('Refreshing all orders with token:', token.substring(0, 20) + '...');
+        
+        const response = await fetch(`/api/private-class-requests`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+      console.log('All orders refresh response status:', response.status);
+        
+        if (response.ok) {
+          const data = await response.json();
+          const transformedOrders = data.requests.map(request => ({
             id: request.id,
             title: request.title,
             sessions: `${request.sessions_count} حصص`,
@@ -289,91 +352,28 @@ export const usePrivateClasses = () => {
             status: request.status,
             time: request.time,
             createdAt: request.created_at,
+            studentId: request.student_id,
             agora_channel: request.agora_channel,
             scheduled_at: request.scheduled_at,
-            hierarchy_path: request.hierarchy_path,
-            payment_status: request.payment_status,
-            payment_date: request.payment_date,
-            points_used: request.points_used,
-            price_per_session: request.price_per_session
-          }));
-        setMyPendingRequests(transformedRequests);
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Student requests refresh failed:', response.status, errorData);
-        setMyPendingRequests([]);
-      }
-    } catch (error) {
-      console.error('Student requests refresh error:', error);
-      setMyPendingRequests([]);
-    } finally {
-      setRequestsLoading(false);
-    }
-  };
-
-  // Fetch current user's pending requests
-  useEffect(() => {
-    refreshRequests();
-  }, [user, isProfessor]);
-
-  // Function to refresh all orders data
-  const refreshAllOrders = async () => {
-    try {
-      setAllOrdersLoading(true);
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        console.log('No token found, skipping all orders fetch');
-        setAllOrders([]);
-        return;
-      }
-      
-      console.log('Refreshing all orders with token:', token.substring(0, 20) + '...');
-      
-      const response = await fetch(`/api/private-class-requests`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      console.log('All orders refresh response status:', response.status);
-      
-      if (response.ok) {
-        const data = await response.json();
-        const transformedOrders = data.requests.map(request => ({
-          id: request.id,
-          title: request.title,
-          sessions: `${request.sessions_count} حصص`,
-          description: request.description,
-          teacher: request.teacher_name,
-          date: request.date,
-          subject: request.subject,
-          grade: request.grade,
-          status: request.status,
-          time: request.time,
-          createdAt: request.created_at,
-          studentId: request.student_id,
-          agora_channel: request.agora_channel,
-          scheduled_at: request.scheduled_at,
           hierarchy_path: request.hierarchy_path,
           payment_status: request.payment_status,
           payment_date: request.payment_date,
           points_used: request.points_used,
           price_per_session: request.price_per_session
-        }));
-        setAllOrders(transformedOrders);
-      } else {
-        const errorData = await response.json().catch(() => ({}));
+          }));
+          setAllOrders(transformedOrders);
+        } else {
+          const errorData = await response.json().catch(() => ({}));
         console.error('All orders refresh failed:', response.status, errorData);
-        setAllOrders([]);
-      }
-    } catch (error) {
+          setAllOrders([]);
+        }
+      } catch (error) {
       console.error('All orders refresh error:', error);
       setAllOrders([]);
-    } finally {
-      setAllOrdersLoading(false);
-    }
-  };
+      } finally {
+        setAllOrdersLoading(false);
+      }
+    };
 
   // Fetch all orders for the grid
   useEffect(() => {

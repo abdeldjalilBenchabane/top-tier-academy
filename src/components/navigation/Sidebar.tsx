@@ -71,6 +71,7 @@ const Sidebar = () => {
     { name: 'Live Sessions', path: '/professor/live-sessions', icon: <Video className="h-5 w-5" /> },
     { name: 'Create Live Session', path: '/professor/create-live-session', icon: <Video className="h-5 w-5" /> },
     { name: 'Create Quiz', path: '/professor/quiz', icon: <HelpCircle className="h-5 w-5" /> },
+    { name: 'My Quizzes', path: '/professor/my-quizzes', icon: <FileText className="h-5 w-5" /> },
     { name: 'Quiz Results', path: '/professor/results', icon: <BarChart className="h-5 w-5" /> },
     { name: 'تعليقات الطلاب', path: '/professor/comments', icon: <MessageCircle className="h-5 w-5" /> },
     { name: 'الحصص الخاصة', path: '/professor/private-classes', icon: <Clock className="h-5 w-5" /> },

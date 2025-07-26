@@ -185,6 +185,12 @@ export type PendingQuiz = Omit<Quiz, "materialId" | "isActive"> & {
   approvedAt?: string;
   materialId?: string;
   reviewedBy?: string;
+  courseTitle?: string;
+  professorName?: string;
+  materialName?: string;
+  specialityName?: string;
+  yearName?: string;
+  levelName?: string;
 };
 
 export type QuizAttempt = {

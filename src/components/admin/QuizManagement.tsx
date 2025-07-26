@@ -3,19 +3,17 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Eye, CheckCircle, XCircle, Clock, Users } from 'lucide-react';
 import { api } from '@/lib/api';
 import { PendingQuiz, User } from '@/types';
 import { toast } from '@/lib/toast';
-import PathSelector from './PathSelector';
+
 
 const QuizManagement = () => {
   const [pendingQuizzes, setpendingQuizzes] = useState<PendingQuiz[]>([]);
   const [professors, setProfessors] = useState<User[]>([]);
-  const [selectedQuiz, setSelectedQuiz] = useState<PendingQuiz | null>(null);
-  const [showPathSelector, setShowPathSelector] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -25,6 +23,7 @@ const QuizManagement = () => {
           api.getPendingQuizzes(),
           api.getUsers()
         ]);
+        console.log('Fetched quizzes data:', quizzesData);
         setpendingQuizzes(quizzesData);
         setProfessors(professorsData.filter(user => user.role === 'professor'));
       } catch (error) {
@@ -59,9 +58,16 @@ const QuizManagement = () => {
     );
   };
 
-  const handleApproveQuiz = (quiz: PendingQuiz) => {
-    setSelectedQuiz(quiz);
-    setShowPathSelector(true);
+  const handleApproveQuiz = async (quiz: PendingQuiz) => {
+    try {
+      await api.approveQuiz(quiz.id);
+      toast.success('Quiz approved successfully');
+      const updatedQuizzes = await api.getPendingQuizzes();
+      setpendingQuizzes(updatedQuizzes);
+    } catch (error) {
+      console.error('Error approving quiz:', error);
+      toast.error('Failed to approve quiz');
+    }
   };
 
   const handleRejectQuiz = async (quizId: string) => {
@@ -76,12 +82,7 @@ const QuizManagement = () => {
     }
   };
 
-  const handlePathSelectorSuccess = async () => {
-    setShowPathSelector(false);
-    setSelectedQuiz(null);
-    const updatedQuizzes = await api.getPendingQuizzes();
-    setpendingQuizzes(updatedQuizzes);
-  };
+
 
   if (isLoading) {
     return <div className="py-8 text-center">Loading quizzes...</div>;
@@ -136,7 +137,7 @@ const QuizManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {pendingQuizzes.reduce((total, quiz) => total + quiz.questions.length, 0)}
+              {pendingQuizzes.reduce((total, quiz) => total + (quiz.questions?.length || 0), 0)}
             </div>
           </CardContent>
         </Card>
@@ -152,6 +153,7 @@ const QuizManagement = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Title</TableHead>
+                <TableHead>Course</TableHead>
                 <TableHead>Professor</TableHead>
                 <TableHead>Questions</TableHead>
                 <TableHead>Time Limit</TableHead>
@@ -164,8 +166,9 @@ const QuizManagement = () => {
               {pendingQuizzes.map((quiz) => (
                 <TableRow key={quiz.id}>
                   <TableCell className="font-medium">{quiz.title}</TableCell>
-                  <TableCell>{getProfessorName(quiz.createdBy)}</TableCell>
-                  <TableCell>{quiz.questions.length}</TableCell>
+                  <TableCell>{quiz.courseTitle || 'Unknown Course'}</TableCell>
+                  <TableCell>{quiz.professorName || getProfessorName(quiz.createdBy)}</TableCell>
+                  <TableCell>{quiz.questions?.length || 0}</TableCell>
                   <TableCell>{quiz.timeLimit ? `${quiz.timeLimit} min` : 'No limit'}</TableCell>
                   <TableCell>{getStatusBadge(quiz.status)}</TableCell>
                   <TableCell>{new Date(quiz.createdAt).toLocaleDateString()}</TableCell>
@@ -177,21 +180,70 @@ const QuizManagement = () => {
                             <Eye className="h-4 w-4" />
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-4xl">
+                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                           <DialogHeader>
                             <DialogTitle>{quiz.title}</DialogTitle>
+                            <DialogDescription>
+                              Review quiz details and questions
+                            </DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4">
                             <p className="text-gray-600">{quiz.description}</p>
+                            
+                            {/* Course and Path Information */}
+                            <div className="bg-gray-50 p-4 rounded-lg">
+                              <h4 className="font-semibold text-gray-800 mb-2">Course Information</h4>
+                              <div className="grid grid-cols-1 gap-2 text-sm">
+                                <div><strong>Course:</strong> {quiz.courseTitle || 'Unknown Course'}</div>
+                                <div><strong>Professor:</strong> {quiz.professorName || getProfessorName(quiz.createdBy)}</div>
+                                <div><strong>Created:</strong> {new Date(quiz.createdAt).toLocaleDateString('en-US', { 
+                                  year: 'numeric', 
+                                  month: 'long', 
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}</div>
+                              </div>
+                            </div>
+                            
+                            {/* Educational Path */}
+                            {(quiz.levelName || quiz.yearName || quiz.specialityName || quiz.materialName) && (
+                              <div className="bg-blue-50 p-4 rounded-lg">
+                                <h4 className="font-semibold text-blue-800 mb-2">Educational Path</h4>
+                                <div className="flex items-center gap-2 text-sm text-blue-700">
+                                  {quiz.levelName && <span className="font-medium">{quiz.levelName}</span>}
+                                  {quiz.yearName && (
+                                    <>
+                                      <span>→</span>
+                                      <span className="font-medium">{quiz.yearName}</span>
+                                    </>
+                                  )}
+                                  {quiz.specialityName && (
+                                    <>
+                                      <span>→</span>
+                                      <span className="font-medium">{quiz.specialityName}</span>
+                                    </>
+                                  )}
+                                  {quiz.materialName && (
+                                    <>
+                                      <span>→</span>
+                                      <span className="font-medium">{quiz.materialName}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div><strong>Time Limit:</strong> {quiz.timeLimit ? `${quiz.timeLimit} minutes` : 'No limit'}</div>
                               <div><strong>Passing Score:</strong> {quiz.passingScore}%</div>
                               <div><strong>Max Attempts:</strong> {quiz.maxAttempts || 'Unlimited'}</div>
-                              <div><strong>Questions:</strong> {quiz.questions.length}</div>
+                              <div><strong>Questions:</strong> {quiz.questions?.length || 0}</div>
                             </div>
-                            <div className="space-y-3">
-                              <h4 className="font-semibold">Questions:</h4>
-                              {quiz.questions.map((question, index) => (
+                                                          <div className="space-y-3">
+                                <h4 className="font-semibold">Questions: {quiz.questions?.length || 0}</h4>
+                                {console.log('Quiz questions:', quiz.questions)}
+                                {quiz.questions?.map((question, index) => (
                                 <div key={question.id} className="border p-3 rounded">
                                   <div className="font-medium">{index + 1}. {question.question}</div>
                                   <div className="text-sm text-gray-600 mt-1">Type: {question.type} | Points: {question.points}</div>
@@ -248,20 +300,7 @@ const QuizManagement = () => {
         </CardContent>
       </Card>
 
-      {showPathSelector && selectedQuiz && (
-        <Dialog open={showPathSelector} onOpenChange={setShowPathSelector}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Assign Quiz to Educational Path</DialogTitle>
-            </DialogHeader>
-            <PathSelector
-              pendingCourse={selectedQuiz as any}
-              onSuccess={handlePathSelectorSuccess}
-              onCancel={() => setShowPathSelector(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
+
     </div>
   );
 };

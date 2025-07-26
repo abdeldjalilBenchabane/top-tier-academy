@@ -33,8 +33,8 @@ const StatusControl = ({ session, onStatusUpdate, userRole, isOwner = false }: S
     try {
       await api.saveLiveSessionToLibrary(session.id);
       toast.success('Session saved to library successfully');
-      setIsDialogOpen(false);
-      onStatusUpdate();
+    setIsDialogOpen(false);
+    onStatusUpdate();
     } catch (error) {
       console.error('Failed to save session to library:', error);
       toast.error('Failed to save session to library');
@@ -89,8 +89,8 @@ const StatusControl = ({ session, onStatusUpdate, userRole, isOwner = false }: S
           </SelectTrigger>
           <SelectContent>
             {statusOptions.map((option) => (
-              <SelectItem 
-                key={option.value} 
+              <SelectItem
+                key={option.value}
                 value={option.value}
                 disabled={option.disabled}
               >
@@ -119,21 +119,21 @@ const StatusControl = ({ session, onStatusUpdate, userRole, isOwner = false }: S
                 Save "{session.title}" to the course library as recorded content.
               </DialogDescription>
             </DialogHeader>
-            
-            <div className="py-4">
-              <p className="text-sm text-gray-600">
+
+                <div className="py-4">
+                  <p className="text-sm text-gray-600">
                 This will save the live session to the course library, making it available as a recorded session for students.
-              </p>
-            </div>
+                  </p>
+                </div>
             
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSaveToLibrary}>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSaveToLibrary}>
                 Save to Library
-              </Button>
-            </DialogFooter>
+                  </Button>
+                </DialogFooter>
           </DialogContent>
         </Dialog>
       )}

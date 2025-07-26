@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,16 +14,48 @@ import { QuizQuestion } from '@/types';
 import { toast } from '@/lib/toast';
 
 const QuizCreation = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const editQuiz = location.state?.editQuiz;
+  
   const [quizData, setQuizData] = useState({
-    title: '',
-    description: '',
-    timeLimit: '',
-    passingScore: 70,
-    maxAttempts: ''
+    title: editQuiz?.title || '',
+    description: editQuiz?.description || '',
+    course_id: editQuiz?.course_id || 0,
+    timeLimit: editQuiz?.timeLimit?.toString() || '',
+    passingScore: editQuiz?.passingScore || 70,
+    maxAttempts: editQuiz?.maxAttempts?.toString() || ''
   });
 
-  const [questions, setQuestions] = useState<Omit<QuizQuestion, 'id'>[]>([]);
+  const [questions, setQuestions] = useState<Omit<QuizQuestion, 'id'>[]>(
+    editQuiz?.questions?.map(q => ({
+      question: q.question,
+      type: q.type,
+      options: q.options || [],
+      correctAnswer: q.correctAnswer,
+      points: q.points,
+      explanation: q.explanation || ''
+    })) || []
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [courses, setCourses] = useState<{ id: number; title: string }[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
+
+  // Fetch professor's courses on component mount
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const coursesData = await api.getProfessorCourses();
+        setCourses(coursesData);
+      } catch (error) {
+        console.error('Error fetching courses:', error);
+        toast.error('Failed to load courses');
+      } finally {
+        setLoadingCourses(false);
+      }
+    };
+    fetchCourses();
+  }, []);
 
   const addQuestion = () => {
     setQuestions([...questions, {
@@ -54,8 +87,13 @@ const QuizCreation = () => {
   };
 
   const handleSubmit = async () => {
-    if (!quizData.title || !quizData.description || questions.length === 0) {
-      toast.error('Please fill in all required fields and add at least one question');
+    if (editQuiz) {
+      // Handle edit mode
+      toast.info('Edit functionality will be implemented soon');
+      return;
+    }
+    if (!quizData.title || !quizData.description || !quizData.course_id || questions.length === 0) {
+      toast.error('Please fill in all required fields, select a course, and add at least one question');
       return;
     }
 
@@ -78,14 +116,14 @@ const QuizCreation = () => {
       await api.submitQuiz({
         title: quizData.title,
         description: quizData.description,
+        course_id: quizData.course_id,
         questions: questions.map((q, index) => ({
           ...q,
           id: `q-${Date.now()}-${index}`
         })),
         timeLimit: quizData.timeLimit ? parseInt(quizData.timeLimit) : undefined,
         passingScore: quizData.passingScore,
-        maxAttempts: quizData.maxAttempts ? parseInt(quizData.maxAttempts) : undefined,
-        createdBy: '1' // This should be the current user's ID
+        maxAttempts: quizData.maxAttempts ? parseInt(quizData.maxAttempts) : undefined
       });
 
       toast.success('Quiz submitted for approval');
@@ -94,6 +132,7 @@ const QuizCreation = () => {
       setQuizData({
         title: '',
         description: '',
+        course_id: 0,
         timeLimit: '',
         passingScore: 70,
         maxAttempts: ''
@@ -110,8 +149,10 @@ const QuizCreation = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Create Quiz</h2>
-        <p className="text-gray-600">Create engaging quizzes for your students</p>
+        <h2 className="text-2xl font-bold">{editQuiz ? 'Edit Quiz' : 'Create Quiz'}</h2>
+        <p className="text-gray-600">
+          {editQuiz ? 'Modify your existing quiz' : 'Create engaging quizzes for your students'}
+        </p>
       </div>
 
       <Card>
@@ -139,6 +180,31 @@ const QuizCreation = () => {
               placeholder="Describe what this quiz covers"
               rows={3}
             />
+          </div>
+
+          <div>
+            <Label htmlFor="course">Select Course *</Label>
+            {loadingCourses ? (
+              <div className="text-sm text-gray-500">Loading courses...</div>
+            ) : courses.length === 0 ? (
+              <div className="text-sm text-red-500">No courses found. Please create a course first.</div>
+            ) : (
+              <Select
+                value={quizData.course_id ? quizData.course_id.toString() : ''}
+                onValueChange={(value) => setQuizData({...quizData, course_id: parseInt(value)})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a course for this quiz" />
+                </SelectTrigger>
+                <SelectContent>
+                  {courses.map((course) => (
+                    <SelectItem key={course.id} value={course.id.toString()}>
+                      {course.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -332,11 +398,11 @@ const QuizCreation = () => {
           className="min-w-32"
         >
           {isSubmitting ? (
-            "Submitting..."
+            editQuiz ? "Updating..." : "Submitting..."
           ) : (
             <>
               <Save className="h-4 w-4 mr-2" />
-              Submit Quiz
+              {editQuiz ? 'Update Quiz' : 'Submit Quiz'}
             </>
           )}
         </Button>
