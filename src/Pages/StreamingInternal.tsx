@@ -339,6 +339,29 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         };
     }, [socket]);
 
+    // [LIVE STREAM MODIF] --- Réception de l'événement 'stream-ended-professor' côté professeur ---
+    useEffect(() => {
+        if (!socket || !isProfessor) return;
+        const handleStreamEndedProfessor = ({ roomId }) => {
+            console.log('[DEBUG] stream-ended-professor event received', roomId); // [LIVE STREAM MODIF]
+            // Désactive micro et caméra avant de rediriger [LIVE STREAM MODIF]
+            if (agoraVideoRef.current) {
+                if (!agoraVideoRef.current.isLocalMicMuted) {
+                    agoraVideoRef.current.toggleLocalMic();
+                }
+                if (agoraVideoRef.current.isLocalCameraEnabled) {
+                    agoraVideoRef.current.toggleLocalCamera();
+                }
+            }
+            // Redirect professor to their live sessions page instead of home
+            window.location.href = '/professor/live-sessions'; // [LIVE STREAM MODIF]
+        };
+        socket.on('stream-ended-professor', handleStreamEndedProfessor);
+        return () => {
+            socket.off('stream-ended-professor', handleStreamEndedProfessor);
+        };
+    }, [socket, isProfessor]);
+
     useEffect(() => {
         console.log('[DEBUG] Re-render, messages.length:', messages.length);
         console.log('[DEBUG] Messages:', messages);
@@ -795,6 +818,8 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                                         socket.emit('end-stream', id); // [LIVE STREAM MODIF]
                                                     } else {
                                                         console.error('[DEBUG] end-stream NOT emitted', { socket, id }); // [LIVE STREAM MODIF]
+                                                        // Fallback: redirect immediately if no socket
+                                                        navigate('/professor/live-sessions');
                                                     }
                                             }}
                                         >
