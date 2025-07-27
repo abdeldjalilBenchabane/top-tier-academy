@@ -531,7 +531,7 @@ export const api = {
     return newYear;
   },
   getAllYears: async (): Promise<Year[]> => {
-    const res = await fetch('/api/years', {
+    const res = await fetch('/api/structure/years', {
       headers: {
         ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
       },
@@ -558,7 +558,7 @@ export const api = {
     return newSpeciality;
   },
   getAllSpecialities: async (): Promise<Speciality[]> => {
-    const res = await fetch('/api/specialities', {
+    const res = await fetch('/api/structure/specialities', {
       headers: {
         ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
       },
@@ -585,7 +585,7 @@ export const api = {
     return newMaterial;
   },
   getAllMaterials: async (): Promise<Material[]> => {
-    const res = await fetch('/api/materials', {
+    const res = await fetch('/api/structure/materials', {
       headers: {
         ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
       },
@@ -1279,7 +1279,7 @@ export const api = {
     return await res.json();
   },
   getAllLanguageLevels: async (): Promise<LanguageLevel[]> => {
-    const res = await fetch('/api/language-levels', {
+    const res = await fetch('/api/structure/language-levels', {
       headers: {
         ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
       },

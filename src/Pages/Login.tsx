@@ -46,8 +46,15 @@ const Login = () => {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-600">SchoolHouse</h1>
-          <p className="text-gray-600 mt-2">Course Management System</p>
+          {/* Logo */}
+          <div className="mb-4 flex justify-center">
+            <img 
+              src="/2.svg" 
+              alt="Schoolhouse Logo" 
+              className="h-16 w-auto"
+            />
+          </div>
+          
         </div>
         
         <Card>

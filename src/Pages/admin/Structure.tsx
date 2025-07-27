@@ -467,15 +467,15 @@ const Structure = () => {
         title="Educational Structure" 
         description="Manage your school's hierarchical education system and languages"
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button onClick={() => setShowForm('language')}>
               <Globe className="mr-2 h-4 w-4" />
               Add Language
             </Button>
-          <Button onClick={() => setShowForm('level')}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Level
-          </Button>
+            <Button onClick={() => setShowForm('level')}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Level
+            </Button>
           </div>
         }
       />

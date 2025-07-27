@@ -240,7 +240,7 @@ const QuizManagement = () => {
                               <div><strong>Max Attempts:</strong> {quiz.maxAttempts || 'Unlimited'}</div>
                               <div><strong>Questions:</strong> {quiz.questions?.length || 0}</div>
                             </div>
-                                                          <div className="space-y-3">
+                            <div className="space-y-3">
                                 <h4 className="font-semibold">Questions: {quiz.questions?.length || 0}</h4>
                                 {console.log('Quiz questions:', quiz.questions)}
                                 {quiz.questions?.map((question, index) => (

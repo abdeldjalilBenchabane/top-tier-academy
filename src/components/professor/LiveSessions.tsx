@@ -34,12 +34,9 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
     courseId: '',
     scheduledAt: '',
     duration: 60,
-    meetingUrl: '',
     presenter: user?.name || '',
     price: 0,
     currency: 'DZD',
-
-    thumbnail: '',
     isPaid: false,
   });
 
@@ -188,12 +185,9 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
       courseId: '',
       scheduledAt: '',
       duration: 60,
-      meetingUrl: '',
       presenter: user?.name || '',
       price: 0,
       currency: 'DZD',
-
-      thumbnail: '',
       isPaid: false,
     });
   };
@@ -360,27 +354,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
 
 
 
-              <div className="space-y-2">
-                <Label htmlFor="thumbnail">Thumbnail URL</Label>
-                <Input
-                  id="thumbnail"
-                  type="url"
-                  value={formData.thumbnail}
-                  onChange={(e) => setFormData({ ...formData, thumbnail: e.target.value })}
-                  placeholder="https://example.com/image.jpg"
-                />
-              </div>
 
-
-              <div className="space-y-2">
-                <Label htmlFor="meetingUrl">Meeting URL (optional)</Label>
-                <Input
-                  id="meetingUrl"
-                  value={formData.meetingUrl}
-                  onChange={(e) => setFormData({ ...formData, meetingUrl: e.target.value })}
-                  placeholder="https://zoom.us/j/..."
-                />
-              </div>
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>

@@ -204,12 +204,12 @@ router.post('/live-sections/:sectionId/assign-path', verifyToken, requireProfess
     };
 
     if (rootType === 'education') {
-      if (!levelId || !yearId || !specialityId || !materialId) {
-        return res.status(400).json({ error: 'All education hierarchy fields are required' });
+      if (!levelId || !yearId || !materialId) {
+        return res.status(400).json({ error: 'Level, year, and material are required' });
       }
       updateFields.level_id = levelId;
       updateFields.year_id = yearId;
-      updateFields.speciality_id = specialityId;
+      updateFields.speciality_id = specialityId || null; // Make speciality optional
       updateFields.material_id = materialId;
     } else if (rootType === 'language') {
       if (!languageId || !languageLevelId) {

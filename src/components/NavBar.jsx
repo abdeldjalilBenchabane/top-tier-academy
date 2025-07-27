@@ -115,14 +115,23 @@ const Navbar = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between py-3 w-full">
 
-          {/* Logo */}
-          <Link to="/" className="mr-6 hover:opacity-90 transition">
-            <img 
-              src="/1.png" 
-              alt="TTH Logo" 
-              className="h-8 md:h-10 w-auto"
-            />
-          </Link>
+          {/* Logo - Left on mobile, left on desktop */}
+          <div className="flex justify-start">
+            <Link to="/" className="hover:opacity-90 transition">
+              <img 
+                src="/1.png" 
+                alt="TTH Logo" 
+                className="h-6 md:h-10 w-auto"
+              />
+            </Link>
+          </div>
+
+          {/* Mobile Burger Menu - Right side on mobile */}
+          <div className="custom:hidden">
+            <button onClick={toggleMenu} className="mobile-menu-button text-white focus:outline-none hover:bg-white/20 p-2 rounded transition">
+              {isMenuOpen ? <FaTimes size={24} /> : <FaBars size={24} />}
+            </button>
+          </div>
 
           {/* Desktop menu */}
           <div className="hidden custom:flex flex-1 items-center justify-start mr-16 gap-6">
@@ -196,12 +205,8 @@ const Navbar = () => {
             ) : null}
           </div>
 
-          {/* Mobile toggle (hidden at ≥800px) */}
-          <div className="custom:hidden">
-            <button onClick={toggleMenu} className="mobile-menu-button text-white focus:outline-none hover:bg-white/20 p-2 rounded transition">
-              {isMenuOpen ? <FaTimes size={24} /> : <FaBars size={24} />}
-            </button>
-          </div>
+          {/* Empty div for mobile layout balance */}
+          <div className="custom:hidden w-10"></div>
         </div>
 
         {/* Mobile menu */}

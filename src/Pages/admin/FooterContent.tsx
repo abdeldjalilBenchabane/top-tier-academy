@@ -234,13 +234,15 @@ const FooterContent = () => {
       </div>
 
       <Tabs value={activeSection} onValueChange={setActiveSection}>
-        <TabsList className="grid w-full grid-cols-6">
-          {sections.map(section => (
-            <TabsTrigger key={section} value={section}>
-              {sectionLabels[section] || section}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <div className="overflow-x-auto">
+          <TabsList className="grid w-full grid-cols-6 min-w-max">
+            {sections.map(section => (
+              <TabsTrigger key={section} value={section}>
+                {sectionLabels[section] || section}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
 
         {sections.map(section => (
           <TabsContent key={section} value={section} className="space-y-4">
