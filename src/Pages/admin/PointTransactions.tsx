@@ -454,7 +454,7 @@ const AdminPointTransactions: React.FC = () => {
           <h2 className="text-2xl font-bold">Point Transactions Management</h2>
           <p className="text-gray-600">Manage all point transactions in the system</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Button variant="outline" onClick={fetchTransactions}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh

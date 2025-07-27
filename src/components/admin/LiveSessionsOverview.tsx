@@ -402,10 +402,9 @@ const LiveSessionsOverview = () => {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="all-sessions">All Sessions</TabsTrigger>
-          <TabsTrigger value="saved-library">Saved Library</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -514,7 +513,7 @@ const LiveSessionsOverview = () => {
               <CardTitle>All Sessions</CardTitle>
               <CardDescription>Complete overview of all live sessions with management controls</CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                   <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                     <SelectTrigger className="w-40">
                       <SelectValue placeholder="Filter by status" />

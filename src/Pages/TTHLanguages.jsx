@@ -620,132 +620,134 @@ export default function Languages() {
         {!loading && (Object.keys(groupedCourses).length > 0 || Object.keys(groupedLiveSections).length > 0) && (
           <section className="py-8 bg-white shadow-sm">
             <div className="container mx-auto px-4">
-              {/* Main Filter Buttons */}
-              <div className="flex flex-wrap justify-center gap-4 mb-6">
-                <button
-                  onClick={() => setActiveFilter('all')}
-                  className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
-                    activeFilter === 'all' 
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
-                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
-                  }`}
-                >
-                  جميع اللغات
-                  {activeFilter === 'all' && (
-                    <span className="ml-2 bg-white/20 px-2 py-1 rounded-full text-xs">
-                      {Object.values(groupedCourses).flat().length}
-                    </span>
-                  )}
-                </button>
-                
-                <button
-                  onClick={() => setActiveFilter('live')}
-                  className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
-                    activeFilter === 'live' 
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
-                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
-                  }`}
-                >
-                  لغات لايف
-                  {activeFilter === 'live' && (
-                    <span className="ml-2 bg-white/20 px-2 py-1 rounded-full text-xs">
-                      {Object.values(groupedLiveSections).flat().length}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {/* Language Specific Filter Buttons */}
-              {activeFilter === 'all' && Object.keys(groupedCourses).length > 0 && (
-                <div className="flex flex-wrap justify-center gap-4">
+              {/* Combined Filter Buttons - Main Filters and Language Specific Filters */}
+              <div className="flex flex-col md:flex-row md:justify-between items-center gap-4 mb-6 px-4 md:px-10">
+                {/* First Group - Main Filter Buttons */}
+                <div className="flex flex-wrap justify-center md:justify-start gap-2 md:gap-4 w-full md:w-auto">
                   <button
-                    onClick={() => handleLanguageFilter(null)}
-                    className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
-                      selectedLanguageFilter === null 
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
-                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
+                    onClick={() => setActiveFilter('live')}
+                    className={`px-4 md:px-6 py-2 md:py-3 rounded-full font-semibold transition-all duration-300 text-sm md:text-base ${
+                      activeFilter === 'live' 
+                        ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg' 
+                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-red-300 hover:shadow-md'
                     }`}
                   >
-                    جميع اللغات
-                    {selectedLanguageFilter === null && (
-                      <span className="ml-2 bg-white/20 px-2 py-1 rounded-full text-xs">
-                        {Object.values(groupedCourses).flat().length}
-                      </span>
-                    )}
-                  </button>
-                  
-                  {Object.keys(groupedCourses).map((languageName) => {
-                    const languageCourseCount = groupedCourses[languageName].length;
-                    
-                    return (
-                      <button
-                        key={languageName}
-                        onClick={() => handleLanguageFilter(languageName)}
-                        className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
-                          selectedLanguageFilter === languageName 
-                            ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
-                            : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
-                        }`}
-                      >
-                        {languageName}
-                        <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
-                          selectedLanguageFilter === languageName 
-                            ? 'bg-white/20' 
-                            : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {languageCourseCount}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Live Language Specific Filter Buttons */}
-              {activeFilter === 'live' && Object.keys(groupedLiveSections).length > 0 && (
-                <div className="flex flex-wrap justify-center gap-4">
-                  <button
-                    onClick={() => handleLanguageFilter(null)}
-                    className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
-                      selectedLanguageFilter === null 
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
-                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
-                    }`}
-                  >
-                    جميع اللغات
-                    {selectedLanguageFilter === null && (
-                      <span className="ml-2 bg-white/20 px-2 py-1 rounded-full text-xs">
+                    لغات لايف
+                    {activeFilter === 'live' && (
+                      <span className="ml-1 md:ml-2 bg-white/20 px-1 md:px-2 py-0.5 md:py-1 rounded-full text-xs">
                         {Object.values(groupedLiveSections).flat().length}
                       </span>
                     )}
                   </button>
                   
-                  {Object.keys(groupedLiveSections).map((languageName) => {
-                    const languageLiveSectionCount = groupedLiveSections[languageName].length;
-                    
-                    return (
-                      <button
-                        key={languageName}
-                        onClick={() => handleLanguageFilter(languageName)}
-                        className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
-                          selectedLanguageFilter === languageName 
-                            ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
-                            : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
-                        }`}
-                      >
-                        {languageName}
-                        <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
-                          selectedLanguageFilter === languageName 
-                            ? 'bg-white/20' 
-                            : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {languageLiveSectionCount}
-                        </span>
-                      </button>
-                    );
-                  })}
+                  <button
+                    onClick={() => setActiveFilter('all')}
+                    className={`px-4 md:px-6 py-2 md:py-3 rounded-full font-semibold transition-all duration-300 text-sm md:text-base ${
+                      activeFilter === 'all' 
+                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
+                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
+                    }`}
+                  >
+                    الدورات المحفوظة 
+                    {activeFilter === 'all' && (
+                      <span className="ml-1 md:ml-2 bg-white/20 px-1 md:px-2 py-0.5 md:py-1 rounded-full text-xs">
+                        {Object.values(groupedCourses).flat().length}
+                      </span>
+                    )}
+                  </button>
                 </div>
-              )}
+
+                {/* Second Group - Language Specific Filter Buttons */}
+                {activeFilter === 'all' && Object.keys(groupedCourses).length > 0 && (
+                  <div className="flex flex-wrap justify-center md:justify-end gap-2 md:gap-4 w-full md:w-auto">
+                    <button
+                      onClick={() => handleLanguageFilter(null)}
+                      className={`px-4 md:px-6 py-2 md:py-3 rounded-full font-semibold transition-all duration-300 text-sm md:text-base ${
+                        selectedLanguageFilter === null 
+                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
+                          : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
+                      }`}
+                    >
+                      جميع اللغات
+                      {selectedLanguageFilter === null && (
+                        <span className="ml-1 md:ml-2 bg-white/20 px-1 md:px-2 py-0.5 md:py-1 rounded-full text-xs">
+                          {Object.values(groupedCourses).flat().length}
+                        </span>
+                      )}
+                    </button>
+                    
+                    {Object.keys(groupedCourses).map((languageName) => {
+                      const languageCourseCount = groupedCourses[languageName].length;
+                      
+                      return (
+                        <button
+                          key={languageName}
+                          onClick={() => handleLanguageFilter(languageName)}
+                          className={`px-4 md:px-6 py-2 md:py-3 rounded-full font-semibold transition-all duration-300 text-sm md:text-base ${
+                            selectedLanguageFilter === languageName 
+                              ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
+                              : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
+                          }`}
+                        >
+                          {languageName}
+                          <span className={`ml-1 md:ml-2 px-1 md:px-2 py-0.5 md:py-1 rounded-full text-xs ${
+                            selectedLanguageFilter === languageName 
+                              ? 'bg-white/20' 
+                              : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {languageCourseCount}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {activeFilter === 'live' && Object.keys(groupedLiveSections).length > 0 && (
+                  <div className="flex flex-wrap justify-center md:justify-end gap-2 md:gap-4 w-full md:w-auto">
+                    <button
+                      onClick={() => handleLanguageFilter(null)}
+                      className={`px-4 md:px-6 py-2 md:py-3 rounded-full font-semibold transition-all duration-300 text-sm md:text-base ${
+                        selectedLanguageFilter === null 
+                          ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg' 
+                          : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-red-300 hover:shadow-md'
+                      }`}
+                    >
+                     جميع اللغات 
+                      {selectedLanguageFilter === null && (
+                        <span className="ml-1 md:ml-2 bg-white/20 px-1 md:px-2 py-0.5 md:py-1 rounded-full text-xs">
+                          {Object.values(groupedLiveSections).flat().length}
+                        </span>
+                      )}
+                    </button>
+                    
+                    {Object.keys(groupedLiveSections).map((languageName) => {
+                      const languageLiveSectionCount = groupedLiveSections[languageName].length;
+                      
+                      return (
+                        <button
+                          key={languageName}
+                          onClick={() => handleLanguageFilter(languageName)}
+                          className={`px-4 md:px-6 py-2 md:py-3 rounded-full font-semibold transition-all duration-300 text-sm md:text-base ${
+                            selectedLanguageFilter === languageName 
+                              ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg' 
+                              : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-red-300 hover:shadow-md'
+                          }`}
+                        >
+                          {languageName}
+                          <span className={`ml-1 md:ml-2 px-1 md:px-2 py-0.5 md:py-1 rounded-full text-xs ${
+                            selectedLanguageFilter === languageName 
+                              ? 'bg-white/20' 
+                              : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {languageLiveSectionCount}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </section>
         )}

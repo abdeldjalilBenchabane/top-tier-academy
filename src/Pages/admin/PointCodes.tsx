@@ -343,7 +343,7 @@ const AdminPointCodes: React.FC = () => {
               <Label htmlFor="date">Date</Label>
               <input id="date" type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="border rounded px-2 py-1 w-full" />
             </div>
-            <div className="flex gap-2 items-end">
+            <div className="flex flex-col sm:flex-row gap-2 items-end">
               <Button variant="outline" className="w-full" onClick={() => handleDownloadCodes('all')}><Download className="h-4 w-4 mr-2" />Download All Unused (CSV)</Button>
               <Button variant="outline" className="w-full" onClick={() => handleDownloadCodes('date')} disabled={!dateFilter}><Download className="h-4 w-4 mr-2" />Download Unused by Date (CSV)</Button>
               <Button variant="outline" className="w-full" onClick={() => handleDownloadCodes('selected')} disabled={selectedCodes.length === 0}><Download className="h-4 w-4 mr-2" />Download Selected (CSV)</Button>

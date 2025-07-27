@@ -225,18 +225,18 @@ const EnhancedHomepageSlides = () => {
           <h2 className="text-2xl font-bold">Enhanced Homepage Slides</h2>
           <p className="text-gray-600">Manage your homepage slides with advanced features</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Button variant="outline" onClick={bulkReorder}>
             <Settings className="h-4 w-4 mr-2" />
             Reorder All
           </Button>
-        <Button onClick={() => {
-          setEditingSlide(null);
-          setIsDialogOpen(true);
-        }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Slide
-        </Button>
+          <Button onClick={() => {
+            setEditingSlide(null);
+            setIsDialogOpen(true);
+          }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Slide
+          </Button>
         </div>
       </div>
 
@@ -304,19 +304,20 @@ const EnhancedHomepageSlides = () => {
           <CardDescription>View and manage all your homepage slides</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order</TableHead>
-                <TableHead>Preview</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Views</TableHead>
-                <TableHead>Clicks</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+          <div className="overflow-x-auto">
+            <Table className="min-w-full">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[80px]">Order</TableHead>
+                  <TableHead className="min-w-[100px]">Preview</TableHead>
+                  <TableHead className="min-w-[200px]">Title</TableHead>
+                  <TableHead className="min-w-[100px]">Type</TableHead>
+                  <TableHead className="min-w-[100px]">Status</TableHead>
+                  <TableHead className="min-w-[80px]">Views</TableHead>
+                  <TableHead className="min-w-[80px]">Clicks</TableHead>
+                  <TableHead className="min-w-[150px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
             <TableBody>
               {slides.map((slide, index) => (
                 <TableRow key={slide.id}>
@@ -441,6 +442,7 @@ const EnhancedHomepageSlides = () => {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
