@@ -13,14 +13,17 @@
  */
 
 import { Pool } from 'pg';
+import dotenv from 'dotenv';
 
-// Database configuration - UPDATE THESE VALUES FOR YOUR DATABASE
+dotenv.config();
+
+// Database configuration
 const dbConfig = {
-  user: 'your_username',
-  host: 'localhost',
-  database: 'your_database_name',
-  password: 'your_password',
-  port: 5432,
+  host: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT || 5432,
+  database: process.env.DB_NAME || 'tth_database',
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || '***REMOVED***',
 };
 
 // Create database connection pool
@@ -376,8 +379,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log('📋 DATABASE MIGRATION SCRIPT');
   console.log('============================');
   console.log('');
-  console.log('⚠️  IMPORTANT: Update the dbConfig object with your database credentials!');
-  console.log('');
   console.log('Current configuration:');
   console.log('  User:', dbConfig.user);
   console.log('  Host:', dbConfig.host);
@@ -385,17 +386,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log('  Port:', dbConfig.port);
   console.log('');
   
-  // Check if credentials are still default
-  if (dbConfig.user === 'your_username' || dbConfig.database === 'your_database_name') {
-    console.log('❌ Please update the database configuration before running the migration!');
-    console.log('   Edit the dbConfig object at the top of this file.');
-    process.exit(1);
-  }
-  
   console.log('✅ Configuration looks good! Starting migration...');
   console.log('');
   
   runMigration();
 }
 
-export { runMigration, dbConfig }; 
+export { runMigration }; 

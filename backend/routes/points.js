@@ -622,6 +622,96 @@ router.get('/my-courses', auth, async (req, res) => {
   }
 });
 
+// Get purchased live sessions for a student
+router.get('/my-live-sessions', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get purchased live sections with their details
+    const purchasedSections = await pool.query(`
+      SELECT 
+        ls.id,
+        ls.title,
+        ls.description,
+        ls.price,
+        ls.cover_image_url,
+        ls.scheduled_date,
+        ls.scheduled_time,
+        ls.duration_minutes,
+        ls.telegram_channel,
+        ls.status,
+        ls.created_at,
+        lsp.purchase_date,
+        lsp.points_spent,
+        u.name as professor_name,
+        m.name as material_name,
+        l.name as language_name,
+        ll.name as language_level_name
+      FROM live_section_purchases lsp
+      JOIN live_sections ls ON lsp.live_section_id = ls.id
+      LEFT JOIN users u ON ls.professor_id = u.id
+      LEFT JOIN materials m ON ls.material_id = m.id
+      LEFT JOIN languages l ON ls.language_id = l.id
+      LEFT JOIN language_levels ll ON ls.language_level_id = ll.id
+      WHERE lsp.student_id = $1
+      ORDER BY lsp.purchase_date DESC
+    `, [userId]);
+    
+    res.json({
+      success: true,
+      liveSessions: purchasedSections.rows
+    });
+  } catch (error) {
+    console.error('Error fetching purchased live sessions:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get purchased individual live sessions for a student
+router.get('/my-individual-live-sessions', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get purchased individual live sessions with their details
+    const purchasedSessions = await pool.query(`
+      SELECT 
+        ls.id,
+        ls.title,
+        ls.description,
+        ls.price,
+        ls.cover_image_url,
+        ls.start_time,
+        ls.duration,
+        ls.status,
+        ls.created_at,
+        p.purchased_at,
+        p.amount_paid,
+        u.name as professor_name,
+        m.name as material_name,
+        s.name as speciality_name,
+        y.name as year_name,
+        l.name as level_name
+      FROM purchases p
+      JOIN live_sessions ls ON p.session_id = ls.id
+      LEFT JOIN users u ON ls.professor_id = u.id
+      LEFT JOIN materials m ON ls.material_id = m.id
+      LEFT JOIN specialities s ON m.speciality_id = s.id
+      LEFT JOIN years y ON s.year_id = y.id
+      LEFT JOIN levels l ON y.level_id = l.id
+      WHERE p.student_id = $1
+      ORDER BY p.purchased_at DESC
+    `, [userId]);
+    
+    res.json({
+      success: true,
+      liveSessions: purchasedSessions.rows
+    });
+  } catch (error) {
+    console.error('Error fetching purchased individual live sessions:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Admin buy points for student (admin only)
 router.post('/admin/buy-for-student', auth, requireAdmin, async (req, res) => {
   try {

@@ -232,6 +232,12 @@ export const pointsAPI = {
 
   // Get all purchased course IDs for the logged-in user
   getMyCourses: () => apiRequest('/points/my-courses'),
+
+  // Get purchased live sessions for the logged-in user
+  getMyLiveSessions: () => apiRequest('/points/my-live-sessions'),
+
+  // Get purchased individual live sessions for the logged-in user
+  getMyIndividualLiveSessions: () => apiRequest('/points/my-individual-live-sessions'),
 };
 
 // Payments API calls

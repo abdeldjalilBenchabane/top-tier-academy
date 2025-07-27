@@ -63,12 +63,17 @@ interface LiveSectionFormProps {
 
 const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFormProps) => {
   const { user } = useAuth();
+  
+  console.log('[DEBUG] LiveSectionForm props:', { editingSection, onSuccess, onCancel });
+  
   const [title, setTitle] = useState(editingSection?.title || '');
   const [description, setDescription] = useState(editingSection?.description || '');
   const [price, setPrice] = useState(editingSection?.price || 500);
   const [telegramChannel, setTelegramChannel] = useState(editingSection?.telegram_channel || '');
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [existingCoverUrl, setExistingCoverUrl] = useState(editingSection?.cover_image_url || '');
+  
+  console.log('[DEBUG] Form state initialized:', { title, description, price, telegramChannel, existingCoverUrl });
   
   const [sections, setSections] = useState<LiveSection[]>(() => {
     if (editingSection?.live_sessions && editingSection.live_sessions.length > 0) {
@@ -114,6 +119,25 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Add useEffect to update form fields when editingSection changes
+  React.useEffect(() => {
+    console.log('[DEBUG] editingSection changed:', editingSection);
+    if (editingSection) {
+      setTitle(editingSection.title || '');
+      setDescription(editingSection.description || '');
+      setPrice(editingSection.price || 500);
+      setTelegramChannel(editingSection.telegram_channel || '');
+      setExistingCoverUrl(editingSection.cover_image_url || '');
+      console.log('[DEBUG] Form fields updated:', {
+        title: editingSection.title,
+        description: editingSection.description,
+        price: editingSection.price,
+        telegram_channel: editingSection.telegram_channel,
+        cover_image_url: editingSection.cover_image_url
+      });
+    }
+  }, [editingSection]);
 
   const addSection = () => {
     setSections([
@@ -174,6 +198,7 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
     blockId: string,
     updates: Partial<LiveSessionBlock>
   ) => {
+    console.log('[DEBUG] Updating live session block:', { sectionId, blockId, updates });
     setSections(
       sections.map(section => {
         if (section.id === sectionId) {
@@ -217,6 +242,9 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('[DEBUG] Form submission started');
+    console.log('[DEBUG] Form data:', { title, description, price, telegramChannel, editingSection });
+    
     if (!user) {
       toast.error('You must be logged in to create a live section');
       return;
@@ -259,6 +287,12 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
         ? `/api/live-sections/${editingSection.id}`
         : `/api/professors/${user?.id}/live-sections`;
 
+      console.log('[DEBUG] Making request:', { method, url });
+      console.log('[DEBUG] FormData contents:');
+      for (let [key, value] of formData.entries()) {
+        console.log(`  ${key}:`, value);
+      }
+
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -267,17 +301,27 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
         body: formData
       });
 
+      console.log('[DEBUG] Response status:', response.status);
+      console.log('[DEBUG] Response ok:', response.ok);
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('[DEBUG] Live section error response:', errorText);
-        throw new Error('Failed to create live section');
+        throw new Error(`Failed to ${editingSection ? 'update' : 'create'} live section: ${errorText}`);
       }
 
       const sectionData = await response.json();
+      console.log('[DEBUG] Section data received:', sectionData);
       
-      // Create individual live sessions using the same logic as LiveSessionForm
+      // Handle live sessions - update existing ones and create new ones
+      const allBlocks = sections.flatMap(section => section.blocks);
       
-      // Filter out existing sessions (they already exist in the database)
+      // Separate existing sessions (to update) and new sessions (to create)
+      const existingBlocks = allBlocks.filter(block => {
+        // If we're in edit mode and the block has a numeric ID, it's an existing session
+        return editingSection && !isNaN(Number(block.id));
+      });
+      
       const newBlocks = allBlocks.filter(block => {
         // If we're in edit mode and the block has a numeric ID, it's an existing session
         if (editingSection && !isNaN(Number(block.id))) {
@@ -286,7 +330,55 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
         return true;
       });
       
-      const promises = newBlocks.map(async (block) => {
+      console.log('[DEBUG] Existing blocks to update:', existingBlocks);
+      console.log('[DEBUG] New blocks to create:', newBlocks);
+      
+      // Update existing sessions
+      const updatePromises = existingBlocks.map(async (block) => {
+        console.log('[DEBUG] Updating existing session:', block.id, block.title);
+        
+        const sessionFormData = new FormData();
+        sessionFormData.append('title', block.title);
+        sessionFormData.append('description', block.description);
+        sessionFormData.append('start_time', block.scheduledAt);
+        sessionFormData.append('duration', block.duration.toString());
+        sessionFormData.append('price', price.toString());
+        sessionFormData.append('professorId', user.id);
+        sessionFormData.append('section_id', sectionData.id);
+        
+        if (coverFile) {
+          sessionFormData.append('cover_image', coverFile);
+        }
+
+        const sessionResponse = await fetch(`/api/live-sessions/${block.id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: sessionFormData
+        });
+
+        if (!sessionResponse.ok) {
+          let errorMessage = 'Failed to update live session';
+          try {
+            const errorData = await sessionResponse.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (parseError) {
+            const errorText = await sessionResponse.text();
+            errorMessage = `Server error: ${sessionResponse.status} ${sessionResponse.statusText}`;
+          }
+          console.error('[DEBUG] Live session update error:', errorMessage);
+          throw new Error(errorMessage);
+        }
+
+        const sessionResult = await sessionResponse.json();
+        console.log('[DEBUG] Session updated successfully:', sessionResult);
+        return sessionResult;
+      });
+      
+      // Create new sessions
+      const createPromises = newBlocks.map(async (block) => {
+        console.log('[DEBUG] Creating new session:', block.title);
         
         const sessionFormData = new FormData();
         sessionFormData.append('title', block.title);
@@ -325,12 +417,15 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
         }
 
         const sessionResult = await sessionResponse.json();
+        console.log('[DEBUG] Session created successfully:', sessionResult);
         return sessionResult;
       });
 
-      if (promises.length > 0) {
-        await Promise.all(promises);
-      } else {
+      // Execute all promises
+      const allPromises = [...updatePromises, ...createPromises];
+      if (allPromises.length > 0) {
+        await Promise.all(allPromises);
+        console.log('[DEBUG] All sessions processed successfully');
       }
       
       toast.success(editingSection ? 'تم تحديث القسم المباشر بنجاح!' : 'تم إنشاء القسم المباشر بنجاح!');

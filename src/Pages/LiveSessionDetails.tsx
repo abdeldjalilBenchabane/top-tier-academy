@@ -160,13 +160,8 @@ const LiveSessionDetails = () => {
       return;
     }
     
-    // Check if there's a Telegram channel link
-    if (liveSection?.telegram_channel) {
-      console.log('[DEBUG] Opening Telegram channel:', liveSection.telegram_channel);
-      window.open(liveSection.telegram_channel, '_blank');
-    } else {
-      toast.error('لا يوجد رابط قناة تليجرام متاح');
-    }
+    // Navigate to streaming page
+    navigate(`/streaming/${session.id}`);
   };
 
   // Helper function to safely parse dates
@@ -560,7 +555,13 @@ const LiveSessionDetails = () => {
                   <div className="flex items-center pt-4 gap-3">
                     {/* Telegram Channel Button - Always visible */}
                     <button
-                      onClick={handleJoinSession}
+                      onClick={() => {
+                        if (liveSection?.telegram_channel) {
+                          window.open(liveSection.telegram_channel, '_blank');
+                        } else {
+                          toast.error('Telegram channel not available');
+                        }
+                      }}
                       className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-lg font-bold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 flex items-center justify-center shadow-lg hover:shadow-xl transform hover:scale-105"
                     >
                       <TelegramIcon className="w-5 h-5 ml-2" />

@@ -140,6 +140,7 @@ export type LiveSession = {
   agoraChannel?: string;
   agoraToken?: string;
   price?: number;
+  cover_image_url?: string;
 };
 
 export type Breadcrumb = {

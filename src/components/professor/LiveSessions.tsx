@@ -414,19 +414,33 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                                      <div className="flex items-center gap-2">
-                    <CardTitle className="text-lg">{session.title}</CardTitle>
-                    {getApprovalStatusBadge(session)}
-                    <Badge variant={getStatusColor(getSessionStatus(session))}>
-                      {getSessionStatus(session) === 'live' ? 'مباشر الآن' : 
-                       getSessionStatus(session) === 'upcoming' ? 'قريباً' :
-                       getSessionStatus(session) === 'ended' ? 'منتهي' :
-                       session.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : 'Unknown'}
-                    </Badge>
-                  </div>
-                    <CardDescription className="mt-1">
-                      {session.description}
-                    </CardDescription>
+                    {/* Cover Image */}
+                    {session.cover_image_url && (
+                      <div className="mb-3">
+                        <img
+                          src={session.cover_image_url}
+                          alt={`${session.title} Cover`}
+                          className="w-full h-32 object-cover rounded-lg border"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg">{session.title}</CardTitle>
+                      {getApprovalStatusBadge(session)}
+                      <Badge variant={getStatusColor(getSessionStatus(session))}>
+                        {getSessionStatus(session) === 'live' ? 'مباشر الآن' : 
+                         getSessionStatus(session) === 'upcoming' ? 'قريباً' :
+                         getSessionStatus(session) === 'ended' ? 'منتهي' :
+                         session.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : 'Unknown'}
+                      </Badge>
+                    </div>
+                      <CardDescription className="mt-1">
+                        {session.description}
+                      </CardDescription>
                   </div>
                   <div className="flex items-center gap-2 ml-4">
                     {getSessionStatus(session) === 'live' && (

@@ -77,7 +77,7 @@ router.post('/professors/:professorId/live-sessions',
     });
     
     // Extract data from request body (FormData)
-    const { title, start_time, duration, price, material_id, description, section_id } = req.body;
+    const { title, start_time, duration, price, material_id, description, section_id, telegram_channel } = req.body;
     
     console.log('[DEBUG] Extracted data:', {
         title,
@@ -86,7 +86,8 @@ router.post('/professors/:professorId/live-sessions',
         price,
         material_id,
         description,
-        section_id
+        section_id,
+        telegram_channel
     });
     
     console.log('[DEBUG] start_time type and value:', {
@@ -119,8 +120,8 @@ router.post('/professors/:professorId/live-sessions',
         }
 
         const result = await pool.query(
-            'INSERT INTO live_sessions (professor_id, professor_name, title, description, start_time, duration, price, material_id, cover_image_url, section_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
-            [professor_id, professor_name, title, description, start_time, duration, price, material_id, cover_image_url, section_id || null]
+            'INSERT INTO live_sessions (professor_id, professor_name, title, description, start_time, duration, price, material_id, cover_image_url, section_id, telegram_channel) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+            [professor_id, professor_name, title, description, start_time, duration, price, material_id, cover_image_url, section_id || null, telegram_channel || null]
         );
         const session = result.rows[0];
 
@@ -144,7 +145,8 @@ router.post('/professors/:professorId/live-sessions',
             price,
             material_id,
             cover_image_url,
-            section_id: section_id || null
+            section_id: section_id || null,
+            telegram_channel: telegram_channel || null
         });
 
         // Notify all admins
@@ -176,7 +178,7 @@ router.put('/live-sessions/:id', verifyToken, requireProfessor, (req, res, next)
 }, async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, description, start_time, duration, price } = req.body;
+        const { title, description, start_time, duration, price, telegram_channel } = req.body;
         
         const professor_id = req.user.id;
 
@@ -207,9 +209,9 @@ router.put('/live-sessions/:id', verifyToken, requireProfessor, (req, res, next)
             }
         }
 
-        const updateFields = ['title = $1', 'description = $2', 'start_time = $3', 'duration = $4', 'price = $5'];
-        const updateValues = [title, description, start_time, duration, price];
-        let paramIndex = 6;
+        const updateFields = ['title = $1', 'description = $2', 'start_time = $3', 'duration = $4', 'price = $5', 'telegram_channel = $6'];
+        const updateValues = [title, description, start_time, duration, price, telegram_channel || null];
+        let paramIndex = 7;
 
         if (cover_image_url) {
             updateFields.push(`cover_image_url = $${paramIndex}`);

@@ -28,6 +28,7 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
   const [scheduledAt, setScheduledAt] = useState('');
   const [duration, setDuration] = useState(60);
   const [price, setPrice] = useState(500);
+  const [telegramChannel, setTelegramChannel] = useState('');
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -261,6 +262,7 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
       formData.append('price', price.toString());
       formData.append('material_id', selectedMaterial);
       formData.append('professorId', user.id);
+      formData.append('telegram_channel', telegramChannel);
       
       if (coverImage) {
         formData.append('cover_image', coverImage);
@@ -306,6 +308,7 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
     setScheduledAt('');
     setDuration(60);
     setPrice(500);
+    setTelegramChannel('');
     setCoverImage(null);
     setImagePreview('');
     setSelectedLevel('');
@@ -583,6 +586,20 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
                   onChange={(e) => setPrice(parseFloat(e.target.value) || 0)}
                   className="mt-1"
                   required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="telegramChannel" className="text-sm font-medium">
+                  رابط قناة التلغرام (اختياري)
+                </Label>
+                <Input
+                  id="telegramChannel"
+                  type="url"
+                  placeholder="https://t.me/yourchannel"
+                  value={telegramChannel}
+                  onChange={(e) => setTelegramChannel(e.target.value)}
+                  className="mt-1"
                 />
               </div>
             </div>

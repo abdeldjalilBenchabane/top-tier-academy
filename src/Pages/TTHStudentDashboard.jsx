@@ -43,10 +43,13 @@ const StudentDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [purchasedCourses, setPurchasedCourses] = useState([]);
+    const [purchasedLiveSessions, setPurchasedLiveSessions] = useState([]);
     const [pointsBalance, setPointsBalance] = useState(0);
     const [myPendingRequests, setMyPendingRequests] = useState([]);
     const navigate = useNavigate();
     const [editMode, setEditMode] = useState(false);
+    const [currentTime, setCurrentTime] = useState(new Date());
+    const [sessionTimers, setSessionTimers] = useState({});
 
     // Function to refresh student stats
     const refreshStudentStats = async () => {
@@ -60,6 +63,57 @@ const StudentDashboard = () => {
             console.error('Error refreshing student stats:', error);
         }
     };
+
+    // Timer effect for live sessions countdown
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, []);
+
+    // Calculate session timers
+    useEffect(() => {
+        const timers = {};
+        purchasedLiveSessions.forEach(session => {
+            if (!session.start_time) {
+                timers[session.id] = '';
+                return;
+            }
+
+            const sessionTime = new Date(session.start_time);
+            const sessionEndTime = new Date(sessionTime.getTime() + (session.duration || 60) * 60 * 1000);
+
+            if (session.status === 'ended' || session.is_ended) {
+                timers[session.id] = 'منتهي';
+                return;
+            }
+
+            if (currentTime < sessionTime) {
+                // Session hasn't started yet
+                const timeDiff = sessionTime.getTime() - currentTime.getTime();
+                const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+                const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+
+                if (hours > 0) {
+                    timers[session.id] = `${hours}h ${minutes}m`;
+                } else if (minutes > 0) {
+                    timers[session.id] = `${minutes}m ${seconds}s`;
+                } else {
+                    timers[session.id] = `${seconds}s`;
+                }
+            } else if (currentTime >= sessionTime && currentTime <= sessionEndTime) {
+                // Session is live
+                timers[session.id] = 'مباشر الآن';
+            } else {
+                // Session has ended
+                timers[session.id] = 'منتهي';
+            }
+        });
+        setSessionTimers(timers);
+    }, [currentTime, purchasedLiveSessions]);
 
     // Function to fetch private class requests
     const fetchPrivateClassRequests = useCallback(async () => {
@@ -132,8 +186,10 @@ const StudentDashboard = () => {
                 try {
                   const res = await fetch('/api/courses?status=approved');
                   let data = await res.json();
+                  console.log('[DEBUG] All courses from API:', data);
                   // Only keep courses WITHOUT a language_level_id (education path)
                   data = data.filter(course => !course.language_level_id || course.language_level_id === null || course.language_level_id === undefined);
+                  console.log('[DEBUG] Filtered education courses:', data);
                   // For education courses, fetch price from materials table
                   try {
                     const materialsRes = await fetch('/api/courses/materials/list');
@@ -151,6 +207,24 @@ const StudentDashboard = () => {
                 const purchased = allCourses
                   .filter(course => purchasedIds.includes(course.id))
                   .map(course => ({ ...course, purchased: true }));
+                console.log('[DEBUG] Purchased courses:', purchased);
+
+                // Fetch purchased live sessions (only individual sessions from TTHLiveClasses)
+                let purchasedIndividualLiveSessions = [];
+                
+                try {
+                  // Fetch individual live sessions (from /TTHLiveClasses)
+                  const purchasedIndividualLiveSessionsRes = await pointsAPI.getMyIndividualLiveSessions();
+                  purchasedIndividualLiveSessions = purchasedIndividualLiveSessionsRes.liveSessions || [];
+                  console.log('[DEBUG] Purchased individual live sessions from API:', purchasedIndividualLiveSessions);
+                } catch (e) { 
+                  console.error('[DEBUG] Error fetching individual live sessions:', e);
+                  purchasedIndividualLiveSessions = []; 
+                }
+
+                // Use only individual live sessions
+                const allPurchasedLiveSessions = purchasedIndividualLiveSessions.map(session => ({ ...session, type: 'individual_session' }));
+
                 // Fetch points balance
                 let balance = 0;
                 try {
@@ -165,6 +239,7 @@ const StudentDashboard = () => {
                 setRecentActivities(activities);
                 setProfile(prof);
                 setPurchasedCourses(purchased);
+                setPurchasedLiveSessions(allPurchasedLiveSessions);
                 setPointsBalance(balance);
             } catch (e) {
                 setError('Erreur lors du chargement des données');
@@ -245,26 +320,54 @@ const StudentDashboard = () => {
 
             <div className="max-w-7xl bg-gray-100 mx-auto px-6 py-8">
                 {/* Navigation Tabs */}
-                <div className="flex space-x-1 space-x-reverse bg-white rounded-lg p-1 mb-8 shadow-sm">
-                    {[
-                        { id: 'overview', label: 'نظرة عامة', icon: TrendingUp },
-                        { id: 'courses', label: 'الحصص الخاصة', icon: BookOpen },
-                        { id: 'comments', label: 'تعليقاتي', icon: MessageSquare },
-                        { id: 'profile', label: 'الملف الشخصي', icon: User }
-                    ].map((tab) => (
-                        <Button
-                            key={tab.id}
-                            variant={activeTab === tab.id ? "default" : "ghost"}
-                            className={`flex-1 justify-center gap-2 ${activeTab === tab.id
-                                ? 'bg-blue-400 text-white'
-                                : 'text-blue-600 hover:text-blue-3bg-blue-300'
-                                }`}
-                            onClick={() => setActiveTab(tab.id)}
-                        >
-                            <tab.icon className="w-4 h-4" />
-                            {tab.label}
-                        </Button>
-                    ))}
+                <div className="bg-white rounded-lg p-1 mb-8 shadow-sm">
+                    {/* Desktop Tabs */}
+                    <div className="hidden md:flex space-x-1 space-x-reverse">
+                        {[
+                            { id: 'overview', label: 'نظرة عامة', icon: TrendingUp },
+                            { id: 'courses', label: 'الحصص الخاصة', icon: BookOpen },
+                            { id: 'live-sessions', label: 'حصص مباشرة', icon: Video },
+                            { id: 'comments', label: 'تعليقاتي', icon: MessageSquare },
+                            { id: 'profile', label: 'الملف الشخصي', icon: User }
+                        ].map((tab) => (
+                            <Button
+                                key={tab.id}
+                                variant={activeTab === tab.id ? "default" : "ghost"}
+                                className={`flex-1 justify-center gap-2 ${activeTab === tab.id
+                                    ? 'bg-blue-400 text-white'
+                                    : 'text-blue-600 hover:text-blue-3bg-blue-300'
+                                    }`}
+                                onClick={() => setActiveTab(tab.id)}
+                            >
+                                <tab.icon className="w-4 h-4" />
+                                {tab.label}
+                            </Button>
+                        ))}
+                    </div>
+                    
+                    {/* Mobile Tabs */}
+                    <div className="md:hidden grid grid-cols-3 gap-2">
+                        {[
+                            { id: 'overview', label: 'نظرة عامة', icon: TrendingUp },
+                            { id: 'courses', label: 'الحصص الخاصة', icon: BookOpen },
+                            { id: 'live-sessions', label: 'حصص مباشرة', icon: Video },
+                            { id: 'comments', label: 'تعليقاتي', icon: MessageSquare },
+                            { id: 'profile', label: 'الملف الشخصي', icon: User }
+                        ].map((tab) => (
+                            <Button
+                                key={tab.id}
+                                variant={activeTab === tab.id ? "default" : "ghost"}
+                                className={`flex flex-col items-center justify-center gap-1 py-3 px-2 text-xs ${activeTab === tab.id
+                                    ? 'bg-blue-400 text-white'
+                                    : 'text-blue-600 hover:bg-blue-50'
+                                    }`}
+                                onClick={() => setActiveTab(tab.id)}
+                            >
+                                <tab.icon className="w-5 h-5" />
+                                <span className="text-center leading-tight">{tab.label}</span>
+                            </Button>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Content based on active tab */}
@@ -314,12 +417,12 @@ const StudentDashboard = () => {
                                     </Link>
                                 </CardContent>
                             </Card>
-                            <Card className="bg-gradient-to-r from-orange-500 to-orange-700 text-white cursor-pointer hover:shadow-lg transition-all duration-300" onClick={() => navigate('/live-classes')}>
+                            <Card className="bg-gradient-to-r from-orange-500 to-orange-700 text-white cursor-pointer hover:shadow-lg transition-all duration-300" onClick={() => setActiveTab('live-sessions')}>
                                 <CardContent className="p-8">
                                     <div className="flex mt-2 items-center justify-between">
                                         <div>
-                                            <p className="text-orange-100">جلسات مباشرة قادمة</p>
-                                            <p className="text-3xl mt-2 font-bold">{studentStats?.upcomingLives ?? 0}</p>
+                                            <p className="text-orange-100">حصصي المباشرة</p>
+                                            <p className="text-3xl mt-2 font-bold">{purchasedLiveSessions.length}</p>
                                         </div>
                                         <Video className="w-8 h-8 text-orange-200" />
                                     </div>
@@ -327,11 +430,230 @@ const StudentDashboard = () => {
                             </Card>
                         </div>
 
+                        {/* Purchased Courses Section */}
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-2xl font-bold text-gray-900">دوراتي المشتراة</h2>
+                                <Link to="/TTHCourses">
+                                    <Button variant="outline" className="text-blue-600 border-blue-600 hover:bg-blue-50">
+                                        عرض جميع الدورات
+                                    </Button>
+                                </Link>
+                            </div>
+                            
+                            {purchasedCourses.length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {purchasedCourses.map((course) => {
+                                        console.log('[DEBUG] Course cover URL:', course.cover_url, 'for course:', course.title);
+                                        return (
+                                        <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer">
+                                            <div className="relative">
+                                                {course.cover_url ? (
+                                                    <img
+                                                        src={course.cover_url}
+                                                        alt={course.title}
+                                                        className="w-full h-48 object-cover"
+                                                        onError={(e) => {
+                                                            console.error('[DEBUG] Failed to load image:', course.cover_url);
+                                                            e.target.style.display = 'none';
+                                                            e.target.nextSibling.style.display = 'block';
+                                                        }}
+                                                        onLoad={() => {
+                                                            console.log('[DEBUG] Successfully loaded image:', course.cover_url);
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-48 bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center">
+                                                        <BookOpen className="w-12 h-12 text-white" />
+                                                    </div>
+                                                )}
+                                                <div className="absolute top-3 right-3">
+                                                    <Badge className="bg-green-500 text-white">
+                                                        تم الشراء
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                            <CardContent className="p-6">
+                                                <CardTitle className="text-lg font-semibold mb-3 overflow-hidden text-ellipsis whitespace-nowrap">
+                                                    {course.title}
+                                                </CardTitle>
+                                                <p className="text-gray-600 text-sm mb-4 overflow-hidden text-ellipsis whitespace-nowrap">
+                                                    {course.description}
+                                                </p>
+                                                <div className="space-y-2 mb-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm font-medium text-gray-700">المادة:</span>
+                                                        <span className="text-sm text-gray-600">{course.material_name || 'غير محدد'}</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm font-medium text-gray-700">السعر:</span>
+                                                        <span className="text-sm font-semibold text-green-600">
+                                                            {course.price ? `${course.price.toLocaleString()} دج` : 'مجاناً'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <Button 
+                                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                                    onClick={() => navigate(`/coursesList/courses/${course.id}`)}
+                                                >
+                                                    عرض الدورة
+                                                </Button>
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                })}
+                                </div>
+                            ) : (
+                                <Card className="p-8 text-center">
+                                    <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                                    <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد دورات مشتراة</h3>
+                                    <p className="text-gray-500 mb-4">ابدأ رحلتك التعليمية بشراء دورات من متجرنا</p>
+                                    <Link to="/TTHCourses">
+                                        <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                                            استكشف الدورات
+                                        </Button>
+                                    </Link>
+                                </Card>
+                            )}
+                        </div>
                     </div>
                 )}
 
                 {activeTab === 'courses' && (
                   <PrivateClassesSection />
+                )}
+                {activeTab === 'live-sessions' && (
+                  <div className="space-y-6 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-2xl font-bold text-gray-900">حصصي المباشرة</h2>
+                      <div className="flex gap-2">
+                        <Link to="/TTHLiveClasses">
+                          <Button variant="outline" className="text-purple-600 border-purple-600 hover:bg-purple-50">
+                            الجلسات الفردية
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                    
+                    {purchasedLiveSessions.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {purchasedLiveSessions.map((session) => (
+                                <Card key={`${session.type}-${session.id}`} className="overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer">
+                                    <div className="relative">
+                                        {session.cover_image_url ? (
+                                            <img
+                                                src={session.cover_image_url}
+                                                alt={session.title}
+                                                className="w-full h-48 object-cover"
+                                                onError={(e) => {
+                                                    console.error('[DEBUG] Failed to load image:', session.cover_image_url);
+                                                    e.target.style.display = 'none';
+                                                    e.target.nextSibling.style.display = 'block';
+                                                }}
+                                                onLoad={() => {
+                                                    console.log('[DEBUG] Successfully loaded image:', session.cover_image_url);
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="w-full h-48 bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center">
+                                                <Video className="w-12 h-12 text-white" />
+                                            </div>
+                                        )}
+                                        <div className="absolute top-3 right-3">
+                                            <Badge className="bg-green-500 text-white">
+                                                تم الشراء
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <CardContent className="p-6">
+                                        <CardTitle className="text-lg font-semibold mb-3 overflow-hidden text-ellipsis whitespace-nowrap">
+                                            {session.title}
+                                        </CardTitle>
+                                        <p className="text-gray-600 text-sm mb-4 overflow-hidden text-ellipsis whitespace-nowrap">
+                                            {session.description}
+                                        </p>
+                                        <div className="space-y-2 mb-4">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm font-medium text-gray-700">المادة:</span>
+                                                <span className="text-sm text-gray-600">{session.material_name || 'غير محدد'}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm font-medium text-gray-700">السعر:</span>
+                                                <span className="text-sm font-semibold text-green-600">
+                                                    {session.price ? `${session.price.toLocaleString()} دج` : 'مجاناً'}
+                                                </span>
+                                            </div>
+                                            {session.start_time && (
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm font-medium text-gray-700">التاريخ:</span>
+                                                    <span className="text-sm text-gray-600">
+                                                        {new Date(session.start_time).toLocaleDateString('en-US', {
+                                                            year: 'numeric',
+                                                            month: 'long',
+                                                            day: 'numeric'
+                                                        })}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {session.start_time && (
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm font-medium text-gray-700">الوقت:</span>
+                                                    <span className={`text-sm font-semibold ${
+                                                        sessionTimers[session.id] === 'مباشر الآن' 
+                                                            ? 'text-green-600' 
+                                                            : sessionTimers[session.id] === 'منتهي' 
+                                                            ? 'text-red-600' 
+                                                            : 'text-blue-600'
+                                                    }`}>
+                                                        {sessionTimers[session.id] || new Date(session.start_time).toLocaleTimeString('en-US', {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        })}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <Button 
+                                            className={`w-full font-semibold ${
+                                                sessionTimers[session.id] === 'مباشر الآن'
+                                                    ? 'bg-green-600 hover:bg-green-700 text-white animate-pulse'
+                                                    : sessionTimers[session.id] === 'منتهي'
+                                                    ? 'bg-gray-400 hover:bg-gray-500 text-white cursor-not-allowed'
+                                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                            }`}
+                                            onClick={() => {
+                                                if (sessionTimers[session.id] !== 'منتهي') {
+                                                    navigate(`/streaming/${session.id}`);
+                                                }
+                                            }}
+                                            disabled={sessionTimers[session.id] === 'منتهي'}
+                                        >
+                                            {sessionTimers[session.id] === 'مباشر الآن' 
+                                                ? 'انضم الآن - مباشر' 
+                                                : sessionTimers[session.id] === 'منتهي'
+                                                ? 'انتهى البث'
+                                                : sessionTimers[session.id] && sessionTimers[session.id] !== ''
+                                                ? `انتظار البداية - ${sessionTimers[session.id]}`
+                                                : 'انضم الآن'
+                                            }
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    ) : (
+                        <Card className="p-8 text-center">
+                            <Video className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد حصص مباشرة مشتراة</h3>
+                            <p className="text-gray-500 mb-4">اشترِ حصص مباشرة من صفحة الجلسات الفردية للانضمام إلى البث المباشر</p>
+                            <Link to="/TTHLiveClasses">
+                                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                                    استكشف الجلسات الفردية
+                                </Button>
+                            </Link>
+                        </Card>
+                    )}
+                  </div>
                 )}
                 {activeTab === 'comments' && <StudentCommentsSection />}
                 {activeTab === 'profile' && <ProfileSection />}

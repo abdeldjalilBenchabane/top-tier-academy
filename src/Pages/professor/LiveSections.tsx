@@ -19,7 +19,7 @@ interface LiveSection {
   title: string;
   description: string;
   price: number;
-  cover_url?: string;
+  cover_image_url?: string;
   status: 'draft' | 'pending' | 'approved' | 'rejected';
   scheduled_date?: string;
   scheduled_time?: string;
@@ -162,8 +162,10 @@ const ProfessorLiveSections = () => {
     setEditingSectionId(null);
     
     if (sectionData) {
-      // Add the newly created section to the mock data
-      const newSection: LiveSection = {
+      // Check if we're editing an existing section or creating a new one
+      const existingSectionIndex = liveSections.findIndex(section => section.id === sectionData.id);
+      
+      const updatedSection: LiveSection = {
         id: sectionData.id,
         title: sectionData.title,
         description: sectionData.description,
@@ -172,13 +174,24 @@ const ProfessorLiveSections = () => {
         createdAt: sectionData.createdAt,
         updatedAt: sectionData.updatedAt,
         live_sessions_count: sectionData.live_sessions_count,
-        cover_url: sectionData.cover_url
+        cover_image_url: sectionData.cover_image_url
       };
       
-      setLiveSections(prev => [newSection, ...prev]);
+      if (existingSectionIndex !== -1) {
+        // Update existing section
+        setLiveSections(prev => prev.map((section, index) => 
+          index === existingSectionIndex ? updatedSection : section
+        ));
+        toastLib.success('Live section updated successfully!');
+      } else {
+        // Add new section
+        setLiveSections(prev => [updatedSection, ...prev]);
+        toastLib.success('Live section created successfully!');
+      }
     }
     
-    toastLib.success('Live section saved successfully!');
+    // Refresh the data to ensure we have the latest information
+    fetchLiveSections();
   };
 
   const handleFormCancel = () => {
@@ -320,16 +333,16 @@ const ProfessorLiveSections = () => {
                   .map(section => (
                     <Card key={`draft-${section.id}`} className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleEditSection(section.id)}>
                       <CardHeader className="pb-2">
-                        {section.cover_url && (
+                        {section.cover_image_url && (
                           <img
-                            src={section.cover_url}
+                            src={section.cover_image_url}
                             alt="Live Section Cover"
                             className="w-full h-28 object-cover rounded-t-md mb-2 border"
                             style={{ minHeight: '7rem', background: '#f3f4f6' }}
                             onError={e => { (e.target as HTMLImageElement).src = fallbackCover; }}
                           />
                         )}
-                        {!section.cover_url && (
+                        {!section.cover_image_url && (
                           <img
                             src={fallbackCover}
                             alt="Default Live Section Cover"
@@ -408,16 +421,16 @@ const ProfessorLiveSections = () => {
                   .map(section => (
                     <Card key={`pending-${section.id}`} className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleEditSection(section.id)}>
                       <CardHeader className="pb-2">
-                        {section.cover_url && (
+                        {section.cover_image_url && (
                           <img
-                            src={section.cover_url}
+                            src={section.cover_image_url}
                             alt="Live Section Cover"
                             className="w-full h-28 object-cover rounded-t-md mb-2 border"
                             style={{ minHeight: '7rem', background: '#f3f4f6' }}
                             onError={e => { (e.target as HTMLImageElement).src = fallbackCover; }}
                           />
                         )}
-                        {!section.cover_url && (
+                        {!section.cover_image_url && (
                           <img
                             src={fallbackCover}
                             alt="Default Live Section Cover"
@@ -496,16 +509,16 @@ const ProfessorLiveSections = () => {
                   .map(section => (
                     <Card key={`rejected-${section.id}`} className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleEditSection(section.id)}>
                       <CardHeader className="pb-2">
-                        {section.cover_url && (
+                        {section.cover_image_url && (
                           <img
-                            src={section.cover_url}
+                            src={section.cover_image_url}
                             alt="Live Section Cover"
                             className="w-full h-28 object-cover rounded-t-md mb-2 border"
                             style={{ minHeight: '7rem', background: '#f3f4f6' }}
                             onError={e => { (e.target as HTMLImageElement).src = fallbackCover; }}
                           />
                         )}
-                        {!section.cover_url && (
+                        {!section.cover_image_url && (
                           <img
                             src={fallbackCover}
                             alt="Default Live Section Cover"
@@ -558,16 +571,16 @@ const ProfessorLiveSections = () => {
                   .map(section => (
                     <Card key={`approved-${section.id}`} className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleEditSection(section.id)}>
                       <CardHeader className="pb-2">
-                        {section.cover_url && (
+                        {section.cover_image_url && (
                           <img
-                            src={section.cover_url}
+                            src={section.cover_image_url}
                             alt="Live Section Cover"
                             className="w-full h-28 object-cover rounded-t-md mb-2 border"
                             style={{ minHeight: '7rem', background: '#f3f4f6' }}
                             onError={e => { (e.target as HTMLImageElement).src = fallbackCover; }}
                           />
                         )}
-                        {!section.cover_url && (
+                        {!section.cover_image_url && (
                           <img
                             src={fallbackCover}
                             alt="Default Live Section Cover"
