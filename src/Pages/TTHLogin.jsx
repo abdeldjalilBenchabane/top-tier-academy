@@ -65,6 +65,14 @@ const Login = () => {
                 <div className="w-full max-w-md">
                     {/* Header */}
                     <div className="text-center mb-8">
+                        {/* Logo */}
+                        <div className="mb-6 flex justify-center">
+                            <img 
+                                src="/2.svg" 
+                                alt="Schoolhouse Logo" 
+                                className="h-16 w-auto"
+                            />
+                        </div>
                         <h1 className="text-4xl font-bold text-gray-800 mb-2">مرحباً بك مرة أخرى</h1>
                         <p className="text-gray-600">سجل دخولك للوصول إلى حسابك</p>
                     </div>
