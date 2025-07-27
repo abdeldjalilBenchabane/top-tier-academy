@@ -9,6 +9,8 @@ interface Message {
     color: string;
 }
 
+
+
 interface Props {
     messages: Message[];
     input: string;
