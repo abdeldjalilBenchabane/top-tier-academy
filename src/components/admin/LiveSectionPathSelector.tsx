@@ -101,13 +101,24 @@ const LiveSectionPathSelector = ({
     }
   }, [selectedYearId]);
 
-  // Load materials when speciality is selected
+  // Load materials when year or speciality is selected
   useEffect(() => {
-    if (selectedSpecialityId) {
+    if (selectedYearId) {
       const fetchMaterials = async () => {
         try {
-          const data = await api.getMaterials(selectedSpecialityId);
-          setMaterials(data);
+          // Get all materials and filter for the year
+          const data = await api.getAllMaterials();
+          const yearMaterials = data.filter((material: any) => {
+            // Convert to string for comparison since selectedYearId is a string
+            const matchesYear = material.yearId?.toString() === selectedYearId;
+            const matchesSpeciality = selectedSpecialityId 
+              ? material.specialityId?.toString() === selectedSpecialityId 
+              : !material.specialityId;
+            
+            return matchesYear && matchesSpeciality;
+          });
+          
+          setMaterials(yearMaterials);
           setSelectedMaterialId('');
         } catch (error) {
           console.error(error);
@@ -118,8 +129,9 @@ const LiveSectionPathSelector = ({
       fetchMaterials();
     } else {
       setMaterials([]);
+      setSelectedMaterialId('');
     }
-  }, [selectedSpecialityId]);
+  }, [selectedYearId, selectedSpecialityId]);
 
   // Load languages when root type changes
   useEffect(() => {
@@ -165,8 +177,8 @@ const LiveSectionPathSelector = ({
     }
 
     if (rootType === 'education') {
-      if (!selectedLevelId || !selectedYearId || !selectedSpecialityId || !selectedMaterialId) {
-        toast.error('Please select all education hierarchy fields');
+      if (!selectedLevelId || !selectedYearId || !selectedMaterialId) {
+        toast.error('Please select level, year, and material');
         return;
       }
     } else if (rootType === 'language') {
@@ -318,39 +330,47 @@ const LiveSectionPathSelector = ({
             </Select>
           </div>
 
-          {/* Speciality */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Speciality *</label>
-            <Select value={selectedSpecialityId} onValueChange={setSelectedSpecialityId} disabled={!selectedYearId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select speciality" />
-              </SelectTrigger>
-              <SelectContent>
-                {specialities.map((speciality) => (
-                  <SelectItem key={speciality.id} value={speciality.id.toString()}>
-                    {speciality.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Speciality (Optional) */}
+          {selectedYearId && specialities.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-2">Speciality (Optional)</label>
+              <Select value={selectedSpecialityId || 'none'} onValueChange={(value) => setSelectedSpecialityId(value === 'none' ? '' : value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Speciality (or leave empty for direct materials)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Direct Materials (No Speciality)</SelectItem>
+                  {specialities.map((speciality) => (
+                    <SelectItem key={speciality.id} value={speciality.id.toString()}>
+                      {speciality.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Material */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Material *</label>
-            <Select value={selectedMaterialId} onValueChange={setSelectedMaterialId} disabled={!selectedSpecialityId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select material" />
-              </SelectTrigger>
-              <SelectContent>
-                {materials.map((material) => (
-                  <SelectItem key={material.id} value={material.id.toString()}>
-                    {material.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {selectedYearId && (
+            <div>
+              <label className="block text-sm font-medium mb-2">Material *</label>
+              <Select value={selectedMaterialId} onValueChange={setSelectedMaterialId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Material" />
+                </SelectTrigger>
+                <SelectContent>
+                  {materials.map((material) => (
+                    <SelectItem key={material.id} value={material.id.toString()}>
+                      {material.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {materials.length === 0 && (
+                <div className="text-xs text-red-500 mt-1">No materials available for the selected path.</div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
