@@ -9,12 +9,14 @@ import { Eye, CheckCircle, XCircle, Clock, Users } from 'lucide-react';
 import { api } from '@/lib/api';
 import { PendingQuiz, User } from '@/types';
 import { toast } from '@/lib/toast';
+import { usePendingQuizzesCount } from '@/contexts/PendingQuizzesCountContext';
 
 
 const QuizManagement = () => {
   const [pendingQuizzes, setpendingQuizzes] = useState<PendingQuiz[]>([]);
   const [professors, setProfessors] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { refreshPendingQuizzesCount } = usePendingQuizzesCount();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -64,6 +66,7 @@ const QuizManagement = () => {
       toast.success('Quiz approved successfully');
       const updatedQuizzes = await api.getPendingQuizzes();
       setpendingQuizzes(updatedQuizzes);
+      refreshPendingQuizzesCount();
     } catch (error) {
       console.error('Error approving quiz:', error);
       toast.error('Failed to approve quiz');
@@ -76,6 +79,7 @@ const QuizManagement = () => {
       toast.success('Quiz rejected');
       const updatedQuizzes = await api.getPendingQuizzes();
       setpendingQuizzes(updatedQuizzes);
+      refreshPendingQuizzesCount();
     } catch (error) {
       console.error('Error rejecting quiz:', error);
       toast.error('Failed to reject quiz');

@@ -23,6 +23,7 @@ import homepageMaterialsRoutes from './routes/homepage-materials.js';
 import footerContentRoutes from './routes/footer-content.js';
 import notificationsRoutes from './routes/notifications.js';
 import quizzesRoutes from './routes/quizzes.js';
+import adminRoutes from './routes/admin.js';
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 
@@ -97,6 +98,7 @@ app.use('/api/homepage-materials', homepageMaterialsRoutes);
 app.use('/api/footer-content', footerContentRoutes);
 app.use('/api', notificationsRoutes);
 app.use('/api/quizzes', quizzesRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Socket.IO chat functionality
 io.on('connection', (socket) => {

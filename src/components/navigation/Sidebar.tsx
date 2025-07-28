@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePendingCount } from '@/contexts/PendingCountContext';
+import { useLiveSessionsCount } from '@/contexts/LiveSessionsCountContext';
+import { usePendingQuizzesCount } from '@/contexts/PendingQuizzesCountContext';
 import { Badge } from '@/components/ui/badge';
 import {
   BookOpen,
@@ -37,6 +39,8 @@ interface SidebarLink {
 const Sidebar = () => {
   const { isAdmin, isProfessor } = useAuth();
   const { pendingCount } = usePendingCount();
+  const { liveSessionsCount } = useLiveSessionsCount();
+  const { pendingQuizzesCount } = usePendingQuizzesCount();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -51,10 +55,9 @@ const Sidebar = () => {
     { name: 'Dashboard', path: '/admin/dashboard', icon: <Home className="h-5 w-5" /> },
     { name: 'Education Structure', path: '/admin/structure', icon: <Layers className="h-5 w-5" /> },
     { name: 'Courses', path: '/admin/courses', icon: <BookOpen className="h-5 w-5" /> },
-    { name: 'Course Files', path: '/admin/course-files', icon: <FolderOpen className="h-5 w-5" /> },
     { name: 'Pending Approvals', path: '/admin/pending', icon: <Clock className="h-5 w-5" />, badge: pendingCount },
-    { name: 'Quiz Management', path: '/admin/quizzes', icon: <HelpCircle className="h-5 w-5" /> },
-    { name: 'Live Sessions', path: '/admin/live-sessions', icon: <Video className="h-5 w-5" /> },
+    { name: 'Quiz Management', path: '/admin/quizzes', icon: <HelpCircle className="h-5 w-5" />, badge: pendingQuizzesCount.total },
+    { name: 'Live Sessions', path: '/admin/live-sessions', icon: <Video className="h-5 w-5" />, badge: liveSessionsCount.total },
     { name: 'User Management', path: '/admin/users', icon: <Users className="h-5 w-5" /> },
     { name: 'Enhanced Slides', path: '/admin/enhanced-slides', icon: <Image className="h-5 w-5" /> },
     { name: 'Points', path: '/admin/points', icon: <DollarSign className="h-5 w-5" /> },

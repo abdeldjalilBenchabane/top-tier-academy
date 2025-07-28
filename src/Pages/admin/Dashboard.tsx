@@ -3,15 +3,68 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/common/PageHeader';
 import DashboardStats from '@/components/common/DashboardStats';
+import AnalyticsCharts from '@/components/admin/AnalyticsCharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { toast } from '@/lib/toast';
+import { Clock, Users, BookOpen, Video, DollarSign, Activity, Database, Zap } from 'lucide-react';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [systemHealth, setSystemHealth] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const [activityResponse, healthResponse] = await Promise.all([
+        api.get('/admin/dashboard/recent-activity?limit=8'),
+        api.get('/admin/dashboard/system-health')
+      ]);
+      
+      setRecentActivity(activityResponse.activities || []);
+      setSystemHealth(healthResponse);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatTimeAgo = (timestamp) => {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffInSeconds = Math.floor((now - time) / 1000);
+    
+    if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    return `${Math.floor(diffInSeconds / 86400)}d ago`;
+  };
+
+  const getActivityIcon = (type) => {
+    switch (type) {
+      case 'user_registration':
+        return <Users className="h-4 w-4 text-blue-500" />;
+      case 'course_submission':
+        return <BookOpen className="h-4 w-4 text-green-500" />;
+      case 'live_session_submission':
+        return <Video className="h-4 w-4 text-purple-500" />;
+      case 'point_transaction':
+        return <DollarSign className="h-4 w-4 text-orange-500" />;
+      default:
+        return <Activity className="h-4 w-4 text-gray-500" />;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -32,24 +85,33 @@ const AdminDashboard = () => {
           <div className="grid gap-6 md:grid-cols-2">
             <div className="bg-white p-6 rounded-lg border">
               <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span>New course submitted for approval</span>
-                  <span className="text-gray-500">1 hour ago</span>
+              {loading ? (
+                <div className="space-y-3">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
+                      <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span>Professor John Smith registered</span>
-                  <span className="text-gray-500">3 hours ago</span>
+              ) : recentActivity.length > 0 ? (
+                <div className="space-y-3">
+                  {recentActivity.map((activity, index) => (
+                    <div key={index} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        {getActivityIcon(activity.type)}
+                        <span className="truncate max-w-xs">{activity.title}</span>
+                      </div>
+                      <span className="text-gray-500 whitespace-nowrap">{formatTimeAgo(activity.time)}</span>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span>Live session saved to library</span>
-                  <span className="text-gray-500">2 hours ago</span>
+              ) : (
+                <div className="text-center py-4 text-gray-500">
+                  <Activity className="h-8 w-8 mx-auto mb-2" />
+                  <p>No recent activity</p>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span>Homepage slide updated</span>
-                  <span className="text-gray-500">1 day ago</span>
-                </div>
-              </div>
+              )}
             </div>
 
             <div className="bg-white p-6 rounded-lg border">
@@ -57,27 +119,39 @@ const AdminDashboard = () => {
               <div className="space-y-2">
                 <button
                   onClick={() => navigate('/admin/pending')}
-                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-sm"
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-sm transition-colors"
                 >
                   Review pending courses
                 </button>
                 <button
                   onClick={() => navigate('/admin/live-sessions')}
-                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-sm"
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-sm transition-colors"
                 >
                   Manage live sessions
                 </button>
                 <button
-                  onClick={() => navigate('/admin/slides')}
-                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-sm"
+                  onClick={() => navigate('/admin/enhanced-slides')}
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-sm transition-colors"
                 >
                   Manage homepage slides
                 </button>
                 <button
                   onClick={() => navigate('/admin/users')}
-                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-sm"
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-sm transition-colors"
                 >
                   Add new user
+                </button>
+                <button
+                  onClick={() => navigate('/admin/quizzes')}
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-sm transition-colors"
+                >
+                  Review quiz submissions
+                </button>
+                <button
+                  onClick={() => navigate('/admin/private-classes')}
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 text-sm transition-colors"
+                >
+                  Manage private classes
                 </button>
               </div>
             </div>
@@ -85,105 +159,52 @@ const AdminDashboard = () => {
 
           <div className="bg-white p-6 rounded-lg border">
             <h3 className="text-lg font-semibold mb-4">System Health</h3>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">98.5%</div>
-                <div className="text-sm text-gray-600">Uptime</div>
+            {loading ? (
+              <div className="grid grid-cols-3 gap-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="text-center">
+                    <div className="h-8 w-16 bg-gray-200 rounded animate-pulse mx-auto mb-2" />
+                    <div className="h-4 w-20 bg-gray-200 rounded animate-pulse mx-auto" />
+                  </div>
+                ))}
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">1.2s</div>
-                <div className="text-sm text-gray-600">Avg Response</div>
+            ) : systemHealth ? (
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{systemHealth.performance.uptime}%</div>
+                  <div className="text-sm text-gray-600 flex items-center justify-center gap-1">
+                    <Database className="h-3 w-3" />
+                    Uptime
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{systemHealth.performance.avgResponseTime}s</div>
+                  <div className="text-sm text-gray-600 flex items-center justify-center gap-1">
+                    <Zap className="h-3 w-3" />
+                    Avg Response
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">{systemHealth.performance.successRate}%</div>
+                  <div className="text-sm text-gray-600 flex items-center justify-center gap-1">
+                    <Activity className="h-3 w-3" />
+                    Success Rate
+                  </div>
+                </div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">99.1%</div>
-                <div className="text-sm text-gray-600">Success Rate</div>
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                <Database className="h-8 w-8 mx-auto mb-2" />
+                <p>System health data unavailable</p>
               </div>
-            </div>
+            )}
           </div>
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="bg-white p-6 rounded-lg border">
-              <h3 className="text-lg font-semibold mb-4">User Growth</h3>
-              <div className="text-center py-8 text-gray-500">
-                <div className="text-4xl mb-2">📈</div>
-                <p>Analytics charts would go here</p>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg border">
-              <h3 className="text-lg font-semibold mb-4">Course Performance</h3>
-              <div className="text-center py-8 text-gray-500">
-                <div className="text-4xl mb-2">📊</div>
-                <p>Course statistics would go here</p>
-              </div>
-            </div>
-          </div>
+          <AnalyticsCharts />
         </TabsContent>
       </Tabs>
-    </div>
-  );
-};
-
-const LiveAppointmentsApproval = () => {
-  const [sessions, setSessions] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchPendingSessions = async () => {
-    setLoading(true);
-    try {
-      // Fetch all sessions, including unapproved (admin endpoint)
-      const data = await api.get('/live-sessions?all=true'); // You may need to implement this endpoint to return all sessions for admin
-      setSessions(data.filter((s: any) => !s.is_approved));
-    } catch (err) {
-      toast.error('Failed to load live sessions');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchPendingSessions();
-  }, []);
-
-  const handleApprove = async (id: number) => {
-    try {
-      await api.patch(`/live-sessions/${id}/approve`);
-      toast.success('Session approved!');
-      setSessions(sessions.filter((s: any) => s.id !== id));
-    } catch (err) {
-      toast.error('Failed to approve session');
-    }
-  };
-
-  return (
-    <div className="bg-white p-6 rounded-lg border mt-6">
-      <h3 className="text-lg font-semibold mb-4">Live Appointments Approval</h3>
-      {loading ? (
-        <div>Loading...</div>
-      ) : sessions.length === 0 ? (
-        <div>No pending live appointments.</div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {sessions.map((session: any) => (
-            <Card key={session.id} className="overflow-hidden">
-              <CardHeader>
-                <CardTitle>{session.title}</CardTitle>
-                <div className="text-sm text-gray-500">By Prof. {session.professor_id}</div>
-                <div className="text-xs text-gray-400">{new Date(session.start_time).toLocaleString()}</div>
-              </CardHeader>
-              <CardContent>
-                <div>Duration: {session.duration} min</div>
-                <div>Price: {session.price} €</div>
-              </CardContent>
-              <CardFooter>
-                <Button onClick={() => handleApprove(session.id)}>Accept</Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      )}
     </div>
   );
 };

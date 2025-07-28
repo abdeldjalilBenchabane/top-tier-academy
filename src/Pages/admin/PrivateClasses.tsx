@@ -173,7 +173,7 @@ const PrivateClasses = () => {
       />
 
       {/* Summary Cards at the top */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{filteredRequests.length}</div>
@@ -202,6 +202,17 @@ const PrivateClasses = () => {
               {filteredRequests.filter(r => r.payment_status === 'pending').length}
             </div>
             <div className="text-sm text-gray-500">Pending Payment</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-purple-600">
+              {filteredRequests
+                .filter(r => r.payment_status === 'paid')
+                .reduce((total, r) => total + (r.points_used || 0), 0)
+              }
+            </div>
+            <div className="text-sm text-gray-500">Paid Points</div>
           </CardContent>
         </Card>
       </div>

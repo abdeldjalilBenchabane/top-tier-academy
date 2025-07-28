@@ -227,6 +227,7 @@ const PendingPage = () => {
                                   await api.rejectCourseAdmin(course.id, reason);
                                   toast.success('Course rejected');
                                   fetchPendingCourses();
+                                  refreshPendingCount();
                                 } catch (err) {
                                   toast.error('Failed to reject course');
                                 }
@@ -240,6 +241,7 @@ const PendingPage = () => {
                                 try {
                                   await api.approveCourseAdmin(course.id);
                                   toast.success('Course approved');
+                                  refreshPendingCount();
                                   navigate('/admin/courses');
                                 } catch (err) {
                                   toast.error('Failed to approve course');
@@ -364,6 +366,7 @@ const PendingPage = () => {
                                     body: JSON.stringify({ reason })
                                   });
                                   fetchPendingLiveSections();
+                                  refreshPendingCount();
                                   toast.success('Live section rejected successfully');
                                 } catch (error) {
                                   console.error('Error rejecting live section:', error);
@@ -385,6 +388,7 @@ const PendingPage = () => {
                                     }
                                   });
                                   fetchPendingLiveSections();
+                                  refreshPendingCount();
                                   toast.success('Live section approved successfully');
                                 } catch (error) {
                                   console.error('Error approving live section:', error);

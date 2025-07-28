@@ -364,6 +364,19 @@ export const api = {
     await delay(500);
     return mockData.homeSlides.sort((a, b) => a.order - b.order);
   },
+  
+  // Generic GET method for any endpoint
+  get: async (endpoint: string) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`/api${endpoint}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch data');
+    return res.json();
+  },
   createHomeSlide: async (slide: Omit<HomeSlide, 'id'>): Promise<HomeSlide> => {
     await delay(500);
     const newSlide: HomeSlide = {

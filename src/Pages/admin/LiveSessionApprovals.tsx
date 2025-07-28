@@ -6,12 +6,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/lib/toast';
 import { Video, TrendingUp, FileVideo, Clock, Play, CheckCircle, XCircle, RotateCw, Pause, AlertTriangle } from 'lucide-react';
+import { useLiveSessionsCount } from '@/contexts/LiveSessionsCountContext';
 
 const LiveSessionsAdmin = () => {
     const [pending, setPending] = useState([]);
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('overview');
+    const { refreshLiveSessionsCount } = useLiveSessionsCount();
 
     const fetchData = async () => {
         setLoading(true);
@@ -38,6 +40,7 @@ const LiveSessionsAdmin = () => {
             await api.patch(`/live-sessions/${id}/approve`);
             toast.success('Session approved!');
             fetchData();
+            refreshLiveSessionsCount();
         } catch (err) {
             toast.error('Failed to approve session');
         }
@@ -48,6 +51,7 @@ const LiveSessionsAdmin = () => {
             await api.patch(`/live-sessions/${id}/reject`);
             toast.success('Session rejected!');
             fetchData();
+            refreshLiveSessionsCount();
         } catch (err) {
             toast.error('Failed to reject session');
         }

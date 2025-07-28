@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api';
 import { LiveSession, User } from '@/types';
 import { toast } from '@/lib/toast';
+import { useLiveSessionsCount } from '@/contexts/LiveSessionsCountContext';
 import { 
   Video, 
   Calendar, 
@@ -55,6 +56,7 @@ const LiveSessionsOverview = () => {
   const [selectedApproval, setSelectedApproval] = useState<string>('all');
   const [approvingSession, setApprovingSession] = useState<string | null>(null);
   const [rejectingSession, setRejectingSession] = useState<string | null>(null);
+  const { refreshLiveSessionsCount } = useLiveSessionsCount();
 
   useEffect(() => {
     fetchData();
@@ -218,6 +220,7 @@ const LiveSessionsOverview = () => {
       if (response) {
         toast.success('Session approved successfully');
         fetchData(); // Refresh data
+        refreshLiveSessionsCount(); // Refresh count
       }
     } catch (error) {
       console.error('Failed to approve session:', error);
@@ -238,6 +241,7 @@ const LiveSessionsOverview = () => {
       if (response) {
         toast.success('Session rejected successfully');
         fetchData(); // Refresh data
+        refreshLiveSessionsCount(); // Refresh count
       }
     } catch (error) {
       console.error('Failed to reject session:', error);

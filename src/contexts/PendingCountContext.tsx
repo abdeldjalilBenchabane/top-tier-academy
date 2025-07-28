@@ -32,10 +32,17 @@ export const PendingCountProvider: React.FC<PendingCountProviderProps> = ({ chil
     }
 
     try {
+      // Fetch pending courses
       const pendingCourses = await api.getPendingCourses();
-      const count = pendingCourses.filter((course: any) => course.status === 'pending').length;
-      console.log(`🔄 Pending count updated: ${count} courses`);
-      setPendingCount(count);
+      const pendingCoursesCount = pendingCourses.filter((course: any) => course.status === 'pending').length;
+      
+      // Fetch pending live sections using admin endpoint
+      const pendingLiveSections = await api.get('/admin/live-sections/pending');
+      const pendingLiveSectionsCount = pendingLiveSections.length;
+      
+      const totalPendingCount = pendingCoursesCount + pendingLiveSectionsCount;
+      console.log(`🔄 Pending count updated: ${pendingCoursesCount} courses + ${pendingLiveSectionsCount} live sections = ${totalPendingCount} total`);
+      setPendingCount(totalPendingCount);
     } catch (error) {
       console.error('Failed to fetch pending count:', error);
       setPendingCount(0);
@@ -51,11 +58,11 @@ export const PendingCountProvider: React.FC<PendingCountProviderProps> = ({ chil
     console.log('🔄 Initializing pending count provider...');
     fetchPendingCount();
     
-    // Refresh count every 10 seconds
+    // Refresh count every 5 seconds for more responsive updates
     const interval = setInterval(() => {
       console.log('🔄 Auto-refreshing pending count...');
       fetchPendingCount();
-    }, 10000);
+    }, 5000);
     
     return () => {
       console.log('🔄 Cleaning up pending count interval...');
