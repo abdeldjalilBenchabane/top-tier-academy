@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePendingCount } from '@/contexts/PendingCountContext';
 import { useLiveSessionsCount } from '@/contexts/LiveSessionsCountContext';
 import { usePendingQuizzesCount } from '@/contexts/PendingQuizzesCountContext';
+import { usePendingPrivateClassesCount } from '@/contexts/PendingPrivateClassesCountContext';
 import { Badge } from '@/components/ui/badge';
 import {
   BookOpen,
@@ -44,6 +45,7 @@ const Sidebar = () => {
   const { pendingCount } = usePendingCount();
   const { liveSessionsCount } = useLiveSessionsCount();
   const { pendingQuizzesCount } = usePendingQuizzesCount();
+  const { pendingPrivateClassesCount } = usePendingPrivateClassesCount();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -85,7 +87,7 @@ const Sidebar = () => {
     { name: 'My Quizzes', path: '/professor/my-quizzes', icon: <FileText className="h-5 w-5" /> },
     { name: 'Quiz Results', path: '/professor/results', icon: <BarChart className="h-5 w-5" /> },
     { name: 'تعليقات الطلاب', path: '/professor/comments', icon: <MessageCircle className="h-5 w-5" /> },
-    { name: 'الحصص الخاصة', path: '/professor/private-classes', icon: <Clock className="h-5 w-5" /> },
+    { name: 'الحصص الخاصة', path: '/professor/private-classes', icon: <Clock className="h-5 w-5" />, badge: pendingPrivateClassesCount },
     { name: 'Settings', path: '/professor/settings', icon: <Settings className="h-5 w-5" /> },
     { name: 'My Students', path: '/professor/my-students', icon: <Users className="h-5 w-5" /> },
   ];

@@ -196,7 +196,7 @@ router.post('/', verifyToken, async (req, res) => {
 router.patch('/:requestId/status', verifyToken, async (req, res) => {
   try {
     const { requestId } = req.params;
-    const { status, time } = req.body;
+    const { status, time, rejection_reason } = req.body;
     // Check if user is professor or admin
     if (req.user.role !== 'professor' && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Unauthorized' });
@@ -217,6 +217,23 @@ router.patch('/:requestId/status', verifyToken, async (req, res) => {
       updateQuery += `, status = $${paramIdx}`;
       params.push(status);
       paramIdx++;
+    }
+    
+    // If rejecting, handle rejection reason
+    if (status === 'مرفوض') {
+      if (rejection_reason) {
+        updateQuery += `, rejection_reason = $${paramIdx}`;
+        params.push(rejection_reason);
+        paramIdx++;
+      } else {
+        // Set default rejection reason if none provided
+        updateQuery += `, rejection_reason = $${paramIdx}`;
+        params.push('تم رفض الطلب من قبل المدرس');
+        paramIdx++;
+      }
+    } else if (status === 'مؤكد') {
+      // Clear rejection reason when accepting
+      updateQuery += `, rejection_reason = NULL`;
     }
     
     // If time is being set/updated, also set scheduled_at and agora_channel if not already set

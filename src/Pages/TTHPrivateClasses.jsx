@@ -200,9 +200,9 @@ const PrivateClasses = () => {
                 </div>
                 <p className="text-gray-500">جاري تحميل الطلبات...</p>
               </div>
-            ) : myPendingRequests.filter(r => r.status !== 'مرفوض').length > 0 ? (
+            ) : myPendingRequests.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
-                {myPendingRequests.filter(r => r.status !== 'مرفوض').map((request, index) => (
+                {myPendingRequests.map((request, index) => (
                   <div 
                     key={request.id} 
                     className="animate-fadeIn"
@@ -238,7 +238,8 @@ const PrivateClasses = () => {
           <div className="flex-1 order-2 lg:order-2">
             {/* Content Header */}
             <div className="mb-6 sm:mb-8">
-             
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">الحصص الخاصة المتاحة</h2>
+              <p className="text-gray-600">اطلب حصة خاصة من الأساتذة المتاحين</p>
             </div>
 
             {/* Sessions Grid */}
