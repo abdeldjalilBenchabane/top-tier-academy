@@ -67,14 +67,8 @@ const DashboardStats = ({ userRole }: DashboardStatsProps) => {
   const fetchProfessorStats = async () => {
     try {
       setLoading(true);
-      // For now, use mock data for professor stats
-      // TODO: Implement professor dashboard API
-      setStats({
-        myCourses: 8,
-        totalStudents: 324,
-        liveSessions: 5,
-        monthlyEarnings: 3240
-      });
+      const response = await api.getProfessorDashboardStats();
+      setStats(response);
     } catch (error) {
       console.error('Error fetching professor stats:', error);
       toast.error('Failed to load dashboard statistics');
@@ -174,31 +168,60 @@ const DashboardStats = ({ userRole }: DashboardStatsProps) => {
   if (userRole === 'professor' && stats) {
     const professorStats = [
       {
-        title: 'My Courses',
-        value: stats.myCourses,
-        description: 'Published courses',
+        title: 'Total Courses',
+        value: stats.courseStats.total_courses,
+        description: `${stats.courseStats.approved_courses} approved, ${stats.courseStats.pending_courses} pending`,
         icon: <BookOpen className="h-4 w-4" />,
-        trend: { value: 2, isPositive: true }
+        trend: { value: stats.courseStats.approved_courses, isPositive: true }
       },
       {
         title: 'Total Students',
-        value: stats.totalStudents,
-        description: 'Enrolled across all courses',
+        value: stats.studentStats.total_students,
+        description: `${stats.studentStats.total_enrollments} total enrollments`,
         icon: <Users className="h-4 w-4" />,
-        trend: { value: 18, isPositive: true }
+        trend: { value: stats.studentStats.total_enrollments, isPositive: true }
       },
       {
         title: 'Live Sessions',
-        value: stats.liveSessions,
-        description: 'Scheduled this week',
+        value: stats.liveSessionStats.total_sessions,
+        description: `${stats.liveSessionStats.scheduled_sessions} scheduled, ${stats.liveSessionStats.live_sessions} live`,
         icon: <Video className="h-4 w-4" />,
+        trend: { value: stats.liveSessionStats.scheduled_sessions, isPositive: true }
       },
       {
-        title: 'Monthly Earnings',
-        value: `${stats.monthlyEarnings.toLocaleString()} DZD`,
-        description: 'From course sales',
-        icon: <DollarSign className="h-4 w-4" />,
-        trend: { value: 22, isPositive: true }
+        title: 'Live Sections',
+        value: stats.liveSectionStats.total_sections,
+        description: `${stats.liveSectionStats.active_sections} active, ${stats.liveSectionStats.pending_sections} pending`,
+        icon: <Video className="h-4 w-4" />,
+        trend: { value: stats.liveSectionStats.active_sections, isPositive: true }
+      },
+      {
+        title: 'Private Classes',
+        value: stats.privateClassStats.total_requests,
+        description: `${stats.privateClassStats.accepted_requests} accepted, ${stats.privateClassStats.pending_requests} pending`,
+        icon: <Users className="h-4 w-4" />,
+        trend: { value: stats.privateClassStats.accepted_requests, isPositive: true }
+      },
+      {
+        title: 'Comments',
+        value: stats.commentStats.total_comments,
+        description: `${stats.commentStats.replied_comments} replied, ${stats.commentStats.pending_replies} pending`,
+        icon: <HelpCircle className="h-4 w-4" />,
+        trend: { value: stats.commentStats.replied_comments, isPositive: true }
+      },
+      {
+        title: 'Quizzes',
+        value: stats.quizStats.total_quizzes,
+        description: `${stats.quizStats.approved_quizzes} approved, ${stats.quizStats.pending_quizzes} pending`,
+        icon: <HelpCircle className="h-4 w-4" />,
+        trend: { value: stats.quizStats.approved_quizzes, isPositive: true }
+      },
+      {
+        title: 'Upcoming Sessions',
+        value: stats.upcomingSessions.length,
+        description: 'Next 7 days',
+        icon: <Clock className="h-4 w-4" />,
+        trend: { value: stats.upcomingSessions.length, isPositive: true }
       }
     ];
 

@@ -27,8 +27,10 @@ import {
   Globe,
   Menu,
   X,
-  Tag
+  Tag,
+  LayoutDashboard
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface SidebarLink {
   name: string;
@@ -85,6 +87,7 @@ const Sidebar = () => {
     { name: 'تعليقات الطلاب', path: '/professor/comments', icon: <MessageCircle className="h-5 w-5" /> },
     { name: 'الحصص الخاصة', path: '/professor/private-classes', icon: <Clock className="h-5 w-5" /> },
     { name: 'Settings', path: '/professor/settings', icon: <Settings className="h-5 w-5" /> },
+    { name: 'My Students', path: '/professor/my-students', icon: <Users className="h-5 w-5" /> },
   ];
 
   const links: SidebarLink[] = isAdmin ? adminLinks : professorLinks;

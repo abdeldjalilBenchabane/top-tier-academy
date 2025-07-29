@@ -45,6 +45,8 @@ const CourseDetailsPage = () => {
   const [coverReloadKey, setCoverReloadKey] = useState(0);
   // Add state for AdminPathSelector
   const [showPathSelector, setShowPathSelector] = useState(false);
+  // Add state for course path
+  const [coursePath, setCoursePath] = useState<{ pathType: string; path: string; details: any } | null>(null);
 
   // Check if course needs path assignment
   const needsPathAssignment = course && course.status === 'approved' && 
@@ -75,7 +77,18 @@ const CourseDetailsPage = () => {
           } else {
             setIsLoadingProfessor(false);
           }
-          // Load course path data (material, speciality, year, level)
+          
+          // Load complete course path data using new API
+          try {
+            const pathData = await api.getCoursePath(courseId);
+            setCoursePath(pathData);
+            console.log('Course path data:', pathData);
+          } catch (err) {
+            console.error('Failed to load course path:', err);
+            setCoursePath(null);
+          }
+          
+          // Load course path data (material, speciality, year, level) - keep for backward compatibility
           if (courseData.materialId) {
             const materialsData = await api.getAllMaterials();
             const materialData = materialsData.find(m => m.id === courseData.materialId);
@@ -400,26 +413,42 @@ const CourseDetailsPage = () => {
                       </Button>
                     </div>
                   ) : (
-                  <Badge variant="outline" className="text-xs flex items-center">
-                    <Layers className="h-3 w-3 mr-1" />
-                      {languageLevel && language ? (
-                        <>{language.name} &gt; {languageLevel.name}</>
-                      ) : languageLevel && !language ? (
-                        <>Unknown Language &gt; {languageLevel.name}</>
-                      ) : !languageLevel && language ? (
-                        <>{language.name} &gt; Unknown Level</>
-                      ) : (
-                        <>
-                    {level && <>{level.name}</>}
-                    {level && year && <>&nbsp;&gt;&nbsp;</>}
-                    {year && <>{year.name}</>}
-                    {year && speciality && <>&nbsp;&gt;&nbsp;</>}
-                    {speciality && <>{speciality.name}</>}
-                      {(speciality || (!speciality && material)) && <>&nbsp;&gt;&nbsp;</>}
-                    {material && <>{material.name}</>}
-                        </>
-                      )}
-                  </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs flex items-center">
+                        <Layers className="h-3 w-3 mr-1" />
+                        {coursePath ? (
+                          coursePath.path
+                        ) : (
+                          <>
+                            {languageLevel && language ? (
+                              <>{language.name} &gt; {languageLevel.name}</>
+                            ) : languageLevel && !language ? (
+                              <>Unknown Language &gt; {languageLevel.name}</>
+                            ) : !languageLevel && language ? (
+                              <>{language.name} &gt; Unknown Level</>
+                            ) : (
+                              <>
+                                {level && <>{level.name}</>}
+                                {level && year && <>&nbsp;&gt;&nbsp;</>}
+                                {year && <>{year.name}</>}
+                                {year && speciality && <>&nbsp;&gt;&nbsp;</>}
+                                {speciality && <>{speciality.name}</>}
+                                {(speciality || (!speciality && material)) && <>&nbsp;&gt;&nbsp;</>}
+                                {material && <>{material.name}</>}
+                              </>
+                            )}
+                          </>
+                        )}
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowPathSelector(true)}
+                        className="text-xs"
+                      >
+                        Change Path
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -442,44 +471,70 @@ const CourseDetailsPage = () => {
           </Card>
 
           {/* Course Cover Card */}
-          {(coverPreviewUrl || course.cover_url) && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Course Cover</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <img
-                  key={(coverPreviewUrl || course.cover_url) + '-' + coverReloadKey}
-                  src={coverPreviewUrl || course.cover_url}
-                  alt="Course Cover"
-                  className="w-full h-auto rounded-md object-cover border mb-2"
-                  style={{ maxHeight: 300 }}
-                  onError={() => {
-                    // If the server is slow to serve the new file, retry after 1s
-                    if (!coverPreviewUrl) {
-                      setTimeout(() => setCoverReloadKey(k => k + 1), 1000);
-                    }
-                  }}
-                />
-                <input
-                  type="file"
-                  accept="image/*"
-                  id="cover-upload-input"
-                  style={{ display: 'none' }}
-                  onChange={handleCoverChange}
-                  disabled={isUploadingCover}
-                />
-                <Button
-                  variant="outline"
-                  className="w-full mt-2"
-                  onClick={() => document.getElementById('cover-upload-input')?.click()}
-                  disabled={isUploadingCover}
-                >
-                  {isUploadingCover ? 'Uploading...' : 'Change Cover'}
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Course Cover</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {coverPreviewUrl || course.cover_url ? (
+                <>
+                  <img
+                    key={(coverPreviewUrl || course.cover_url) + '-' + coverReloadKey}
+                    src={coverPreviewUrl || course.cover_url}
+                    alt="Course Cover"
+                    className="w-full h-auto rounded-md object-cover border mb-2"
+                    style={{ maxHeight: 300 }}
+                    onError={() => {
+                      // If the server is slow to serve the new file, retry after 1s
+                      if (!coverPreviewUrl) {
+                        setTimeout(() => setCoverReloadKey(k => k + 1), 1000);
+                      }
+                    }}
+                  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    id="cover-upload-input"
+                    style={{ display: 'none' }}
+                    onChange={handleCoverChange}
+                    disabled={isUploadingCover}
+                  />
+                  <Button
+                    variant="outline"
+                    className="w-full mt-2"
+                    onClick={() => document.getElementById('cover-upload-input')?.click()}
+                    disabled={isUploadingCover}
+                  >
+                    {isUploadingCover ? 'Uploading...' : 'Change Cover'}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="border-2 border-dashed border-gray-300 rounded-md p-8 text-center mb-2">
+                    <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <p className="text-gray-500 mb-2">No cover image uploaded</p>
+                    <p className="text-sm text-gray-400">Add a cover image to make this course more attractive</p>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    id="cover-upload-input"
+                    style={{ display: 'none' }}
+                    onChange={handleCoverChange}
+                    disabled={isUploadingCover}
+                  />
+                  <Button
+                    variant="outline"
+                    className="w-full mt-2"
+                    onClick={() => document.getElementById('cover-upload-input')?.click()}
+                    disabled={isUploadingCover}
+                  >
+                    {isUploadingCover ? 'Uploading...' : 'Add Cover Image'}
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
         </div>
         
         <div className="lg:col-span-2">

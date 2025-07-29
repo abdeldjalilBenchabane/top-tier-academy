@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Edit } from 'lucide-react';
+import { Plus, Trash2, Edit, ArrowLeft } from 'lucide-react';
 import PathSelector from '@/components/admin/PathSelector';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +57,7 @@ const ProfessorCourseDetails = () => {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   // Remove localSections state and all inline editing handlers
 
   useEffect(() => {
@@ -299,44 +300,159 @@ const ProfessorCourseDetails = () => {
     }
   };
 
+  // Drag and drop handlers for cover upload
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length === 0) return;
+    
+    const file = files[0];
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please drop an image file');
+      return;
+    }
+    
+    // Use the same logic as handleCoverChange
+    setCoverFile(file);
+    setIsUploadingCover(true);
+    const previewUrl = URL.createObjectURL(file);
+    setCoverPreviewUrl(previewUrl);
+    
+    try {
+      if (!course) throw new Error('No course loaded');
+      const newCoverUrl = await api.uploadCourseCover(course.id, file);
+      setCourse((prev: any) => prev ? { ...prev, cover_url: `${newCoverUrl}?t=${Date.now()}` } : prev);
+      setCoverPreviewUrl(null);
+      setCoverFile(null);
+      toast.success('Course cover updated!');
+    } catch (err) {
+      console.error('Failed to upload cover:', err);
+      toast.error('Failed to upload course cover');
+    } finally {
+      setIsUploadingCover(false);
+    }
+  };
+
   if (loading) return <div className="p-8 text-center">Loading...</div>;
   if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
   if (!course) return <div className="p-8 text-center">Course not found</div>;
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
+      {/* Back Button */}
+      <div className="flex items-center">
+        <Button
+          variant="ghost"
+          onClick={() => navigate('/professor/courses')}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Courses
+        </Button>
+      </div>
+      
       {/* Cover Upload UI */}
-      {(coverPreviewUrl || course?.cover_url) && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Course Cover</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <img
-              src={coverPreviewUrl || course.cover_url}
-              alt="Course Cover"
-              className="w-full h-auto rounded-md object-cover border mb-2"
-              style={{ maxHeight: 300 }}
-            />
-            <input
-              type="file"
-              accept="image/*"
-              id="cover-upload-input"
-              style={{ display: 'none' }}
-              onChange={handleCoverChange}
-              disabled={isUploadingCover}
-            />
-            <Button
-              variant="outline"
-              className="w-full mt-2"
-              onClick={() => document.getElementById('cover-upload-input')?.click()}
-              disabled={isUploadingCover}
-            >
-              {isUploadingCover ? 'Uploading...' : 'Change Cover'}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Course Cover</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {coverPreviewUrl || course?.cover_url ? (
+            <>
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`relative ${isDragOver ? 'ring-2 ring-blue-500 ring-opacity-50' : ''}`}
+              >
+                <img
+                  src={coverPreviewUrl || course.cover_url}
+                  alt="Course Cover"
+                  className="w-full h-auto rounded-md object-cover border mb-2"
+                  style={{ maxHeight: 300 }}
+                />
+                {isDragOver && (
+                  <div className="absolute inset-0 bg-blue-500 bg-opacity-20 rounded-md flex items-center justify-center">
+                    <p className="text-white font-medium">Drop to replace cover</p>
+                  </div>
+                )}
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                id="cover-upload-input"
+                style={{ display: 'none' }}
+                onChange={handleCoverChange}
+                disabled={isUploadingCover}
+              />
+              <Button
+                variant="outline"
+                className="w-full mt-2"
+                onClick={() => document.getElementById('cover-upload-input')?.click()}
+                disabled={isUploadingCover}
+              >
+                {isUploadingCover ? 'Uploading...' : 'Change Cover'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <div 
+                className={`border-2 border-dashed rounded-md p-8 text-center mb-2 transition-colors ${
+                  isDragOver 
+                    ? 'border-blue-500 bg-blue-50' 
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <ImageIcon className={`mx-auto h-12 w-12 mb-4 ${
+                  isDragOver ? 'text-blue-500' : 'text-gray-400'
+                }`} />
+                <p className={`mb-2 ${
+                  isDragOver ? 'text-blue-600' : 'text-gray-500'
+                }`}>
+                  {isDragOver ? 'Drop your image here' : 'No cover image uploaded'}
+                </p>
+                <p className="text-sm text-gray-400">
+                  {isDragOver 
+                    ? 'Release to upload the image' 
+                    : 'Drag and drop an image here or click the button below'
+                  }
+                </p>
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                id="cover-upload-input"
+                style={{ display: 'none' }}
+                onChange={handleCoverChange}
+                disabled={isUploadingCover}
+              />
+              <Button
+                variant="outline"
+                className="w-full mt-2"
+                onClick={() => document.getElementById('cover-upload-input')?.click()}
+                disabled={isUploadingCover}
+              >
+                {isUploadingCover ? 'Uploading...' : 'Add Cover Image'}
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>Course Details</CardTitle>
@@ -355,9 +471,6 @@ const ProfessorCourseDetails = () => {
               <p className="text-gray-600">{course.description}</p>
               <Button variant="outline" onClick={() => setEditMode(true)}><Edit className="h-4 w-4 mr-1" /> Edit</Button>
             </>
-          )}
-          {course.cover_url && (
-            <img src={course.cover_url} alt="Course Cover" className="w-full max-w-xs rounded" />
           )}
         </CardContent>
       </Card>

@@ -209,7 +209,7 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
       // Add basic course data
       formData.append('title', title);
       formData.append('description', description);
-      formData.append('price', price || '0');
+      formData.append('price', price || ''); // Send empty string instead of '0' to use material price
       formData.append('sections', JSON.stringify(validSections));
       
       // Add cover file if selected
@@ -381,7 +381,7 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
           />
         </div>
 
-        <div className="space-y-2">
+        {/* <div className="space-y-2">
           <Label htmlFor="course-price">Course Price (Optional)</Label>
           <Input
             id="course-price"
@@ -392,7 +392,7 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
             step="0.01"
             min="0"
           />
-        </div>
+        </div> */}
 
         <div className="space-y-2">
           <Label htmlFor="course-cover">Course Cover Image (Optional)</Label>

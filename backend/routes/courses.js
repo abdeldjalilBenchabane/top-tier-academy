@@ -257,10 +257,11 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      // Insert new course
+      // Insert new course - set price to null if empty or '0' to use material price
+      const coursePrice = (!price || price === '0' || price === 0) ? null : price;
       const courseResult = await client.query(
         'INSERT INTO courses (title, description, material_id, created_by, price, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-        [title, description, material_id || null, created_by, price, status]
+        [title, description, material_id || null, created_by, coursePrice, status]
       );
       const courseId = courseResult.rows[0].id;
       // Handle cover upload
@@ -341,6 +342,94 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
   }
 });
 
+// Add endpoint to get complete course path data
+router.get('/:id/path', verifyToken, async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    
+    // Get course with complete path details
+    const result = await pool.query(`
+      SELECT 
+        c.id, 
+        c.title, 
+        c.status, 
+        c.material_id, 
+        c.language_level_id,
+        m.name as material_name,
+        m.speciality_id,
+        m.year_id,
+        s.name as speciality_name,
+        s.year_id as speciality_year_id,
+        y.name as year_name,
+        y.level_id,
+        l.name as level_name,
+        ll.name as language_level_name,
+        lang.name as language_name
+      FROM courses c
+      LEFT JOIN materials m ON c.material_id = m.id
+      LEFT JOIN specialities s ON m.speciality_id = s.id
+      LEFT JOIN years y ON m.year_id = y.id OR s.year_id = y.id
+      LEFT JOIN levels l ON y.level_id = l.id
+      LEFT JOIN language_levels ll ON c.language_level_id = ll.id
+      LEFT JOIN languages lang ON ll.language_id = lang.id
+      WHERE c.id = $1
+    `, [courseId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    
+    const course = result.rows[0];
+    
+    // Build the path string
+    let path = '';
+    let pathType = '';
+    
+    if (course.language_level_id) {
+      // Language path
+      pathType = 'language';
+      if (course.language_name) {
+        path += course.language_name;
+      }
+      if (course.language_level_name) {
+        path += path ? ` > ${course.language_level_name}` : course.language_level_name;
+      }
+    } else if (course.material_id) {
+      // Education path
+      pathType = 'education';
+      if (course.level_name) {
+        path += course.level_name;
+      }
+      if (course.year_name) {
+        path += path ? ` > ${course.year_name}` : course.year_name;
+      }
+      if (course.speciality_name) {
+        path += path ? ` > ${course.speciality_name}` : course.speciality_name;
+      }
+      if (course.material_name) {
+        path += path ? ` > ${course.material_name}` : course.material_name;
+      }
+    }
+    
+    res.json({
+      courseId: course.id,
+      pathType,
+      path,
+      details: {
+        level: course.level_name,
+        year: course.year_name,
+        speciality: course.speciality_name,
+        material: course.material_name,
+        language: course.language_name,
+        languageLevel: course.language_level_name
+      }
+    });
+  } catch (error) {
+    console.error('Error getting course path:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Add endpoint for admins to assign material path to approved courses without path
 router.put('/:id/assign-material-admin', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
@@ -357,16 +446,12 @@ router.put('/:id/assign-material-admin', verifyToken, requireRole(['admin']), as
       return res.status(404).json({ error: 'Course not found' });
     }
     
-    // Only allow assigning to approved courses that don't have a material_id
+    // Only allow assigning to approved courses
     if (course.status !== 'approved') {
       return res.status(400).json({ error: 'Can only assign paths to approved courses' });
     }
     
-    if (course.material_id) {
-      return res.status(400).json({ error: 'Course already has a material path assigned' });
-    }
-    
-    // Update course with material_id
+    // Update course with material_id (allow updating existing material_id)
     const result = await query(
       'UPDATE courses SET material_id = $1 WHERE id = $2 RETURNING *',
       [material_id, courseId]

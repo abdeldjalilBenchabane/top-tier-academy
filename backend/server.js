@@ -24,6 +24,7 @@ import footerContentRoutes from './routes/footer-content.js';
 import notificationsRoutes from './routes/notifications.js';
 import quizzesRoutes from './routes/quizzes.js';
 import adminRoutes from './routes/admin.js';
+import professorRoutes from './routes/professor.js';
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 
@@ -99,6 +100,7 @@ app.use('/api/footer-content', footerContentRoutes);
 app.use('/api', notificationsRoutes);
 app.use('/api/quizzes', quizzesRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/professor', professorRoutes);
 
 // Socket.IO chat functionality
 io.on('connection', (socket) => {

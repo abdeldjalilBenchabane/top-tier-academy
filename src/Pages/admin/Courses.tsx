@@ -118,30 +118,28 @@ const CoursesPage = () => {
     
 
     
-    // Filter by course type first
-    if (courseType !== 'all') {
-      if (courseType === 'structure') {
-        filtered = filtered.filter(course => course.materialId && !course.languageLevelId);
-      } else if (courseType === 'language') {
-        filtered = filtered.filter(course => course.languageLevelId && !course.materialId);
-      }
+    // Filter by course type
+    if (courseType === 'structure') {
+      filtered = filtered.filter(course => course.materialId && !course.language_level_id);
+    } else if (courseType === 'language') {
+      filtered = filtered.filter(course => course.language_level_id && !course.materialId);
     }
     
-    // Filter by language path
-    if (courseType === 'all' || courseType === 'language') {
-      if (selectedLanguageLevel && selectedLanguageLevel !== 'all') {
-        filtered = filtered.filter(course => course.languageLevelId === selectedLanguageLevel);
-      } else if (selectedLanguage && selectedLanguage !== 'all') {
-        // Get language levels for this language
-        const languageLevelIds = languageLevels
-          .filter(ll => ll.languageId === selectedLanguage)
-          .map(ll => ll.id);
-        
-        if (languageLevelIds.length > 0) {
-          filtered = filtered.filter(course => 
-            course.languageLevelId && languageLevelIds.includes(course.languageLevelId)
-          );
-        }
+    // Filter by language level
+    if (selectedLanguageLevel && selectedLanguageLevel !== 'all') {
+      filtered = filtered.filter(course => course.language_level_id === selectedLanguageLevel);
+    }
+    
+    // Filter by language
+    if (selectedLanguage && selectedLanguage !== 'all') {
+      const languageLevelIds = languageLevels
+        .filter(ll => ll.language_id === selectedLanguage)
+        .map(ll => ll.id);
+      
+      if (languageLevelIds.length > 0) {
+        filtered = filtered.filter(course => 
+          course.language_level_id && languageLevelIds.includes(course.language_level_id)
+        );
       }
     }
     
@@ -665,9 +663,12 @@ const CoursesPage = () => {
                 // Handle language courses
                 let languageDisplay = null;
                 if (course.languageLevelId) {
-                  const language = languages.find(l => l.id === course.languageLevelId);
-                  if (language) {
-                    languageDisplay = `Language: ${language.name}`;
+                  const languageLevel = languageLevels.find(ll => ll.id === course.languageLevelId);
+                  if (languageLevel) {
+                    const language = languages.find(l => l.id === languageLevel.language_id);
+                    if (language) {
+                      languageDisplay = `${language.name} > ${languageLevel.name}`;
+                    }
                   }
                 }
                 
@@ -686,20 +687,11 @@ const CoursesPage = () => {
                         {course.description}
                       </p>
                       
-                      {pathDisplay && (
+                      {(pathDisplay || languageDisplay) && (
                         <div className="flex flex-wrap gap-1 mb-2">
                           <Badge variant="outline" className="text-xs flex items-center">
                             <Layers className="h-3 w-3 mr-1" />
-                            {pathDisplay}
-                          </Badge>
-                        </div>
-                      )}
-                      
-                      {languageDisplay && (
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          <Badge variant="outline" className="text-xs flex items-center">
-                            <BookOpen className="h-3 w-3 mr-1" />
-                            {languageDisplay}
+                            {pathDisplay || languageDisplay}
                           </Badge>
                         </div>
                       )}

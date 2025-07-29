@@ -68,6 +68,7 @@ import ProfessorComments from './Pages/professor/Comments';
 import CourseCommentsOverview from './Pages/professor/CourseCommentsOverview';
 import CourseComments from './Pages/professor/CourseComments';
 import ProfessorPrivateClasses from './Pages/professor/PrivateClasses';
+import MyStudents from './Pages/professor/MyStudents';
 import LiveSessionsPage from './Pages/professor/LiveSessionsPage';
 import CreateLiveSessionPage from './Pages/professor/CreateLiveSession';
 // Admin components
@@ -186,6 +187,7 @@ const App: React.FC = () => {
                         <Route path="comments" element={<CourseCommentsOverview />} />
                         <Route path="comments/:courseId" element={<CourseComments />} />
                         <Route path="private-classes" element={<ProfessorPrivateClasses />} />
+                        <Route path="my-students" element={<MyStudents />} />
                       </Route>
 
                       {/* Catch all */}

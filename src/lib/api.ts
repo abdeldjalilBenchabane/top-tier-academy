@@ -618,17 +618,36 @@ export const api = {
     if (!res.ok) throw new Error('Failed to fetch courses');
     return await res.json();
   },
-  getCourseById: async (courseId: string): Promise<Course | null> => {
-    const res = await fetch(`/api/courses/${courseId}`, {
+  getCourseById: async (id: string): Promise<Course> => {
+    const res = await fetch(`/api/courses/${id}`, {
       headers: {
         ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
       },
       credentials: 'include'
     });
-    if (!res.ok) {
-      if (res.status === 404) return null;
-      throw new Error('Failed to fetch course');
-    }
+    if (!res.ok) throw new Error('Failed to fetch course');
+    return await res.json();
+  },
+  
+  getCoursePath: async (id: string): Promise<{ pathType: string; path: string; details: any }> => {
+    const res = await fetch(`/api/courses/${id}/path`, {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch course path');
+    return await res.json();
+  },
+  
+  getProfessorDashboardStats: async (): Promise<any> => {
+    const res = await fetch('/api/professor/dashboard/stats', {
+      headers: {
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to fetch professor dashboard stats');
     return await res.json();
   },
   getPendingCourseById: async (courseId: string): Promise<PendingCourse | null> => {
