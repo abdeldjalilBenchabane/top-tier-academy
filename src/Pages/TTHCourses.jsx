@@ -58,8 +58,7 @@ export default function Courses() {
           if (!course.language_level_id) {
             let price = course.price;
             if (!price || price === 0) {
-              const material = materialsData.find(m => m.name === course.material_name);
-              price = material ? material.price : 0;
+              price = course.material_price || 0;
             }
             return { ...course, price };
           }

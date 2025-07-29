@@ -403,16 +403,23 @@ router.post('/buy-course', auth, async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      // Deduct points
-      await client.query(
-        'UPDATE user_points SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
-        [price, userId]
-      );
+      
+      // Create point transaction record (this will trigger the balance update)
+      await client.query(`
+        INSERT INTO point_transactions (user_id, transaction_type, points, amount, status, metadata)
+        VALUES ($1, 'spend', $2, $3, 'completed', $4)
+      `, [userId, price, price, JSON.stringify({
+        type: 'course_purchase',
+        course_id: courseId,
+        course_title: course.title || 'Unknown Course'
+      })]);
+      
       // Record purchase
       await client.query(
-        'INSERT INTO student_courses (student_id, course_id, completed, progress, hours_spent, last_accessed) VALUES ($1, $2, FALSE, 0, 0, NOW())',
+        'INSERT INTO student_courses (student_id, course_id, completed, progress, hours_spent, last_accessed, buy_at) VALUES ($1, $2, FALSE, 0, 0, NOW(), NOW())',
         [userId, courseId]
       );
+      
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');

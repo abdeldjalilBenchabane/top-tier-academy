@@ -26,7 +26,8 @@ import {
   RefreshCw,
   Globe,
   Menu,
-  X
+  X,
+  Tag
 } from 'lucide-react';
 
 interface SidebarLink {
@@ -67,6 +68,8 @@ const Sidebar = () => {
     { name: 'Private Class Settings', path: '/admin/private-class-settings', icon: <Settings className="h-5 w-5" /> },
     { name: 'Homepage Materials', path: '/admin/homepage-materials', icon: <Globe className="h-5 w-5" /> },
     { name: 'Footer Content', path: '/admin/footer-content', icon: <FileText className="h-5 w-5" /> },
+    { name: 'Pricing Management', path: '/admin/pricing', icon: <Tag className="h-5 w-5" /> },
+    { name: 'Earnings Analytics', path: '/admin/earnings', icon: <TrendingUp className="h-5 w-5" /> },
   ];
 
   const professorLinks: SidebarLink[] = [

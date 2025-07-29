@@ -52,6 +52,12 @@ const CourseCard = ({ course }) => {
       if (res.success) {
         setBuySuccess(true);
         alert('تم شراء الكورس بنجاح! سيتم توجيهك إلى محتوى الكورس.');
+        
+        // Trigger points update event to refresh navbar
+        window.dispatchEvent(new CustomEvent('pointsUpdated', { 
+          detail: { points: res.newBalance } 
+        }));
+        
         window.location.href = `/coursesList/courses/${course.id}`;
       } else {
         setBuyError(res.error || 'حدث خطأ أثناء الشراء');

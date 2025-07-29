@@ -94,11 +94,6 @@ const AdminPointCodes: React.FC = () => {
       });
       const data = await res.json();
       setTransactions(data.transactions || []);
-      // Calculate total revenue from completed purchase transactions
-      const totalRevenue = (data.transactions || [])
-        .filter((t: any) => t.status === 'completed' && t.transaction_type === 'purchase' && t.amount)
-        .reduce((sum: number, t: any) => sum + (typeof t.amount === 'number' ? t.amount : parseFloat(t.amount) || 0), 0);
-      setRevenue(totalRevenue);
     } catch (e) {
       setTransactions([]);
       setRevenue(0);
@@ -110,6 +105,30 @@ const AdminPointCodes: React.FC = () => {
     fetchPackages();
     fetchTransactions();
   }, []);
+
+  // Recalculate revenue when codes or packages change
+  useEffect(() => {
+    console.log('Revenue calculation triggered:', { codesLength: codes.length, packagesLength: packages.length });
+    
+    if (codes.length > 0 && packages.length > 0) {
+      const usedCodes = codes.filter(c => c.is_used);
+      console.log('Used codes count:', usedCodes.length);
+      console.log('All codes:', codes);
+      console.log('All packages:', packages);
+      
+      const totalRevenue = usedCodes.reduce((sum: number, code: any) => {
+        const pkg = packages.find(p => p.id === code.package_id);
+        const price = pkg ? (typeof pkg.price === 'string' ? parseFloat(pkg.price) : pkg.price) || 0 : 0;
+        console.log(`Code ${code.code}: package_id=${code.package_id}, found package:`, pkg, 'price:', price, 'type:', typeof price);
+        return sum + price;
+      }, 0);
+      
+      console.log('Total revenue calculated:', totalRevenue, 'type:', typeof totalRevenue);
+      setRevenue(totalRevenue);
+    } else {
+      console.log('Not enough data to calculate revenue');
+    }
+  }, [codes, packages]);
 
   const handleGenerateCodes = async () => {
     if (!selectedPackageId || !quantity) {

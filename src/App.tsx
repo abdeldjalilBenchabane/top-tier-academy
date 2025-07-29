@@ -11,6 +11,8 @@ import { LiveSessionsCountProvider } from './contexts/LiveSessionsCountContext';
 import { PendingQuizzesCountProvider } from './contexts/PendingQuizzesCountContext';
 import AdminPointCodes from './Pages/admin/PointCodes';
 import PrivateClasses from './Pages/admin/PrivateClasses';
+import PricingManagement from './Pages/admin/PricingManagement';
+import EarningsAnalytics from './Pages/admin/EarningsAnalytics';
 
 
 // TTH Pages
@@ -161,6 +163,8 @@ const App: React.FC = () => {
                         <Route path="private-classes" element={<PrivateClasses />} />
                         <Route path="homepage-materials" element={<HomepageMaterials />} />
                         <Route path="footer-content" element={<FooterContent />} />
+                        <Route path="pricing" element={<PricingManagement />} />
+                        <Route path="earnings" element={<EarningsAnalytics />} />
                       </Route>
 
                       {/* Professor (protected) */}
