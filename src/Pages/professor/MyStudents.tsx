@@ -133,7 +133,15 @@ const MyStudents = () => {
         uniqueStudents.set(student.id, {
           ...student,
           content_count: 1,
-          content_types: [student.content_type]
+          content_types: [student.content_type],
+          courses: [],
+          live_sessions: [],
+          live_sections: [],
+          private_classes: [],
+          course_count: 0,
+          live_session_count: 0,
+          live_section_count: 0,
+          private_class_count: 0
         });
       } else {
         const existing = uniqueStudents.get(student.id);
@@ -141,6 +149,27 @@ const MyStudents = () => {
         if (!existing.content_types.includes(student.content_type)) {
           existing.content_types.push(student.content_type);
         }
+      }
+      
+      // Add content details
+      const studentData = uniqueStudents.get(student.id);
+      switch (student.content_type) {
+        case 'course':
+          studentData.courses.push(student.content_title);
+          studentData.course_count++;
+          break;
+        case 'live_session':
+          studentData.live_sessions.push(student.content_title);
+          studentData.live_session_count++;
+          break;
+        case 'live_section':
+          studentData.live_sections.push(student.content_title);
+          studentData.live_section_count++;
+          break;
+        case 'private_class':
+          studentData.private_classes.push({ title: student.content_title, status: student.status });
+          studentData.private_class_count++;
+          break;
       }
     });
     return Array.from(uniqueStudents.values());
@@ -151,10 +180,10 @@ const MyStudents = () => {
   const stats = {
     totalStudents: uniqueStudents.length,
     totalEnrollments: filteredStudents.length,
-    courses: filteredStudents.filter(s => s.content_type === 'course').length,
-    liveSessions: filteredStudents.filter(s => s.content_type === 'live_session').length,
-    liveSections: filteredStudents.filter(s => s.content_type === 'live_section').length,
-    privateClasses: filteredStudents.filter(s => s.content_type === 'private_class').length
+    courses: uniqueStudents.reduce((sum, student) => sum + student.course_count, 0),
+    liveSessions: uniqueStudents.reduce((sum, student) => sum + student.live_session_count, 0),
+    liveSections: uniqueStudents.reduce((sum, student) => sum + student.live_section_count, 0),
+    privateClasses: uniqueStudents.reduce((sum, student) => sum + student.private_class_count, 0)
   };
 
   if (loading) {
@@ -191,7 +220,7 @@ const MyStudents = () => {
               <Users className="h-5 w-5 text-blue-600" />
               <div>
                 <div className="text-2xl font-bold">{stats.totalStudents}</div>
-                <div className="text-sm text-gray-500">Total Students</div>
+                <div className="text-sm text-gray-500">Unique Students</div>
               </div>
             </div>
           </CardContent>
@@ -252,6 +281,55 @@ const MyStudents = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Quick Summary */}
+      {uniqueStudents.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Student Overview</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {uniqueStudents.map((student) => (
+                <div key={student.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-blue-600 font-semibold text-sm">
+                        {student.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="font-medium">{student.name}</h4>
+                      <p className="text-sm text-gray-500">{student.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-1">
+                      <BookOpen className="h-4 w-4 text-blue-600" />
+                      <span>{student.course_count} courses</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Video className="h-4 w-4 text-green-600" />
+                      <span>{student.live_session_count} sessions</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <GraduationCap className="h-4 w-4 text-purple-600" />
+                      <span>{student.live_section_count} sections</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Users className="h-4 w-4 text-orange-600" />
+                      <span>{student.private_class_count} private</span>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {student.content_count} total
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card>
@@ -326,7 +404,7 @@ const MyStudents = () => {
                         <p className="text-sm text-gray-500">{student.email}</p>
                       </div>
                     </div>
-                    <Badge variant="outline">{student.content_count} enrollments</Badge>
+                    <Badge variant="outline">{student.content_count} total</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -340,14 +418,77 @@ const MyStudents = () => {
                       <span>Last activity: {formatDate(student.last_activity)}</span>
                     </div>
                   )}
-                  <div className="flex flex-wrap gap-1">
-                    {student.content_types.map((type) => (
-                      <Badge key={type} className={getContentTypeColor(type)}>
-                        {getContentTypeIcon(type)}
-                        <span className="ml-1">{type.replace('_', ' ')}</span>
-                      </Badge>
-                    ))}
+                  
+                  {/* Content Breakdown */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-1">
+                        <BookOpen className="h-3 w-3 text-blue-600" />
+                        <span className="text-gray-700">Courses:</span>
+                      </div>
+                      <Badge variant="outline" className="text-xs">{student.course_count}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-1">
+                        <Video className="h-3 w-3 text-green-600" />
+                        <span className="text-gray-700">Live Sessions:</span>
+                      </div>
+                      <Badge variant="outline" className="text-xs">{student.live_session_count}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-1">
+                        <GraduationCap className="h-3 w-3 text-purple-600" />
+                        <span className="text-gray-700">Live Sections:</span>
+                      </div>
+                      <Badge variant="outline" className="text-xs">{student.live_section_count}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-1">
+                        <Users className="h-3 w-3 text-orange-600" />
+                        <span className="text-gray-700">Private Classes:</span>
+                      </div>
+                      <Badge variant="outline" className="text-xs">{student.private_class_count}</Badge>
+                    </div>
                   </div>
+
+                  {/* Content Details (Collapsible) */}
+                  <details className="group">
+                    <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">
+                      View Details
+                    </summary>
+                    <div className="mt-2 space-y-2 text-xs">
+                      {student.courses.length > 0 && (
+                        <div>
+                          <p className="font-medium text-gray-600">Courses:</p>
+                          <ul className="list-disc list-inside text-gray-500 ml-2">
+                            {student.courses.map((course, index) => (
+                              <li key={index}>{course}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {student.live_sections.length > 0 && (
+                        <div>
+                          <p className="font-medium text-gray-600">Live Sections:</p>
+                          <ul className="list-disc list-inside text-gray-500 ml-2">
+                            {student.live_sections.map((section, index) => (
+                              <li key={index}>{section}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {student.private_classes.length > 0 && (
+                        <div>
+                          <p className="font-medium text-gray-600">Private Classes:</p>
+                          <ul className="list-disc list-inside text-gray-500 ml-2">
+                            {student.private_classes.map((pc, index) => (
+                              <li key={index}>{pc.title} ({pc.status})</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </details>
                 </CardContent>
               </Card>
             ))}

@@ -285,22 +285,22 @@ router.get('/students', verifyToken, async (req, res) => {
       WHERE c.created_by = $1
     `, [professorId]);
 
-    // Get students from live sessions
+    // Get students from live sessions (purchases table)
     const liveSessionStudents = await getRows(`
       SELECT 
         u.id,
         u.name,
         u.email,
         u.avatar_url as avatar,
-        lsp.joined_at as enrollment_date,
-        lsp.joined_at as last_activity,
+        p.purchased_at as enrollment_date,
+        p.purchased_at as last_activity,
         ls.title as content_title,
         ls.id as content_id,
         'live_session' as content_type,
         'enrolled' as status
-      FROM live_session_participants lsp
-      JOIN users u ON lsp.user_id = u.id
-      JOIN live_sessions ls ON lsp.session_id = ls.id
+      FROM purchases p
+      JOIN users u ON p.student_id = u.id
+      JOIN live_sessions ls ON p.session_id = ls.id
       WHERE ls.professor_id = $1
     `, [professorId]);
 
@@ -323,7 +323,7 @@ router.get('/students', verifyToken, async (req, res) => {
       WHERE ls.professor_id = $1
     `, [professorId]);
 
-    // Get students from private classes
+    // Get students from private classes (only accepted and paid)
     const privateClassStudents = await getRows(`
       SELECT 
         u.id,
@@ -339,6 +339,8 @@ router.get('/students', verifyToken, async (req, res) => {
       FROM private_class_requests pcr
       JOIN users u ON pcr.student_id = u.id
       WHERE pcr.teacher_name = (SELECT name FROM users WHERE id = $1)
+        AND pcr.status = 'مؤكد'
+        AND pcr.payment_status = 'paid'
     `, [professorId]);
 
     // Combine all students
