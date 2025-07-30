@@ -823,6 +823,7 @@ router.get('/pricing/overview', verifyToken, requireAdmin, async (req, res) => {
         c.id, c.title,
         l.name as language_name,
         ll.name as language_level_name,
+        c.language_level_id,
         COALESCE(lcp.price, 0) as price
       FROM courses c
       JOIN language_levels ll ON c.language_level_id = ll.id

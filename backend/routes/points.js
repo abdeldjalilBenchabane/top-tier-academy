@@ -31,6 +31,23 @@ router.get('/balance', auth, async (req, res) => {
   }
 });
 
+// Get all purchases for a user
+router.get('/purchases', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const result = await pool.query(
+      'SELECT session_id, amount_paid, purchased_at FROM purchases WHERE student_id = $1 ORDER BY purchased_at DESC',
+      [userId]
+    );
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching user purchases:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Debug endpoint to check any user's balance (admin only)
 router.get('/balance/:userId', auth, requireAdmin, async (req, res) => {
   try {
@@ -378,10 +395,11 @@ router.post('/buy-course', auth, async (req, res) => {
       }
     }
 
-    if (!price || price <= 0) {
-      console.log(`[BUY-COURSE] Invalid price for courseId=${courseId}, resolved price=`, price, 'course:', course);
-      return res.status(400).json({ error: 'Invalid course price' });
-    }
+    // Allow free courses (price = 0) - remove the price validation
+    // if (!price || price <= 0) {
+    //   console.log(`[BUY-COURSE] Invalid price for courseId=${courseId}, resolved price=`, price, 'course:', course);
+    //   return res.status(400).json({ error: 'Invalid course price' });
+    // }
 
     // Check if already purchased
     const purchasedRes = await pool.query('SELECT id FROM student_courses WHERE student_id = $1 AND course_id = $2', [userId, courseId]);
@@ -394,7 +412,9 @@ router.post('/buy-course', auth, async (req, res) => {
     const pointsRes = await pool.query('SELECT balance FROM user_points WHERE user_id = $1', [userId]);
     const balance = pointsRes.rows[0]?.balance || 0;
     console.log(`[BUY-COURSE] User ${userId} balance before purchase:`, balance, 'Course price:', price);
-    if (balance < price) {
+    
+    // Only check balance if course is not free
+    if (price > 0 && balance < price) {
       console.log(`[BUY-COURSE] Not enough points: balance=${balance}, price=${price}`);
       return res.status(400).json({ error: 'Not enough points' });
     }
@@ -404,15 +424,18 @@ router.post('/buy-course', auth, async (req, res) => {
     try {
       await client.query('BEGIN');
       
-      // Create point transaction record (this will trigger the balance update)
-      await client.query(`
-        INSERT INTO point_transactions (user_id, transaction_type, points, amount, status, metadata)
-        VALUES ($1, 'spend', $2, $3, 'completed', $4)
-      `, [userId, price, price, JSON.stringify({
-        type: 'course_purchase',
-        course_id: courseId,
-        course_title: course.title || 'Unknown Course'
-      })]);
+      // Only create point transaction if course is not free
+      if (price > 0) {
+        // Create point transaction record (this will trigger the balance update)
+        await client.query(`
+          INSERT INTO point_transactions (user_id, transaction_type, points, amount, status, metadata)
+          VALUES ($1, 'spend', $2, $3, 'completed', $4)
+        `, [userId, price, price, JSON.stringify({
+          type: 'course_purchase',
+          course_id: courseId,
+          course_title: course.title || 'Unknown Course'
+        })]);
+      }
       
       // Record purchase
       await client.query(
@@ -455,40 +478,40 @@ router.post('/buy-live-session', auth, async (req, res) => {
     const section = sectionRes.rows[0];
     const price = parseInt(section.price);
 
-    if (!price || price <= 0) {
-      return res.status(400).json({ error: 'Invalid live section price' });
+    // Check if already purchased (using live_section_purchases table)
+    const purchasedRes = await pool.query('SELECT id FROM live_section_purchases WHERE student_id = $1 AND live_section_id = $2', [userId, sessionId]);
+    if (purchasedRes.rows.length > 0) {
+      return res.status(409).json({ error: 'You have already purchased this live session.' });
     }
-
-                        // Check if already purchased (using live_section_purchases table)
-                    const purchasedRes = await pool.query('SELECT id FROM live_section_purchases WHERE student_id = $1 AND live_section_id = $2', [userId, sessionId]);
-                    if (purchasedRes.rows.length > 0) {
-                      return res.status(409).json({ error: 'You have already purchased this live session.' });
-                    }
 
     // Get user points
     const pointsRes = await pool.query('SELECT balance FROM user_points WHERE user_id = $1', [userId]);
     const balance = pointsRes.rows[0]?.balance || 0;
     
-    if (balance < price) {
+    // Only check balance if live section is not free
+    if (price > 0 && balance < price) {
       return res.status(400).json({ error: 'Not enough points' });
     }
 
-    // Deduct points and record purchase in a transaction
+    // Record purchase in a transaction
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       
-      // Deduct points
-      await client.query(
-        'UPDATE user_points SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
-        [price, userId]
-      );
+      // Only deduct points if live section is not free
+      if (price > 0) {
+        // Deduct points
+        await client.query(
+          'UPDATE user_points SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+          [price, userId]
+        );
+      }
       
-                            // Record purchase (using live_section_purchases table)
-                      await client.query(
-                        'INSERT INTO live_section_purchases (student_id, live_section_id, points_spent) VALUES ($1, $2, $3)',
-                        [userId, sessionId, price]
-                      );
+      // Record purchase (using live_section_purchases table)
+      await client.query(
+        'INSERT INTO live_section_purchases (student_id, live_section_id, points_spent) VALUES ($1, $2, $3)',
+        [userId, sessionId, price]
+      );
       
       await client.query('COMMIT');
     } catch (err) {

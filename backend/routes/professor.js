@@ -358,23 +358,4 @@ router.get('/students', verifyToken, async (req, res) => {
   }
 });
 
-// Get pending private classes count for professor
-router.get('/pending-private-classes-count', verifyToken, async (req, res) => {
-  try {
-    const professorId = req.user.id;
-    
-    const result = await getRows(`
-      SELECT COUNT(*) as count
-      FROM private_class_requests pcr
-      WHERE pcr.teacher_name = (SELECT name FROM users WHERE id = $1)
-      AND pcr.status = 'في الانتظار'
-    `, [professorId]);
-
-    res.json({ count: parseInt(result[0]?.count || 0) });
-  } catch (error) {
-    console.error('Error fetching pending private classes count:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 export default router; 

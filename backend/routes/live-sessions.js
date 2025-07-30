@@ -444,7 +444,9 @@ router.post('/live-sessions/:sessionId/purchase', verifyToken, requireStudent, a
         }
 
         const currentBalance = studentPoints.rows[0].balance;
-        if (currentBalance < pointsNeeded) {
+        
+        // Only check balance if live session is not free
+        if (pointsNeeded > 0 && currentBalance < pointsNeeded) {
             return res.status(400).json({ 
                 error: `Insufficient points. You need ${pointsNeeded} points but have ${currentBalance} points.`,
                 pointsNeeded,
@@ -457,16 +459,19 @@ router.post('/live-sessions/:sessionId/purchase', verifyToken, requireStudent, a
         try {
             await client.query('BEGIN');
             
-            // Deduct points from student (using the trigger system)
-            await client.query(`
-                INSERT INTO point_transactions (user_id, transaction_type, points, amount, status, metadata)
-                VALUES ($1, 'spend', $2, $3, 'completed', $4)
-            `, [student_id, pointsNeeded, session.price, JSON.stringify({
-                type: 'live_session_purchase',
-                session_id: sessionId,
-                session_title: session.title,
-                professor_name: session.professor_name
-            })]);
+            // Only deduct points if live session is not free
+            if (pointsNeeded > 0) {
+                // Deduct points from student (using the trigger system)
+                await client.query(`
+                    INSERT INTO point_transactions (user_id, transaction_type, points, amount, status, metadata)
+                    VALUES ($1, 'spend', $2, $3, 'completed', $4)
+                `, [student_id, pointsNeeded, session.price, JSON.stringify({
+                    type: 'live_session_purchase',
+                    session_id: sessionId,
+                    session_title: session.title,
+                    professor_name: session.professor_name
+                })]);
+            }
 
             // Record the purchase
             await client.query(
@@ -475,6 +480,8 @@ router.post('/live-sessions/:sessionId/purchase', verifyToken, requireStudent, a
             );
 
             await client.query('COMMIT');
+
+            console.log(`[PURCHASE] Successfully purchased session ${sessionId} for student ${student_id}, amount: ${session.price}`);
 
             // Get updated balance
             const newBalanceRes = await pool.query('SELECT balance FROM user_points WHERE user_id = $1', [student_id]);
@@ -530,14 +537,23 @@ router.get('/live-sessions/:sessionId/access', verifyToken, async (req, res) => 
         const session = sessionRes.rows[0];
         const isLive = true; // Live sections are always considered "live"
 
-            // Check if user has purchased this session (using live_section_purchases table)
-    const purchaseRes = await pool.query(
-      'SELECT * FROM live_section_purchases WHERE live_section_id = $1 AND student_id = $2',
-      [sessionId, userId]
-    );
+        // Check if user has purchased this session (using purchases table)
+        const purchaseRes = await pool.query(
+          'SELECT * FROM purchases WHERE session_id = $1 AND student_id = $2',
+          [sessionId, userId]
+        );
 
         const hasPurchased = purchaseRes.rows.length > 0;
         const canAccess = hasPurchased; // Allow access if purchased, regardless of live status
+
+        console.log(`[ACCESS] Session ${sessionId}, User ${userId}, HasPurchased: ${hasPurchased}, CanAccess: ${canAccess}`);
+        console.log(`[ACCESS] Purchase query result:`, purchaseRes.rows);
+        console.log(`[ACCESS] Response object:`, {
+            canAccess: canAccess,
+            hasPurchased: hasPurchased,
+            isLive: isLive,
+            session: session
+        });
 
         res.json({
             canAccess: canAccess,
@@ -637,7 +653,7 @@ router.patch('/live-sessions/:id/approve', verifyToken, requireRole(['admin']), 
             'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
             [session.professor_id, `Your live session "${session.title}" has been approved by the admin.`]
         );
-        res.json({ message: 'Session approved', session });
+        res.json({ message: 'Session approved successfully' });
     } catch (error) {
         console.error('Error approving session:', error);
         res.status(500).json({ error: 'Internal server error' });
