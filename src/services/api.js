@@ -507,3 +507,31 @@ export const structureAPI = {
 };
 
 export { getAuthToken, setAuthToken, removeAuthToken }; 
+
+// Chat notifications
+export const getChatNotifications = async (sessionId) => {
+    const response = await fetch(`/api/chat-notifications/${sessionId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    return response.json();
+};
+
+export const markChatAsSeen = async (sessionId, lastSeenMessageId) => {
+    const response = await fetch(`/api/chat-notifications/${sessionId}/mark-seen`, {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('token')}` 
+        },
+        body: JSON.stringify({ lastSeenMessageId })
+    });
+    return response.json();
+};
+
+export const incrementUnseenCount = async (sessionId) => {
+    const response = await fetch(`/api/chat-notifications/${sessionId}/increment`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    return response.json();
+}; 

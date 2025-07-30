@@ -301,7 +301,7 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
                 video.style.transform = 'none';
                 video.style.transition = 'none';
                 if (type === 'screen') {
-                    video.style.objectFit = 'contain';
+                    video.style.objectFit = 'none';
                 } else {
                     video.style.objectFit = 'cover';
                 }
@@ -470,7 +470,8 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
                     userSelect: 'none',
                     WebkitUserSelect: 'none',
                     WebkitTouchCallout: 'none',
-                    ...(role === 'audience' ? { transform: 'scaleX(-1)' } : {})
+                    // Mirror the host's own video (like Zoom/Google Meet) but not screen sharing
+                    ...(role === 'host' && !isScreenSharing ? { transform: 'scaleX(-1)' } : {})
                   }}
                 />
                 {role === 'audience' && remoteUsers.length === 0 && (
