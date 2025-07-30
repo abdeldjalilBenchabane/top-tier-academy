@@ -359,20 +359,6 @@ const MyStudents = () => {
                 <SelectItem value="private_class">Private Classes</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="enrolled">Enrolled</SelectItem>
-                <SelectItem value="confirmed">Confirmed</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </CardContent>
       </Card>
@@ -381,10 +367,22 @@ const MyStudents = () => {
       <Tabs defaultValue="all" className="space-y-4">
         <TabsList>
           <TabsTrigger value="all">All Students ({uniqueStudents.length})</TabsTrigger>
-          <TabsTrigger value="courses">Courses</TabsTrigger>
-          <TabsTrigger value="live_sessions">Live Sessions</TabsTrigger>
-          <TabsTrigger value="live_sections">Live Sections</TabsTrigger>
-          <TabsTrigger value="private_classes">Private Classes</TabsTrigger>
+          <TabsTrigger value="courses">Courses ({filteredStudents.filter(s => s.content_type === 'course').reduce((acc, student) => {
+            if (!acc.has(student.id)) acc.set(student.id, true);
+            return acc;
+          }, new Map()).size})</TabsTrigger>
+          <TabsTrigger value="live_sessions">Live Sessions ({filteredStudents.filter(s => s.content_type === 'live_session').reduce((acc, student) => {
+            if (!acc.has(student.id)) acc.set(student.id, true);
+            return acc;
+          }, new Map()).size})</TabsTrigger>
+          <TabsTrigger value="live_sections">Live Sections ({filteredStudents.filter(s => s.content_type === 'live_section').reduce((acc, student) => {
+            if (!acc.has(student.id)) acc.set(student.id, true);
+            return acc;
+          }, new Map()).size})</TabsTrigger>
+          <TabsTrigger value="private_classes">Private Classes ({filteredStudents.filter(s => s.content_type === 'private_class').reduce((acc, student) => {
+            if (!acc.has(student.id)) acc.set(student.id, true);
+            return acc;
+          }, new Map()).size})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
@@ -495,13 +493,59 @@ const MyStudents = () => {
           </div>
         </TabsContent>
 
-        {['courses', 'live_sessions', 'live_sections', 'private_classes'].map((contentType) => (
-          <TabsContent key={contentType} value={contentType} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredStudents
-                .filter(student => student.content_type === contentType.replace('_', ''))
-                .map((student) => (
-                  <Card key={`${student.id}-${student.content_id}`} className="hover:shadow-lg transition-shadow">
+        {['courses', 'live_sessions', 'live_sections', 'private_classes'].map((contentType) => {
+          const contentTypeMap = {
+            'courses': 'course',
+            'live_sessions': 'live_session',
+            'live_sections': 'live_section',
+            'private_classes': 'private_class'
+          };
+          
+          // Filter students for this content type
+          const studentsForThisType = filteredStudents.filter(student => 
+            student.content_type === contentTypeMap[contentType]
+          );
+          
+          // Get unique students for this content type
+          const uniqueStudentsForType = new Map();
+          studentsForThisType.forEach(student => {
+            if (!uniqueStudentsForType.has(student.id)) {
+              uniqueStudentsForType.set(student.id, {
+                ...student,
+                content_count: 1,
+                content_titles: [student.content_title]
+              });
+            } else {
+              const existing = uniqueStudentsForType.get(student.id);
+              existing.content_count++;
+              existing.content_titles.push(student.content_title);
+            }
+          });
+          
+          const uniqueStudentsArray = Array.from(uniqueStudentsForType.values());
+          
+          return (
+            <TabsContent key={contentType} value={contentType} className="space-y-4">
+              {/* Summary Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    {getContentTypeIcon(contentTypeMap[contentType])}
+                    {contentType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    <Badge variant="outline">{uniqueStudentsArray.length} students</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-600">
+                    {uniqueStudentsArray.length} unique students with {studentsForThisType.length} total enrollments
+                  </p>
+                </CardContent>
+              </Card>
+              
+              {/* Student Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {uniqueStudentsArray.map((student) => (
+                  <Card key={student.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -515,16 +559,10 @@ const MyStudents = () => {
                             <p className="text-sm text-gray-500">{student.email}</p>
                           </div>
                         </div>
-                        <Badge className={getStatusColor(student.status)}>
-                          {student.status}
-                        </Badge>
+                        <Badge variant="outline">{student.content_count}</Badge>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Content:</p>
-                        <p className="text-sm text-gray-600">{student.content_title}</p>
-                      </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Calendar className="h-4 w-4" />
                         <span>Enrolled: {formatDate(student.enrollment_date)}</span>
@@ -535,24 +573,36 @@ const MyStudents = () => {
                           <span>Last activity: {formatDate(student.last_activity)}</span>
                         </div>
                       )}
-                      {student.progress !== undefined && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-700">Progress:</p>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full" 
-                              style={{ width: `${student.progress}%` }}
-                            ></div>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">{student.progress}% complete</p>
+                      
+                      {/* Content Details */}
+                      <details className="group">
+                        <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900 flex items-center gap-2">
+                          <span>Enrolled Content</span>
+                          <Badge variant="outline" className="text-xs">{student.content_titles.length}</Badge>
+                          <svg 
+                            className="w-4 h-4 transition-transform group-open:rotate-180" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </summary>
+                        <div className="mt-2 space-y-1">
+                          {student.content_titles.map((title, index) => (
+                            <div key={index} className="text-sm text-gray-600 bg-gray-50 p-2 rounded border-l-2 border-blue-200">
+                              {title}
+                            </div>
+                          ))}
                         </div>
-                      )}
+                      </details>
                     </CardContent>
                   </Card>
                 ))}
-            </div>
-          </TabsContent>
-        ))}
+              </div>
+            </TabsContent>
+          );
+        })}
       </Tabs>
     </div>
   );

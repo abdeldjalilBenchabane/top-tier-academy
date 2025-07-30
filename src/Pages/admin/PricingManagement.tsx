@@ -42,6 +42,7 @@ interface LanguageCourse {
   title: string;
   language_name: string;
   language_level_name: string;
+  language_level_id: string;
   price: number;
 }
 
@@ -138,6 +139,7 @@ const PricingManagement = () => {
         toast.success('Material price updated successfully');
       } else if (editingLanguageCourse) {
         // Update language course price
+        console.log('Updating language course:', editingLanguageCourse);
         await api.put(`/admin/pricing/language-courses/${editingLanguageCourse.id}`, {
           price: priceValue,
           language_level_id: editingLanguageCourse.language_level_id

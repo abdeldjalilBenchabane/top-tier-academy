@@ -48,6 +48,7 @@ const Sidebar = () => {
   const { pendingPrivateClassesCount } = usePendingPrivateClassesCount();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [hasLiveNow, setHasLiveNow] = useState(localStorage.getItem('professorHasLiveNow') === '1');
 
   // Add visual feedback when count changes
   useEffect(() => {
@@ -55,6 +56,18 @@ const Sidebar = () => {
     const timer = setTimeout(() => setIsRefreshing(false), 1000);
     return () => clearTimeout(timer);
   }, [pendingCount]);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e && e.detail && typeof e.detail.hasLiveNow === 'boolean') {
+        setHasLiveNow(e.detail.hasLiveNow);
+      } else {
+        setHasLiveNow(localStorage.getItem('professorHasLiveNow') === '1');
+      }
+    };
+    window.addEventListener('professorLiveNowChanged', handler);
+    return () => window.removeEventListener('professorLiveNowChanged', handler);
+  }, []);
 
   const adminLinks: SidebarLink[] = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: <Home className="h-5 w-5" /> },
@@ -80,7 +93,7 @@ const Sidebar = () => {
     { name: 'Dashboard', path: '/professor/dashboard', icon: <Home className="h-5 w-5" /> },
     { name: 'My Courses', path: '/professor/courses', icon: <BookOpen className="h-5 w-5" /> },
     { name: 'Create Course', path: '/professor/create', icon: <FileText className="h-5 w-5" /> },
-    { name: 'Live Sessions', path: '/professor/live-sessions', icon: <Video className="h-5 w-5" /> },
+    { name: 'Live Sessions', path: '/professor/live-sessions', icon: <Video className="h-5 w-5" />, badge: hasLiveNow ? -1 : undefined },
     { name: 'Create Live Session', path: '/professor/create-live-session', icon: <Video className="h-5 w-5" /> },
     { name: 'Live Sections', path: '/professor/live-sections', icon: <Video className="h-5 w-5" /> },
     { name: 'Create Quiz', path: '/professor/quiz', icon: <HelpCircle className="h-5 w-5" /> },
@@ -159,7 +172,9 @@ const Sidebar = () => {
                     {link.icon}
                     {link.name}
                   </div>
-                  {link.badge && link.badge > 0 && (
+                  {link.badge === -1 ? (
+                    <span className="ml-2 w-3 h-3 rounded-full bg-red-600 animate-pulse inline-block" title="Live Now" />
+                  ) : link.badge && link.badge > 0 && (
                     <Badge variant="destructive" className={`ml-auto transition-all duration-300 ${isRefreshing ? 'animate-pulse' : ''}`}>
                       {isRefreshing ? (
                         <RefreshCw className="h-3 w-3 animate-spin" />
@@ -193,7 +208,9 @@ const Sidebar = () => {
                 {link.icon}
                 {link.name}
               </div>
-              {link.badge && link.badge > 0 && (
+              {link.badge === -1 ? (
+                <span className="ml-2 w-3 h-3 rounded-full bg-red-600 animate-pulse inline-block" title="Live Now" />
+              ) : link.badge && link.badge > 0 && (
                 <Badge variant="destructive" className={`ml-auto transition-all duration-300 ${isRefreshing ? 'animate-pulse' : ''}`}>
                   {isRefreshing ? (
                     <RefreshCw className="h-3 w-3 animate-spin" />

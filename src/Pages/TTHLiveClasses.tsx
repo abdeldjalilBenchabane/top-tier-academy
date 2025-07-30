@@ -170,7 +170,7 @@ const TTHLiveClasses = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                     {filteredSessions.map((session) => (
                       <TTHLiveCard 
-                        key={session.id} 
+                        key={`${session.id}-${Date.now()}`} 
                         session={session} 
                         onStatusChange={handleSessionStatusChange}
                       />
@@ -216,6 +216,7 @@ const TTHLiveClasses = () => {
                           style={{ animationDelay: `${index * 100}ms` }}
                         >
                           <TTHLiveCard 
+                            key={`${session.id}-${Date.now()}`}
                             session={session} 
                             onStatusChange={handleSessionStatusChange}
                           />

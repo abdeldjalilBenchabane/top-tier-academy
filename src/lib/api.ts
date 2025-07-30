@@ -377,6 +377,32 @@ export const api = {
     if (!res.ok) throw new Error('Failed to fetch data');
     return res.json();
   },
+  
+  // Generic PUT method for any endpoint
+  put: async (endpoint: string, data: any) => {
+    const token = localStorage.getItem('token');
+    console.log(`[API] PUT ${endpoint}`, data);
+    
+    const res = await fetch(`/api${endpoint}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data),
+      credentials: 'include'
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      console.error(`[API] PUT ${endpoint} failed:`, res.status, errorData);
+      throw new Error(errorData.error || `HTTP ${res.status}: ${res.statusText}`);
+    }
+    
+    const result = await res.json();
+    console.log(`[API] PUT ${endpoint} success:`, result);
+    return result;
+  },
   createHomeSlide: async (slide: Omit<HomeSlide, 'id'>): Promise<HomeSlide> => {
     await delay(500);
     const newSlide: HomeSlide = {

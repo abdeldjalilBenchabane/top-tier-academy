@@ -14,6 +14,8 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
   const [hasPurchased, setHasPurchased] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [userPoints, setUserPoints] = useState(0);
+  const [forceUpdate, setForceUpdate] = useState(0); // Force re-render
+  const [purchaseStatusLoading, setPurchaseStatusLoading] = useState(true); // NEW
   const prevSessionStatus = useRef(sessionStatus);
   const formatTime = (timeString) => {
     if (!timeString) return '';
@@ -66,41 +68,110 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
   }, []);
 
   // Check if user has purchased this session and get user points
-  useEffect(() => {
-    const checkPurchaseStatus = async () => {
-      if (!user) return;
-
-      try {
-        // Check if user has purchased this session
-        const accessResponse = await fetch(`/api/live-sessions/${session.id}/access`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-
-        if (accessResponse.ok) {
-          const accessData = await accessResponse.json();
-          setHasPurchased(accessData.has_purchased);
+  const checkPurchaseStatus = async () => {
+    if (!user) return;
+    setPurchaseStatusLoading(true); // NEW
+    try {
+      console.log(`[TTHLiveCard] Checking purchase status for session ${session.id}, user: ${user.id}`);
+      
+      // Check if user has purchased this session
+      const accessResponse = await fetch(`/api/live-sessions/${session.id}/access`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
         }
+      });
 
-        // Get user points balance
-        const pointsResponse = await fetch('/api/points/balance', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
+      console.log(`[TTHLiveCard] Access response status: ${accessResponse.status}`);
 
-        if (pointsResponse.ok) {
-          const pointsData = await pointsResponse.json();
-          setUserPoints(pointsData.balance || 0);
-        }
-      } catch (error) {
-        console.error('Error checking purchase status:', error);
+      if (accessResponse.ok) {
+        const accessData = await accessResponse.json();
+        console.log(`[TTHLiveCard] Access data for session ${session.id}:`, accessData);
+        console.log(`[TTHLiveCard] hasPurchased property:`, accessData.hasPurchased);
+        console.log(`[TTHLiveCard] Setting hasPurchased to: ${accessData.hasPurchased}`);
+        setHasPurchased(accessData.hasPurchased);
+        setForceUpdate(prev => prev + 1); // Force re-render
+      } else {
+        console.error(`[TTHLiveCard] Failed to check access for session ${session.id}:`, accessResponse.status);
+        const errorText = await accessResponse.text();
+        console.error(`[TTHLiveCard] Error response:`, errorText);
+        
+        // Fallback: Check if we have a local purchase record
+        const localPurchases = JSON.parse(localStorage.getItem('userPurchases') || '[]');
+        const hasLocalPurchase = localPurchases.includes(session.id);
+        console.log(`[TTHLiveCard] Local purchase check:`, hasLocalPurchase);
+        setHasPurchased(hasLocalPurchase);
       }
-    };
 
+      // Get user points balance
+      const pointsResponse = await fetch('/api/points/balance', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (pointsResponse.ok) {
+        const pointsData = await pointsResponse.json();
+        setUserPoints(pointsData.balance || 0);
+      } else {
+        console.error('Failed to fetch user points');
+      }
+    } catch (error) {
+      console.error('Error checking purchase status:', error);
+      
+      // Fallback: Check if we have a local purchase record
+      const localPurchases = JSON.parse(localStorage.getItem('userPurchases') || '[]');
+      const hasLocalPurchase = localPurchases.includes(session.id);
+      console.log(`[TTHLiveCard] Fallback local purchase check:`, hasLocalPurchase);
+      setHasPurchased(hasLocalPurchase);
+    } finally {
+      setPurchaseStatusLoading(false); // NEW
+    }
+  };
+
+  // Initialize local purchases from database
+  const initializeLocalPurchases = async () => {
+    if (!user) return;
+    
+    try {
+      // Get all purchases for this user
+      const response = await fetch('/api/points/purchases', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const purchases = await response.json();
+        const sessionIds = purchases.map(p => p.session_id);
+        localStorage.setItem('userPurchases', JSON.stringify(sessionIds));
+        console.log(`[TTHLiveCard] Initialized local purchases:`, sessionIds);
+      }
+    } catch (error) {
+      console.error('Failed to initialize local purchases:', error);
+    }
+  };
+
+  useEffect(() => {
     checkPurchaseStatus();
   }, [user, session.id]);
+
+  // Initialize local purchases on mount
+  useEffect(() => {
+    initializeLocalPurchases();
+  }, [user]);
+
+  // Refresh purchase status when component mounts and when session changes
+  useEffect(() => {
+    if (user && session.id) {
+      checkPurchaseStatus();
+    }
+  }, [user, session.id]);
+
+  // Force re-render when purchase status changes
+  useEffect(() => {
+    console.log(`[TTHLiveCard] Force update triggered: ${forceUpdate}, hasPurchased: ${hasPurchased}`);
+  }, [forceUpdate, hasPurchased]);
 
   // Calculate session status and countdown
   useEffect(() => {
@@ -185,11 +256,13 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
       return;
     }
 
-    if (userPoints < session.price) {
+    // For free live sessions, don't check points balance
+    if (session.price && session.price > 0 && userPoints < session.price) {
       alert(`نقاطك غير كافية. تحتاج ${session.price} نقطة ولديك ${userPoints} نقطة.`);
       return;
     }
 
+    console.log(`[TTHLiveCard] Starting purchase for session ${session.id}`);
     setIsPurchasing(true);
     try {
       const response = await fetch(`/api/live-sessions/${session.id}/purchase`, {
@@ -200,18 +273,40 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
         }
       });
 
+      console.log(`[TTHLiveCard] Purchase response status:`, response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log(`[TTHLiveCard] Purchase successful:`, data);
         setHasPurchased(true);
+        setForceUpdate(prev => prev + 1); // Force re-render
         setUserPoints(data.newBalance);
-        alert(`تم شراء البث المباشر بنجاح! تم خصم ${data.pointsDeducted} نقطة من رصيدك.`);
+        
+        // Store purchase locally for fallback
+        const localPurchases = JSON.parse(localStorage.getItem('userPurchases') || '[]');
+        if (!localPurchases.includes(session.id)) {
+          localPurchases.push(session.id);
+          localStorage.setItem('userPurchases', JSON.stringify(localPurchases));
+        }
+        
+        if (session.price && session.price > 0) {
+          alert(`تم شراء البث المباشر بنجاح! تم خصم ${data.pointsDeducted} نقطة من رصيدك.`);
+        } else {
+          alert('تم الحصول على البث المباشر مجاناً بنجاح!');
+        }
         
         // Trigger points update event to refresh navbar
         window.dispatchEvent(new CustomEvent('pointsUpdated', { 
           detail: { points: data.newBalance } 
         }));
+        
+        // Immediately check purchase status again to ensure UI is updated
+        setTimeout(() => {
+          checkPurchaseStatus();
+        }, 500);
       } else {
         const errorData = await response.json();
+        console.error(`[TTHLiveCard] Purchase failed:`, errorData);
         alert(`خطأ في الشراء: ${errorData.error}`);
       }
     } catch (error) {
@@ -335,7 +430,15 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
           )}
 
           {/* Purchase/Join button */}
-          {hasPurchased ? (
+          {purchaseStatusLoading ? (
+            <button
+              className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-gradient-to-r from-gray-300 to-gray-400 text-gray-500 cursor-not-allowed animate-pulse"
+              disabled
+            >
+              <span className="loader mr-2" />
+              جاري التحقق...
+            </button>
+          ) : hasPurchased ? (
             <button 
               onClick={handleJoinSession}
               className={`w-full py-3 rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2 group-hover:scale-[1.02] shadow-lg hover:shadow-xl transform hover:-translate-y-1 ${
@@ -362,13 +465,13 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
           ) : (
             <button 
               onClick={handlePurchaseSession}
-              disabled={isPurchasing || isEnded || (user && userPoints < session.price)}
+              disabled={isPurchasing || isEnded || (user && session.price && session.price > 0 && userPoints < session.price)}
               className={`w-full py-3 rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2 group-hover:scale-[1.02] shadow-lg hover:shadow-xl transform hover:-translate-y-1 ${
                 isPurchasing
                   ? 'bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed'
                   : isEnded
                   ? 'bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed'
-                  : user && userPoints < session.price
+                  : user && session.price && session.price > 0 && userPoints < session.price
                   ? 'bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed'
                   : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700'
               }`}
@@ -377,7 +480,8 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
               <span>
                 {isPurchasing ? 'جاري الشراء...' : 
                  isEnded ? 'انتهى البث' :
-                 user && userPoints < session.price ? 'نقاط غير كافية' : 'شراء البث المباشر'}
+                 user && session.price && session.price > 0 && userPoints < session.price ? 'نقاط غير كافية' : 
+                 !session.price || session.price === 0 || session.price === '0' ? 'احصل عليه مجاناً' : 'شراء البث المباشر'}
               </span>
             </button>
           )}

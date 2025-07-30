@@ -150,7 +150,7 @@ const CourseCard = ({ course }) => {
           </div>
         </div>
         {/* Buy with points button and messages */}
-        {user && user.role === 'student' && course.price && course.price > 0 && !purchased && (
+        {user && user.role === 'student' && course.price !== null && course.price !== undefined && !purchased && (
           <div className="mt-4 flex flex-col gap-2">
             <button
               className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-extrabold text-lg shadow-lg transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
@@ -161,7 +161,7 @@ const CourseCard = ({ course }) => {
                 <span className="flex items-center justify-center gap-2">
                   <Loader2 className="w-5 h-5 animate-spin" /> جاري الشراء...
                 </span>
-              ) : 'شراء بالدفع بالنقاط'}
+              ) : course.price === 0 ? 'احصل عليه مجاناً' : 'شراء بالدفع بالنقاط'}
             </button>
             {buyError && (
               <div className="flex items-center justify-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded p-2 text-sm font-bold mt-1">
@@ -176,7 +176,7 @@ const CourseCard = ({ course }) => {
           </div>
         )}
         {/* If not logged in, show buy button that redirects to login after alert */}
-        {!user && course.price && course.price > 0 && !purchased && (
+        {!user && course.price !== null && course.price !== undefined && !purchased && (
           <div className="mt-4 flex flex-col gap-2">
             <button
               className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-extrabold text-lg shadow-lg transition-all duration-300"
@@ -186,7 +186,7 @@ const CourseCard = ({ course }) => {
                 window.location.href = '/login';
               }}
             >
-              شراء بالدفع بالنقاط
+              {course.price === 0 ? 'احصل عليه مجاناً' : 'شراء بالدفع بالنقاط'}
             </button>
           </div>
         )}

@@ -1,104 +1,92 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { api } from '@/lib/api';
-import { LiveSession } from '@/types';
-import { toast } from '@/lib/toast';
-import { Plus, Video, Calendar, Clock, Play, Bell, Timer, Zap } from 'lucide-react';
-import StatusControl from '@/components/live-sessions/StatusControl';
-import { useAuth } from '@/contexts/AuthContext';
+import { Video, Plus, Calendar, Clock, Zap, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import StatusControl from '../live-sessions/StatusControl';
+import { LiveSession } from '@/types';
+import { api } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface LiveSessionsProps {
   professorId: string;
 }
 
 const LiveSessions = ({ professorId }: LiveSessionsProps) => {
-  const { user } = useAuth();
-  console.log('[DEBUG] user:', user);
-  const navigate = useNavigate();
   const [sessions, setSessions] = useState<LiveSession[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [sessionTimers, setSessionTimers] = useState<{[key: string]: string}>({});
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    courseId: '',
-    scheduledAt: '',
-    duration: 60,
-    presenter: user?.name || '',
-    price: 0,
-    currency: 'DZD',
-    isPaid: false,
-  });
-
-  // Real-time timer effect
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // Calculate timers for all sessions
-  useEffect(() => {
-    const timers: {[key: string]: string} = {};
-    
-    sessions.forEach(session => {
-      if (!session.start_time) {
-        timers[session.id] = '';
-        return;
-      }
-
-      const sessionTime = new Date(session.start_time);
-      const sessionEndTime = new Date(sessionTime.getTime() + (session.duration || 60) * 60 * 1000);
-      
-      // Check if session is manually ended
-      if (session.status === 'ended' || session.is_ended) {
-        timers[session.id] = 'منتهي';
-        return;
-      }
-
-      if (currentTime < sessionTime) {
-        // Session hasn't started yet
-        const timeDiff = sessionTime.getTime() - currentTime.getTime();
-        const hours = Math.floor(timeDiff / (1000 * 60 * 60));
-        const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
-        
-        if (hours > 0) {
-          timers[session.id] = `${hours}h ${minutes}m`;
-        } else if (minutes > 0) {
-          timers[session.id] = `${minutes}m ${seconds}s`;
-        } else {
-          timers[session.id] = `${seconds}s`;
-        }
-      } else if (currentTime >= sessionTime && currentTime <= sessionEndTime) {
-        // Session is live
-        timers[session.id] = 'مباشر الآن';
-      } else {
-        // Session has ended
-        timers[session.id] = 'منتهي';
-      }
-    });
-    
-    setSessionTimers(timers);
-  }, [currentTime, sessions]);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
-    if (!professorId) return;
     fetchSessions();
     fetchNotifications();
   }, [professorId]);
+
+  // Sort sessions so 'live' are at the top
+  const sortedSessions = [...sessions].sort((a, b) => {
+    if (a.status === 'live' && b.status !== 'live') return -1;
+    if (a.status !== 'live' && b.status === 'live') return 1;
+    return 0;
+  });
+
+  // Broadcast 'hasLiveNow' to sidebar
+  useEffect(() => {
+    const hasLiveNow = sessions.some(s => s.status === 'live');
+    localStorage.setItem('professorHasLiveNow', hasLiveNow ? '1' : '0');
+    window.dispatchEvent(new CustomEvent('professorLiveNowChanged', { detail: { hasLiveNow } }));
+  }, [sessions]);
+
+  // Automatic status management
+  const checkAndUpdateSessionStatus = async (session: LiveSession) => {
+    const now = new Date();
+    const sessionStartTime = new Date(session.start_time || session.scheduledAt);
+    const sessionEndTime = new Date(sessionStartTime.getTime() + (session.duration || 60) * 60 * 1000);
+    
+    let newStatus = session.status;
+    
+    // Check if session should be live
+    if (session.status === 'scheduled' && now >= sessionStartTime && now <= sessionEndTime) {
+      newStatus = 'live';
+    }
+    // Check if session should be ended
+    else if (session.status === 'live' && now > sessionEndTime) {
+      newStatus = 'ended';
+    }
+    
+    // Update status if it changed
+    if (newStatus !== session.status) {
+      try {
+        await api.updateLiveSessionStatus(session.id, newStatus);
+        console.log(`Session ${session.id} status automatically updated to: ${newStatus}`);
+        // Refresh sessions to get updated status
+        fetchSessions();
+      } catch (error) {
+        console.error(`Failed to update session ${session.id} status:`, error);
+      }
+    }
+  };
+
+  // Check all sessions for status updates
+  useEffect(() => {
+    if (sessions.length === 0) return;
+    
+    const checkAllSessions = () => {
+      sessions.forEach(session => {
+        checkAndUpdateSessionStatus(session);
+      });
+    };
+    
+    // Check immediately
+    checkAllSessions();
+    
+    // Check every 30 seconds
+    const interval = setInterval(checkAllSessions, 30000);
+    
+    return () => clearInterval(interval);
+  }, [sessions]);
 
   // Refresh sessions every 30 seconds to get updated status
   useEffect(() => {
@@ -118,9 +106,13 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
       setSessions(data);
     } catch (error) {
       console.error('Failed to fetch live sessions:', error);
-      toast.error('Failed to load live sessions');
+      toast({
+        title: "Error",
+        description: "Failed to load live sessions",
+        variant: "destructive",
+      });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -135,61 +127,22 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
   };
 
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!professorId) {
-      toast.error('Professor ID is missing. Please log in again.');
-      return;
-    }
-    // Validate required fields
-    if (!formData.title || !formData.scheduledAt || !formData.duration || formData.price === undefined || formData.price === null || formData.price === "") {
-      toast.error('Please fill in all required fields: title, scheduled date, duration, and price.');
-      return;
-    }
-
-    try {
-      // Only send the required fields to the backend
-      const payload = {
-        title: formData.title,
-        start_time: formData.scheduledAt,
-        duration: formData.duration,
-        price: formData.price,
-      };
-      console.log('[DEBUG] Creating live session with payload:', payload);
-      await api.createLiveSession({ ...payload, professorId });
-      toast.success('Live session scheduled successfully');
-      await fetchSessions();
-      resetForm();
-      setIsDialogOpen(false);
-    } catch (error) {
-      console.error('Failed to create live session:', error);
-      toast.error('Failed to schedule live session');
-    }
-  };
-
   const handleStartSession = async (sessionId: string) => {
     try {
       await api.updateLiveSessionStatus(sessionId, 'live');
-      toast.success('Live session started successfully');
+      toast({
+        title: "Success",
+        description: "Live session started successfully",
+      });
       navigate(`/streaming/${sessionId}`);
     } catch (error) {
       console.error('Failed to start live session:', error);
-      toast.error('Failed to start live session');
+      toast({
+        title: "Error",
+        description: "Failed to start live session",
+        variant: "destructive",
+      });
     }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      title: '',
-      description: '',
-      courseId: '',
-      scheduledAt: '',
-      duration: 60,
-      presenter: user?.name || '',
-      price: 0,
-      currency: 'DZD',
-      isPaid: false,
-    });
   };
 
   const getStatusColor = (status: LiveSession['status']) => {
@@ -204,32 +157,19 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
   };
 
   const getSessionStatus = (session: LiveSession) => {
-    if (!session.start_time) return 'scheduled';
-    
-    const sessionTime = new Date(session.start_time);
-    const sessionEndTime = new Date(sessionTime.getTime() + (session.duration || 60) * 60 * 1000);
-    
     // Check if session is manually ended
-    if (session.status === 'ended' || session.is_ended) {
+    if (session.status === 'ended' || session.status === 'cancelled') {
       return 'ended';
     }
 
-    if (currentTime < sessionTime) {
-      return 'upcoming';
-    } else if (currentTime >= sessionTime && currentTime <= sessionEndTime) {
-      return 'live';
-    } else {
-      return 'ended';
-    }
+    // For now, return the session status as is
+    return session.status || 'scheduled';
   };
 
   const canStartSession = (session: LiveSession) => {
-    if (!session.start_time) return false;
-    const sessionTime = new Date(session.start_time);
-    const now = new Date();
-    const timeDiff = sessionTime.getTime() - now.getTime();
-    const minutesUntilStart = timeDiff / (1000 * 60);
-    return minutesUntilStart <= 15 && minutesUntilStart >= -session.duration;
+    // Add logic to determine if session can be started
+    // For now, allow starting if status is 'scheduled'
+    return session.status === 'scheduled';
   };
 
   // Helper to get status badge
@@ -243,7 +183,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
     return <Badge className="bg-yellow-500 text-black">Pending Approval</Badge>;
   };
 
-  if (isLoading) {
+  if (loading) {
     return <div className="py-8 text-center">Loading live sessions...</div>;
   }
 
@@ -256,134 +196,30 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
           <p className="text-gray-600">Schedule and manage your live teaching sessions</p>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="h-4 w-4 mr-2" />
-              Schedule Session
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Schedule Live Session</DialogTitle>
-              <DialogDescription>
-                Create a new live teaching session for your students.
-              </DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Session Title</Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="Introduction to React Hooks"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="What will be covered in this session?"
-                  rows={3}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="scheduledAt">Scheduled Date & Time</Label>
-                  <Input
-                    id="scheduledAt"
-                    type="datetime-local"
-                    value={formData.scheduledAt}
-                    onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="duration">Duration (minutes)</Label>
-                  <Input
-                    id="duration"
-                    type="number"
-                    min="15"
-                    max="300"
-                    value={formData.duration}
-                    onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
-                    required
-                  />
-                </div>
-              </div>
-              {/* <div className="space-y-2">
-                <Label htmlFor="presenter">Presenter Name</Label>
-                <Input
-                  id="presenter"
-                  value={formData.presenter}
-                  onChange={(e) => setFormData({ ...formData, presenter: e.target.value })}
-                  placeholder="Prof. John Doe"
-                  required
-                />
-              </div> */}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="price">Price</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    min="0"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="currency">Currency</Label>
-                  <Input
-                    id="currency"
-                    value={formData.currency}
-                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                  />
-                </div>
-              </div>
-
-
-
-
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  Schedule Session
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => navigate('/professor/create-live-session')}>
+          <Plus className="h-4 w-4 mr-2" />
+          Schedule Session
+        </Button>
       </div>
 
       <div className="grid gap-4">
-        {sessions.length === 0 ? (
-          <Card>
-            <CardContent className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <Video className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900">No live sessions scheduled</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Schedule your first live session to start teaching.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-2 text-gray-600">Loading live sessions...</p>
+          </div>
+        ) : sortedSessions.length === 0 ? (
+          <div className="text-center py-8">
+            <Video className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Live Sessions</h3>
+            <p className="text-gray-600 mb-4">You haven't created any live sessions yet.</p>
+            <Button onClick={() => navigate('/professor/create-live-session')}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Your First Live Session
+            </Button>
+          </div>
         ) : (
-          sessions.map((session) => (
+          sortedSessions.map((session) => (
             <Card key={session.id}>
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -458,7 +294,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                     {new Date(session.start_time || session.scheduledAt).toLocaleTimeString()} ({session.duration} min)
                   </div>
                   {/* Timer Display */}
-                  {sessionTimers[session.id] && (
+                  {/* sessionTimers[session.id] && (
                     <div className={`flex items-center gap-1 ${
                       getSessionStatus(session) === 'live' ? 'text-blue-600 font-semibold' :
                       getSessionStatus(session) === 'ended' ? 'text-gray-500' :
@@ -467,7 +303,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                       <Timer className="h-4 w-4" />
                       <span className="font-mono">{sessionTimers[session.id]}</span>
                     </div>
-                  )}
+                  ) */}
                 </div>
 
                 {session.meetingUrl && (

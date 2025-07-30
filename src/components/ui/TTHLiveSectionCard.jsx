@@ -51,9 +51,14 @@ const LiveSectionCard = ({ section }) => {
       alert('يجب أن تكون مسجلاً كطالب لشراء هذه الجلسة.');
       return;
     }
-    if (!window.confirm('هل أنت متأكد أنك تريد شراء هذه الجلسة بالنقاط؟')) {
-      return;
+    
+    // For free live sections, don't ask for confirmation
+    if (section.price && section.price > 0) {
+      if (!window.confirm('هل أنت متأكد أنك تريد شراء هذه الجلسة بالنقاط؟')) {
+        return;
+      }
     }
+    
     setBuyLoading(true);
     setBuyError(null);
     setBuySuccess(false);
@@ -163,7 +168,7 @@ const LiveSectionCard = ({ section }) => {
           </div>
         </div>
         {/* Buy with points button and messages */}
-        {user && user.role === 'student' && section.price && section.price > 0 && !purchased && (
+        {user && user.role === 'student' && !purchased && (
           <div className="mt-4 flex flex-col gap-2">
             <button
               className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-extrabold text-lg shadow-lg transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
@@ -174,7 +179,7 @@ const LiveSectionCard = ({ section }) => {
                 <span className="flex items-center justify-center gap-2">
                   <Loader2 className="w-5 h-5 animate-spin" /> جاري الشراء...
                 </span>
-              ) : 'شراء الجلسة بالنقاط'}
+              ) : !section.price || section.price === 0 || section.price === '0' ? 'احصل عليه مجاناً' : 'شراء الجلسة بالنقاط'}
             </button>
             {buyError && (
               <div className="flex items-center justify-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded p-2 text-sm font-bold mt-1">
@@ -189,7 +194,7 @@ const LiveSectionCard = ({ section }) => {
           </div>
         )}
         {/* If not logged in, show buy button that redirects to login after alert */}
-        {!user && section.price && section.price > 0 && !purchased && (
+        {!user && !purchased && (
           <div className="mt-4 flex flex-col gap-2">
             <button
               className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-extrabold text-lg shadow-lg transition-all duration-300"
@@ -199,7 +204,7 @@ const LiveSectionCard = ({ section }) => {
                 window.location.href = '/login';
               }}
             >
-              شراء الجلسة بالنقاط
+              {!section.price || section.price === 0 || section.price === '0' ? 'احصل عليه مجاناً' : 'شراء الجلسة بالنقاط'}
             </button>
           </div>
         )}
