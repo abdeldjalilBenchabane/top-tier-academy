@@ -85,8 +85,13 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
           try {
             const date = new Date(session.scheduledAt);
             if (!isNaN(date.getTime())) {
-              // Format as YYYY-MM-DDTHH:MM for datetime-local input
-              formattedScheduledAt = date.toISOString().slice(0, 16);
+              // Format as YYYY-MM-DDTHH:MM for datetime-local input using local timezone
+              const year = date.getFullYear();
+              const month = String(date.getMonth() + 1).padStart(2, '0');
+              const day = String(date.getDate()).padStart(2, '0');
+              const hours = String(date.getHours()).padStart(2, '0');
+              const minutes = String(date.getMinutes()).padStart(2, '0');
+              formattedScheduledAt = `${year}-${month}-${day}T${hours}:${minutes}`;
             }
           } catch (error) {
             console.error('[DEBUG] Error formatting date:', session.scheduledAt, error);
@@ -165,11 +170,18 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
   const addLiveSessionBlock = (sectionId: string) => {
     const blockId = `block_${Date.now()}${Math.random().toString(36).substring(2, 9)}`;
     
-    // Set default date/time to tomorrow at 10:00 AM
+    // Set default date/time to tomorrow at 10:00 AM using local timezone
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(10, 0, 0, 0);
-    const defaultDateTime = tomorrow.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:MM
+    
+    // Format as YYYY-MM-DDTHH:MM using local timezone
+    const year = tomorrow.getFullYear();
+    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const day = String(tomorrow.getDate()).padStart(2, '0');
+    const hours = String(tomorrow.getHours()).padStart(2, '0');
+    const minutes = String(tomorrow.getMinutes()).padStart(2, '0');
+    const defaultDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
     
     setSections(
       sections.map(section => {
