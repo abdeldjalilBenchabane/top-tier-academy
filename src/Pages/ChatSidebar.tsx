@@ -40,9 +40,20 @@ const ChatSidebar: React.FC<Props> = ({
         }
     }, [input]);
 
+    // Auto-scroll to bottom when new messages arrive
+    useEffect(() => {
+        if (chatEndRef.current) {
+            // Scroll only within the chat container, not the whole page
+            const chatContainer = chatEndRef.current.closest('.overflow-y-auto');
+            if (chatContainer) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        }
+    }, [messages]);
+
     return (
         <>
-            <style jsx>{`
+            <style>{`
                 .scrollbar-hide {
                     -ms-overflow-style: none;  /* Internet Explorer 10+ */
                     scrollbar-width: none;  /* Firefox */
@@ -80,7 +91,7 @@ const ChatSidebar: React.FC<Props> = ({
                     <textarea
                         ref={textareaRef}
                         placeholder={chatEnabled ? "اكتب رسالتك..." : "الدردشة مغلقة"}
-                        className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none break-words whitespace-pre-line min-h-[40px] text-base sm:text-lg"
+                        className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none break-words whitespace-pre-line min-h-[40px] text-base sm:text-lg scrollbar-hide"
                         value={input}
                         onChange={e => setInput(e.target.value)}
                         onKeyDown={e => {

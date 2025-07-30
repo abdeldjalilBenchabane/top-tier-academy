@@ -10,7 +10,7 @@ import { api } from '@/lib/api';
 import ChatSidebar from './ChatSidebar';
 
 // Import chat notification APIs
-import { getChatNotifications, markChatAsSeen, incrementUnseenCount } from '@/services/api';
+import { getChatNotifications, markChatAsSeen, incrementUnseenCount, getChatMessages } from '@/services/api';
 
 // Telegram icon component
 const TelegramIcon = ({ className }: { className?: string }) => (
@@ -37,7 +37,6 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     const [chatEnabled, setChatEnabled] = useState(true);
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
-    const chatEndRef = useRef(null);
     const [studentsMuted, setStudentsMuted] = useState(true);
     const [agoraToken, setAgoraToken] = useState<string | null>(null);
     const [agoraError, setAgoraError] = useState<string | null>(null);
@@ -61,6 +60,9 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
     // Socket.IO for chat
     const [socket, setSocket] = useState<Socket | null>(null);
+    
+    // Ref for fullscreen chat auto-scroll
+    const fullscreenChatEndRef = useRef<HTMLDivElement>(null);
 
     const [studentMuteStates, setStudentMuteStates] = useState<{ [key: string]: boolean }>({});
 
@@ -95,12 +97,17 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     const role = user?.role === 'professor' ? 'host' : 'audience';
     const isProfessor = role === 'host';
 
-    // Scroll chat to bottom on new message
+    // Auto-scroll fullscreen chat to bottom when new messages arrive
     useEffect(() => {
-        if (chatEndRef.current) {
-            chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        if (fullscreenChatEndRef.current && showFullscreenChat && isFullScreen) {
+            const chatContainer = fullscreenChatEndRef.current.closest('.overflow-y-auto');
+            if (chatContainer) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
         }
-    }, [messages]);
+    }, [messages, showFullscreenChat, isFullScreen]);
+
+
 
     // TODO: Integrate Agora SDK here
     // useEffect(() => { ... }, [role, id]);
@@ -206,6 +213,29 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
             avatar_url: user.avatar_url,
             socketId: newSocket.id
         });
+
+        // Load old messages from database
+        const loadOldMessages = async () => {
+            try {
+                const data = await getChatMessages(id);
+                if (data.success && data.messages) {
+                    const formattedMessages = data.messages.map(msg => ({
+                        sender: msg.user_name,
+                        color: msg.user_id === user.id ? 'text-green-300' : 'text-blue-300',
+                        text: msg.message_text,
+                        id: msg.id,
+                        timestamp: msg.timestamp
+                    }));
+                    setMessages(formattedMessages);
+                    console.log('[DEBUG] Loaded', formattedMessages.length, 'old messages');
+                }
+            } catch (error) {
+                console.error('[DEBUG] Error loading old messages:', error);
+            }
+        };
+
+        // Load old messages after joining the room
+        loadOldMessages();
 
         // Listen for new messages
         newSocket.on('new-message', async (messageData) => {
@@ -427,6 +457,16 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         });
 
         setInput('');
+        
+        // Immediately scroll fullscreen chat to bottom for better UX
+        if (showFullscreenChat && isFullScreen && fullscreenChatEndRef.current) {
+            setTimeout(() => {
+                const chatContainer = fullscreenChatEndRef.current?.closest('.overflow-y-auto');
+                if (chatContainer) {
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+            }, 100);
+        }
     };
 
     // Professor controls (Socket.IO only)
@@ -786,7 +826,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                             {!chatEnabled && <span className="ml-2 text-xs text-red-400">الدردشة مغلقة من قبل الأستاذ</span>}
                                         </div>
 
-                                        <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+                                        <div className="flex-1 overflow-y-auto space-y-3 mb-4 scrollbar-hide">
                                             {messages.length === 0 ? (
                                                 <div className="text-center text-gray-400 py-8">
                                                     <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -801,6 +841,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                                     </div>
                                                 ))
                                             )}
+                                            <div ref={fullscreenChatEndRef}></div>
                                         </div>
 
                                         <div className="flex items-center gap-2">

@@ -26,6 +26,7 @@ import quizzesRoutes from './routes/quizzes.js';
 import adminRoutes from './routes/admin.js';
 import professorRoutes from './routes/professor.js';
 import chatNotificationsRouter from './routes/chat-notifications.js';
+import chatMessagesRouter from './routes/chat-messages.js';
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 
@@ -103,6 +104,7 @@ app.use('/api/quizzes', quizzesRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/professor', professorRoutes);
 app.use('/api/chat-notifications', chatNotificationsRouter);
+app.use('/api/chat-messages', chatMessagesRouter);
 
 // Socket.IO chat functionality
 io.on('connection', (socket) => {
@@ -172,16 +174,47 @@ io.on('connection', (socket) => {
   });
 
   // Handle chat messages
-  socket.on('send-message', (roomId, messageData) => {
+  socket.on('send-message', async (roomId, messageData) => {
     console.log('Message received in room', roomId, ':', messageData);
 
-    // Broadcast message to all users in the room
-    io.to(roomId).emit('new-message', {
-      id: socket.id,
-      sender: messageData.sender,
-      text: messageData.text,
-      timestamp: new Date().toISOString()
-    });
+    try {
+      // Save message to database
+      const query = `
+        INSERT INTO chat_messages (session_id, user_id, user_name, user_role, message_text)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *
+      `;
+      
+      const values = [
+        roomId, 
+        socket.userData.id, 
+        messageData.sender, 
+        socket.userData.role || 'student', 
+        messageData.text
+      ];
+      
+      const result = await pool.query(query, values);
+      const savedMessage = result.rows[0];
+
+      // Broadcast message to all users in the room
+      io.to(roomId).emit('new-message', {
+        id: socket.id,
+        sender: messageData.sender,
+        text: messageData.text,
+        timestamp: savedMessage.timestamp,
+        messageId: savedMessage.id
+      });
+      
+    } catch (error) {
+      console.error('Error saving chat message to database:', error);
+      // Still broadcast the message even if database save fails
+      io.to(roomId).emit('new-message', {
+        id: socket.id,
+        sender: messageData.sender,
+        text: messageData.text,
+        timestamp: new Date().toISOString()
+      });
+    }
   });
 
   // Handle professor controls

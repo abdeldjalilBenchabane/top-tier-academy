@@ -534,4 +534,24 @@ export const incrementUnseenCount = async (sessionId) => {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     });
     return response.json();
+};
+
+// Chat Messages API
+export const getChatMessages = async (sessionId) => {
+    const response = await fetch(`/api/chat-messages/${sessionId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    return response.json();
+};
+
+export const saveChatMessage = async (sessionId, messageText) => {
+    const response = await fetch(`/api/chat-messages/${sessionId}`, {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('token')}` 
+        },
+        body: JSON.stringify({ message_text: messageText })
+    });
+    return response.json();
 }; 

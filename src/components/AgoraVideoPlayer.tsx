@@ -482,7 +482,7 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
                     </div>
                 )}
                 {role === 'audience' && !isLocalMicMuted && (
-                    <div className="absolute top-2 left-2 bg-green-600 text-white px-3 py-1 rounded-full text-xs z-50">الميكروفون نشط</div>
+                    <div className="absolute top-2 right-2 bg-green-600 text-white px-3 py-1 rounded-full text-xs z-50">الميكروفون نشط</div>
                 )}
             </div>
         </div>
