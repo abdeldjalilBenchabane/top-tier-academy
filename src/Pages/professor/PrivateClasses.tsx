@@ -12,6 +12,8 @@ const ProfessorPrivateClasses = () => {
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
   const [selectedTime, setSelectedTime] = useState('16:00 - 17:30');
   const [showTimeModal, setShowTimeModal] = useState(false);
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
   // New: store the session being edited (for edit time)
   const [editMode, setEditMode] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
@@ -139,18 +141,30 @@ const ProfessorPrivateClasses = () => {
     }
   };
 
-  const handleRefuse = async (requestId: number) => {
+  const handleRefuse = (requestId: number) => {
+    setSelectedRequestId(requestId);
+    setRejectionReason('');
+    setShowRejectionModal(true);
+  };
+
+  const handleConfirmReject = async () => {
+    if (!selectedRequestId) return;
     setActionLoading(true);
     try {
-      const response = await fetch(`/api/private-class-requests/${requestId}/status`, {
+      const response = await fetch(`/api/private-class-requests/${selectedRequestId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ status: 'مرفوض' })
+        body: JSON.stringify({ 
+          status: 'مرفوض',
+          rejection_reason: rejectionReason || 'تم رفض الطلب من قبل المدرس'
+        })
       });
       if (response.ok) {
+        setShowRejectionModal(false);
+        setRejectionReason('');
         fetchRequests();
       }
     } finally {
@@ -309,6 +323,47 @@ const ProfessorPrivateClasses = () => {
                 disabled={actionLoading}
               >
                 {editMode ? 'تحديث التوقيت' : 'تأكيد القبول'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection reason modal */}
+      {showRejectionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-8 max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4 text-red-700">سبب رفض الطلب</h2>
+            
+            <div className="mb-4">
+              <label className="block mb-2 text-gray-700">أدخل سبب الرفض (اختياري):</label>
+              <textarea
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 h-24 resize-none"
+                placeholder="اكتب سبب رفض الطلب هنا..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+              />
+            </div>
+            
+            <div className="text-sm text-gray-600 mb-4">
+              <p>• إذا لم تكتب سبباً، سيتم استخدام السبب الافتراضي</p>
+              <p>• سيتم إعلام الطالب بذلك</p>
+            </div>
+            
+            <div className="flex gap-4 justify-end">
+              <button
+                className="px-4 py-2 bg-gray-300 rounded-lg font-bold"
+                onClick={() => { setShowRejectionModal(false); setRejectionReason(''); }}
+                disabled={actionLoading}
+              >
+                إلغاء
+              </button>
+              <button
+                className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition"
+                onClick={handleConfirmReject}
+                disabled={actionLoading}
+              >
+                رفض الطلب
               </button>
             </div>
           </div>

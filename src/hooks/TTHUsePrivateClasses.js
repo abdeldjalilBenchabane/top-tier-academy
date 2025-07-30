@@ -276,7 +276,6 @@ export const usePrivateClasses = () => {
         if (response.ok) {
           const data = await response.json();
           const transformedRequests = data.requests
-            .filter(request => request.status !== 'مرفوض')
             .map(request => ({
               id: request.id,
               title: request.title,
@@ -295,7 +294,8 @@ export const usePrivateClasses = () => {
               payment_status: request.payment_status,
               payment_date: request.payment_date,
               points_used: request.points_used,
-              price_per_session: request.price_per_session
+              price_per_session: request.price_per_session,
+              rejection_reason: request.rejection_reason
             }));
           setMyPendingRequests(transformedRequests);
         } else {
@@ -534,8 +534,8 @@ export const usePrivateClasses = () => {
     setSelectedSession(null);
   };
 
-  // Use only dynamic data from database
-  const filteredSessions = allOrders;
+  // Use only dynamic data from database, but exclude rejected requests for other students
+  const filteredSessions = allOrders.filter(session => session.status !== 'مرفوض');
 
   return {
     selectedLevel,

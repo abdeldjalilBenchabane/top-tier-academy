@@ -271,6 +271,16 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
         {isProfessor && session.status === 'مرفوض' && (
           <div className="text-red-700 font-bold text-center mt-2">تم رفض الطلب</div>
         )}
+        {!isProfessor && session.status === 'مرفوض' && (
+          <div className="text-center mt-2">
+            <div className="text-red-700 font-bold">تم رفض الطلب</div>
+            {session.rejection_reason && (
+              <div className="text-red-600 text-sm mt-1 p-2 bg-red-50 rounded-lg border border-red-200">
+                <strong>سبب الرفض:</strong> {session.rejection_reason}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Join/Start Live Button & Countdown - Show for all sessions but enable only when confirmed and time selected */}
         {(isProfessor || isMySession) && (

@@ -9,6 +9,7 @@ import { AvatarProvider } from './contexts/AvatarContext';
 import { PendingCountProvider } from './contexts/PendingCountContext';
 import { LiveSessionsCountProvider } from './contexts/LiveSessionsCountContext';
 import { PendingQuizzesCountProvider } from './contexts/PendingQuizzesCountContext';
+import { PendingPrivateClassesCountProvider } from './contexts/PendingPrivateClassesCountContext';
 import AdminPointCodes from './Pages/admin/PointCodes';
 import PrivateClasses from './Pages/admin/PrivateClasses';
 import PricingManagement from './Pages/admin/PricingManagement';
@@ -106,95 +107,97 @@ const App: React.FC = () => {
           <PendingCountProvider>
             <LiveSessionsCountProvider>
               <PendingQuizzesCountProvider>
-                <TooltipProvider>
-                  <Toaster />
-                  <Sonner />
-                  <BrowserRouter>
-                    <Routes>
-                      {/* TTH always public */}
-                      <Route path="/" element={<TTHHome />} />
-                      <Route path="/register" element={<TTHFormulair />} />
-                      <Route path="/login" element={<TTHLogin />} />
-                      <Route path="/forgot-password" element={<TTHForgotPassword />} />
-                      <Route path="/reset-password" element={<TTHResetPassword />} />
-                      <Route path="/description" element={<TTHCourseDetail />} />
-                      <Route path="/TTHStudentDashboard" element={<TTHStudentDashboard />} />
-                      <Route path="/TTHCourses" element={<TTHCourses />} />
-                      <Route path="/TTHLanguages" element={<TTHLanguages />} />
-                      <Route path="/TTHLiveClasses" element={<TTHLiveClasses />} />
-                      <Route path="/streaming/:id" element={<Streaming />} />
-                      <Route path="/TTHSession" element={<TTHSession />} />
-                      <Route path="/TTHPrivateClasses" element={<TTHPrivateClasses />} />
-                      <Route path="/TTHTeacherProfile" element={<TTHTeacherProfile />} />
-                      <Route path="/profile" element={<TTHStudentDashboard />} />
-                      <Route path="/coursesList/courses/:id" element={<TTHCourseDetail />} />
-                      <Route path="/TTHLanguages/livesection/:id" element={<LiveSessionDetails />} />
-                      <Route path="/TTHStudentDashboard" element={<TTHStudentDashboard />} />
-                      <Route path="/points" element={<PointsPurchase />} />
-                      <Route path="/points/success" element={<PointsSuccess />} />
-                      <Route path="/points/failure" element={<PointsFailure />} />
-                      <Route path="/points/history" element={<PointsHistory />} />
-                      <Route path="/quiz/:quizId" element={<QuizTaking />} />
+                <PendingPrivateClassesCountProvider>
+                  <TooltipProvider>
+                    <Toaster />
+                    <Sonner />
+                    <BrowserRouter>
+                      <Routes>
+                        {/* TTH always public */}
+                        <Route path="/" element={<TTHHome />} />
+                        <Route path="/register" element={<TTHFormulair />} />
+                        <Route path="/login" element={<TTHLogin />} />
+                        <Route path="/forgot-password" element={<TTHForgotPassword />} />
+                        <Route path="/reset-password" element={<TTHResetPassword />} />
+                        <Route path="/description" element={<TTHCourseDetail />} />
+                        <Route path="/TTHStudentDashboard" element={<TTHStudentDashboard />} />
+                        <Route path="/TTHCourses" element={<TTHCourses />} />
+                        <Route path="/TTHLanguages" element={<TTHLanguages />} />
+                        <Route path="/TTHLiveClasses" element={<TTHLiveClasses />} />
+                        <Route path="/streaming/:id" element={<Streaming />} />
+                        <Route path="/TTHSession" element={<TTHSession />} />
+                        <Route path="/TTHPrivateClasses" element={<TTHPrivateClasses />} />
+                        <Route path="/TTHTeacherProfile" element={<TTHTeacherProfile />} />
+                        <Route path="/profile" element={<TTHStudentDashboard />} />
+                        <Route path="/coursesList/courses/:id" element={<TTHCourseDetail />} />
+                        <Route path="/TTHLanguages/livesection/:id" element={<LiveSessionDetails />} />
+                        <Route path="/TTHStudentDashboard" element={<TTHStudentDashboard />} />
+                        <Route path="/points" element={<PointsPurchase />} />
+                        <Route path="/points/success" element={<PointsSuccess />} />
+                        <Route path="/points/failure" element={<PointsFailure />} />
+                        <Route path="/points/history" element={<PointsHistory />} />
+                        <Route path="/quiz/:quizId" element={<QuizTaking />} />
 
 
-                      {/* Schoolhouse public */}
-                      <Route path="/schoolhouse/login" element={<Login />} />
-                      <Route path="/schoolhouse/forgot-password" element={<ForgotPassword />} />
-                      <Route path="/schoolhouse/reset-password" element={<ResetPassword />} />
-                      <Route path="/schoolhouse" element={<Index />} />
+                        {/* Schoolhouse public */}
+                        <Route path="/schoolhouse/login" element={<Login />} />
+                        <Route path="/schoolhouse/forgot-password" element={<ForgotPassword />} />
+                        <Route path="/schoolhouse/reset-password" element={<ResetPassword />} />
+                        <Route path="/schoolhouse" element={<Index />} />
 
-                      {/* Admin (protected) */}
-                      <Route path="/admin/*" element={<AppLayout />}>
-                        <Route path="dashboard" element={<AdminDashboard />} />
-                        <Route path="structure" element={<AdminStructure />} />
-                        <Route path="pending" element={<AdminPending />} />
-                        <Route path="courses" element={<AdminCourses />} />
-                        <Route path="courses/:courseId" element={<AdminCourseDetails />} />
-                        <Route path="course-files" element={<CourseFilesPage />} />
-                        <Route path="quizzes" element={<QuizManagement />} />
-                        <Route path="users" element={<UserManagement />} />
-                        <Route path="slides" element={<HomepageSlides />} />
-                        <Route path="enhanced-slides" element={<EnhancedHomepageSlides />} />
-                        <Route path="live-sessions" element={<LiveSessionsOverview />} />
-                        <Route path="settings" element={<AdminSettings />} />
-                        <Route path="points" element={<AdminPoints />} />
-                        <Route path="point-codes" element={<AdminPointCodes />} />
-                        <Route path="point-transactions" element={<AdminPointTransactions />} />
-                        <Route path="private-class-settings" element={<AdminPrivateClassSettings />} />
-                        <Route path="private-classes" element={<PrivateClasses />} />
-                        <Route path="homepage-materials" element={<HomepageMaterials />} />
-                        <Route path="footer-content" element={<FooterContent />} />
-                        <Route path="pricing" element={<PricingManagement />} />
-                        <Route path="earnings" element={<EarningsAnalytics />} />
-                      </Route>
+                        {/* Admin (protected) */}
+                        <Route path="/admin/*" element={<AppLayout />}>
+                          <Route path="dashboard" element={<AdminDashboard />} />
+                          <Route path="structure" element={<AdminStructure />} />
+                          <Route path="pending" element={<AdminPending />} />
+                          <Route path="courses" element={<AdminCourses />} />
+                          <Route path="courses/:courseId" element={<AdminCourseDetails />} />
+                          <Route path="course-files" element={<CourseFilesPage />} />
+                          <Route path="quizzes" element={<QuizManagement />} />
+                          <Route path="users" element={<UserManagement />} />
+                          <Route path="slides" element={<HomepageSlides />} />
+                          <Route path="enhanced-slides" element={<EnhancedHomepageSlides />} />
+                          <Route path="live-sessions" element={<LiveSessionsOverview />} />
+                          <Route path="settings" element={<AdminSettings />} />
+                          <Route path="points" element={<AdminPoints />} />
+                          <Route path="point-codes" element={<AdminPointCodes />} />
+                          <Route path="point-transactions" element={<AdminPointTransactions />} />
+                          <Route path="private-class-settings" element={<AdminPrivateClassSettings />} />
+                          <Route path="private-classes" element={<PrivateClasses />} />
+                          <Route path="homepage-materials" element={<HomepageMaterials />} />
+                          <Route path="footer-content" element={<FooterContent />} />
+                          <Route path="pricing" element={<PricingManagement />} />
+                          <Route path="earnings" element={<EarningsAnalytics />} />
+                        </Route>
 
-                      {/* Professor (protected) */}
-                      <Route path="/professor/*" element={<AppLayout />}>
-                        <Route path="dashboard" element={<ProfessorDashboard />} />
-                        <Route path="courses" element={<ProfessorCourses />} />
-                        <Route path="courses/:id" element={<ProfessorCourseDetails />} />
-                        <Route path="create" element={<ProfessorCreate />} />
+                        {/* Professor (protected) */}
+                        <Route path="/professor/*" element={<AppLayout />}>
+                          <Route path="dashboard" element={<ProfessorDashboard />} />
+                          <Route path="courses" element={<ProfessorCourses />} />
+                          <Route path="courses/:id" element={<ProfessorCourseDetails />} />
+                          <Route path="create" element={<ProfessorCreate />} />
 
 
-                        <Route path="live-sections" element={<LiveSectionsPage />} />
-                        <Route path="live-sessions" element={<LiveSessionsPage />} />
-                        <Route path="create-live-session" element={<CreateLiveSessionPage />} />
-                        <Route path="quiz" element={<QuizCreation />} />
-                        <Route path="edit-quiz/:id" element={<EditQuiz />} />
-                        <Route path="results" element={<QuizResults />} />
-                        <Route path="my-quizzes" element={<MyQuizzes />} />
-                        <Route path="settings" element={<ProfessorSettings />} />
-                        <Route path="comments" element={<CourseCommentsOverview />} />
-                        <Route path="comments/:courseId" element={<CourseComments />} />
-                        <Route path="private-classes" element={<ProfessorPrivateClasses />} />
-                        <Route path="my-students" element={<MyStudents />} />
-                      </Route>
+                          <Route path="live-sections" element={<LiveSectionsPage />} />
+                          <Route path="live-sessions" element={<LiveSessionsPage />} />
+                          <Route path="create-live-session" element={<CreateLiveSessionPage />} />
+                          <Route path="quiz" element={<QuizCreation />} />
+                          <Route path="edit-quiz/:id" element={<EditQuiz />} />
+                          <Route path="results" element={<QuizResults />} />
+                          <Route path="my-quizzes" element={<MyQuizzes />} />
+                          <Route path="settings" element={<ProfessorSettings />} />
+                          <Route path="comments" element={<CourseCommentsOverview />} />
+                          <Route path="comments/:courseId" element={<CourseComments />} />
+                          <Route path="private-classes" element={<ProfessorPrivateClasses />} />
+                          <Route path="my-students" element={<MyStudents />} />
+                        </Route>
 
-                      {/* Catch all */}
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </BrowserRouter>
-                </TooltipProvider>
+                        {/* Catch all */}
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </BrowserRouter>
+                  </TooltipProvider>
+                </PendingPrivateClassesCountProvider>
               </PendingQuizzesCountProvider>
             </LiveSessionsCountProvider>
           </PendingCountProvider>

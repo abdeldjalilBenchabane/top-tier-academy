@@ -4,6 +4,30 @@ import { verifyToken, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Get pending private classes count for professor
+router.get('/pending-private-classes-count', verifyToken, async (req, res) => {
+  try {
+    const professorId = req.user.id;
+    console.log('API called for professor ID:', professorId);
+    
+    const result = await getRows(`
+      SELECT COUNT(*) as count
+      FROM private_class_requests pcr
+      WHERE pcr.teacher_name = (SELECT name FROM users WHERE id = $1)
+      AND pcr.status = 'في الانتظار'
+    `, [professorId]);
+
+    console.log('Query result:', result);
+    const count = parseInt(result[0]?.count || 0);
+    console.log('Final count:', count);
+    
+    res.json({ count });
+  } catch (error) {
+    console.error('Error fetching pending private classes count:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get professor dashboard statistics
 router.get('/dashboard/stats', verifyToken, requireRole(['professor']), async (req, res) => {
   try {
@@ -328,6 +352,25 @@ router.get('/students', verifyToken, async (req, res) => {
     res.json({ students: allStudents });
   } catch (error) {
     console.error('Error fetching professor students:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get pending private classes count for professor
+router.get('/pending-private-classes-count', verifyToken, async (req, res) => {
+  try {
+    const professorId = req.user.id;
+    
+    const result = await getRows(`
+      SELECT COUNT(*) as count
+      FROM private_class_requests pcr
+      WHERE pcr.teacher_name = (SELECT name FROM users WHERE id = $1)
+      AND pcr.status = 'في الانتظار'
+    `, [professorId]);
+
+    res.json({ count: parseInt(result[0]?.count || 0) });
+  } catch (error) {
+    console.error('Error fetching pending private classes count:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
