@@ -225,7 +225,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     {/* Cover Image */}
-                    {session.cover_image_url && (
+                    {/* {session.cover_image_url && (
                       <div className="mb-3">
                         <img
                           src={session.cover_image_url}
@@ -236,7 +236,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                           }}
                         />
                       </div>
-                    )}
+                    )} */}
                     
                     <div className="flex items-center gap-2">
                       <CardTitle className="text-lg">{session.title}</CardTitle>

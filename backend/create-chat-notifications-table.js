@@ -18,7 +18,7 @@ async function createChatNotificationsTable() {
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER NOT NULL,
                 session_id VARCHAR(255) NOT NULL,
-                last_seen_message_id INTEGER DEFAULT 0,
+                last_seen_message_id VARCHAR(255) DEFAULT '0',
                 unseen_count INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

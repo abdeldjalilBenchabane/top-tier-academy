@@ -112,11 +112,9 @@ router.post('/professors/:professorId/live-sessions',
     try {
         // Handle file upload if present
         let cover_image_url = null;
-        if (req.files && req.files.length > 0) {
-            const coverFile = req.files.find(f => f.fieldname === 'cover_image');
-            if (coverFile) {
-                cover_image_url = `/uploads/live-sessions/${coverFile.filename}`;
-            }
+        if (req.file) {
+            cover_image_url = `/uploads/live-sessions/${req.file.filename}`;
+            console.log('[DEBUG] Cover image uploaded:', cover_image_url);
         }
 
         const result = await pool.query(
@@ -206,6 +204,7 @@ router.put('/live-sessions/:id', verifyToken, requireProfessor, (req, res, next)
             const coverFile = req.files.find(f => f.fieldname === 'cover_image');
             if (coverFile) {
                 cover_image_url = `/uploads/live-sessions/${coverFile.filename}`;
+                console.log('[DEBUG] Cover image uploaded for update:', cover_image_url);
             }
         }
 

@@ -13,7 +13,7 @@ async function addSampleCoverImages() {
     // Get all live sessions without cover images
     const result = await pool.query(`
       SELECT id, title FROM live_sessions 
-      WHERE cover_image IS NULL OR cover_image = ''
+      WHERE cover_image_url IS NULL OR cover_image_url = ''
     `);
     
     console.log(`📊 Found ${result.rows.length} live sessions without cover images`);
@@ -23,7 +23,7 @@ async function addSampleCoverImages() {
       const randomImage = sampleImages[i % sampleImages.length];
       
       await pool.query(
-        'UPDATE live_sessions SET cover_image = $1 WHERE id = $2',
+        'UPDATE live_sessions SET cover_image_url = $1 WHERE id = $2',
         [randomImage, session.id]
       );
       

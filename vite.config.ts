@@ -10,7 +10,8 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     proxy: {
       '/api': 'http://localhost:5001',
-      '/uploads': 'http://localhost:5001'
+      '/uploads': 'http://localhost:5001',
+      '/images': 'http://localhost:5001'
     }
   },
   plugins: [

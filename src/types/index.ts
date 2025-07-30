@@ -123,9 +123,10 @@ export type LiveSession = {
   courseId?: string;
   professorId: string;
   scheduledAt: string;
+  start_time?: string; // Add this for compatibility with backend
   duration: number;
   meetingUrl?: string;
-  status: 'scheduled' | 'live' | 'ended' | 'cancelled' | 'starting' | 'paused' | 'technical_issues';
+  status: 'scheduled' | 'live' | 'ended' | 'cancelled' | 'starting' | 'paused' | 'technical_issues' | 'upcoming';
   attendeesCount?: number;
   maxAttendees?: number;
   recordingUrl?: string;
