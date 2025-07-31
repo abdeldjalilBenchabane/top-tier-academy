@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/lib/toast';
 import { UserAvatar } from '@/components/ui/UserAvatar';
+import NotificationBell from '@/components/ui/NotificationBell';
 
 const Navbar = () => {
   const { user, logout, isAdmin } = useAuth();
@@ -40,6 +41,8 @@ const Navbar = () => {
           <span className="hidden md:block text-sm text-gray-600">
             {isAdmin ? 'Admin Dashboard' : 'Professor Dashboard'}
           </span>
+          
+          <NotificationBell />
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

@@ -142,6 +142,7 @@ export type LiveSession = {
   agoraToken?: string;
   price?: number;
   cover_image_url?: string;
+  rejectionReason?: string; // Add this for rejection functionality
 };
 
 export type Breadcrumb = {

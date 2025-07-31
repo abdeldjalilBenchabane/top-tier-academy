@@ -234,6 +234,46 @@ router.post('/live-sections/:sectionId/assign-path', verifyToken, requireProfess
     const values = [sectionId, ...Object.values(updateFields)];
     const result = await pool.query(query, values);
 
+    // Send notifications and emails for live section creation (when path is assigned)
+    try {
+      const NotificationService = (await import('../services/notificationService.js')).default;
+      const { sendLiveSectionCreatedEmailToAdmin } = await import('../services/emailService.js');
+      
+      // Get section information
+      const sectionRes = await pool.query('SELECT title, professor_id FROM live_sections WHERE id = $1', [sectionId]);
+      if (sectionRes.rows.length > 0) {
+        const section = sectionRes.rows[0];
+        
+        // Get professor information
+        const professorRes = await pool.query('SELECT name FROM users WHERE id = $1', [section.professor_id]);
+        const professor = professorRes.rows[0];
+        
+        // Send notifications to admins
+        await NotificationService.notifyLiveSectionCreated(
+          sectionId,
+          section.title,
+          professor.name,
+          section.professor_id
+        );
+        
+        // Send emails to admins
+        const adminRes = await pool.query('SELECT name, email FROM users WHERE role = $1', ['admin']);
+        for (const admin of adminRes.rows) {
+          await sendLiveSectionCreatedEmailToAdmin(
+            admin.email,
+            admin.name,
+            professor.name,
+            section.title
+          );
+        }
+        
+        console.log(`✅ Live section creation notifications and emails sent for section ${sectionId}`);
+      }
+    } catch (error) {
+      console.error('Error sending live section creation notifications/emails:', error);
+      // Don't fail the update if notifications fail
+    }
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error assigning path to live section:', error);
@@ -339,6 +379,49 @@ router.post('/admin/live-sections/:sectionId/approve', verifyToken, requireAdmin
     `;
 
     const result = await pool.query(query, [adminId, sectionId]);
+    
+    // Send notifications and emails for live section approval
+    try {
+      const NotificationService = (await import('../services/notificationService.js')).default;
+      const { sendLiveSectionApprovedEmailToProfessor } = await import('../services/emailService.js');
+      
+      // Get section information
+      const sectionRes = await pool.query('SELECT title, professor_id FROM live_sections WHERE id = $1', [sectionId]);
+      if (sectionRes.rows.length > 0) {
+        const section = sectionRes.rows[0];
+        
+        // Get professor information
+        const professorRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [section.professor_id]);
+        const professor = professorRes.rows[0];
+        
+        // Get admin information
+        const adminRes = await pool.query('SELECT name FROM users WHERE id = $1', [adminId]);
+        const admin = adminRes.rows[0];
+        
+        // Send notification to professor
+        await NotificationService.notifyLiveSectionApproved(
+          sectionId,
+          section.title,
+          section.professor_id,
+          professor.name,
+          admin.name
+        );
+        
+        // Send email to professor
+        await sendLiveSectionApprovedEmailToProfessor(
+          professor.email,
+          professor.name,
+          section.title,
+          admin.name
+        );
+        
+        console.log(`✅ Live section approval notifications and emails sent for section ${sectionId}`);
+      }
+    } catch (error) {
+      console.error('Error sending live section approval notifications/emails:', error);
+      // Don't fail the update if notifications fail
+    }
+    
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error approving live section:', error);
@@ -375,6 +458,51 @@ router.post('/admin/live-sections/:sectionId/reject', verifyToken, requireAdmin,
     `;
 
     const result = await pool.query(query, [adminId, reason, sectionId]);
+    
+    // Send notifications and emails for live section rejection
+    try {
+      const NotificationService = (await import('../services/notificationService.js')).default;
+      const { sendLiveSectionRejectedEmailToProfessor } = await import('../services/emailService.js');
+      
+      // Get section information
+      const sectionRes = await pool.query('SELECT title, professor_id FROM live_sections WHERE id = $1', [sectionId]);
+      if (sectionRes.rows.length > 0) {
+        const section = sectionRes.rows[0];
+        
+        // Get professor information
+        const professorRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [section.professor_id]);
+        const professor = professorRes.rows[0];
+        
+        // Get admin information
+        const adminRes = await pool.query('SELECT name FROM users WHERE id = $1', [adminId]);
+        const admin = adminRes.rows[0];
+        
+        // Send notification to professor
+        await NotificationService.notifyLiveSectionRejected(
+          sectionId,
+          section.title,
+          section.professor_id,
+          professor.name,
+          admin.name,
+          reason
+        );
+        
+        // Send email to professor
+        await sendLiveSectionRejectedEmailToProfessor(
+          professor.email,
+          professor.name,
+          section.title,
+          admin.name,
+          reason
+        );
+        
+        console.log(`✅ Live section rejection notifications and emails sent for section ${sectionId}`);
+      }
+    } catch (error) {
+      console.error('Error sending live section rejection notifications/emails:', error);
+      // Don't fail the update if notifications fail
+    }
+    
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error rejecting live section:', error);

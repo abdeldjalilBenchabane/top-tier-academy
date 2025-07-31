@@ -45,6 +45,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 
 const LiveSessionsOverview = () => {
   const [sessions, setSessions] = useState<LiveSession[]>([]);
@@ -56,6 +58,9 @@ const LiveSessionsOverview = () => {
   const [selectedApproval, setSelectedApproval] = useState<string>('all');
   const [approvingSession, setApprovingSession] = useState<string | null>(null);
   const [rejectingSession, setRejectingSession] = useState<string | null>(null);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [sessionToReject, setSessionToReject] = useState<LiveSession | null>(null);
   const { refreshLiveSessionsCount } = useLiveSessionsCount();
 
   useEffect(() => {
@@ -230,12 +235,13 @@ const LiveSessionsOverview = () => {
     }
   };
 
-  const handleRejectSession = async (session: LiveSession) => {
+  const handleRejectSession = async (session: LiveSession, reason: string = 'No reason provided') => {
     setRejectingSession(session.id);
     try {
       const response = await api.updateLiveSession(session.id, { 
         isApproved: false,
-        status: 'cancelled'
+        status: 'cancelled',
+        rejectionReason: reason
       });
       
       if (response) {
@@ -248,7 +254,15 @@ const LiveSessionsOverview = () => {
       toast.error('Failed to reject session');
     } finally {
       setRejectingSession(null);
+      setRejectDialogOpen(false);
+      setRejectReason('');
+      setSessionToReject(null);
     }
+  };
+
+  const openRejectDialog = (session: LiveSession) => {
+    setSessionToReject(session);
+    setRejectDialogOpen(true);
   };
 
   const formatDate = (dateString: string) => {
@@ -702,7 +716,7 @@ const LiveSessionsOverview = () => {
                                     variant="outline" 
                                     disabled={approvingSession === session.id || rejectingSession === session.id}
                                     className="h-7 px-3 text-xs bg-red-50 text-red-700 hover:bg-red-100 border-red-200 hover:border-red-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    onClick={() => handleRejectSession(session)}
+                                    onClick={() => openRejectDialog(session)}
                                   >
                                     {rejectingSession === session.id ? (
                                       <RotateCw className="h-3 w-3 mr-1 animate-spin" />
@@ -865,6 +879,48 @@ const LiveSessionsOverview = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Rejection Dialog */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Live Session</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to reject "{sessionToReject?.title}"? Please provide a reason for the rejection.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="rejectReason" className="block text-sm font-medium text-gray-700 mb-2">
+                Rejection Reason
+              </label>
+              <Textarea
+                id="rejectReason"
+                placeholder="Enter the reason for rejection..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setRejectDialogOpen(false);
+              setRejectReason('');
+              setSessionToReject(null);
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => sessionToReject && handleRejectSession(sessionToReject, rejectReason)}
+              disabled={!rejectReason.trim()}
+            >
+              Reject Session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

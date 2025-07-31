@@ -26,6 +26,7 @@ import quizzesRoutes from './routes/quizzes.js';
 import adminRoutes from './routes/admin.js';
 import professorRoutes from './routes/professor.js';
 import chatNotificationsRouter from './routes/chat-notifications.js';
+import sessionReminderScheduler from './session-reminder-scheduler.js';
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 
@@ -305,4 +306,7 @@ pool.query('SELECT NOW()', (err, result) => {
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`DB → ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
+  
+  // Start the session reminder scheduler
+  sessionReminderScheduler.start();
 });

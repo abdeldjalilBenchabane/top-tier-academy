@@ -1,6 +1,8 @@
 import express from 'express';
 import pool from '../db.js';
 import { verifyToken, requireRole } from '../middleware/auth.js';
+import NotificationService from '../services/notificationService.js';
+import { sendQuizCreatedEmailToAdmin, sendQuizApprovedEmailToProfessor, sendQuizApprovedEmailToStudent } from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -98,6 +100,38 @@ router.post('/', verifyToken, requireRole(['professor']), async (req, res) => {
         );
       } // short-answer: no answers table entry needed
     }
+
+    // Get professor name for notification
+    const professorResult = await pool.query(
+      'SELECT name FROM users WHERE id = $1',
+      [professorId]
+    );
+    const professorName = professorResult.rows[0]?.name || 'Unknown Professor';
+
+    // Get course title for notification
+    const courseResult = await pool.query(
+      'SELECT title FROM courses WHERE id = $1',
+      [course_id]
+    );
+    const courseTitle = courseResult.rows[0]?.title || 'Unknown Course';
+
+    // Send notification and email to all admins
+    try {
+      const adminResult = await pool.query('SELECT id, email, name FROM users WHERE role = $1', ['admin']);
+      const admins = adminResult.rows;
+
+      for (const admin of admins) {
+        // Send notification
+        await NotificationService.notifyQuizCreated(quizId, title, professorName, professorId, admin.id);
+        
+        // Send email
+        await sendQuizCreatedEmailToAdmin(admin.email, admin.name, professorName, title, courseTitle);
+      }
+    } catch (notificationError) {
+      console.error('Error sending quiz creation notifications:', notificationError);
+      // Don't fail the quiz creation if notifications fail
+    }
+
     res.status(201).json({ id: quizId });
   } catch (err) {
     console.error('Quiz creation error:', err);
@@ -174,12 +208,62 @@ router.get('/admin/quizzes', verifyToken, requireRole(['admin']), async (req, re
 router.patch('/admin/quizzes/:id/approve', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
     const quizId = req.params.id;
+    const adminId = parseInt(req.user.id);
+    
+    // Get admin name
+    const adminResult = await pool.query('SELECT name FROM users WHERE id = $1', [adminId]);
+    const adminName = adminResult.rows[0]?.name || 'Admin';
+
+    // Update quiz status
     await pool.query(
       `UPDATE quizzes SET status = 'approved', approved_at = NOW(), approved_by = $1 WHERE id = $2`,
-      [parseInt(req.user.id), quizId]
+      [adminId, quizId]
     );
+
+    // Get quiz details for notifications
+    const quizResult = await pool.query(
+      `SELECT q.title, q.description, q.created_by, u.name as professor_name, u.email as professor_email,
+              c.title as course_title, c.id as course_id
+       FROM quizzes q
+       JOIN users u ON q.created_by = u.id
+       JOIN courses c ON q.course_id = c.id
+       WHERE q.id = $1`,
+      [quizId]
+    );
+
+    if (quizResult.rows.length > 0) {
+      const quiz = quizResult.rows[0];
+      
+      // Send notification and email to professor
+      try {
+        await NotificationService.notifyQuizApproved(quiz.created_by, quiz.title, adminName);
+        await sendQuizApprovedEmailToProfessor(quiz.professor_email, quiz.professor_name, quiz.title, quiz.course_title, adminName);
+      } catch (notificationError) {
+        console.error('Error sending quiz approval notifications to professor:', notificationError);
+      }
+
+      // Send notifications and emails to students enrolled in the course
+      try {
+        const studentsResult = await pool.query(
+          `SELECT DISTINCT sc.student_id, u.name as student_name, u.email as student_email
+           FROM student_courses sc
+           JOIN users u ON sc.student_id = u.id
+           WHERE sc.course_id = $1`,
+          [quiz.course_id]
+        );
+
+        for (const student of studentsResult.rows) {
+          await NotificationService.notifyQuizApproved(student.student_id, quiz.title, adminName);
+          await sendQuizApprovedEmailToStudent(student.student_email, student.student_name, quiz.title, quiz.course_title, quiz.professor_name);
+        }
+      } catch (studentNotificationError) {
+        console.error('Error sending quiz approval notifications to students:', studentNotificationError);
+      }
+    }
+
     res.json({ success: true });
   } catch (err) {
+    console.error('Error approving quiz:', err);
     res.status(500).json({ error: 'Failed to approve quiz' });
   }
 });

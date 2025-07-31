@@ -87,6 +87,28 @@ router.patch('/notifications/:id/read', verifyToken, async (req, res) => {
     }
 });
 
+// PATCH /api/notifications/mark-all-read → mark all notifications as read for user
+router.patch('/notifications/mark-all-read', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        const result = await pool.query(`
+            UPDATE notifications 
+            SET is_read = TRUE 
+            WHERE user_id = $1 AND is_read = FALSE
+            RETURNING *
+        `, [userId]);
+        
+        res.json({ 
+            message: 'All notifications marked as read',
+            count: result.rows.length 
+        });
+    } catch (error) {
+        console.error('Error marking all notifications as read:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // DELETE /api/notifications/:id → delete notification
 router.delete('/notifications/:id', verifyToken, async (req, res) => {
     try {

@@ -2,6 +2,8 @@ import express from 'express';
 import { query, getRows, getRow } from '../db.js';
 import pool from '../db.js';
 import { verifyToken } from '../middleware/auth.js';
+import NotificationService from '../services/notificationService.js';
+import { sendPrivateClassRequestEmail, sendPrivateClassApprovalEmail, sendPrivateClassRejectionEmail, sendPrivateClassPaymentEmail, sendPrivateClassTimeUpdateEmail } from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -179,6 +181,50 @@ router.post('/', verifyToken, async (req, res) => {
     // Get hierarchy path for the response
     const hierarchyPath = await getHierarchyPath(level_id, year_id, speciality_id, material_id);
     
+    // Get student and teacher information for notifications
+    const student = await getRow('SELECT name, email FROM users WHERE id = $1', [student_id]);
+    const teacher = await getRow('SELECT id, name, email FROM users WHERE name = $1', [teacher_name]);
+    
+    // Send notification to teacher
+    if (teacher) {
+      try {
+        await NotificationService.notifyPrivateClassRequestReceived(
+          teacher.id,
+          student.name,
+          {
+            subject,
+            grade,
+            date,
+            time,
+            sessions_count,
+            description,
+            price_per_session
+          }
+        );
+        
+        // Send email to teacher
+        await sendPrivateClassRequestEmail(
+          teacher.email,
+          teacher.name,
+          student.name,
+          {
+            subject,
+            grade,
+            date,
+            time,
+            sessions_count,
+            description,
+            price_per_session
+          }
+        );
+        
+        console.log('Notification and email sent to teacher:', teacher.name);
+      } catch (error) {
+        console.error('Failed to send notification/email to teacher:', error);
+        // Don't fail the request if notification/email fails
+      }
+    }
+    
     res.status(201).json({ 
       message: 'Private class request created successfully',
       request: {
@@ -267,9 +313,124 @@ router.patch('/:requestId/status', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'Request not found' });
     }
     
+    const updatedRequest = result.rows[0];
+    
+    // Get student and teacher information for notifications
+    const student = await getRow('SELECT name, email FROM users WHERE id = $1', [updatedRequest.student_id]);
+    const teacher = await getRow('SELECT name, email FROM users WHERE name = $1', [updatedRequest.teacher_name]);
+    
+    // Send notifications and emails based on status
+    if (status === 'مؤكد') {
+      // Request approved
+      try {
+        // Send notification to student
+        await NotificationService.notifyPrivateClassApproved(
+          updatedRequest.student_id,
+          teacher.name,
+          {
+            subject: updatedRequest.subject,
+            grade: updatedRequest.grade,
+            date: updatedRequest.date,
+            time: updatedRequest.time,
+            sessions_count: updatedRequest.sessions_count,
+            price_per_session: updatedRequest.price_per_session
+          }
+        );
+        
+        // Send email to student
+        await sendPrivateClassApprovalEmail(
+          student.email,
+          student.name,
+          teacher.name,
+          {
+            subject: updatedRequest.subject,
+            grade: updatedRequest.grade,
+            date: updatedRequest.date,
+            time: updatedRequest.time,
+            sessions_count: updatedRequest.sessions_count,
+            price_per_session: updatedRequest.price_per_session
+          }
+        );
+        
+        console.log('Approval notification and email sent to student:', student.name);
+      } catch (error) {
+        console.error('Failed to send approval notification/email:', error);
+      }
+    } else if (status === 'مرفوض') {
+      // Request rejected
+      try {
+        // Send notification to student
+        await NotificationService.notifyPrivateClassRejected(
+          updatedRequest.student_id,
+          teacher.name,
+          {
+            subject: updatedRequest.subject,
+            grade: updatedRequest.grade,
+            date: updatedRequest.date,
+            sessions_count: updatedRequest.sessions_count
+          },
+          updatedRequest.rejection_reason
+        );
+        
+        // Send email to student
+        await sendPrivateClassRejectionEmail(
+          student.email,
+          student.name,
+          teacher.name,
+          {
+            subject: updatedRequest.subject,
+            grade: updatedRequest.grade,
+            date: updatedRequest.date,
+            sessions_count: updatedRequest.sessions_count
+          },
+          updatedRequest.rejection_reason
+        );
+        
+        console.log('Rejection notification and email sent to student:', student.name);
+      } catch (error) {
+        console.error('Failed to send rejection notification/email:', error);
+      }
+    }
+    
+    // Check if time was updated (either through approval or time-only update)
+    if (time && time !== current.time) {
+      try {
+        // Send notification to student about time update
+        await NotificationService.notifyPrivateClassTimeUpdated(
+          updatedRequest.student_id,
+          teacher.name,
+          {
+            subject: updatedRequest.subject,
+            grade: updatedRequest.grade,
+            date: updatedRequest.date,
+            sessions_count: updatedRequest.sessions_count
+          },
+          time
+        );
+        
+        // Send email to student about time update
+        await sendPrivateClassTimeUpdateEmail(
+          student.email,
+          student.name,
+          teacher.name,
+          {
+            subject: updatedRequest.subject,
+            grade: updatedRequest.grade,
+            date: updatedRequest.date,
+            sessions_count: updatedRequest.sessions_count
+          },
+          time
+        );
+        
+        console.log('Time update notification and email sent to student:', student.name);
+      } catch (error) {
+        console.error('Failed to send time update notification/email:', error);
+      }
+    }
+    
     res.json({ 
       message: 'Request status updated successfully',
-      request: result.rows[0]
+      request: updatedRequest
     });
   } catch (error) {
     console.error('Error updating request status:', error);
@@ -359,6 +520,70 @@ router.post('/:requestId/purchase', verifyToken, async (req, res) => {
       
       // Get updated request
       const updatedRequest = await getRow('SELECT * FROM private_class_requests WHERE id = $1', [requestId]);
+      
+      // Send notification to student about successful purchase
+      try {
+        await NotificationService.notifyPrivateClassPurchased(
+          req.user.id,
+          request.teacher_name,
+          {
+            subject: request.subject,
+            grade: request.grade,
+            date: request.date,
+            time: request.time,
+            sessions_count: request.sessions_count
+          },
+          pointsNeeded
+        );
+        
+        console.log('Purchase notification sent to student');
+      } catch (error) {
+        console.error('Failed to send purchase notification:', error);
+        // Don't fail the purchase if notification fails
+      }
+      
+      // Send notification and email to teacher about payment
+      try {
+        // Get teacher information
+        const teacher = await getRow('SELECT id, name, email FROM users WHERE name = $1', [request.teacher_name]);
+        const student = await getRow('SELECT name FROM users WHERE id = $1', [req.user.id]);
+        
+        if (teacher) {
+          // Send notification to teacher
+          await NotificationService.notifyPrivateClassPaymentReceived(
+            teacher.id,
+            student.name,
+            {
+              subject: request.subject,
+              grade: request.grade,
+              date: request.date,
+              time: request.time,
+              sessions_count: request.sessions_count
+            },
+            pointsNeeded
+          );
+          
+          // Send email to teacher
+          await sendPrivateClassPaymentEmail(
+            teacher.email,
+            teacher.name,
+            student.name,
+            {
+              subject: request.subject,
+              grade: request.grade,
+              date: request.date,
+              time: request.time,
+              sessions_count: request.sessions_count
+            },
+            pointsNeeded
+          );
+          
+          console.log('Payment notification and email sent to teacher:', teacher.name);
+        }
+      } catch (error) {
+        console.error('Failed to send payment notification/email to teacher:', error);
+        // Don't fail the purchase if notification/email fails
+      }
       
       res.json({ 
         message: 'Private class purchased successfully',

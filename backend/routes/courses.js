@@ -314,6 +314,7 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
         }
       }
       await client.query('COMMIT');
+      
       // Get the created course with all details
       const createdCourse = await getRow(`
         SELECT 
@@ -627,6 +628,44 @@ router.put('/:id/assign-material', verifyToken, requireRole(['professor']), asyn
       [material_id, 'pending', courseId]
     );
     
+    // Send notifications and emails for course path assignment
+    try {
+      // Import notification and email services
+      const NotificationService = (await import('../services/notificationService.js')).default;
+      const { sendCourseCreatedEmailToAdmin } = await import('../services/emailService.js');
+
+      // Get professor information
+      const professorRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [req.user.id]);
+      const professor = professorRes.rows[0];
+
+      // Get course title
+      const courseTitle = result.rows[0].title;
+
+      // Send notifications to all admins
+      await NotificationService.notifyCourseCreated(
+        courseId,
+        courseTitle,
+        professor.name,
+        req.user.id
+      );
+
+      // Send emails to all admins
+      const adminRes = await pool.query('SELECT name, email FROM users WHERE role = $1', ['admin']);
+      for (const admin of adminRes.rows) {
+        await sendCourseCreatedEmailToAdmin(
+          admin.email,
+          admin.name,
+          professor.name,
+          courseTitle
+        );
+      }
+
+      console.log(`✅ Course path assignment notifications and emails sent for course ${courseId}`);
+    } catch (error) {
+      console.error('Error sending course path assignment notifications/emails:', error);
+      // Don't fail the path assignment if notifications fail
+    }
+    
     res.json({ message: 'Course path assigned successfully', course: result.rows[0] });
   } catch (error) {
     console.error('Error assigning material path:', error);
@@ -697,6 +736,44 @@ router.put('/:id/create-material', verifyToken, requireRole(['professor']), asyn
       
       await client.query('COMMIT');
       
+      // Send notifications and emails for course path assignment
+      try {
+        // Import notification and email services
+        const NotificationService = (await import('../services/notificationService.js')).default;
+        const { sendCourseCreatedEmailToAdmin } = await import('../services/emailService.js');
+
+        // Get professor information
+        const professorRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [req.user.id]);
+        const professor = professorRes.rows[0];
+
+        // Get course title
+        const courseTitle = courseResult.rows[0].title;
+
+        // Send notifications to all admins
+        await NotificationService.notifyCourseCreated(
+          courseId,
+          courseTitle,
+          professor.name,
+          req.user.id
+        );
+
+        // Send emails to all admins
+        const adminRes = await pool.query('SELECT name, email FROM users WHERE role = $1', ['admin']);
+        for (const admin of adminRes.rows) {
+          await sendCourseCreatedEmailToAdmin(
+            admin.email,
+            admin.name,
+            professor.name,
+            courseTitle
+          );
+        }
+
+        console.log(`✅ Course path assignment notifications and emails sent for course ${courseId}`);
+      } catch (error) {
+        console.error('Error sending course path assignment notifications/emails:', error);
+        // Don't fail the path assignment if notifications fail
+      }
+      
       res.json({ 
         message: 'Material created and course path assigned successfully', 
         course: courseResult.rows[0],
@@ -730,15 +807,148 @@ router.put('/:id/approve', verifyToken, requireRole(['admin']), async (req, res)
       return res.status(400).json({ error: 'Course must have a material path or language path assigned before approval' });
     }
     
+    // Get course creator information
+    const courseCreatorRes = await pool.query(
+      'SELECT created_by FROM courses WHERE id = $1',
+      [courseId]
+    );
+    
+    if (courseCreatorRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    
+    const professorId = courseCreatorRes.rows[0].created_by;
+    
+    // Get professor information
+    const professorRes = await pool.query(
+      'SELECT name, email FROM users WHERE id = $1',
+      [professorId]
+    );
+    
+    const professor = professorRes.rows[0];
+    
     // Update course status to approved, preserving existing material_id and language_level_id
     const result = await query(
       'UPDATE courses SET status = $1, approved_at = NOW() WHERE id = $2 RETURNING *',
       ['approved', courseId]
     );
     
+    // Send notifications and emails for course approval
+    try {
+      // Import notification and email services
+      const NotificationService = (await import('../services/notificationService.js')).default;
+      const { sendCourseApprovedEmailToProfessor } = await import('../services/emailService.js');
+
+      // Get admin information
+      const adminRes = await pool.query('SELECT name FROM users WHERE id = $1', [req.user.id]);
+      const admin = adminRes.rows[0];
+
+      // Send notification to professor
+      await NotificationService.notifyCourseApproved(
+        courseId,
+        result.rows[0].title,
+        professorId,
+        professor.name,
+        admin.name
+      );
+
+      // Send email to professor
+      await sendCourseApprovedEmailToProfessor(
+        professor.email,
+        professor.name,
+        result.rows[0].title,
+        admin.name
+      );
+
+      console.log(`✅ Course approval notifications and emails sent for course ${courseId}`);
+    } catch (error) {
+      console.error('Error sending course approval notifications/emails:', error);
+      // Don't fail the approval if notifications fail
+    }
+    
     res.json({ message: 'Course approved', course: result.rows[0] });
   } catch (error) {
     console.error('Error approving course:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add endpoint to reject a course
+router.put('/:id/reject', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    const { reason } = req.body;
+    
+    // Check if course exists
+    const course = await getRow('SELECT * FROM courses WHERE id = $1', [courseId]);
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    
+    // Get course creator information
+    const courseCreatorRes = await pool.query(
+      'SELECT created_by FROM courses WHERE id = $1',
+      [courseId]
+    );
+    
+    if (courseCreatorRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    
+    const professorId = courseCreatorRes.rows[0].created_by;
+    
+    // Get professor information
+    const professorRes = await pool.query(
+      'SELECT name, email FROM users WHERE id = $1',
+      [professorId]
+    );
+    
+    const professor = professorRes.rows[0];
+    
+    // Update course status to rejected
+    const result = await query(
+      'UPDATE courses SET status = $1, rejected_at = NOW() WHERE id = $2 RETURNING *',
+      ['rejected', courseId]
+    );
+    
+    // Send notifications and emails for course rejection
+    try {
+      // Import notification and email services
+      const NotificationService = (await import('../services/notificationService.js')).default;
+      const { sendCourseRejectedEmailToProfessor } = await import('../services/emailService.js');
+
+      // Get admin information
+      const adminRes = await pool.query('SELECT name FROM users WHERE id = $1', [req.user.id]);
+      const admin = adminRes.rows[0];
+
+      // Send notification to professor
+      await NotificationService.notifyCourseRejected(
+        courseId,
+        result.rows[0].title,
+        professorId,
+        professor.name,
+        admin.name,
+        reason
+      );
+
+      // Send email to professor
+      await sendCourseRejectedEmailToProfessor(
+        professor.email,
+        professor.name,
+        result.rows[0].title,
+        admin.name,
+        reason
+      );
+
+      console.log(`✅ Course rejection notifications and emails sent for course ${courseId}`);
+    } catch (error) {
+      console.error('Error sending course rejection notifications/emails:', error);
+      // Don't fail the rejection if notifications fail
+    }
+    
+    res.json({ message: 'Course rejected', course: result.rows[0] });
+  } catch (error) {
+    console.error('Error rejecting course:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -764,6 +974,45 @@ router.put('/:id/language-path', verifyToken, requireRole(['professor']), async 
       'UPDATE courses SET language_level_id = $1, status = $2 WHERE id = $3 RETURNING *',
       [language_level_id, 'pending', courseId]
     );
+    
+    // Send notifications and emails for course path assignment
+    try {
+      // Import notification and email services
+      const NotificationService = (await import('../services/notificationService.js')).default;
+      const { sendCourseCreatedEmailToAdmin } = await import('../services/emailService.js');
+
+      // Get professor information
+      const professorRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [req.user.id]);
+      const professor = professorRes.rows[0];
+
+      // Get course title
+      const courseTitle = result.rows[0].title;
+
+      // Send notifications to all admins
+      await NotificationService.notifyCourseCreated(
+        courseId,
+        courseTitle,
+        professor.name,
+        req.user.id
+      );
+
+      // Send emails to all admins
+      const adminRes = await pool.query('SELECT name, email FROM users WHERE role = $1', ['admin']);
+      for (const admin of adminRes.rows) {
+        await sendCourseCreatedEmailToAdmin(
+          admin.email,
+          admin.name,
+          professor.name,
+          courseTitle
+        );
+      }
+
+      console.log(`✅ Course path assignment notifications and emails sent for course ${courseId}`);
+    } catch (error) {
+      console.error('Error sending course path assignment notifications/emails:', error);
+      // Don't fail the path assignment if notifications fail
+    }
+    
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating course language path:', error);

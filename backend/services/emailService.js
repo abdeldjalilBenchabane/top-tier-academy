@@ -1,72 +1,15 @@
 import nodemailer from 'nodemailer';
 
-// Create transporter
-const createTransporter = () => {
-  // For development, use Gmail or a service like Mailtrap
-  // For production, use a proper email service like SendGrid, AWS SES, etc.
-  
-  if (process.env.NODE_ENV === 'production') {
-    // Production email configuration
-    return nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
-  } else {
-    // Development configuration - using Gmail with app password
-    // If you want to use Mailtrap for testing, uncomment the lines below
-    // and comment out the Gmail configuration
-    
-    // Mailtrap configuration (for testing)
-    if (process.env.USE_MAILTRAP === 'true') {
-      return nodemailer.createTransport({
-        host: 'smtp.mailtrap.io',
-        port: 2525,
-        auth: {
-          user: process.env.MAILTRAP_USER || 'your-mailtrap-user',
-          pass: process.env.MAILTRAP_PASS || 'your-mailtrap-pass'
-        }
-      });
-    }
-    
-    // Gmail configuration
-    return nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER || 'your-email@gmail.com',
-        pass: process.env.EMAIL_PASSWORD || 'your-app-password'
-      }
-    });
-  }
+// Helper function to get the current year
+const getCurrentYear = () => {
+  return new Date().getFullYear();
 };
 
-// Send password reset email
-export const sendPasswordResetEmail = async (email, resetToken, userName) => {
-  try {
-    // In development, optionally log instead of sending
-    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
-      console.log('📧 EMAIL LOG (not sent):');
-      console.log('To:', email);
-      console.log('Subject: Password Reset Request - TTA Learning Platform');
-      console.log('Reset URL:', `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`);
-      console.log('User:', userName);
-      return true;
-    }
-    
-    const transporter = createTransporter();
-    
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
-    
-    const mailOptions = {
-      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
-      to: email,
-      subject: 'Password Reset Request - TTA Learning Platform',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; color: white;">
-            <img src="data:image/svg+xml;base64,${Buffer.from(`<?xml version="1.0" encoding="utf-8"?>
+// Helper function to get the school logo HTML
+const getSchoolLogo = () => {
+  return `
+    <div style="text-align: center; margin-bottom: 20px;">
+      <img src="data:image/svg+xml;base64,${Buffer.from(`<?xml version="1.0" encoding="utf-8"?>
 <!-- Generator: Adobe Illustrator 25.2.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
 <svg version="1.1" id="Calque_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
 	 viewBox="0 0 1233.35 197.9" style="enable-background:new 0 0 1233.35 197.9;" xml:space="preserve">
@@ -135,7 +78,7 @@ export const sendPasswordResetEmail = async (email, resetToken, userName) => {
 		1056.98,155.78 1035.66,155.78 1035.66,141.43 1063.49,141.43 1063.49,127.85 1018.34,127.85 	"/>
 	<path class="st3" d="M1134.23,128.18c-0.49,0.19-0.95,0.49-1.35,0.89c-0.38,0.38-0.74,0.9-1.09,1.56l-17.41,34.29
 		c-0.63,1.22-1.24,2.48-1.83,3.78c-0.33,0.74-0.68,1.51-1.01,2.32c-0.31-0.76-0.64-1.51-0.97-2.24c-0.57-1.27-1.18-2.53-1.8-3.71
-		l-17.46-34.44c-0.35-0.66-0.70-1.17-1.09-1.56c-0.4-0.4-0.86-0.7-1.35-0.89c-0.49-0.19-1.04-0.28-1.64-0.28h-14.54v69.26h15.35
+		l-17.46-34.44c-0.35-0.66-0.7-1.17-1.09-1.56c-0.4-0.4-0.86-0.7-1.35-0.89c-0.49-0.19-1.04-0.28-1.64-0.28h-14.54v69.26h15.35
 		v-39.75c0-0.79-0.03-1.65-0.07-2.57l16.36,31.63c0.62,1.21,1.48,2.14,2.54,2.77c1.06,0.62,2.27,0.94,3.61,0.94h2.14
 		c1.34,0,2.55-0.32,3.61-0.94c1.06-0.63,1.91-1.56,2.54-2.77l16.34-31.72c-0.04,0.92-0.06,1.81-0.06,2.66v39.75h15.36V127.9h-14.55
 		C1135.28,127.9,1134.72,127.99,1134.23,128.18"/>
@@ -166,7 +109,81 @@ export const sendPasswordResetEmail = async (email, resetToken, userName) => {
 		c-0.14-0.17-0.23-0.35-0.28-0.54c-0.06-0.19-0.12-0.33-0.18-0.44h-1.23v5.17H1215.6z M1218.41,19.96h2.14
 		c1.47,0,2.21-0.53,2.21-1.59c0-1.06-0.74-1.59-2.21-1.59h-2.14V19.96z"/>
 </g>
-</svg>`).toString('base64')}" alt="TTA Logo" style="width: 200px; height: auto; margin-bottom: 15px;" />
+</svg>`).toString('base64')}" 
+           alt="TTA Learning Platform" 
+           style="height: 60px; width: auto; max-width: 200px;"
+      />
+    </div>
+  `;
+};
+
+// Create transporter
+const createTransporter = () => {
+  // For development, use Gmail or a service like Mailtrap
+  // For production, use a proper email service like SendGrid, AWS SES, etc.
+  
+  if (process.env.NODE_ENV === 'production') {
+    // Production email configuration
+    return nodemailer.createTransport({
+      service: process.env.EMAIL_SERVICE || 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+  } else {
+    // Development configuration - using Gmail with app password
+    // If you want to use Mailtrap for testing, uncomment the lines below
+    // and comment out the Gmail configuration
+    
+    // Mailtrap configuration (for testing)
+    if (process.env.USE_MAILTRAP === 'true') {
+      return nodemailer.createTransport({
+        host: 'smtp.mailtrap.io',
+        port: 2525,
+        auth: {
+          user: process.env.MAILTRAP_USER || 'your-mailtrap-user',
+          pass: process.env.MAILTRAP_PASS || 'your-mailtrap-pass'
+        }
+      });
+    }
+    
+    // Gmail configuration
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER || 'your-email@gmail.com',
+        pass: process.env.EMAIL_PASSWORD || 'your-app-password'
+      }
+    });
+  }
+};
+
+// Send password reset email
+export const sendPasswordResetEmail = async (email, resetToken, userName) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', email);
+      console.log('Subject: Password Reset Request - TTA Learning Platform');
+      console.log('Reset URL:', `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`);
+      console.log('User:', userName);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: email,
+      subject: 'Password Reset Request - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${getSchoolLogo()}
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; color: white;">
             <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
             <p style="margin: 10px 0 0 0; opacity: 0.9;">Password Reset Request</p>
           </div>
@@ -212,7 +229,7 @@ export const sendPasswordResetEmail = async (email, resetToken, userName) => {
           
           <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
             <p style="margin: 0; font-size: 14px; opacity: 0.8;">
-              © 2024 TTA Learning Platform. All rights reserved.
+              © ${getCurrentYear()} TTA Learning Platform. All rights reserved.
             </p>
           </div>
         </div>
@@ -310,5 +327,2291 @@ export const sendSchoolHousePasswordResetEmail = async (email, resetToken, userN
   } catch (error) {
     console.error('Error sending SchoolHouse password reset email:', error);
     throw new Error('Failed to send password reset email');
+  }
+};
+
+// Send private class request email to teacher
+export const sendPrivateClassRequestEmail = async (teacherEmail, teacherName, studentName, requestData) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', teacherEmail);
+      console.log('Subject: New Private Class Request');
+      console.log('Teacher:', teacherName);
+      console.log('Student:', studentName);
+      console.log('Request Data:', requestData);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: teacherEmail,
+      subject: 'New Private Class Request - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">New Private Class Request</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${teacherName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              You have received a new private class request from <strong>${studentName}</strong>.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #667eea; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Request Details:</h3>
+              <p><strong>Subject:</strong> ${requestData.subject}</p>
+              <p><strong>Grade:</strong> ${requestData.grade}</p>
+              <p><strong>Date:</strong> ${requestData.date}</p>
+              <p><strong>Time:</strong> ${requestData.time || 'To be scheduled'}</p>
+              <p><strong>Sessions:</strong> ${requestData.sessions_count} session(s)</p>
+              <p><strong>Description:</strong> ${requestData.description}</p>
+              <p><strong>Price per session:</strong> ${requestData.price_per_session} points</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Please log in to your dashboard to review and respond to this request.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/professor/private-classes" 
+                 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View Request
+              </a>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Private class request email sent:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending private class request email:', error);
+    throw new Error('Failed to send private class request email');
+  }
+};
+
+// Send private class approval email to student
+export const sendPrivateClassApprovalEmail = async (studentEmail, studentName, teacherName, requestData) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', studentEmail);
+      console.log('Subject: Private Class Request Approved');
+      console.log('Student:', studentName);
+      console.log('Teacher:', teacherName);
+      console.log('Request Data:', requestData);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: studentEmail,
+      subject: 'Private Class Request Approved - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Request Approved!</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${studentName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Great news! Your private class request has been <strong>approved</strong> by <strong>${teacherName}</strong>.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #28a745; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Class Details:</h3>
+              <p><strong>Subject:</strong> ${requestData.subject}</p>
+              <p><strong>Grade:</strong> ${requestData.grade}</p>
+              <p><strong>Date:</strong> ${requestData.date}</p>
+              <p><strong>Time:</strong> ${requestData.time}</p>
+              <p><strong>Sessions:</strong> ${requestData.sessions_count} session(s)</p>
+              <p><strong>Price per session:</strong> ${requestData.price_per_session} points</p>
+              <p><strong>Total cost:</strong> ${requestData.price_per_session * requestData.sessions_count} points</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Please complete the payment to confirm your booking. You can pay using your points balance.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/TTHPrivateClasses" 
+                 style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                Complete Payment
+              </a>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Private class approval email sent:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending private class approval email:', error);
+    throw new Error('Failed to send private class approval email');
+  }
+};
+
+// Send private class rejection email to student
+export const sendPrivateClassRejectionEmail = async (studentEmail, studentName, teacherName, requestData, rejectionReason) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', studentEmail);
+      console.log('Subject: Private Class Request Rejected');
+      console.log('Student:', studentName);
+      console.log('Teacher:', teacherName);
+      console.log('Request Data:', requestData);
+      console.log('Rejection Reason:', rejectionReason);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: studentEmail,
+      subject: 'Private Class Request Rejected - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Request Rejected</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${studentName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Unfortunately, your private class request has been <strong>rejected</strong> by <strong>${teacherName}</strong>.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #dc3545; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Request Details:</h3>
+              <p><strong>Subject:</strong> ${requestData.subject}</p>
+              <p><strong>Grade:</strong> ${requestData.grade}</p>
+              <p><strong>Date:</strong> ${requestData.date}</p>
+              <p><strong>Sessions:</strong> ${requestData.sessions_count} session(s)</p>
+              <p><strong>Rejection Reason:</strong> ${rejectionReason}</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              You can submit a new request with different details or contact another teacher.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/TTHPrivateClasses" 
+                 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                Submit New Request
+              </a>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Private class rejection email sent:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending private class rejection email:', error);
+    throw new Error('Failed to send private class rejection email');
+  }
+};
+
+// Send private class payment email to teacher
+export const sendPrivateClassPaymentEmail = async (teacherEmail, teacherName, studentName, requestData, pointsUsed) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', teacherEmail);
+      console.log('Subject: Payment Received for Private Class');
+      console.log('Teacher:', teacherName);
+      console.log('Student:', studentName);
+      console.log('Request Data:', requestData);
+      console.log('Points Used:', pointsUsed);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: teacherEmail,
+      subject: 'Payment Received for Private Class - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Payment Received!</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${teacherName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Great news! <strong>${studentName}</strong> has completed the payment for your private class.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #28a745; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Payment Details:</h3>
+              <p><strong>Student:</strong> ${studentName}</p>
+              <p><strong>Subject:</strong> ${requestData.subject}</p>
+              <p><strong>Grade:</strong> ${requestData.grade}</p>
+              <p><strong>Date:</strong> ${requestData.date}</p>
+              <p><strong>Time:</strong> ${requestData.time}</p>
+              <p><strong>Points Paid:</strong> ${pointsUsed} points</p>
+              <p><strong>Status:</strong> <span style="color: #28a745; font-weight: bold;">✅ Payment Confirmed</span></p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              The class is now confirmed and ready to proceed. Please ensure you're available at the scheduled time.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/professor/private-classes" 
+                 style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View Class Details
+              </a>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Private class payment email sent:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending private class payment email:', error);
+    throw new Error('Failed to send private class payment email');
+  }
+};
+
+// Send private class time update email to student
+export const sendPrivateClassTimeUpdateEmail = async (studentEmail, studentName, teacherName, requestData, newTime) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', studentEmail);
+      console.log('Subject: Private Class Time Updated');
+      console.log('Student:', studentName);
+      console.log('Teacher:', teacherName);
+      console.log('Request Data:', requestData);
+      console.log('New Time:', newTime);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: studentEmail,
+      subject: 'Private Class Time Updated - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Class Time Updated</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${studentName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Your private class with <strong>${teacherName}</strong> has been rescheduled.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #ff6b35; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Updated Class Details:</h3>
+              <p><strong>Subject:</strong> ${requestData.subject}</p>
+              <p><strong>Grade:</strong> ${requestData.grade}</p>
+              <p><strong>Date:</strong> ${requestData.date}</p>
+              <p><strong>New Time:</strong> <span style="color: #ff6b35; font-weight: bold;">${newTime}</span></p>
+              <p><strong>Sessions:</strong> ${requestData.sessions_count} session(s)</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Please make sure to attend the class at the new scheduled time. If you have any conflicts, please contact your teacher as soon as possible.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/TTHPrivateClasses" 
+                 style="background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View Class Details
+              </a>
+            </div>
+            
+            <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+              <p style="margin: 0; color: #856404; font-size: 14px;">
+                <strong>Important:</strong> Please note the new time and ensure you're available for the rescheduled session.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Private class time update email sent:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending private class time update email:', error);
+    throw new Error('Failed to send private class time update email');
+  }
+};
+
+// Course Purchase Email Functions
+export const sendCoursePurchaseEmailToProfessor = async (professorEmail, professorName, studentName, courseTitle, price, courseType = 'course') => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', professorEmail);
+      console.log('Subject: Course Purchased - New Student');
+      console.log('Professor:', professorName);
+      console.log('Student:', studentName);
+      console.log('Course:', courseTitle);
+      console.log('Price:', price);
+      console.log('Type:', courseType);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: professorEmail,
+      subject: 'Course Purchased - New Student',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Course Purchased!</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${professorName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Great news! A student has purchased your course.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Purchase Details:</h3>
+              <p><strong>Student:</strong> ${studentName}</p>
+              <p><strong>Course:</strong> ${courseTitle}</p>
+              <p><strong>Type:</strong> ${courseType}</p>
+              <p><strong>Price:</strong> ${price} points</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              This is a great opportunity to engage with your new student and help them succeed!
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/professor/courses" 
+                 style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View My Courses
+              </a>
+            </div>
+            
+            <div style="background: #d1fae5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+              <p style="margin: 0; color: #065f46; font-size: 14px;">
+                <strong>Congratulations!</strong> Your course is helping students learn and grow.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Course purchase email sent to professor:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending course purchase email to professor:', error);
+    throw new Error('Failed to send course purchase email to professor');
+  }
+};
+
+export const sendCoursePurchaseEmailToAdmin = async (adminEmail, adminName, studentName, courseTitle, price, courseType = 'course') => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', adminEmail);
+      console.log('Subject: Course Purchase - Platform Activity');
+      console.log('Admin:', adminName);
+      console.log('Student:', studentName);
+      console.log('Course:', courseTitle);
+      console.log('Price:', price);
+      console.log('Type:', courseType);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: adminEmail,
+      subject: 'Course Purchase - Platform Activity',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Course Purchase Activity</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${adminName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              A new course purchase has been made on the platform.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #3b82f6; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Purchase Details:</h3>
+              <p><strong>Student:</strong> ${studentName}</p>
+              <p><strong>Course:</strong> ${courseTitle}</p>
+              <p><strong>Type:</strong> ${courseType}</p>
+              <p><strong>Price:</strong> ${price} points</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              This transaction has been recorded in the system.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/dashboard" 
+                 style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View Dashboard
+              </a>
+            </div>
+            
+            <div style="background: #dbeafe; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+              <p style="margin: 0; color: #1e40af; font-size: 14px;">
+                <strong>Platform Activity:</strong> This transaction has been automatically recorded.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Course purchase email sent to admin:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending course purchase email to admin:', error);
+    throw new Error('Failed to send course purchase email to admin');
+  }
+};
+
+export const sendLiveSessionPurchaseEmailToProfessor = async (professorEmail, professorName, studentName, sessionTitle, price) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', professorEmail);
+      console.log('Subject: Live Session Purchased - New Student');
+      console.log('Professor:', professorName);
+      console.log('Student:', studentName);
+      console.log('Session:', sessionTitle);
+      console.log('Price:', price);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: professorEmail,
+      subject: 'Live Session Purchased - New Student',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Live Session Purchased!</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${professorName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Great news! A student has purchased your live session.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Purchase Details:</h3>
+              <p><strong>Student:</strong> ${studentName}</p>
+              <p><strong>Session:</strong> ${sessionTitle}</p>
+              <p><strong>Price:</strong> ${price} points</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Make sure to prepare for the upcoming live session!
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/professor/live-sessions" 
+                 style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View Live Sessions
+              </a>
+            </div>
+            
+            <div style="background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+              <p style="margin: 0; color: #92400e; font-size: 14px;">
+                <strong>Preparation:</strong> Ensure your session is ready and engaging for your new student.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Live session purchase email sent to professor:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending live session purchase email to professor:', error);
+    throw new Error('Failed to send live session purchase email to professor');
+  }
+};
+
+export const sendLiveSessionPurchaseEmailToAdmin = async (adminEmail, adminName, studentName, sessionTitle, price) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', adminEmail);
+      console.log('Subject: Live Session Purchase - Platform Activity');
+      console.log('Admin:', adminName);
+      console.log('Student:', studentName);
+      console.log('Session:', sessionTitle);
+      console.log('Price:', price);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: adminEmail,
+      subject: 'Live Session Purchase - Platform Activity',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Live Session Purchase Activity</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${adminName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              A new live session purchase has been made on the platform.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #3b82f6; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Purchase Details:</h3>
+              <p><strong>Student:</strong> ${studentName}</p>
+              <p><strong>Session:</strong> ${sessionTitle}</p>
+              <p><strong>Price:</strong> ${price} points</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              This transaction has been recorded in the system.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/dashboard" 
+                 style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View Dashboard
+              </a>
+            </div>
+            
+            <div style="background: #dbeafe; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+              <p style="margin: 0; color: #1e40af; font-size: 14px;">
+                <strong>Platform Activity:</strong> This transaction has been automatically recorded.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Live session purchase email sent to admin:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending live session purchase email to admin:', error);
+    throw new Error('Failed to send live session purchase email to admin');
+  }
+};
+
+// Course Creation and Approval Email Functions
+export const sendCourseCreatedEmailToAdmin = async (adminEmail, adminName, professorName, courseTitle) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', adminEmail);
+      console.log('Subject: New Course Created - Requires Approval');
+      console.log('Admin:', adminName);
+      console.log('Professor:', professorName);
+      console.log('Course:', courseTitle);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: adminEmail,
+      subject: 'New Course Created - Requires Approval',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">New Course Created</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${adminName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              A new course has been created and requires your approval.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #3b82f6; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Course Details:</h3>
+              <p><strong>Course Title:</strong> ${courseTitle}</p>
+              <p><strong>Created By:</strong> ${professorName}</p>
+              <p><strong>Status:</strong> Pending Approval</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Please review the course content and approve or reject it accordingly.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/pending" 
+                 style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                Review Course
+              </a>
+            </div>
+            
+            <div style="background: #dbeafe; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+              <p style="margin: 0; color: #1e40af; font-size: 14px;">
+                <strong>Action Required:</strong> This course needs admin approval before it can be published.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Course created email sent to admin:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending course created email to admin:', error);
+    throw new Error('Failed to send course created email to admin');
+  }
+};
+
+export const sendCourseApprovedEmailToProfessor = async (professorEmail, professorName, courseTitle, adminName) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', professorEmail);
+      console.log('Subject: Course Approved');
+      console.log('Professor:', professorName);
+      console.log('Course:', courseTitle);
+      console.log('Admin:', adminName);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: professorEmail,
+      subject: 'Course Approved - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Course Approved!</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${professorName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Great news! Your course has been approved and is now live on the platform.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Course Details:</h3>
+              <p><strong>Course Title:</strong> ${courseTitle}</p>
+              <p><strong>Status:</strong> Approved</p>
+              <p><strong>Approved By:</strong> ${adminName}</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Your course is now available to students and can be purchased on the platform.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/professor/courses" 
+                 style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View My Courses
+              </a>
+            </div>
+            
+            <div style="background: #d1fae5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+              <p style="margin: 0; color: #065f46; font-size: 14px;">
+                <strong>Congratulations!</strong> Your course is now live and ready to help students learn.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Course approved email sent to professor:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending course approved email to professor:', error);
+    throw new Error('Failed to send course approved email to professor');
+  }
+};
+
+export const sendCourseRejectedEmailToProfessor = async (professorEmail, professorName, courseTitle, adminName, reason) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', professorEmail);
+      console.log('Subject: Course Rejected');
+      console.log('Professor:', professorName);
+      console.log('Course:', courseTitle);
+      console.log('Admin:', adminName);
+      console.log('Reason:', reason);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: professorEmail,
+      subject: 'Course Rejected - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Course Rejected</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${professorName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              We regret to inform you that your course has been rejected.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #ef4444; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Course Details:</h3>
+              <p><strong>Course Title:</strong> ${courseTitle}</p>
+              <p><strong>Status:</strong> Rejected</p>
+              <p><strong>Rejected By:</strong> ${adminName}</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Please review the feedback and make necessary improvements before resubmitting.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/professor/courses" 
+                 style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View My Courses
+              </a>
+            </div>
+            
+            <div style="background: #fee2e2; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
+              <p style="margin: 0; color: #991b1b; font-size: 14px;">
+                <strong>Next Steps:</strong> Please address the feedback and resubmit your course for approval.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Course rejected email sent to professor:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending course rejected email to professor:', error);
+    throw new Error('Failed to send course rejected email to professor');
+  }
+};
+
+// Live Session Creation and Approval Email Functions
+export const sendLiveSessionCreatedEmailToAdmin = async (adminEmail, adminName, professorName, sessionTitle) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', adminEmail);
+      console.log('Subject: New Live Session Created - Requires Approval');
+      console.log('Admin:', adminName);
+      console.log('Professor:', professorName);
+      console.log('Session:', sessionTitle);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: adminEmail,
+      subject: 'New Live Session Created - Requires Approval',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">New Live Session Created</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${adminName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              A new live session has been created and requires your approval.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #3b82f6; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Session Details:</h3>
+              <p><strong>Session Title:</strong> ${sessionTitle}</p>
+              <p><strong>Created By:</strong> ${professorName}</p>
+              <p><strong>Status:</strong> Pending Approval</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Please review the session content and approve or reject it accordingly.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/live-sessions" 
+                 style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                Review Live Sessions
+              </a>
+            </div>
+            
+            <div style="background: #dbeafe; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+              <p style="margin: 0; color: #1e40af; font-size: 14px;">
+                <strong>Action Required:</strong> This live session needs admin approval before it can be published.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Live session created email sent to admin:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending live session created email to admin:', error);
+    throw new Error('Failed to send live session created email to admin');
+  }
+};
+
+export const sendLiveSessionApprovedEmailToProfessor = async (professorEmail, professorName, sessionTitle, adminName) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', professorEmail);
+      console.log('Subject: Live Session Approved');
+      console.log('Professor:', professorName);
+      console.log('Session:', sessionTitle);
+      console.log('Admin:', adminName);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: professorEmail,
+      subject: 'Live Session Approved - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Live Session Approved!</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${professorName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Great news! Your live session has been approved and is now live on the platform.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Session Details:</h3>
+              <p><strong>Session Title:</strong> ${sessionTitle}</p>
+              <p><strong>Status:</strong> Approved</p>
+              <p><strong>Approved By:</strong> ${adminName}</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Your live session is now available to students and can be purchased on the platform.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/professor/live-sessions" 
+                 style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View My Live Sessions
+              </a>
+            </div>
+            
+            <div style="background: #d1fae5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+              <p style="margin: 0; color: #065f46; font-size: 14px;">
+                <strong>Congratulations!</strong> Your live session is now live and ready to help students learn.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Live session approved email sent to professor:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending live session approved email to professor:', error);
+    throw new Error('Failed to send live session approved email to professor');
+  }
+};
+
+export const sendLiveSessionRejectedEmailToProfessor = async (professorEmail, professorName, sessionTitle, adminName, reason) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', professorEmail);
+      console.log('Subject: Live Session Rejected');
+      console.log('Professor:', professorName);
+      console.log('Session:', sessionTitle);
+      console.log('Admin:', adminName);
+      console.log('Reason:', reason);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: professorEmail,
+      subject: 'Live Session Rejected - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Live Session Rejected</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${professorName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              We regret to inform you that your live session has been rejected.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #ef4444; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Session Details:</h3>
+              <p><strong>Session Title:</strong> ${sessionTitle}</p>
+              <p><strong>Status:</strong> Rejected</p>
+              <p><strong>Rejected By:</strong> ${adminName}</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Please review the feedback and make necessary improvements before resubmitting.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/professor/live-sessions" 
+                 style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View My Live Sessions
+              </a>
+            </div>
+            
+            <div style="background: #fee2e2; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
+              <p style="margin: 0; color: #991b1b; font-size: 14px;">
+                <strong>Next Steps:</strong> Please address the feedback and resubmit your live session for approval.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Live session rejected email sent to professor:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending live session rejected email to professor:', error);
+    throw new Error('Failed to send live session rejected email to professor');
+  }
+};
+
+// Live Section Email Functions
+export const sendLiveSectionCreatedEmailToAdmin = async (adminEmail, adminName, professorName, sectionTitle) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', adminEmail);
+      console.log('Subject: New Live Section Created');
+      console.log('Admin:', adminName);
+      console.log('Professor:', professorName);
+      console.log('Section:', sectionTitle);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: adminEmail,
+      subject: 'New Live Section Created - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">New Live Section Created</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${adminName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              A new live section has been created and requires your approval.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #3b82f6; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Section Details:</h3>
+              <p><strong>Section Title:</strong> ${sectionTitle}</p>
+              <p><strong>Created By:</strong> ${professorName}</p>
+              <p><strong>Status:</strong> Pending Approval</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Please review the live section and approve or reject it accordingly.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/pending" 
+                 style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                Review Live Section
+              </a>
+            </div>
+            
+            <div style="background: #dbeafe; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+              <p style="margin: 0; color: #1e40af; font-size: 14px;">
+                <strong>Action Required:</strong> Please review and approve or reject this live section within 24 hours.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Live section created email sent to admin:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending live section created email to admin:', error);
+    throw new Error('Failed to send live section created email to admin');
+  }
+};
+
+export const sendLiveSectionApprovedEmailToProfessor = async (professorEmail, professorName, sectionTitle, adminName) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', professorEmail);
+      console.log('Subject: Live Section Approved');
+      console.log('Professor:', professorName);
+      console.log('Section:', sectionTitle);
+      console.log('Admin:', adminName);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: professorEmail,
+      subject: 'Live Section Approved - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Live Section Approved</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${professorName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Congratulations! Your live section has been approved and is now available to students.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Section Details:</h3>
+              <p><strong>Section Title:</strong> ${sectionTitle}</p>
+              <p><strong>Status:</strong> Approved</p>
+              <p><strong>Approved By:</strong> ${adminName}</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Your live section is now live and students can enroll in it. You can start creating live sessions within this section.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/professor/live-sections" 
+                 style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View My Live Sections
+              </a>
+            </div>
+            
+            <div style="background: #d1fae5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+              <p style="margin: 0; color: #065f46; font-size: 14px;">
+                <strong>Next Steps:</strong> You can now create live sessions within this approved section and start teaching!
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Live section approved email sent to professor:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending live section approved email to professor:', error);
+    throw new Error('Failed to send live section approved email to professor');
+  }
+};
+
+export const sendLiveSectionRejectedEmailToProfessor = async (professorEmail, professorName, sectionTitle, adminName, reason) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', professorEmail);
+      console.log('Subject: Live Section Rejected');
+      console.log('Professor:', professorName);
+      console.log('Section:', sectionTitle);
+      console.log('Admin:', adminName);
+      console.log('Reason:', reason);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: professorEmail,
+      subject: 'Live Section Rejected - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Live Section Rejected</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${professorName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              We regret to inform you that your live section has been rejected.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #ef4444; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Section Details:</h3>
+              <p><strong>Section Title:</strong> ${sectionTitle}</p>
+              <p><strong>Status:</strong> Rejected</p>
+              <p><strong>Rejected By:</strong> ${adminName}</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Please review the feedback and make necessary improvements before resubmitting.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/professor/live-sections" 
+                 style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View My Live Sections
+              </a>
+            </div>
+            
+            <div style="background: #fee2e2; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
+              <p style="margin: 0; color: #991b1b; font-size: 14px;">
+                <strong>Next Steps:</strong> Please address the feedback and resubmit your live section for approval.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Live section rejected email sent to professor:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending live section rejected email to professor:', error);
+    throw new Error('Failed to send live section rejected email to professor');
+  }
+};
+
+// Session Reminder Email Functions
+export const sendLiveSessionReminderEmailToStudent = async (studentEmail, studentName, sessionTitle, professorName, startTime) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', studentEmail);
+      console.log('Subject: Live Session Starting Soon');
+      console.log('Student:', studentName);
+      console.log('Session:', sessionTitle);
+      console.log('Professor:', professorName);
+      console.log('Start Time:', startTime);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: studentEmail,
+      subject: 'Live Session Starting Soon - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Live Session Reminder</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${studentName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Your live session is starting in 15 minutes! Please make sure you're ready to join.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #3b82f6; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Session Details:</h3>
+              <p><strong>Session Title:</strong> ${sessionTitle}</p>
+              <p><strong>Professor:</strong> ${professorName}</p>
+              <p><strong>Start Time:</strong> ${startTime}</p>
+              <p><strong>Status:</strong> Starting in 15 minutes</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Please ensure you have a stable internet connection and are in a quiet environment for the best learning experience.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/live-sessions" 
+                 style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                Join Live Session
+              </a>
+            </div>
+            
+            <div style="background: #dbeafe; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+              <p style="margin: 0; color: #1e40af; font-size: 14px;">
+                <strong>Reminder:</strong> You can join the session 15 minutes before the scheduled start time.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Live session reminder email sent to student:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending live session reminder email to student:', error);
+    throw new Error('Failed to send live session reminder email to student');
+  }
+};
+
+export const sendLiveSessionReminderEmailToProfessor = async (professorEmail, professorName, sessionTitle, startTime) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', professorEmail);
+      console.log('Subject: Live Session Starting Soon');
+      console.log('Professor:', professorName);
+      console.log('Session:', sessionTitle);
+      console.log('Start Time:', startTime);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: professorEmail,
+      subject: 'Live Session Starting Soon - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Live Session Reminder</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${professorName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Your live session is starting in 15 minutes! Please make sure you're ready to begin.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Session Details:</h3>
+              <p><strong>Session Title:</strong> ${sessionTitle}</p>
+              <p><strong>Start Time:</strong> ${startTime}</p>
+              <p><strong>Status:</strong> Starting in 15 minutes</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Please ensure your equipment is working properly and you're in a quiet environment for the best teaching experience.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/professor/live-sessions" 
+                 style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                Start Live Session
+              </a>
+            </div>
+            
+            <div style="background: #d1fae5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+              <p style="margin: 0; color: #065f46; font-size: 14px;">
+                <strong>Reminder:</strong> Students can join the session 15 minutes before the scheduled start time.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Live session reminder email sent to professor:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending live session reminder email to professor:', error);
+    throw new Error('Failed to send live session reminder email to professor');
+  }
+};
+
+export const sendPrivateClassReminderEmailToStudent = async (studentEmail, studentName, classTitle, teacherName, startTime) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', studentEmail);
+      console.log('Subject: Private Class Starting Soon');
+      console.log('Student:', studentName);
+      console.log('Class:', classTitle);
+      console.log('Teacher:', teacherName);
+      console.log('Start Time:', startTime);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: studentEmail,
+      subject: 'Private Class Starting Soon - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Private Class Reminder</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${studentName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Your private class is starting in 15 minutes! Please make sure you're ready to join.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #8b5cf6; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Class Details:</h3>
+              <p><strong>Class Title:</strong> ${classTitle}</p>
+              <p><strong>Teacher:</strong> ${teacherName}</p>
+              <p><strong>Start Time:</strong> ${startTime}</p>
+              <p><strong>Status:</strong> Starting in 15 minutes</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Please ensure you have a stable internet connection and are in a quiet environment for the best learning experience.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/private-classes" 
+                 style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                Join Private Class
+              </a>
+            </div>
+            
+            <div style="background: #f3e8ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #8b5cf6;">
+              <p style="margin: 0; color: #581c87; font-size: 14px;">
+                <strong>Reminder:</strong> You can join the class 15 minutes before the scheduled start time.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Private class reminder email sent to student:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending private class reminder email to student:', error);
+    throw new Error('Failed to send private class reminder email to student');
+  }
+};
+
+export const sendPrivateClassReminderEmailToProfessor = async (teacherEmail, teacherName, classTitle, studentName, startTime) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', teacherEmail);
+      console.log('Subject: Private Class Starting Soon');
+      console.log('Teacher:', teacherName);
+      console.log('Class:', classTitle);
+      console.log('Student:', studentName);
+      console.log('Start Time:', startTime);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: teacherEmail,
+      subject: 'Private Class Starting Soon - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Private Class Reminder</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${teacherName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Your private class is starting in 15 minutes! Please make sure you're ready to begin.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #8b5cf6; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Class Details:</h3>
+              <p><strong>Class Title:</strong> ${classTitle}</p>
+              <p><strong>Student:</strong> ${studentName}</p>
+              <p><strong>Start Time:</strong> ${startTime}</p>
+              <p><strong>Status:</strong> Starting in 15 minutes</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Please ensure your equipment is working properly and you're in a quiet environment for the best teaching experience.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/professor/private-classes" 
+                 style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                Start Private Class
+              </a>
+            </div>
+            
+            <div style="background: #f3e8ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #8b5cf6;">
+              <p style="margin: 0; color: #581c87; font-size: 14px;">
+                <strong>Reminder:</strong> Students can join the class 15 minutes before the scheduled start time.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Private class reminder email sent to teacher:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending private class reminder email to teacher:', error);
+    throw new Error('Failed to send private class reminder email to teacher');
+  }
+};
+
+// Quiz Email Functions
+export const sendQuizCreatedEmailToAdmin = async (adminEmail, adminName, professorName, quizTitle, courseTitle) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', adminEmail);
+      console.log('Subject: New Quiz Created');
+      console.log('Admin:', adminName);
+      console.log('Professor:', professorName);
+      console.log('Quiz Title:', quizTitle);
+      console.log('Course Title:', courseTitle);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: adminEmail,
+      subject: 'New Quiz Created - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">New Quiz Requires Approval</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${adminName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              A new quiz has been created and requires your approval.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #ff6b35; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Quiz Details:</h3>
+              <p><strong>Quiz Title:</strong> ${quizTitle}</p>
+              <p><strong>Course:</strong> ${courseTitle}</p>
+              <p><strong>Created By:</strong> ${professorName}</p>
+              <p><strong>Status:</strong> Pending Approval</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Please review the quiz content and approve or reject it accordingly.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/quiz-management" 
+                 style="background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                Review Quiz
+              </a>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Quiz creation email sent to admin:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending quiz creation email to admin:', error);
+    throw new Error('Failed to send quiz creation email to admin');
+  }
+};
+
+export const sendQuizApprovedEmailToProfessor = async (professorEmail, professorName, quizTitle, courseTitle, adminName) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', professorEmail);
+      console.log('Subject: Quiz Approved');
+      console.log('Professor:', professorName);
+      console.log('Quiz Title:', quizTitle);
+      console.log('Course Title:', courseTitle);
+      console.log('Admin:', adminName);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: professorEmail,
+      subject: 'Quiz Approved - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Quiz Approved!</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${professorName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Great news! Your quiz has been <strong>approved</strong> by <strong>${adminName}</strong>.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #28a745; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Quiz Details:</h3>
+              <p><strong>Quiz Title:</strong> ${quizTitle}</p>
+              <p><strong>Course:</strong> ${courseTitle}</p>
+              <p><strong>Status:</strong> Approved</p>
+              <p><strong>Approved By:</strong> ${adminName}</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Your quiz is now available to students enrolled in the course. Students will be notified about the new quiz.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/professor/my-quizzes" 
+                 style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View My Quizzes
+              </a>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Quiz approval email sent to professor:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending quiz approval email to professor:', error);
+    throw new Error('Failed to send quiz approval email to professor');
+  }
+};
+
+export const sendQuizApprovedEmailToStudent = async (studentEmail, studentName, quizTitle, courseTitle, professorName) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', studentEmail);
+      console.log('Subject: New Quiz Available');
+      console.log('Student:', studentName);
+      console.log('Quiz Title:', quizTitle);
+      console.log('Course Title:', courseTitle);
+      console.log('Professor:', professorName);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: studentEmail,
+      subject: 'New Quiz Available - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">New Quiz Available!</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${studentName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              A new quiz is now available for one of your enrolled courses!
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #007bff; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Quiz Details:</h3>
+              <p><strong>Quiz Title:</strong> ${quizTitle}</p>
+              <p><strong>Course:</strong> ${courseTitle}</p>
+              <p><strong>Professor:</strong> ${professorName}</p>
+              <p><strong>Status:</strong> Available</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              You can now take this quiz to test your knowledge and track your progress in the course.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/student/dashboard" 
+                 style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                Take Quiz
+              </a>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Quiz approval email sent to student:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending quiz approval email to student:', error);
+    throw new Error('Failed to send quiz approval email to student');
+  }
+};
+
+export const sendPointCodeUsedEmailToAdmin = async (adminEmail, adminName, userName, code, points) => {
+  try {
+    // In development, optionally log instead of sending
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_EMAILS === 'true') {
+      console.log('📧 EMAIL LOG (not sent):');
+      console.log('To:', adminEmail);
+      console.log('Subject: Point Code Used');
+      console.log('Admin:', adminName);
+      console.log('User:', userName);
+      console.log('Code:', code);
+      console.log('Points:', points);
+      return true;
+    }
+    
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@yourdomain.com',
+      to: adminEmail,
+      subject: 'Point Code Used - TTA Learning Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${getSchoolLogo()}
+          <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">TTA Learning Platform</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Point Code Redeemed</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${adminName},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              A student has successfully used a point code to redeem points.
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0;">
+              <h3 style="color: #333; margin-bottom: 15px;">Redemption Details:</h3>
+              <p><strong>Student:</strong> ${userName}</p>
+              <p><strong>Code Used:</strong> ${code}</p>
+              <p><strong>Points Redeemed:</strong> ${points} points</p>
+              <p><strong>Status:</strong> Successfully redeemed</p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              The student's points balance has been updated accordingly.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/point-codes" 
+                 style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                        color: white; 
+                        padding: 15px 30px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: bold; 
+                        display: inline-block;">
+                View Point Codes
+              </a>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 30px;">
+              Best regards,<br>
+              The TTA Learning Platform Team
+            </p>
+          </div>
+          
+          <div style="background: #343a40; padding: 20px; text-align: center; color: white;">
+            <p style="margin: 0; font-size: 14px; opacity: 0.8;">
+              © 2024 TTA Learning Platform. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Point code usage email sent to admin:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending point code usage email to admin:', error);
+    throw new Error('Failed to send point code usage email to admin');
   }
 }; 

@@ -33,6 +33,7 @@ export const usePrivateClasses = () => {
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [allOrdersLoading, setAllOrdersLoading] = useState(false);
   const [pricingSettings, setPricingSettings] = useState(null);
+  const [submitLoading, setSubmitLoading] = useState(false);
 
   // Fetch hierarchy data and pricing settings
   useEffect(() => {
@@ -448,6 +449,7 @@ export const usePrivateClasses = () => {
     const selectedYearObj = years.find(y => y.id === parseInt(selectedYear));
     const grade = selectedLevelObj && selectedYearObj ? `${selectedYearObj.name} ${selectedLevelObj.name}` : '';
     
+    setSubmitLoading(true);
     try {
       // Create multiple requests for each date
       const requests = [];
@@ -514,6 +516,8 @@ export const usePrivateClasses = () => {
       alert(`تم إرسال ${sessionsCount} طلب بنجاح!`);
     } catch (error) {
       alert(error.message || 'حدث خطأ في إرسال الطلبات');
+    } finally {
+      setSubmitLoading(false);
     }
   };
 
@@ -552,6 +556,7 @@ export const usePrivateClasses = () => {
     hierarchyLoading,
     requestsLoading,
     allOrdersLoading,
+    submitLoading,
     isRequestModalOpen,
     requestForm,
     myPendingRequests,
