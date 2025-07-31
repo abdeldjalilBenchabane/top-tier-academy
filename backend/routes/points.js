@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from '../db.js';
 import { verifyToken as auth } from '../middleware/auth.js';
+import NotificationService from '../services/notificationService.js';
 
 const router = express.Router();
 
@@ -375,7 +376,7 @@ router.post('/buy-course', auth, async (req, res) => {
     }
 
     // Check if course exists and get price, material_id, language_level_id
-    const courseRes = await pool.query('SELECT id, price, material_id, language_level_id FROM courses WHERE id = $1', [courseId]);
+    const courseRes = await pool.query('SELECT id, title, price, material_id, language_level_id, created_by FROM courses WHERE id = $1', [courseId]);
     if (courseRes.rows.length === 0) {
       return res.status(404).json({ error: 'Course not found' });
     }
@@ -419,6 +420,24 @@ router.post('/buy-course', auth, async (req, res) => {
       return res.status(400).json({ error: 'Not enough points' });
     }
 
+    // Get student and professor information for notifications
+    const studentRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [userId]);
+    const student = studentRes.rows[0];
+    
+    let professor = null;
+    if (course.created_by) {
+      const professorRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [course.created_by]);
+      professor = professorRes.rows[0];
+    }
+
+    // Determine course type
+    let courseType = 'course';
+    if (course.material_id) {
+      courseType = 'education course';
+    } else if (course.language_level_id) {
+      courseType = 'language course';
+    }
+
     // Deduct points and record purchase in a transaction
     const client = await pool.connect();
     try {
@@ -450,6 +469,54 @@ router.post('/buy-course', auth, async (req, res) => {
     } finally {
       client.release();
     }
+
+    // Send notifications and emails
+    try {
+      // Import notification and email services
+      const NotificationService = (await import('../services/notificationService.js')).default;
+      const { sendCoursePurchaseEmailToProfessor, sendCoursePurchaseEmailToAdmin } = await import('../services/emailService.js');
+
+      // Send notifications
+      await NotificationService.notifyCoursePurchased(
+        courseId,
+        course.title || 'Unknown Course',
+        student.name,
+        userId,
+        price,
+        courseType
+      );
+
+      // Send emails
+      if (professor) {
+        await sendCoursePurchaseEmailToProfessor(
+          professor.email,
+          professor.name,
+          student.name,
+          course.title || 'Unknown Course',
+          price,
+          courseType
+        );
+      }
+
+      // Send emails to all admins
+      const adminRes = await pool.query('SELECT name, email FROM users WHERE role = $1', ['admin']);
+      for (const admin of adminRes.rows) {
+        await sendCoursePurchaseEmailToAdmin(
+          admin.email,
+          admin.name,
+          student.name,
+          course.title || 'Unknown Course',
+          price,
+          courseType
+        );
+      }
+
+      console.log(`✅ Course purchase notifications and emails sent for course ${courseId}`);
+    } catch (error) {
+      console.error('Error sending course purchase notifications/emails:', error);
+      // Don't fail the purchase if notifications fail
+    }
+
     // Get new balance
     const newPointsRes = await pool.query('SELECT balance FROM user_points WHERE user_id = $1', [userId]);
     const newBalance = newPointsRes.rows[0]?.balance || 0;
@@ -852,6 +919,19 @@ router.post('/admin/buy-for-student', auth, requireAdmin, async (req, res) => {
       
       await client.query('COMMIT');
       console.log(`Transaction committed successfully for request ID: ${requestId}`);
+      
+      // Send notification to user about points purchase
+      try {
+        await NotificationService.notifyPointsPurchased(userId, points, amount);
+        console.log('Notification sent for admin points purchase:', {
+          user_id: userId,
+          points: points,
+          amount: amount
+        });
+      } catch (notificationError) {
+        console.error('Failed to send admin points purchase notification:', notificationError);
+        // Don't fail the transaction if notification fails
+      }
       
       console.log(`Admin ${req.user.name} added ${points} points to user ${userId} (package: ${packageName}) - Request ID: ${requestId}`);
       console.log(`=== ADMIN BUY POINTS COMPLETED for request ID: ${requestId} ===`);

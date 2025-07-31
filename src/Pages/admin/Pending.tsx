@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Inbox, User, Calendar, CheckCircle, XCircle, Video, BookOpen, Globe, Clock } from 'lucide-react';
+import { Inbox, User, Calendar, CheckCircle, XCircle, Video, BookOpen, Globe, Clock, RotateCw } from 'lucide-react';
 import PathSelector from '@/components/admin/PathSelector';
 import { toast } from '@/lib/toast';
 import { useNavigate } from 'react-router-dom';
@@ -50,6 +50,13 @@ const PendingPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState<PendingCourse | null>(null);
   const [showPathSelector, setShowPathSelector] = useState(false);
+  const [liveSectionRejectDialogOpen, setLiveSectionRejectDialogOpen] = useState(false);
+  const [liveSectionRejectReason, setLiveSectionRejectReason] = useState('');
+  const [sectionToReject, setSectionToReject] = useState<PendingLiveSection | null>(null);
+  const [approvingCourse, setApprovingCourse] = useState<string | null>(null);
+  const [rejectingCourse, setRejectingCourse] = useState<string | null>(null);
+  const [approvingLiveSection, setApprovingLiveSection] = useState<number | null>(null);
+  const [rejectingLiveSection, setRejectingLiveSection] = useState<number | null>(null);
 
 
   // Calculate counts for live sections
@@ -100,6 +107,39 @@ const PendingPage = () => {
     fetchPendingCourses();
     refreshPendingCount(); // Refresh the sidebar count
     toast.success('Course processed successfully');
+  };
+
+  const handleLiveSectionReject = async () => {
+    if (!sectionToReject) return;
+    
+    setRejectingLiveSection(sectionToReject.id);
+    try {
+      await fetch(`/api/admin/live-sections/${sectionToReject.id}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ reason: liveSectionRejectReason })
+      });
+      
+      fetchPendingLiveSections();
+      refreshPendingCount();
+      toast.success('Live section rejected successfully');
+      setLiveSectionRejectDialogOpen(false);
+      setLiveSectionRejectReason('');
+      setSectionToReject(null);
+    } catch (error) {
+      console.error('Error rejecting live section:', error);
+      toast.error('Failed to reject live section');
+    } finally {
+      setRejectingLiveSection(null);
+    }
+  };
+
+  const openLiveSectionRejectDialog = (section: PendingLiveSection) => {
+    setSectionToReject(section);
+    setLiveSectionRejectDialogOpen(true);
   };
 
 
@@ -221,7 +261,9 @@ const PendingPage = () => {
                           <CardFooter className="flex justify-end gap-2">
                             <Button 
                               variant="destructive"
+                              disabled={approvingCourse === course.id || rejectingCourse === course.id}
                               onClick={async () => {
+                                setRejectingCourse(course.id);
                                 const reason = window.prompt('Enter rejection reason (optional):') || '';
                                 try {
                                   await api.rejectCourseAdmin(course.id, reason);
@@ -230,14 +272,25 @@ const PendingPage = () => {
                                   refreshPendingCount();
                                 } catch (err) {
                                   toast.error('Failed to reject course');
+                                } finally {
+                                  setRejectingCourse(null);
                                 }
                               }}
                             >
-                              Reject
+                              {rejectingCourse === course.id ? (
+                                <>
+                                  <RotateCw className="h-4 w-4 mr-2 animate-spin" />
+                                  Rejecting...
+                                </>
+                              ) : (
+                                'Reject'
+                              )}
                             </Button>
                             <Button 
                               variant="outline"
+                              disabled={approvingCourse === course.id || rejectingCourse === course.id}
                               onClick={async () => {
+                                setApprovingCourse(course.id);
                                 try {
                                   await api.approveCourseAdmin(course.id);
                                   toast.success('Course approved');
@@ -245,10 +298,19 @@ const PendingPage = () => {
                                   navigate('/admin/courses');
                                 } catch (err) {
                                   toast.error('Failed to approve course');
+                                } finally {
+                                  setApprovingCourse(null);
                                 }
                               }}
                             >
-                              Approve
+                              {approvingCourse === course.id ? (
+                                <>
+                                  <RotateCw className="h-4 w-4 mr-2 animate-spin" />
+                                  Approving...
+                                </>
+                              ) : (
+                                'Approve'
+                              )}
                             </Button>
                           </CardFooter>
                         </Card>
@@ -354,32 +416,26 @@ const PendingPage = () => {
                           <CardFooter className="flex justify-end gap-2">
                             <Button 
                               variant="destructive"
-                              onClick={async () => {
-                                const reason = window.prompt('Enter rejection reason (optional):') || '';
-                                try {
-                                  await fetch(`/api/admin/live-sections/${section.id}/reject`, {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                      'Authorization': `Bearer ${localStorage.getItem('token')}`
-                                    },
-                                    body: JSON.stringify({ reason })
-                                  });
-                                  fetchPendingLiveSections();
-                                  refreshPendingCount();
-                                  toast.success('Live section rejected successfully');
-                                } catch (error) {
-                                  console.error('Error rejecting live section:', error);
-                                  toast.error('Failed to reject live section');
-                                }
-                              }}
+                              disabled={approvingLiveSection === section.id || rejectingLiveSection === section.id}
+                              onClick={() => openLiveSectionRejectDialog(section)}
                             >
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Reject
+                              {rejectingLiveSection === section.id ? (
+                                <>
+                                  <RotateCw className="h-4 w-4 mr-2 animate-spin" />
+                                  Rejecting...
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Reject
+                                </>
+                              )}
                             </Button>
                             <Button 
                               variant="default"
+                              disabled={approvingLiveSection === section.id || rejectingLiveSection === section.id}
                               onClick={async () => {
+                                setApprovingLiveSection(section.id);
                                 try {
                                   await fetch(`/api/admin/live-sections/${section.id}/approve`, {
                                     method: 'POST',
@@ -393,11 +449,22 @@ const PendingPage = () => {
                                 } catch (error) {
                                   console.error('Error approving live section:', error);
                                   toast.error('Failed to approve live section');
+                                } finally {
+                                  setApprovingLiveSection(null);
                                 }
                               }}
                             >
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Approve
+                              {approvingLiveSection === section.id ? (
+                                <>
+                                  <RotateCw className="h-4 w-4 mr-2 animate-spin" />
+                                  Approving...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Approve
+                                </>
+                              )}
                             </Button>
                           </CardFooter>
                         </Card>
@@ -456,8 +523,54 @@ const PendingPage = () => {
         </Tabs>
       )}
 
-
-      
+      {/* Live Section Rejection Dialog */}
+      <Dialog open={liveSectionRejectDialogOpen} onOpenChange={setLiveSectionRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Live Section</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to reject "{sectionToReject?.title}"? Please provide a reason for the rejection.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="liveSectionRejectReason" className="block text-sm font-medium text-gray-700 mb-2">
+                Rejection Reason
+              </label>
+              <Textarea
+                id="liveSectionRejectReason"
+                placeholder="Enter the reason for rejection..."
+                value={liveSectionRejectReason}
+                onChange={(e) => setLiveSectionRejectReason(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => {
+              setLiveSectionRejectDialogOpen(false);
+              setLiveSectionRejectReason('');
+              setSectionToReject(null);
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleLiveSectionReject}
+              disabled={!liveSectionRejectReason.trim() || rejectingLiveSection === sectionToReject?.id}
+            >
+              {rejectingLiveSection === sectionToReject?.id ? (
+                <>
+                  <RotateCw className="h-4 w-4 mr-2 animate-spin" />
+                  Rejecting...
+                </>
+              ) : (
+                'Reject Section'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

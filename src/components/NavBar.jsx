@@ -7,6 +7,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { pointsAPI } from '@/services/api';
 import { UserAvatar } from './ui';
+import NotificationBell from './ui/NotificationBell';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -156,6 +157,9 @@ const Navbar = () => {
           <div className="flex items-center gap-3 whitespace-nowrap">
             {user && isStudent ? (
               <>
+                {/* Notification Bell for Students */}
+                <NotificationBell />
+                
                 {/* Points/Money Icon for Students */}
                 <Link to="/points" className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 rounded-full px-3 py-2 transition-all duration-200 text-white font-medium">
                   <FaCoins className="w-4 h-4" />
@@ -232,6 +236,11 @@ const Navbar = () => {
             <div className="mt-4 pt-4 border-t border-blue-500 px-4 space-y-3">
               {user && isStudent ? (
                 <>
+                  {/* Notification Bell in mobile menu for Students */}
+                  <div className="px-4 py-2">
+                    <NotificationBell />
+                  </div>
+                  
                   {/* Points in mobile menu for Students */}
                   <Link to="/points" className="flex items-center gap-2 py-2 px-4 rounded hover:bg-white/20 transition" onClick={() => setIsMenuOpen(false)}>
                     <FaCoins className="w-4 h-4 text-yellow-400" />

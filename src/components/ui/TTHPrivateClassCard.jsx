@@ -3,7 +3,7 @@ import { FaCalendarAlt, FaClock, FaBookOpen, FaEye, FaUserTie, FaChalkboardTeach
 import { formatDate } from '../../data/index';
 import { useAuth } from '../../contexts/AuthContext';
 
-const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionLoading, showActions, studentName, onEditTime, onJoinLive, onPurchase, purchaseLoading }) => {
+const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionLoading, showActions, studentName, onEditTime, onJoinLive, onPurchase, purchaseLoading, approvingRequest, rejectingRequest, editingTimeRequest }) => {
   const { isProfessor, user } = useAuth();
   
   // Check if this session belongs to the current user
@@ -188,18 +188,38 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
         {isProfessor && showActions && session.status === 'في الانتظار' && (
           <div className="flex flex-row gap-2 mt-4 flex-nowrap">
             <button
-              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition"
+              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={() => onAccept && onAccept(session.id)}
-              disabled={actionLoading}
+              disabled={approvingRequest === session.id || rejectingRequest === session.id}
             >
-              قبول
+              {approvingRequest === session.id ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  جاري القبول...
+                </>
+              ) : (
+                'قبول'
+              )}
             </button>
             <button
-              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition"
+              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={() => onRefuse && onRefuse(session.id)}
-              disabled={actionLoading}
+              disabled={approvingRequest === session.id || rejectingRequest === session.id}
             >
-              رفض
+              {rejectingRequest === session.id ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  جاري الرفض...
+                </>
+              ) : (
+                'رفض'
+              )}
             </button>
           </div>
         )}
@@ -210,10 +230,21 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
             <div className="text-green-700 font-bold text-center mt-2">تم قبول الطلب</div>
             {/* Show edit button always for professors */}
             <button
-              className="w-full mt-2 px-4 py-2 bg-yellow-500 text-white rounded-lg font-bold hover:bg-yellow-600 transition"
+              className="w-full mt-2 px-4 py-2 bg-yellow-500 text-white rounded-lg font-bold hover:bg-yellow-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={() => onEditTime && onEditTime(session)}
+              disabled={editingTimeRequest === session.id}
             >
-              تعديل التوقيت
+              {editingTimeRequest === session.id ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  جاري التحديث...
+                </>
+              ) : (
+                'تعديل التوقيت'
+              )}
             </button>
             
             {/* Payment Status for Professors */}

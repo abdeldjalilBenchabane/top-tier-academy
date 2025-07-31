@@ -8,6 +8,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
+import NotificationService from '../services/notificationService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -99,7 +100,6 @@ router.post('/professors/:professorId/live-sessions',
     });
     
     const professor_id = req.user.id;
-    const professor_name = req.user.name || `ID ${professor_id}`;
 
     if (parseInt(req.params.professorId, 10) !== professor_id) {
         return res.status(403).json({ error: "Forbidden: You can only create sessions for yourself." });
@@ -110,13 +110,18 @@ router.post('/professors/:professorId/live-sessions',
     }
 
     try {
+        // Fetch professor name from database
+        const professorRes = await pool.query('SELECT name FROM users WHERE id = $1', [professor_id]);
+        if (professorRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Professor not found' });
+        }
+        const professor_name = professorRes.rows[0].name;
+
         // Handle file upload if present
         let cover_image_url = null;
-        if (req.files && req.files.length > 0) {
-            const coverFile = req.files.find(f => f.fieldname === 'cover_image');
-            if (coverFile) {
-                cover_image_url = `/uploads/live-sessions/${coverFile.filename}`;
-            }
+        if (req.file) {
+            cover_image_url = `/uploads/live-sessions/${req.file.filename}`;
+            console.log('[DEBUG] Cover image uploaded:', cover_image_url);
         }
 
         const result = await pool.query(
@@ -149,14 +154,35 @@ router.post('/professors/:professorId/live-sessions',
             telegram_channel: telegram_channel || null
         });
 
-        // Notify all admins
-        const adminsRes = await pool.query('SELECT id FROM users WHERE role = $1', ['admin']);
-        const notificationMessage = `Prof. ${professor_name} scheduled a new session: \"${title}\"`;
-        for (const admin of adminsRes.rows) {
-            await pool.query(
-                'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
-                [admin.id, notificationMessage]
+        // Send notifications and emails for live session creation
+        try {
+            // Import notification and email services
+            const NotificationService = (await import('../services/notificationService.js')).default;
+            const { sendLiveSessionCreatedEmailToAdmin } = await import('../services/emailService.js');
+
+            // Send notifications to all admins
+            await NotificationService.notifyLiveSessionCreated(
+                session.id,
+                title,
+                professor_name,
+                professor_id
             );
+
+            // Send emails to all admins
+            const adminRes = await pool.query('SELECT name, email FROM users WHERE role = $1', ['admin']);
+            for (const admin of adminRes.rows) {
+                await sendLiveSessionCreatedEmailToAdmin(
+                    admin.email,
+                    admin.name,
+                    professor_name,
+                    title
+                );
+            }
+
+            console.log(`✅ Live session creation notifications and emails sent for session ${session.id}`);
+        } catch (error) {
+            console.error('Error sending live session creation notifications/emails:', error);
+            // Don't fail the session creation if notifications fail
         }
 
         res.status(201).json(session);
@@ -206,6 +232,7 @@ router.put('/live-sessions/:id', verifyToken, requireProfessor, (req, res, next)
             const coverFile = req.files.find(f => f.fieldname === 'cover_image');
             if (coverFile) {
                 cover_image_url = `/uploads/live-sessions/${coverFile.filename}`;
+                console.log('[DEBUG] Cover image uploaded for update:', cover_image_url);
             }
         }
 
@@ -483,6 +510,62 @@ router.post('/live-sessions/:sessionId/purchase', verifyToken, requireStudent, a
 
             console.log(`[PURCHASE] Successfully purchased session ${sessionId} for student ${student_id}, amount: ${session.price}`);
 
+            // Send notifications and emails
+            try {
+                // Import notification and email services
+                const NotificationService = (await import('../services/notificationService.js')).default;
+                const { sendLiveSessionPurchaseEmailToProfessor, sendLiveSessionPurchaseEmailToAdmin } = await import('../services/emailService.js');
+
+                // Get student information
+                const studentRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [student_id]);
+                const student = studentRes.rows[0];
+
+                // Get professor information
+                let professor = null;
+                if (session.professor_id) {
+                    const professorRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [session.professor_id]);
+                    professor = professorRes.rows[0];
+                }
+
+                // Send notifications
+                await NotificationService.notifyLiveSessionPurchased(
+                    sessionId,
+                    session.title,
+                    professor ? professor.name : 'Unknown Professor',
+                    student.name,
+                    student_id,
+                    session.price
+                );
+
+                // Send emails
+                if (professor) {
+                    await sendLiveSessionPurchaseEmailToProfessor(
+                        professor.email,
+                        professor.name,
+                        student.name,
+                        session.title,
+                        session.price
+                    );
+                }
+
+                // Send emails to all admins
+                const adminRes = await pool.query('SELECT name, email FROM users WHERE role = $1', ['admin']);
+                for (const admin of adminRes.rows) {
+                    await sendLiveSessionPurchaseEmailToAdmin(
+                        admin.email,
+                        admin.name,
+                        student.name,
+                        session.title,
+                        session.price
+                    );
+                }
+
+                console.log(`✅ Live session purchase notifications and emails sent for session ${sessionId}`);
+            } catch (error) {
+                console.error('Error sending live session purchase notifications/emails:', error);
+                // Don't fail the purchase if notifications fail
+            }
+
             // Get updated balance
             const newBalanceRes = await pool.query('SELECT balance FROM user_points WHERE user_id = $1', [student_id]);
             const newBalance = newBalanceRes.rows[0].balance;
@@ -648,11 +731,44 @@ router.patch('/live-sessions/:id/approve', verifyToken, requireRole(['admin']), 
             return res.status(404).json({ error: 'Session not found' });
         }
         const session = result.rows[0];
-        // Notify professor
-        await pool.query(
-            'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
-            [session.professor_id, `Your live session "${session.title}" has been approved by the admin.`]
-        );
+        
+        // Send notifications and emails for live session approval
+        try {
+            // Import notification and email services
+            const NotificationService = (await import('../services/notificationService.js')).default;
+            const { sendLiveSessionApprovedEmailToProfessor } = await import('../services/emailService.js');
+
+            // Get professor information
+            const professorRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [session.professor_id]);
+            const professor = professorRes.rows[0];
+
+            // Get admin information
+            const adminRes = await pool.query('SELECT name FROM users WHERE id = $1', [req.user.id]);
+            const admin = adminRes.rows[0];
+
+            // Send notification to professor
+            await NotificationService.notifyLiveSessionApproved(
+                session.id,
+                session.title,
+                session.professor_id,
+                professor.name,
+                admin.name
+            );
+
+            // Send email to professor
+            await sendLiveSessionApprovedEmailToProfessor(
+                professor.email,
+                professor.name,
+                session.title,
+                admin.name
+            );
+
+            console.log(`✅ Live session approval notifications and emails sent for session ${session.id}`);
+        } catch (error) {
+            console.error('Error sending live session approval notifications/emails:', error);
+            // Don't fail the approval if notifications fail
+        }
+        
         res.json({ message: 'Session approved successfully' });
     } catch (error) {
         console.error('Error approving session:', error);
@@ -663,6 +779,7 @@ router.patch('/live-sessions/:id/approve', verifyToken, requireRole(['admin']), 
 // PATCH /api/live-sessions/:id/reject
 router.patch('/live-sessions/:id/reject', verifyToken, requireRole(['admin']), async (req, res) => {
     const { id } = req.params;
+    const { reason } = req.body; // Optional rejection reason
     try {
         const result = await pool.query(
             'UPDATE live_sessions SET is_approved = FALSE, is_rejected = TRUE WHERE id = $1 RETURNING *',
@@ -672,11 +789,46 @@ router.patch('/live-sessions/:id/reject', verifyToken, requireRole(['admin']), a
             return res.status(404).json({ error: 'Session not found' });
         }
         const session = result.rows[0];
-        // Notify professor
-        await pool.query(
-            'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
-            [session.professor_id, `Your live session "${session.title}" has been rejected by the admin.`]
-        );
+        
+        // Send notifications and emails for live session rejection
+        try {
+            // Import notification and email services
+            const NotificationService = (await import('../services/notificationService.js')).default;
+            const { sendLiveSessionRejectedEmailToProfessor } = await import('../services/emailService.js');
+
+            // Get professor information
+            const professorRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [session.professor_id]);
+            const professor = professorRes.rows[0];
+
+            // Get admin information
+            const adminRes = await pool.query('SELECT name FROM users WHERE id = $1', [req.user.id]);
+            const admin = adminRes.rows[0];
+
+            // Send notification to professor
+            await NotificationService.notifyLiveSessionRejected(
+                session.id,
+                session.title,
+                session.professor_id,
+                professor.name,
+                admin.name,
+                reason
+            );
+
+            // Send email to professor
+            await sendLiveSessionRejectedEmailToProfessor(
+                professor.email,
+                professor.name,
+                session.title,
+                admin.name,
+                reason
+            );
+
+            console.log(`✅ Live session rejection notifications and emails sent for session ${session.id}`);
+        } catch (error) {
+            console.error('Error sending live session rejection notifications/emails:', error);
+            // Don't fail the rejection if notifications fail
+        }
+        
         res.json({ message: 'Session rejected', session });
     } catch (error) {
         console.error('Error rejecting session:', error);
@@ -815,6 +967,74 @@ router.patch('/live-sessions/:sessionId/admin', verifyToken, requireRole(['admin
                 'UPDATE live_sessions SET approved_by = $1 WHERE id = $2',
                 [req.user.id, sessionId]
             );
+        }
+
+        // Send notifications and emails for approval/rejection
+        if (updates.isApproved !== undefined) {
+            try {
+                // Import notification and email services
+                const NotificationService = (await import('../services/notificationService.js')).default;
+                const { sendLiveSessionApprovedEmailToProfessor, sendLiveSessionRejectedEmailToProfessor } = await import('../services/emailService.js');
+
+                // Get session information
+                const sessionRes = await pool.query('SELECT title, professor_id, professor_name FROM live_sessions WHERE id = $1', [sessionId]);
+                if (sessionRes.rows.length > 0) {
+                    const session = sessionRes.rows[0];
+                    
+                    // Get professor information
+                    const professorRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [session.professor_id]);
+                    const professor = professorRes.rows[0];
+
+                    // Get admin information
+                    const adminRes = await pool.query('SELECT name FROM users WHERE id = $1', [req.user.id]);
+                    const admin = adminRes.rows[0];
+
+                    if (updates.isApproved === true) {
+                        // Send approval notifications and emails
+                        await NotificationService.notifyLiveSessionApproved(
+                            sessionId,
+                            session.title,
+                            session.professor_id,
+                            professor.name,
+                            admin.name
+                        );
+
+                        await sendLiveSessionApprovedEmailToProfessor(
+                            professor.email,
+                            professor.name,
+                            session.title,
+                            admin.name
+                        );
+
+                        console.log(`✅ Live session approval notifications and emails sent for session ${sessionId}`);
+                    } else if (updates.isApproved === false) {
+                        // Send rejection notifications and emails
+                        const reason = updates.rejectionReason || 'No reason provided';
+                        
+                        await NotificationService.notifyLiveSessionRejected(
+                            sessionId,
+                            session.title,
+                            session.professor_id,
+                            professor.name,
+                            admin.name,
+                            reason
+                        );
+
+                        await sendLiveSessionRejectedEmailToProfessor(
+                            professor.email,
+                            professor.name,
+                            session.title,
+                            admin.name,
+                            reason
+                        );
+
+                        console.log(`✅ Live session rejection notifications and emails sent for session ${sessionId}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error sending live session approval/rejection notifications/emails:', error);
+                // Don't fail the update if notifications fail
+            }
         }
 
         res.json(result.rows[0]);

@@ -1,6 +1,8 @@
 import express from 'express';
 import pool from '../db.js';
 import { verifyToken as auth } from '../middleware/auth.js';
+import NotificationService from '../services/notificationService.js';
+import { sendPointCodeUsedEmailToAdmin } from '../services/emailService.js';
 import crypto from 'crypto';
 
 const router = express.Router();
@@ -114,6 +116,32 @@ router.post('/codes/redeem', auth, async (req, res) => {
     );
     
     await client.query('COMMIT');
+
+    // Get user details for notification
+    const userResult = await client.query(
+      'SELECT name, email FROM users WHERE id = $1',
+      [userId]
+    );
+    const userName = userResult.rows[0]?.name || 'Unknown User';
+    const userEmail = userResult.rows[0]?.email || '';
+
+    // Send notifications and emails to all admins
+    try {
+      const adminResult = await client.query('SELECT id, email, name FROM users WHERE role = $1', ['admin']);
+      const admins = adminResult.rows;
+
+      for (const admin of admins) {
+        // Send notification
+        await NotificationService.notifyPointCodeUsed(pointCode.id, code, pointCode.points, userName, userId, admin.id);
+        
+        // Send email
+        await sendPointCodeUsedEmailToAdmin(admin.email, admin.name, userName, code, pointCode.points);
+      }
+    } catch (notificationError) {
+      console.error('Error sending point code usage notifications:', notificationError);
+      // Don't fail the redemption if notifications fail
+    }
+
     res.json({ 
       success: true, 
       points: pointCode.points,

@@ -51,7 +51,8 @@ const PrivateClasses = () => {
     handleMaterialChange,
     pricingSettings,
     refreshRequests,
-    refreshAllOrders
+    refreshAllOrders,
+    submitLoading
   } = usePrivateClasses();
 
   const navigate = useNavigate();
@@ -314,6 +315,7 @@ const PrivateClasses = () => {
         specialities={specialities}
         materials={materials}
         pricingSettings={pricingSettings}
+        submitLoading={submitLoading}
       />
       
       <Footer />

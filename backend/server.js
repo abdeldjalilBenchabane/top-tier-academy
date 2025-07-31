@@ -27,6 +27,7 @@ import adminRoutes from './routes/admin.js';
 import professorRoutes from './routes/professor.js';
 import chatNotificationsRouter from './routes/chat-notifications.js';
 import chatMessagesRouter from './routes/chat-messages.js';
+import sessionReminderScheduler from './session-reminder-scheduler.js';
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 
@@ -58,6 +59,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '..', 'public', 'uploads')));
+
+// Serve static files from images directory
+app.use('/images', express.static(path.join(__dirname, '..', 'public', 'images')));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -335,4 +339,7 @@ pool.query('SELECT NOW()', (err, result) => {
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`DB → ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
+  
+  // Start the session reminder scheduler
+  sessionReminderScheduler.start();
 });

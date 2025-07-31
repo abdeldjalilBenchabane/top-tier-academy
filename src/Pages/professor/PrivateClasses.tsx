@@ -9,6 +9,9 @@ const ProfessorPrivateClasses = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [approvingRequest, setApprovingRequest] = useState<number | null>(null);
+  const [rejectingRequest, setRejectingRequest] = useState<number | null>(null);
+  const [editingTimeRequest, setEditingTimeRequest] = useState<number | null>(null);
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
   const [selectedTime, setSelectedTime] = useState('16:00 - 17:30');
   const [showTimeModal, setShowTimeModal] = useState(false);
@@ -97,7 +100,7 @@ const ProfessorPrivateClasses = () => {
 
   const handleConfirmAccept = async () => {
     if (!selectedRequestId) return;
-    setActionLoading(true);
+    setApprovingRequest(selectedRequestId);
     try {
       const response = await fetch(`/api/private-class-requests/${selectedRequestId}/status`, {
         method: 'PATCH',
@@ -113,13 +116,13 @@ const ProfessorPrivateClasses = () => {
         fetchRequests();
       }
     } finally {
-      setActionLoading(false);
+      setApprovingRequest(null);
     }
   };
 
   const handleConfirmTime = async () => {
     if (!selectedRequestId) return;
-    setActionLoading(true);
+    setEditingTimeRequest(selectedRequestId);
     try {
       const response = await fetch(`/api/private-class-requests/${selectedRequestId}/status`, {
         method: 'PATCH',
@@ -137,7 +140,7 @@ const ProfessorPrivateClasses = () => {
         fetchRequests();
       }
     } finally {
-      setActionLoading(false);
+      setEditingTimeRequest(null);
     }
   };
 
@@ -149,7 +152,7 @@ const ProfessorPrivateClasses = () => {
 
   const handleConfirmReject = async () => {
     if (!selectedRequestId) return;
-    setActionLoading(true);
+    setRejectingRequest(selectedRequestId);
     try {
       const response = await fetch(`/api/private-class-requests/${selectedRequestId}/status`, {
         method: 'PATCH',
@@ -168,7 +171,7 @@ const ProfessorPrivateClasses = () => {
         fetchRequests();
       }
     } finally {
-      setActionLoading(false);
+      setRejectingRequest(null);
     }
   };
 
@@ -219,6 +222,9 @@ const ProfessorPrivateClasses = () => {
                 actionLoading={actionLoading}
                 showActions={true}
                 studentName={request.studentName}
+                approvingRequest={approvingRequest}
+                rejectingRequest={rejectingRequest}
+                editingTimeRequest={editingTimeRequest}
               />
             </div>
           ))}

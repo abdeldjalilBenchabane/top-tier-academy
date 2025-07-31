@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from '../db.js';
 import { verifyToken as auth } from '../middleware/auth.js';
+import NotificationService from '../services/notificationService.js';
 
 const router = express.Router();
 
@@ -158,6 +159,23 @@ router.post('/webhook', async (req, res) => {
         message: 'Transaction marked as completed (points will be added by trigger)',
         transaction_id: transaction.id
       });
+      
+      // Send notification to user about successful points purchase
+      try {
+        await NotificationService.notifyPointsPurchased(
+          transaction.user_id, 
+          transaction.points, 
+          transaction.amount
+        );
+        console.log('Notification sent for points purchase:', {
+          user_id: transaction.user_id,
+          points: transaction.points,
+          amount: transaction.amount
+        });
+      } catch (notificationError) {
+        console.error('Failed to send points purchase notification:', notificationError);
+        // Don't fail the webhook if notification fails
+      }
     } else if (!status || status.toLowerCase() !== 'paid') {
       await pool.query(
         'UPDATE point_transactions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, CheckCircle, XCircle, Clock, Users } from 'lucide-react';
+import { Eye, CheckCircle, XCircle, Clock, Users, RotateCw } from 'lucide-react';
 import { api } from '@/lib/api';
 import { PendingQuiz, User } from '@/types';
 import { toast } from '@/lib/toast';
@@ -16,6 +16,8 @@ const QuizManagement = () => {
   const [pendingQuizzes, setpendingQuizzes] = useState<PendingQuiz[]>([]);
   const [professors, setProfessors] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [approvingQuiz, setApprovingQuiz] = useState<string | null>(null);
+  const [rejectingQuiz, setRejectingQuiz] = useState<string | null>(null);
   const { refreshPendingQuizzesCount } = usePendingQuizzesCount();
 
   useEffect(() => {
@@ -61,6 +63,7 @@ const QuizManagement = () => {
   };
 
   const handleApproveQuiz = async (quiz: PendingQuiz) => {
+    setApprovingQuiz(quiz.id);
     try {
       await api.approveQuiz(quiz.id);
       toast.success('Quiz approved successfully');
@@ -70,10 +73,13 @@ const QuizManagement = () => {
     } catch (error) {
       console.error('Error approving quiz:', error);
       toast.error('Failed to approve quiz');
+    } finally {
+      setApprovingQuiz(null);
     }
   };
 
   const handleRejectQuiz = async (quizId: string) => {
+    setRejectingQuiz(quizId);
     try {
       await api.rejectQuiz(quizId, 'Quiz not approved');
       toast.success('Quiz rejected');
@@ -83,6 +89,8 @@ const QuizManagement = () => {
     } catch (error) {
       console.error('Error rejecting quiz:', error);
       toast.error('Failed to reject quiz');
+    } finally {
+      setRejectingQuiz(null);
     }
   };
 
@@ -280,18 +288,32 @@ const QuizManagement = () => {
                           <Button
                             variant="outline"
                             size="sm"
+                            disabled={approvingQuiz === quiz.id || rejectingQuiz === quiz.id}
                             onClick={() => handleApproveQuiz(quiz)}
                             className="text-green-600 hover:text-green-700"
                           >
-                            <CheckCircle className="h-4 w-4" />
+                            {approvingQuiz === quiz.id ? (
+                              <>
+                                <RotateCw className="h-4 w-4 animate-spin" />
+                              </>
+                            ) : (
+                              <CheckCircle className="h-4 w-4" />
+                            )}
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
+                            disabled={approvingQuiz === quiz.id || rejectingQuiz === quiz.id}
                             onClick={() => handleRejectQuiz(quiz.id)}
                             className="text-red-600 hover:text-red-700"
                           >
-                            <XCircle className="h-4 w-4" />
+                            {rejectingQuiz === quiz.id ? (
+                              <>
+                                <RotateCw className="h-4 w-4 animate-spin" />
+                              </>
+                            ) : (
+                              <XCircle className="h-4 w-4" />
+                            )}
                           </Button>
                         </>
                       )}
