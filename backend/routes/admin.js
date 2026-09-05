@@ -1037,7 +1037,12 @@ router.get('/earnings-analytics', verifyToken, requireAdmin, async (req, res) =>
     const monthlyEarningsResult = await pool.query(`
       SELECT 
         DATE_TRUNC('month', created_at) as month,
-        COALESCE(SUM(amount), 0) as total_revenue,
+        -- Real revenue is money coming in: point packages bought. Spending
+        -- points is not new revenue, and refunds must not inflate it.
+        COALESCE(SUM(CASE
+          WHEN transaction_type = 'purchase' AND status = 'completed' THEN amount
+          ELSE 0
+        END), 0) as total_revenue,
         COALESCE(COUNT(*), 0) as transaction_count,
         -- Point package revenue (actual purchases)
         COALESCE(SUM(CASE 
@@ -1054,6 +1059,12 @@ router.get('/earnings-analytics', verifyToken, requireAdmin, async (req, res) =>
           WHEN transaction_type = 'spend' AND status = 'completed' AND metadata->>'type' = 'live_session_purchase' THEN amount 
           ELSE 0 
         END), 0) as live_session_revenue,
+        -- Live section (الدورات) revenue. Without this bucket the money spent
+        -- on live sections was counted nowhere.
+        COALESCE(SUM(CASE
+          WHEN transaction_type = 'spend' AND status = 'completed' AND metadata->>'type' = 'live_section_purchase' THEN amount
+          ELSE 0
+        END), 0) as live_section_revenue,
         -- Private class revenue
         COALESCE(SUM(CASE 
           WHEN transaction_type = 'spend' AND status = 'completed' AND metadata->>'type' = 'private_class_purchase' THEN amount 
@@ -1316,18 +1327,18 @@ router.get('/earnings/professor-earnings', verifyToken, requireAdmin, async (req
     const year = month.split('-')[0];
     const monthNum = month.split('-')[1];
     
-    // Get all professors with their earnings breakdown - SEPARATE QUERIES
+    // Get all professors with their earnings breakdown
     const professors = await pool.query(`
       SELECT id, name, email FROM users WHERE role = 'professor'
     `);
     
     const professorEarnings = [];
     
-          for (const professor of professors.rows) {
+    for (const professor of professors.rows) {
         // 1. Education courses earnings (material_id IS NOT NULL)
         const educationCoursesResult = await pool.query(`
           SELECT 
-            COALESCE(SUM(COALESCE(c.price, m.price, 0)), 0) as earnings,
+            COALESCE(SUM(COALESCE(sc.points_spent, c.price, m.price, 0)), 0) as earnings,
             COUNT(DISTINCT sc.student_id) as students
           FROM courses c
           LEFT JOIN materials m ON c.material_id = m.id
@@ -1341,7 +1352,7 @@ router.get('/earnings/professor-earnings', verifyToken, requireAdmin, async (req
         // 2. Language courses earnings (language_level_id IS NOT NULL)
         const languageCoursesResult = await pool.query(`
           SELECT 
-            COALESCE(SUM(lcp.price), 0) as earnings,
+            COALESCE(SUM(COALESCE(sc.points_spent, lcp.price, 0)), 0) as earnings,
             COUNT(DISTINCT sc.student_id) as students
           FROM courses c
           LEFT JOIN language_course_prices lcp ON c.id = lcp.course_id
@@ -1351,7 +1362,7 @@ router.get('/earnings/professor-earnings', verifyToken, requireAdmin, async (req
             AND EXTRACT(YEAR FROM sc.buy_at) = $2 
             AND EXTRACT(MONTH FROM sc.buy_at) = $3
         `, [professor.id, year, monthNum]);
-        
+
         // 3. Live sessions earnings (from purchases table)
         const liveSessionsResult = await pool.query(`
           SELECT 
@@ -1364,20 +1375,16 @@ router.get('/earnings/professor-earnings', verifyToken, requireAdmin, async (req
             AND EXTRACT(MONTH FROM p.purchased_at) = $3
         `, [professor.id, year, monthNum]);
         
-        // 4. Live sections earnings (keep current logic)
+        // 4. Live sections earnings — sum what students actually paid.
         const liveSectionsResult = await pool.query(`
-          SELECT 
-            COALESCE(SUM(ls.price * lsp.student_count), 0) as earnings,
-            COALESCE(SUM(lsp.student_count), 0) as students
+          SELECT
+            COALESCE(SUM(COALESCE(lsp.points_spent, ls.price, 0)), 0) as earnings,
+            COUNT(DISTINCT lsp.student_id) as students
           FROM live_sections ls
-          LEFT JOIN (
-            SELECT live_section_id, COUNT(*) as student_count
-            FROM live_section_purchases 
-            WHERE EXTRACT(YEAR FROM purchase_date) = $1 
-            AND EXTRACT(MONTH FROM purchase_date) = $2
-            GROUP BY live_section_id
-          ) lsp ON ls.id = lsp.live_section_id
+          JOIN live_section_purchases lsp ON ls.id = lsp.live_section_id
           WHERE ls.professor_id = $3
+            AND EXTRACT(YEAR FROM lsp.purchase_date) = $1
+            AND EXTRACT(MONTH FROM lsp.purchase_date) = $2
         `, [year, monthNum, professor.id]);
         
         // 5. Private classes earnings (only paid ones, filter by payment_date)
@@ -1392,7 +1399,7 @@ router.get('/earnings/professor-earnings', verifyToken, requireAdmin, async (req
             AND EXTRACT(MONTH FROM pcr.payment_date) = $3
         `, [professor.name, year, monthNum]);
       
-              const educationCoursesEarnings = parseFloat(educationCoursesResult.rows[0]?.earnings || 0);
+      const educationCoursesEarnings = parseFloat(educationCoursesResult.rows[0]?.earnings || 0);
         const languageCoursesEarnings = parseFloat(languageCoursesResult.rows[0]?.earnings || 0);
         const liveSessionsEarnings = parseFloat(liveSessionsResult.rows[0]?.earnings || 0);
         const liveSectionsEarnings = parseFloat(liveSectionsResult.rows[0]?.earnings || 0);
@@ -1405,9 +1412,54 @@ router.get('/earnings/professor-earnings', verifyToken, requireAdmin, async (req
         const privateClassesStudents = parseInt(privateClassesResult.rows[0]?.students || 0);
         
         const totalEarnings = educationCoursesEarnings + languageCoursesEarnings + liveSessionsEarnings + liveSectionsEarnings + privateClassesEarnings;
-        const totalStudents = educationCoursesStudents + languageCoursesStudents + liveSessionsStudents + liveSectionsStudents + privateClassesStudents;
       
-              professorEarnings.push({
+      // Calculate unique students across all earning sources for this professor (by purchase/paid date)
+      const uniqueStudentsResult = await pool.query(`
+        SELECT COUNT(DISTINCT student_id) AS total_students
+        FROM (
+          -- Education and language courses (student_courses)
+          SELECT sc.student_id
+          FROM student_courses sc
+          JOIN courses c ON c.id = sc.course_id
+          WHERE c.created_by = $1
+            AND EXTRACT(YEAR FROM sc.buy_at) = $2
+            AND EXTRACT(MONTH FROM sc.buy_at) = $3
+          
+          UNION
+          
+          -- Live sessions (purchases table)
+          SELECT p.student_id
+          FROM live_sessions lses
+          JOIN purchases p ON lses.id = p.session_id
+          WHERE lses.professor_id = $1
+            AND EXTRACT(YEAR FROM p.purchased_at) = $2
+            AND EXTRACT(MONTH FROM p.purchased_at) = $3
+          
+          UNION
+          
+          -- Live sections
+          SELECT lsp.student_id
+          FROM live_sections ls
+          JOIN live_section_purchases lsp ON ls.id = lsp.live_section_id
+          WHERE ls.professor_id = $1
+            AND EXTRACT(YEAR FROM lsp.purchase_date) = $2
+            AND EXTRACT(MONTH FROM lsp.purchase_date) = $3
+          
+          UNION
+          
+          -- Private classes (paid only)
+          SELECT pcr.student_id
+          FROM private_class_requests pcr
+          WHERE pcr.teacher_name = $4
+            AND pcr.payment_status = 'paid'
+            AND EXTRACT(YEAR FROM pcr.payment_date) = $2
+            AND EXTRACT(MONTH FROM pcr.payment_date) = $3
+        ) AS all_students
+      `, [professor.id, year, monthNum, professor.name]);
+
+      const totalStudents = parseInt(uniqueStudentsResult.rows[0]?.total_students || 0, 10);
+    
+      professorEarnings.push({
           professor_id: professor.id,
           professor_name: professor.name,
           professor_email: professor.email,
@@ -1418,7 +1470,7 @@ router.get('/earnings/professor-earnings', verifyToken, requireAdmin, async (req
           private_classes_earnings: privateClassesEarnings,
           language_courses_earnings: languageCoursesEarnings,
           point_transactions_earnings: 0,
-          total_students: totalStudents,
+        total_students: totalStudents,
           courses_students: educationCoursesStudents,
           live_sections_students: liveSectionsStudents,
           live_sessions_students: liveSessionsStudents,
@@ -1473,28 +1525,48 @@ router.get('/earnings/professor-details', verifyToken, requireAdmin, async (req,
     
     const professor = professorResult.rows[0];
     
-    // Get education courses
+    // Get courses (education + language) based on purchase date (student_courses.buy_at)
     const coursesResult = await pool.query(`
       SELECT 
         c.id,
         c.title,
-        COALESCE(c.price, m.price, 0) as price,
+        COALESCE(
+          CASE 
+            WHEN c.language_level_id IS NOT NULL THEN lcp.price 
+            ELSE NULL 
+          END,
+          c.price,
+          m.price,
+          0
+        ) AS price,
         COUNT(sc.student_id) as students_count,
-        COALESCE(c.price, m.price, 0) * COUNT(sc.student_id) as earnings
+        COALESCE(
+          CASE 
+            WHEN c.language_level_id IS NOT NULL THEN lcp.price 
+            ELSE NULL 
+          END,
+          c.price,
+          m.price,
+          0
+        ) * COUNT(sc.student_id) as earnings,
+        CASE 
+          WHEN c.language_level_id IS NOT NULL THEN 'language'
+          ELSE 'education'
+        END AS course_type
       FROM courses c
       LEFT JOIN materials m ON c.material_id = m.id
+      LEFT JOIN language_course_prices lcp ON c.id = lcp.course_id
       LEFT JOIN student_courses sc ON c.id = sc.course_id
       WHERE c.created_by = $3 
-        AND c.material_id IS NOT NULL
-        AND EXTRACT(YEAR FROM c.created_at) = $1 
-        AND EXTRACT(MONTH FROM c.created_at) = $2
-      GROUP BY c.id, c.title, c.price, m.price
+        AND EXTRACT(YEAR FROM sc.buy_at) = $1 
+        AND EXTRACT(MONTH FROM sc.buy_at) = $2
+      GROUP BY c.id, c.title, c.price, m.price, lcp.price, course_type
       HAVING COUNT(sc.student_id) > 0
       ORDER BY earnings DESC
     `, [year, monthNum, professorId]);
     
-    // Get live sessions (education path)
-    const liveSessionsResult = await pool.query(`
+    // Get live sections earnings (aligned with summary endpoint, based on purchase_date)
+    const liveSectionsResult = await pool.query(`
       SELECT 
         ls.id,
         ls.title,
@@ -1502,19 +1574,34 @@ router.get('/earnings/professor-details', verifyToken, requireAdmin, async (req,
         COUNT(lsp.student_id) as students_count,
         ls.price * COUNT(lsp.student_id) as earnings
       FROM live_sections ls
-      LEFT JOIN live_section_purchases lsp ON ls.id = lsp.live_section_id 
+      JOIN live_section_purchases lsp ON ls.id = lsp.live_section_id 
+      WHERE ls.professor_id = $3 
         AND EXTRACT(YEAR FROM lsp.purchase_date) = $1 
         AND EXTRACT(MONTH FROM lsp.purchase_date) = $2
-      WHERE ls.professor_id = $3 
-        AND ls.material_id IS NOT NULL
-        AND EXTRACT(YEAR FROM ls.created_at) = $1 
-        AND EXTRACT(MONTH FROM ls.created_at) = $2
       GROUP BY ls.id, ls.title, ls.price
       HAVING COUNT(lsp.student_id) > 0
       ORDER BY earnings DESC
     `, [year, monthNum, professorId]);
+
+    // Get standalone live sessions earnings (aligned with summary endpoint, based on purchased_at)
+    const liveSessionsResult = await pool.query(`
+      SELECT 
+        lses.id,
+        lses.title,
+        lses.price,
+        COUNT(DISTINCT p.student_id) as students_count,
+        COALESCE(SUM(p.amount_paid), 0) as earnings
+      FROM live_sessions lses
+      JOIN purchases p ON lses.id = p.session_id
+      WHERE lses.professor_id = $3
+        AND EXTRACT(YEAR FROM p.purchased_at) = $1
+        AND EXTRACT(MONTH FROM p.purchased_at) = $2
+      GROUP BY lses.id, lses.title, lses.price
+      HAVING COUNT(DISTINCT p.student_id) > 0
+      ORDER BY earnings DESC
+    `, [year, monthNum, professorId]);
     
-    // Get private classes
+    // Get private classes (paid only, based on payment_date)
     const privateClassesResult = await pool.query(`
       SELECT 
         pcr.id,
@@ -1525,10 +1612,10 @@ router.get('/earnings/professor-details', verifyToken, requireAdmin, async (req,
       FROM private_class_requests pcr
       JOIN users u ON pcr.student_id = u.id
       WHERE pcr.teacher_name = $3 
-        AND pcr.status = 'completed'
-        AND EXTRACT(YEAR FROM pcr.created_at) = $1 
-        AND EXTRACT(MONTH FROM pcr.created_at) = $2
-      ORDER BY pcr.created_at DESC
+        AND pcr.payment_status = 'paid'
+        AND EXTRACT(YEAR FROM pcr.payment_date) = $1 
+        AND EXTRACT(MONTH FROM pcr.payment_date) = $2
+      ORDER BY pcr.payment_date DESC
     `, [year, monthNum, professor.name]);
     
     res.json({
@@ -1541,7 +1628,7 @@ router.get('/earnings/professor-details', verifyToken, requireAdmin, async (req,
         price: parseFloat(row.price || 0),
         studentsCount: parseInt(row.students_count || 0),
         earnings: parseFloat(row.earnings || 0),
-        type: 'education'
+        type: row.course_type === 'language' ? 'language' : 'education'
       })),
       liveSessions: liveSessionsResult.rows.map(row => ({
         id: row.id,
@@ -1549,7 +1636,13 @@ router.get('/earnings/professor-details', verifyToken, requireAdmin, async (req,
         price: parseFloat(row.price || 0),
         studentsCount: parseInt(row.students_count || 0),
         earnings: parseFloat(row.earnings || 0),
-        type: 'education'
+      })),
+      liveSections: liveSectionsResult.rows.map(row => ({
+        id: row.id,
+        title: row.title,
+        price: parseFloat(row.price || 0),
+        studentsCount: parseInt(row.students_count || 0),
+        earnings: parseFloat(row.earnings || 0)
       })),
       privateClasses: privateClassesResult.rows.map(row => ({
         id: row.id,

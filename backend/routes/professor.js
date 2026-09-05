@@ -71,9 +71,12 @@ router.get('/dashboard/stats', verifyToken, requireRole(['professor']), async (r
     const liveSectionStats = await getRow(`
       SELECT 
         COUNT(*) as total_sections,
-        COUNT(CASE WHEN status = 'active' THEN 1 END) as active_sections,
-        COUNT(CASE WHEN status = 'inactive' THEN 1 END) as inactive_sections,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_sections
+        -- live_sections.status is approved / rejected / pending / draft.
+        -- The keys keep their old names so the dashboard keeps working.
+        COUNT(CASE WHEN status = 'approved' THEN 1 END) as active_sections,
+        COUNT(CASE WHEN status = 'rejected' THEN 1 END) as inactive_sections,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_sections,
+        COUNT(CASE WHEN status = 'draft' THEN 1 END) as draft_sections
       FROM live_sections 
       WHERE professor_id = $1
     `, [professorId]);
@@ -266,7 +269,7 @@ router.get('/students', verifyToken, async (req, res) => {
   try {
     const professorId = req.user.id;
     
-    // Get students from courses
+    // Get students from courses (exclude professors)
     const courseStudents = await getRows(`
       SELECT 
         u.id,
@@ -283,9 +286,10 @@ router.get('/students', verifyToken, async (req, res) => {
       JOIN users u ON sc.student_id = u.id
       JOIN courses c ON sc.course_id = c.id
       WHERE c.created_by = $1
+        AND u.role = 'student'
     `, [professorId]);
 
-    // Get students from live sessions (purchases table)
+    // Get students from live sessions (purchases table) - exclude professors
     const liveSessionStudents = await getRows(`
       SELECT 
         u.id,
@@ -302,9 +306,10 @@ router.get('/students', verifyToken, async (req, res) => {
       JOIN users u ON p.student_id = u.id
       JOIN live_sessions ls ON p.session_id = ls.id
       WHERE ls.professor_id = $1
+        AND u.role = 'student'
     `, [professorId]);
 
-    // Get students from live sections
+    // Get students from live sections (exclude professors)
     const liveSectionStudents = await getRows(`
       SELECT 
         u.id,
@@ -321,9 +326,10 @@ router.get('/students', verifyToken, async (req, res) => {
       JOIN users u ON lsp.student_id = u.id
       JOIN live_sections ls ON lsp.live_section_id = ls.id
       WHERE ls.professor_id = $1
+        AND u.role = 'student'
     `, [professorId]);
 
-    // Get students from private classes (only accepted and paid)
+    // Get students from private classes (only accepted and paid) - exclude professors
     const privateClassStudents = await getRows(`
       SELECT 
         u.id,
@@ -341,6 +347,7 @@ router.get('/students', verifyToken, async (req, res) => {
       WHERE pcr.teacher_name = (SELECT name FROM users WHERE id = $1)
         AND pcr.status = 'مؤكد'
         AND pcr.payment_status = 'paid'
+        AND u.role = 'student'
     `, [professorId]);
 
     // Combine all students

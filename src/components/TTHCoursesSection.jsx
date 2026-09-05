@@ -39,7 +39,7 @@ const CoursesSection = ({ purchasedCourses }) => {
       case 'completed':
         return <CheckCircle className="w-5 h-5 text-green-600" />;
       case 'in_progress':
-        return <Play className="w-5 h-5 text-blue-600" />;
+        return <Play className="w-5 h-5 text-[#194cbf]" />;
       case 'not_started':
         return <Clock className="w-5 h-5 text-gray-600" />;
       default:

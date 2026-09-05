@@ -271,7 +271,7 @@ const LiveSectionPathSelector = ({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold mb-2">Assign Live Section Path</h3>
+        <h3 className="text-lg font-semibold mb-2">إسناد الدورة Path</h3>
         <p className="text-sm text-gray-600 mb-4">
           Select the educational structure or language path for "{pendingSection.title}". 
           This helps students find your live section in the right place.

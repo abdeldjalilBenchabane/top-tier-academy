@@ -71,7 +71,7 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
   return (
     <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group border border-gray-100 hover:border-blue-200 transform hover:scale-105" dir="rtl">
       {/* Header with gradient */}
-      <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4 sm:p-6 text-white relative overflow-hidden">
+      <div className="bg-gradient-to-r from-[#194cbf] to-[#61a1ff] p-4 sm:p-6 text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -translate-y-16 translate-x-16"></div>
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full translate-y-12 -translate-x-12"></div>
         
@@ -154,7 +154,7 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
         {/* Date and Time */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center">
-            <FaCalendarAlt className="text-blue-600 text-sm sm:text-base" />
+            <FaCalendarAlt className="text-[#194cbf] text-sm sm:text-base" />
           </div>
           <div>
             <p className="text-xs sm:text-sm text-gray-500">التاريخ والوقت</p>
@@ -175,8 +175,8 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
 
         {/* Description */}
         <div className="flex items-start gap-3">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-100 rounded-full flex items-center justify-center mt-1">
-            <FaFileAlt className="text-purple-600 text-sm sm:text-base" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center mt-1">
+            <FaFileAlt className="text-[#61a1ff] text-sm sm:text-base" />
           </div>
           <div className="flex-1">
             <p className="text-xs sm:text-sm text-gray-500 mb-1">وصف الطلب</p>
@@ -275,7 +275,7 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
                 <button
               className={`w-full px-4 py-2 rounded-lg font-bold transition ${
                 session.status === 'مؤكد' && !purchaseLoading?.[session.id]
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  ? 'bg-[#194cbf] text-white hover:bg-blue-700'
                   : 'bg-gray-400 text-gray-600 cursor-not-allowed'
               }`}
               disabled={session.status !== 'مؤكد' || purchaseLoading?.[session.id]}
@@ -321,7 +321,7 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
                 <button
               className={`w-full px-4 py-2 rounded-lg font-bold transition ${
                 session.status === 'مؤكد' && session.time && session.time !== 'سيحدد الأستاذ التوقيت' && canJoin && (isProfessor || session.payment_status === 'paid')
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  ? 'bg-[#194cbf] text-white hover:bg-blue-700'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
               disabled={session.status !== 'مؤكد' || !session.time || session.time === 'سيحدد الأستاذ التوقيت' || !canJoin || (!isProfessor && session.payment_status !== 'paid')}
@@ -332,7 +332,7 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
             
             {/* Show countdown only when confirmed and time is selected */}
             {session.status === 'مؤكد' && session.time && session.time !== 'سيحدد الأستاذ التوقيت' && !canJoin && (
-              <div className="text-sm text-blue-600 font-semibold">الوقت المتبقي: {timeLeft}</div>
+              <div className="text-sm text-[#194cbf] font-semibold">الوقت المتبقي: {timeLeft}</div>
             )}
             
 
@@ -355,7 +355,7 @@ const PrivateClassCard = ({ session, onDetailsClick, onAccept, onRefuse, actionL
         {/* Action Button */}
         <button
           onClick={() => onDetailsClick(session)}
-          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 sm:py-4 px-6 rounded-xl font-bold text-sm sm:text-base hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group-hover:scale-105"
+          className="w-full bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white py-3 sm:py-4 px-6 rounded-xl font-bold text-sm sm:text-base hover:from-[#1340a0] hover:to-[#4a8de8] transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group-hover:scale-105"
         >
           <FaEye className="text-sm sm:text-base" />
           {isProfessor ? 'عرض التفاصيل' : 'عرض التفاصيل'}

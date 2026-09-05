@@ -80,189 +80,179 @@ const Formulair = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-            <Navbar />
-            <div className="flex items-center justify-center min-h-screen px-4 py-12">
-                <div className="w-full max-w-md">
-                    {/* Header */}
-                    <div className="text-center mb-8">
-                        <h1 className="text-4xl font-bold text-gray-800 mb-2">إنشاء حساب جديد</h1>
-                        <p className="text-gray-600">انضم إلينا وابدأ رحلة التعلم</p>
-                    </div>
-                    
-                    {/* Registration Form */}
-                    <div className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl p-8 border border-white/20">
-                    <form onSubmit={handleSubmit}>
-                            {/* Name Field */}
-                        <div className="mb-6">
-                                <label className="block text-gray-700 font-semibold mb-3" htmlFor="name">
-                                <FaUser className="inline ml-2 text-blue-600" /> الاسم الكامل
-                            </label>
-                            <input
-                                type="text"
-                                    id="name"
-                                    name="name"
-                                    value={formData.name}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80 backdrop-blur placeholder-gray-400 transition-all duration-300"
-                                placeholder="أدخل اسمك الكامل"
-                                required
-                                    disabled={Loading}
-                            />
-                                {errors.name && <p className="text-red-500 text-sm mt-2 flex items-center">
-                                <svg className="w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                </svg>
-                                    {errors.name}
-                            </p>}
+        <div className="min-h-screen relative overflow-hidden bg-[#f8fafc]">
+            {/* Animated Background Elements */}
+            <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-200/30 blur-[120px] animate-pulse"></div>
+            <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-200/30 blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+            
+            <div className="relative z-10 flex flex-col min-h-screen">
+                <Navbar />
+                
+                <div className="flex-grow flex items-center justify-center px-4 py-12">
+                    <div className="w-full max-w-lg animate-fadeIn">
+                        {/* Header */}
+                        <div className="text-center mb-10">
+                            <h1 className="text-5xl font-black text-gray-900 mb-3 tracking-tight">إنشاء حساب</h1>
+                            <p className="text-lg text-gray-500 font-medium">ابدأ رحلتك التعليمية معنا اليوم</p>
                         </div>
+                        
+                        {/* Register Card */}
+                        <div className="glass-card rounded-[2.5rem] p-10 relative overflow-hidden">
+                            {/* Inner Glow */}
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
+                            
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Name Field */}
+                                    <div className="space-y-2">
+                                        <label className="block text-gray-800 font-bold text-sm mr-1" htmlFor="name">
+                                            <FaUser className="inline ml-2 text-[#194cbf]" /> الاسم الكامل
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="name"
+                                            name="name"
+                                            value={formData.name}
+                                            onChange={handleChange}
+                                            className="premium-input"
+                                            placeholder="اسمك الكامل"
+                                            required
+                                            disabled={Loading}
+                                        />
+                                        {errors.name && <p className="text-red-500 text-xs mt-1 mr-1">{errors.name}</p>}
+                                    </div>
 
-                            {/* Email Field */}
-                        <div className="mb-6">
-                            <label className="block text-gray-700 font-semibold mb-3" htmlFor="email">
-                                <FaEnvelope className="inline ml-2 text-blue-600" /> البريد الإلكتروني
-                            </label>
-                            <input
-                                type="email"
-                                id="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80 backdrop-blur placeholder-gray-400 transition-all duration-300"
-                                placeholder="أدخل بريدك الإلكتروني"
-                                required
-                                    disabled={Loading}
-                            />
-                            {errors.email && <p className="text-red-500 text-sm mt-2 flex items-center">
-                                <svg className="w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                </svg>
-                                {errors.email}
-                            </p>}
-                        </div>
-
-                            {/* Role Field */}
-                            <div className="mb-6">
-                                <label className="block text-gray-700 font-semibold mb-3" htmlFor="role">
-                                    نوع الحساب
-                                </label>
-                                <select
-                                    id="role"
-                                    name="role"
-                                    value={formData.role}
-                                    onChange={handleRoleChange}
-                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80 backdrop-blur transition-all duration-300"
-                                    disabled={Loading}
-                                >
-                                    <option value="student">طالب</option>
-                                    
-                                </select>
-                            </div>
-
-                            {/* Phone Number Field */}
-                            <div className="mb-6">
-                                <label className="block text-gray-700 font-semibold mb-3" htmlFor="phoneNumber">
-                                    <FaPhone className="inline ml-2 text-blue-600" /> رقم الهاتف
-                                </label>
-                                <input
-                                    type="tel"
-                                    id="phoneNumber"
-                                    name="phoneNumber"
-                                    value={formData.phoneNumber}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80 backdrop-blur placeholder-gray-400 transition-all duration-300"
-                                    placeholder="أدخل رقم هاتفك"
-                                    disabled={Loading}
-                                />
-                                {errors.phoneNumber && <p className="text-red-500 text-sm mt-2 flex items-center">
-                                    <svg className="w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                    </svg>
-                                    {errors.phoneNumber}
-                                </p>}
-                            </div>
-
-                            {/* Password Field */}
-                        <div className="mb-6">
-                            <label className="block text-gray-700 font-semibold mb-3" htmlFor="password">
-                                <FaLock className="inline ml-2 text-blue-600" /> كلمة المرور
-                            </label>
-                            <input
-                                type="password"
-                                id="password"
-                                name="password"
-                                value={formData.password}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80 backdrop-blur placeholder-gray-400 transition-all duration-300"
-                                placeholder="أدخل كلمة المرور"
-                                required
-                                    disabled={Loading}
-                            />
-                            {errors.password && <p className="text-red-500 text-sm mt-2 flex items-center">
-                                <svg className="w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                </svg>
-                                {errors.password}
-                            </p>}
-                        </div>
-
-                            {/* Confirm Password Field */}
-                        <div className="mb-6">
-                                <label className="block text-gray-700 font-semibold mb-3" htmlFor="confirmPassword">
-                                    <FaLock className="inline ml-2 text-blue-600" /> تأكيد كلمة المرور
-                            </label>
-                            <input
-                                    type="password"
-                                    id="confirmPassword"
-                                    name="confirmPassword"
-                                    value={formData.confirmPassword}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80 backdrop-blur placeholder-gray-400 transition-all duration-300"
-                                    placeholder="أعد إدخال كلمة المرور"
-                                required
-                                    disabled={Loading}
-                            />
-                                {errors.confirmPassword && <p className="text-red-500 text-sm mt-2 flex items-center">
-                                <svg className="w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                </svg>
-                                    {errors.confirmPassword}
-                            </p>}
-                        </div>
-
-                            {/* Submit Button */}
-                        <button
-                            type="submit"
-                            disabled={Loading}
-                                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold py-3 px-6 rounded-xl hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transform transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {Loading ? (
-                                <div className="flex items-center justify-center">
-                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white ml-2"></div>
-                                        جاري إنشاء الحساب...
+                                    {/* Email Field */}
+                                    <div className="space-y-2">
+                                        <label className="block text-gray-800 font-bold text-sm mr-1" htmlFor="email">
+                                            <FaEnvelope className="inline ml-2 text-[#194cbf]" /> البريد الإلكتروني
+                                        </label>
+                                        <input
+                                            type="email"
+                                            id="email"
+                                            name="email"
+                                            value={formData.email}
+                                            onChange={handleChange}
+                                            className="premium-input"
+                                            placeholder="example@mail.com"
+                                            required
+                                            disabled={Loading}
+                                        />
+                                        {errors.email && <p className="text-red-500 text-xs mt-1 mr-1">{errors.email}</p>}
+                                    </div>
                                 </div>
-                            ) : (
-                                    'إنشاء الحساب'
-                            )}
-                        </button>
-                    </form>
 
-                        {/* Additional Links */}
-                        <div className="mt-6 text-center">
-                            <p className="text-gray-600">
-                                لديك حساب بالفعل؟{' '}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Role Field */}
+                                    <div className="space-y-2">
+                                        <label className="block text-gray-800 font-bold text-sm mr-1" htmlFor="role">
+                                            نوع الحساب
+                                        </label>
+                                        <select
+                                            id="role"
+                                            name="role"
+                                            value={formData.role}
+                                            onChange={handleRoleChange}
+                                            className="premium-input appearance-none"
+                                            disabled={Loading}
+                                        >
+                                            <option value="student">طالب</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Phone Field */}
+                                    <div className="space-y-2">
+                                        <label className="block text-gray-800 font-bold text-sm mr-1" htmlFor="phoneNumber">
+                                            <FaPhone className="inline ml-2 text-[#194cbf]" /> رقم الهاتف
+                                        </label>
+                                        <input
+                                            type="tel"
+                                            id="phoneNumber"
+                                            name="phoneNumber"
+                                            value={formData.phoneNumber}
+                                            onChange={handleChange}
+                                            className="premium-input"
+                                            placeholder="06XXXXXXXX"
+                                            disabled={Loading}
+                                        />
+                                        {errors.phoneNumber && <p className="text-red-500 text-xs mt-1 mr-1">{errors.phoneNumber}</p>}
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Password Field */}
+                                    <div className="space-y-2">
+                                        <label className="block text-gray-800 font-bold text-sm mr-1" htmlFor="password">
+                                            <FaLock className="inline ml-2 text-[#194cbf]" /> كلمة المرور
+                                        </label>
+                                        <input
+                                            type="password"
+                                            id="password"
+                                            name="password"
+                                            value={formData.password}
+                                            onChange={handleChange}
+                                            className="premium-input"
+                                            placeholder="********"
+                                            required
+                                            disabled={Loading}
+                                        />
+                                        {errors.password && <p className="text-red-500 text-xs mt-1 mr-1">{errors.password}</p>}
+                                    </div>
+
+                                    {/* Confirm Password Field */}
+                                    <div className="space-y-2">
+                                        <label className="block text-gray-800 font-bold text-sm mr-1" htmlFor="confirmPassword">
+                                            <FaLock className="inline ml-2 text-[#194cbf]" /> تأكيد كلمة المرور
+                                        </label>
+                                        <input
+                                            type="password"
+                                            id="confirmPassword"
+                                            name="confirmPassword"
+                                            value={formData.confirmPassword}
+                                            onChange={handleChange}
+                                            className="premium-input"
+                                            placeholder="********"
+                                            required
+                                            disabled={Loading}
+                                        />
+                                        {errors.confirmPassword && <p className="text-red-500 text-xs mt-1 mr-1">{errors.confirmPassword}</p>}
+                                    </div>
+                                </div>
+
+                                {/* Submit Button */}
                                 <button
-                                    onClick={() => navigate('/login')}
-                                    className="text-blue-600 hover:text-blue-800 font-semibold transition-colors duration-200"
+                                    type="submit"
+                                    disabled={Loading}
+                                    className="premium-button mt-4"
                                 >
-                                    تسجيل الدخول
+                                    {Loading ? (
+                                        <div className="flex items-center justify-center">
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white ml-3"></div>
+                                            جاري المعالجة...
+                                        </div>
+                                    ) : (
+                                        'إنشاء حساب جديد'
+                                    )}
                                 </button>
-                            </p>
+                            </form>
+
+                            {/* Additional Links */}
+                            <div className="mt-8 text-center border-t border-gray-200/50 pt-6">
+                                <p className="text-gray-500 font-medium">
+                                    لديك حساب بالفعل؟{' '}
+                                    <button
+                                        onClick={() => navigate('/login')}
+                                        className="text-[#194cbf] hover:text-blue-800 font-black transition-all duration-200 hover:underline underline-offset-4"
+                                    >
+                                        تسجيل الدخول
+                                    </button>
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
+                <Footer />
             </div>
-            <Footer />
         </div>
     );
 };

@@ -1,92 +1,119 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { Toaster } from './components/ui/toaster';
 import { Toaster as Sonner } from './components/ui/sonner';
 import { TooltipProvider } from './components/ui/tooltip';
 import { AuthProvider } from './contexts/AuthContext';
+import { PurchaseConfirmProvider } from './components/ui/TTHPurchaseConfirm';
 import { AvatarProvider } from './contexts/AvatarContext';
 import { PendingCountProvider } from './contexts/PendingCountContext';
 import { LiveSessionsCountProvider } from './contexts/LiveSessionsCountContext';
 import { PendingQuizzesCountProvider } from './contexts/PendingQuizzesCountContext';
 import { PendingPrivateClassesCountProvider } from './contexts/PendingPrivateClassesCountContext';
-import AdminPointCodes from './Pages/admin/PointCodes';
-import PrivateClasses from './Pages/admin/PrivateClasses';
-import PricingManagement from './Pages/admin/PricingManagement';
-import EarningsAnalytics from './Pages/admin/EarningsAnalytics';
 
-
+// Lazy load all page components
 // TTH Pages
-import TTHHome from './Pages/TTHHome';
-import TTHFormulair from './Pages/TTHFormulair';
-import TTHLogin from './Pages/TTHLogin';
-import TTHForgotPassword from './Pages/TTHForgotPassword';
-import TTHResetPassword from './Pages/TTHResetPassword';
-import TTHCourseDetail from './Pages/TTHCourseDetails';
-import TTHStudentDashboard from './Pages/TTHStudentDashboard.jsx';
-import TTHCourses from './Pages/TTHCourses';
-import TTHLanguages from './Pages/TTHLanguages';
-import TTHLiveClasses from './Pages/TTHLiveClasses';
-import Streaming from './Pages/Streaming';
-import TTHSession from './Pages/TTHSession';
-import TTHPrivateClasses from './Pages/TTHPrivateClasses';
-import TTHTeacherProfile from './Pages/TTHTeacherProfile';
-import PointsPurchase from './Pages/PointsPurchase';
-import PointsSuccess from './Pages/PointsSuccess';
-import PointsFailure from './Pages/PointsFailure';
-import PointsHistory from './Pages/PointsHistory';
+const TTHHome = lazy(() => import('./Pages/TTHHome'));
+const TTHFormulair = lazy(() => import('./Pages/TTHFormulair'));
+const TTHLogin = lazy(() => import('./Pages/TTHLogin'));
+const TTHForgotPassword = lazy(() => import('./Pages/TTHForgotPassword'));
+const TTHResetPassword = lazy(() => import('./Pages/TTHResetPassword'));
+const TTHCourseDetail = lazy(() => import('./Pages/TTHCourseDetails'));
+const TTHStudentDashboard = lazy(() => import('./Pages/TTHStudentDashboard.jsx'));
+const TTHCourses = lazy(() => import('./Pages/TTHCourses'));
+const TTHLanguages = lazy(() => import('./Pages/TTHLanguages'));
+const TTHLiveClasses = lazy(() => import('./Pages/TTHLiveClasses'));
+const Streaming = lazy(() => import('./Pages/Streaming'));
+const TTHSession = lazy(() => import('./Pages/TTHSession'));
+const TTHPrivateClasses = lazy(() => import('./Pages/TTHPrivateClasses'));
+const TTHTeacherProfile = lazy(() => import('./Pages/TTHTeacherProfile'));
+const PointsPurchase = lazy(() => import('./Pages/PointsPurchase'));
+const PointsSuccess = lazy(() => import('./Pages/PointsSuccess'));
+const PointsFailure = lazy(() => import('./Pages/PointsFailure'));
+const PointsHistory = lazy(() => import('./Pages/PointsHistory'));
+const TTHPrivacyPolicy = lazy(() => import('./Pages/TTHPrivacyPolicy'));
+const TTHSecurity = lazy(() => import('./Pages/TTHSecurity'));
+const TTHDeleteAccount = lazy(() => import('./Pages/TTHDeleteAccount'));
 
 // Schoolhouse Layouts & Pages
-import AppLayout from './components/layouts/AppLayout';
-import Login from './Pages/Login';
-import ForgotPassword from './Pages/ForgotPassword';
-import ResetPassword from './Pages/ResetPassword';
-import NotFound from './Pages/NotFound';
-import Index from './Pages/Index';
-// Admin
-import AdminDashboard from './Pages/admin/Dashboard';
-import AdminStructure from './Pages/admin/Structure';
-import AdminPending from './Pages/admin/Pending';
-import AdminCourses from './Pages/admin/Courses';
-import AdminCourseDetails from './Pages/admin/CourseDetails';
-import AdminSettings from './Pages/admin/Settings';
-import CourseFilesPage from './Pages/admin/CourseFiles';
-import AdminPoints from './Pages/admin/Points';
-import AdminPointTransactions from './Pages/admin/PointTransactions';
-import AdminPrivateClassSettings from './Pages/admin/PrivateClassSettings';
-import HomepageMaterials from './Pages/admin/HomepageMaterials';
-import FooterContent from './Pages/admin/FooterContent';
-// Professor
-import ProfessorDashboard from './Pages/professor/Dashboard';
-import ProfessorCourses from './Pages/professor/Courses';
-import ProfessorCreate from './Pages/professor/Create';
+const AppLayout = lazy(() => import('./components/layouts/AppLayout'));
+const Login = lazy(() => import('./Pages/Login'));
+const ForgotPassword = lazy(() => import('./Pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./Pages/ResetPassword'));
+const NotFound = lazy(() => import('./Pages/NotFound'));
+const Index = lazy(() => import('./Pages/Index'));
 
+// Admin Pages
+const AdminDashboard = lazy(() => import('./Pages/admin/Dashboard'));
+const AdminStructure = lazy(() => import('./Pages/admin/Structure'));
+const AdminPending = lazy(() => import('./Pages/admin/Pending'));
+const AdminCourses = lazy(() => import('./Pages/admin/Courses'));
+const AdminCourseDetails = lazy(() => import('./Pages/admin/CourseDetails'));
+const AdminSettings = lazy(() => import('./Pages/admin/Settings'));
+const AdminLiveSections = lazy(() => import('./Pages/admin/LiveSections'));
+const AdminPurchases = lazy(() => import('./Pages/admin/Purchases'));
+const AdminLiveSectionDetails = lazy(() => import('./Pages/admin/LiveSectionDetails'));
+const AdminMobileApp = lazy(() => import('./Pages/admin/MobileApp'));
+const CourseFilesPage = lazy(() => import('./Pages/admin/CourseFiles'));
+const AdminPoints = lazy(() => import('./Pages/admin/Points'));
+const AdminPointCodes = lazy(() => import('./Pages/admin/PointCodes'));
+const AdminPointTransactions = lazy(() => import('./Pages/admin/PointTransactions'));
+const AdminPrivateClassSettings = lazy(() => import('./Pages/admin/PrivateClassSettings'));
+const HomepageMaterials = lazy(() => import('./Pages/admin/HomepageMaterials'));
+const FooterContent = lazy(() => import('./Pages/admin/FooterContent'));
+const PrivateClasses = lazy(() => import('./Pages/admin/PrivateClasses'));
+const PricingManagement = lazy(() => import('./Pages/admin/PricingManagement'));
+const EarningsAnalytics = lazy(() => import('./Pages/admin/EarningsAnalytics'));
+const StudentComments = lazy(() => import('./components/admin/StudentComments'));
+const AdminTeacherCourses = lazy(() => import('./Pages/admin/AdminTeacherCourses'));
+const AdminCourseComments = lazy(() => import('./Pages/admin/AdminCourseComments'));
+const LiveSectionStudentComments = lazy(() => import('./components/admin/LiveSectionStudentComments'));
+const AdminTeacherLiveSections = lazy(() => import('./Pages/admin/AdminTeacherLiveSections'));
+const AdminLiveSectionComments = lazy(() => import('./Pages/admin/AdminLiveSectionComments'));
 
-import LiveSectionsPage from './Pages/professor/LiveSections';
-import ProfessorSettings from './Pages/professor/Settings';
-import ProfessorCourseDetails from './Pages/professor/CourseDetails';
-import ProfessorComments from './Pages/professor/Comments';
-import CourseCommentsOverview from './Pages/professor/CourseCommentsOverview';
-import CourseComments from './Pages/professor/CourseComments';
-import ProfessorPrivateClasses from './Pages/professor/PrivateClasses';
-import MyStudents from './Pages/professor/MyStudents';
-import LiveSessionsPage from './Pages/professor/LiveSessionsPage';
-import CreateLiveSessionPage from './Pages/professor/CreateLiveSession';
+// Professor Pages
+const ProfessorDashboard = lazy(() => import('./Pages/professor/Dashboard'));
+const ProfessorCourses = lazy(() => import('./Pages/professor/Courses'));
+const ProfessorCreate = lazy(() => import('./Pages/professor/Create'));
+const LiveSectionsPage = lazy(() => import('./Pages/professor/LiveSections'));
+const ProfessorSettings = lazy(() => import('./Pages/professor/Settings'));
+const ProfessorCourseDetails = lazy(() => import('./Pages/professor/CourseDetails'));
+const ProfessorComments = lazy(() => import('./Pages/professor/Comments'));
+const CourseCommentsOverview = lazy(() => import('./Pages/professor/CourseCommentsOverview'));
+const CourseComments = lazy(() => import('./Pages/professor/CourseComments'));
+const ProfessorPrivateClasses = lazy(() => import('./Pages/professor/PrivateClasses'));
+const MyStudents = lazy(() => import('./Pages/professor/MyStudents'));
+const LiveSessionsPage = lazy(() => import('./Pages/professor/LiveSessionsPage'));
+const EditLiveSessionPage = lazy(() => import('./Pages/professor/EditLiveSession'));
+const CreateLiveSessionPage = lazy(() => import('./Pages/professor/CreateLiveSession'));
+
 // Admin components
-import UserManagement from './components/admin/UserManagement';
-import HomepageSlides from './components/admin/HomepageSlides';
-import EnhancedHomepageSlides from './components/admin/EnhancedHomepageSlides';
-import LiveSessionApprovals from './Pages/admin/LiveSessionApprovals';
-import LiveSessionDetails from './Pages/LiveSessionDetails';
-import LiveSessionsOverview from './components/admin/LiveSessionsOverview';
-import QuizManagement from './components/admin/QuizManagement';
-// Professor components
-import QuizCreation from './components/professor/QuizCreation';
-import QuizResults from './Pages/professor/QuizResults';
-import MyQuizzes from './Pages/professor/MyQuizzes';
-import EditQuiz from './Pages/professor/EditQuiz';
-import QuizTaking from './components/student/QuizTaking';
+const UserManagement = lazy(() => import('./components/admin/UserManagement'));
+const HomepageSlides = lazy(() => import('./components/admin/HomepageSlides'));
+const EnhancedHomepageSlides = lazy(() => import('./components/admin/EnhancedHomepageSlides'));
+const LiveSessionApprovals = lazy(() => import('./Pages/admin/LiveSessionApprovals'));
+const LiveSessionDetails = lazy(() => import('./Pages/LiveSessionDetails'));
+const LiveSessionsOverview = lazy(() => import('./components/admin/LiveSessionsOverview'));
+const QuizManagement = lazy(() => import('./components/admin/QuizManagement'));
 
+// Professor live-section comments
+const ProfessorLiveSectionCommentsOverview = lazy(() => import('./Pages/professor/LiveSectionCommentsOverview'));
+const ProfessorLiveSectionComments = lazy(() => import('./Pages/professor/LiveSectionComments'));
+
+// Professor components
+const QuizCreation = lazy(() => import('./components/professor/QuizCreation'));
+const QuizResults = lazy(() => import('./Pages/professor/QuizResults'));
+const MyQuizzes = lazy(() => import('./Pages/professor/MyQuizzes'));
+const EditQuiz = lazy(() => import('./Pages/professor/EditQuiz'));
+const QuizTaking = lazy(() => import('./components/student/QuizTaking'));
+
+// Loading component
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+  </div>
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -103,6 +130,7 @@ const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <PurchaseConfirmProvider>
         <AvatarProvider>
           <PendingCountProvider>
             <LiveSessionsCountProvider>
@@ -112,89 +140,105 @@ const App: React.FC = () => {
                     <Toaster />
                     <Sonner />
                     <BrowserRouter>
-                      <Routes>
-                        {/* TTH always public */}
-                        <Route path="/" element={<TTHHome />} />
-                        <Route path="/register" element={<TTHFormulair />} />
-                        <Route path="/login" element={<TTHLogin />} />
-                        <Route path="/forgot-password" element={<TTHForgotPassword />} />
-                        <Route path="/reset-password" element={<TTHResetPassword />} />
-                        <Route path="/description" element={<TTHCourseDetail />} />
-                        <Route path="/TTHStudentDashboard" element={<TTHStudentDashboard />} />
-                        <Route path="/TTHCourses" element={<TTHCourses />} />
-                        <Route path="/TTHLanguages" element={<TTHLanguages />} />
-                        <Route path="/TTHLiveClasses" element={<TTHLiveClasses />} />
-                        <Route path="/streaming/:id" element={<Streaming />} />
-                        <Route path="/TTHSession" element={<TTHSession />} />
-                        <Route path="/TTHPrivateClasses" element={<TTHPrivateClasses />} />
-                        <Route path="/TTHTeacherProfile" element={<TTHTeacherProfile />} />
-                        <Route path="/profile" element={<TTHStudentDashboard />} />
-                        <Route path="/coursesList/courses/:id" element={<TTHCourseDetail />} />
-                        <Route path="/TTHLanguages/livesection/:id" element={<LiveSessionDetails />} />
-                        <Route path="/TTHStudentDashboard" element={<TTHStudentDashboard />} />
-                        <Route path="/points" element={<PointsPurchase />} />
-                        <Route path="/points/success" element={<PointsSuccess />} />
-                        <Route path="/points/failure" element={<PointsFailure />} />
-                        <Route path="/points/history" element={<PointsHistory />} />
-                        <Route path="/quiz/:quizId" element={<QuizTaking />} />
+                      <Suspense fallback={<LoadingSpinner />}>
+                        <Routes>
+                          {/* TTH always public */}
+                          <Route path="/" element={<TTHHome />} />
+                          <Route path="/register" element={<TTHFormulair />} />
+                          <Route path="/login" element={<TTHLogin />} />
+                          <Route path="/forgot-password" element={<TTHForgotPassword />} />
+                          <Route path="/reset-password" element={<TTHResetPassword />} />
+                          <Route path="/description" element={<TTHCourseDetail />} />
+                          <Route path="/TTHStudentDashboard" element={<TTHStudentDashboard />} />
+                          <Route path="/TTHCourses" element={<TTHCourses />} />
+                          <Route path="/TTHLanguages" element={<TTHLanguages />} />
+                          <Route path="/TTHLiveClasses" element={<TTHLiveClasses />} />
+                          <Route path="/streaming/:id" element={<Streaming />} />
+                          <Route path="/TTHSession" element={<TTHSession />} />
+                          <Route path="/TTHPrivateClasses" element={<TTHPrivateClasses />} />
+                          <Route path="/TTHTeacherProfile" element={<TTHTeacherProfile />} />
+                          <Route path="/profile" element={<TTHStudentDashboard />} />
+                          <Route path="/coursesList/courses/:id" element={<TTHCourseDetail />} />
+                          <Route path="/TTHLanguages/livesection/:id" element={<LiveSessionDetails />} />
+                          <Route path="/TTHStudentDashboard" element={<TTHStudentDashboard />} />
+                          <Route path="/points" element={<PointsPurchase />} />
+                          <Route path="/points/success" element={<PointsSuccess />} />
+                          <Route path="/points/failure" element={<PointsFailure />} />
+                          <Route path="/points/history" element={<PointsHistory />} />
+                          <Route path="/quiz/:quizId" element={<QuizTaking />} />
+                          <Route path="/privacy-policy" element={<TTHPrivacyPolicy />} />
+                          <Route path="/security" element={<TTHSecurity />} />
+                          <Route path="/delete-account" element={<TTHDeleteAccount />} />
 
+                          {/* Schoolhouse public */}
+                          <Route path="/schoolhouse/login" element={<Login />} />
+                          <Route path="/schoolhouse/forgot-password" element={<ForgotPassword />} />
+                          <Route path="/schoolhouse/reset-password" element={<ResetPassword />} />
+                          <Route path="/schoolhouse" element={<Index />} />
 
-                        {/* Schoolhouse public */}
-                        <Route path="/schoolhouse/login" element={<Login />} />
-                        <Route path="/schoolhouse/forgot-password" element={<ForgotPassword />} />
-                        <Route path="/schoolhouse/reset-password" element={<ResetPassword />} />
-                        <Route path="/schoolhouse" element={<Index />} />
+                          {/* Admin (protected) */}
+                          <Route path="/admin/*" element={<AppLayout />}>
+                            <Route path="dashboard" element={<AdminDashboard />} />
+                            <Route path="structure" element={<AdminStructure />} />
+                            <Route path="pending" element={<AdminPending />} />
+                            <Route path="courses" element={<AdminCourses />} />
+                            <Route path="courses/:courseId" element={<AdminCourseDetails />} />
+                            <Route path="course-files" element={<CourseFilesPage />} />
+                            <Route path="quizzes" element={<QuizManagement />} />
+                            <Route path="users" element={<UserManagement />} />
+                            <Route path="slides" element={<HomepageSlides />} />
+                            <Route path="enhanced-slides" element={<EnhancedHomepageSlides />} />
+                            <Route path="live-sessions" element={<LiveSessionsOverview />} />
+                            <Route path="live-sessions/:sessionId/edit" element={<EditLiveSessionPage asAdmin />} />
+                            <Route path="live-sections" element={<AdminLiveSections />} />
+                            <Route path="live-sections/:sectionId" element={<AdminLiveSectionDetails />} />
+                            <Route path="purchases" element={<AdminPurchases />} />
+                            <Route path="mobile" element={<AdminMobileApp />} />
+                            <Route path="settings" element={<AdminSettings />} />
+                            <Route path="points" element={<AdminPoints />} />
+                            <Route path="point-codes" element={<AdminPointCodes />} />
+                            <Route path="point-transactions" element={<AdminPointTransactions />} />
+                            <Route path="private-class-settings" element={<AdminPrivateClassSettings />} />
+                            <Route path="private-classes" element={<PrivateClasses />} />
+                            <Route path="homepage-materials" element={<HomepageMaterials />} />
+                            <Route path="footer-content" element={<FooterContent />} />
+                            <Route path="pricing" element={<PricingManagement />} />
+                            <Route path="earnings" element={<EarningsAnalytics />} />
+                            <Route path="comments" element={<StudentComments />} />
+                            <Route path="comments/professor/:professorId" element={<AdminTeacherCourses />} />
+                            <Route path="comments/course/:courseId" element={<AdminCourseComments />} />
+                            <Route path="live-section-comments" element={<LiveSectionStudentComments />} />
+                            <Route path="live-section-comments/professor/:professorId" element={<AdminTeacherLiveSections />} />
+                            <Route path="live-section-comments/section/:sectionId" element={<AdminLiveSectionComments />} />
+                          </Route>
 
-                        {/* Admin (protected) */}
-                        <Route path="/admin/*" element={<AppLayout />}>
-                          <Route path="dashboard" element={<AdminDashboard />} />
-                          <Route path="structure" element={<AdminStructure />} />
-                          <Route path="pending" element={<AdminPending />} />
-                          <Route path="courses" element={<AdminCourses />} />
-                          <Route path="courses/:courseId" element={<AdminCourseDetails />} />
-                          <Route path="course-files" element={<CourseFilesPage />} />
-                          <Route path="quizzes" element={<QuizManagement />} />
-                          <Route path="users" element={<UserManagement />} />
-                          <Route path="slides" element={<HomepageSlides />} />
-                          <Route path="enhanced-slides" element={<EnhancedHomepageSlides />} />
-                          <Route path="live-sessions" element={<LiveSessionsOverview />} />
-                          <Route path="settings" element={<AdminSettings />} />
-                          <Route path="points" element={<AdminPoints />} />
-                          <Route path="point-codes" element={<AdminPointCodes />} />
-                          <Route path="point-transactions" element={<AdminPointTransactions />} />
-                          <Route path="private-class-settings" element={<AdminPrivateClassSettings />} />
-                          <Route path="private-classes" element={<PrivateClasses />} />
-                          <Route path="homepage-materials" element={<HomepageMaterials />} />
-                          <Route path="footer-content" element={<FooterContent />} />
-                          <Route path="pricing" element={<PricingManagement />} />
-                          <Route path="earnings" element={<EarningsAnalytics />} />
-                        </Route>
+                          {/* Professor (protected) */}
+                          <Route path="/professor/*" element={<AppLayout />}>
+                            <Route path="dashboard" element={<ProfessorDashboard />} />
+                            <Route path="courses" element={<ProfessorCourses />} />
+                            <Route path="courses/:id" element={<ProfessorCourseDetails />} />
+                            <Route path="create" element={<ProfessorCreate />} />
+                            <Route path="live-sections" element={<LiveSectionsPage />} />
+                            <Route path="live-sessions" element={<LiveSessionsPage />} />
+                            <Route path="live-sessions/:sessionId/edit" element={<EditLiveSessionPage />} />
+                            <Route path="create-live-session" element={<CreateLiveSessionPage />} />
+                            <Route path="quiz" element={<QuizCreation />} />
+                            <Route path="edit-quiz/:id" element={<EditQuiz />} />
+                            <Route path="results" element={<QuizResults />} />
+                            <Route path="my-quizzes" element={<MyQuizzes />} />
+                            <Route path="settings" element={<ProfessorSettings />} />
+                            <Route path="comments" element={<CourseCommentsOverview />} />
+                            <Route path="comments/:courseId" element={<CourseComments />} />
+                            <Route path="private-classes" element={<ProfessorPrivateClasses />} />
+                            <Route path="my-students" element={<MyStudents />} />
+                            <Route path="live-section-comments" element={<ProfessorLiveSectionCommentsOverview />} />
+                            <Route path="live-section-comments/:sectionId" element={<ProfessorLiveSectionComments />} />
+                          </Route>
 
-                        {/* Professor (protected) */}
-                        <Route path="/professor/*" element={<AppLayout />}>
-                          <Route path="dashboard" element={<ProfessorDashboard />} />
-                          <Route path="courses" element={<ProfessorCourses />} />
-                          <Route path="courses/:id" element={<ProfessorCourseDetails />} />
-                          <Route path="create" element={<ProfessorCreate />} />
-
-
-                          <Route path="live-sections" element={<LiveSectionsPage />} />
-                          <Route path="live-sessions" element={<LiveSessionsPage />} />
-                          <Route path="create-live-session" element={<CreateLiveSessionPage />} />
-                          <Route path="quiz" element={<QuizCreation />} />
-                          <Route path="edit-quiz/:id" element={<EditQuiz />} />
-                          <Route path="results" element={<QuizResults />} />
-                          <Route path="my-quizzes" element={<MyQuizzes />} />
-                          <Route path="settings" element={<ProfessorSettings />} />
-                          <Route path="comments" element={<CourseCommentsOverview />} />
-                          <Route path="comments/:courseId" element={<CourseComments />} />
-                          <Route path="private-classes" element={<ProfessorPrivateClasses />} />
-                          <Route path="my-students" element={<MyStudents />} />
-                        </Route>
-
-                        {/* Catch all */}
-                        <Route path="*" element={<NotFound />} />
-                      </Routes>
+                          {/* Catch all */}
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </Suspense>
                     </BrowserRouter>
                   </TooltipProvider>
                 </PendingPrivateClassesCountProvider>
@@ -202,6 +246,7 @@ const App: React.FC = () => {
             </LiveSessionsCountProvider>
           </PendingCountProvider>
         </AvatarProvider>
+        </PurchaseConfirmProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

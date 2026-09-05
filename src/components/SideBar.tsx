@@ -75,7 +75,7 @@ const Sidebar = ({ activeSection, onSectionChange }: SidebarProps) => {
           {/* الرأس */}
           <div className="p-6 border-b border-gray-100">
             <div className="flex items-center space-x-3 space-x-reverse">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-[#194cbf] to-[#61a1ff] rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">تع</span>
               </div>
               <div>

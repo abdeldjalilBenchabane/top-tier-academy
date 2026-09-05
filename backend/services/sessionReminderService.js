@@ -1,6 +1,7 @@
 import pool from '../db.js';
 import NotificationService from './notificationService.js';
 import { sendLiveSessionReminderEmailToStudent, sendLiveSessionReminderEmailToProfessor, sendPrivateClassReminderEmailToStudent, sendPrivateClassReminderEmailToProfessor } from './emailService.js';
+import { formatTimeForDisplay, formatDateForDisplay } from '../utils/timezone.js';
 
 class SessionReminderService {
   // Check for live sessions starting in 15 minutes
@@ -60,7 +61,7 @@ class SessionReminderService {
         await NotificationService.notifyLiveSessionStarting(
           student.id,
           session.title,
-          new Date(session.start_time).toLocaleString()
+          formatTimeForDisplay(session.start_time) + " " + formatDateForDisplay(session.start_time)
         );
         
         // Send email
@@ -69,7 +70,7 @@ class SessionReminderService {
           student.name,
           session.title,
           session.professor_name,
-          new Date(session.start_time).toLocaleString()
+          formatTimeForDisplay(session.start_time) + " " + formatDateForDisplay(session.start_time)
         );
       }
       
@@ -77,14 +78,14 @@ class SessionReminderService {
       await NotificationService.notifyLiveSessionStarting(
         session.professor_id,
         session.title,
-        new Date(session.start_time).toLocaleString()
+        formatTimeForDisplay(session.start_time) + " " + formatDateForDisplay(session.start_time)
       );
       
       await sendLiveSessionReminderEmailToProfessor(
         session.professor_email,
         session.professor_name,
         session.title,
-        new Date(session.start_time).toLocaleString()
+        formatTimeForDisplay(session.start_time) + " " + formatDateForDisplay(session.start_time)
       );
       
       console.log(`✅ Live session reminders sent for session ${session.id}`);
@@ -139,7 +140,7 @@ class SessionReminderService {
         privateClass.student_id,
         privateClass.title,
         privateClass.teacher_name,
-        new Date(privateClass.scheduled_at).toLocaleString()
+        formatTimeForDisplay(privateClass.scheduled_at) + " " + formatDateForDisplay(privateClass.scheduled_at)
       );
       
       await sendPrivateClassReminderEmailToStudent(
@@ -147,7 +148,7 @@ class SessionReminderService {
         privateClass.student_name,
         privateClass.title,
         privateClass.teacher_name,
-        new Date(privateClass.scheduled_at).toLocaleString()
+        formatTimeForDisplay(privateClass.scheduled_at) + " " + formatDateForDisplay(privateClass.scheduled_at)
       );
       
       // Send notification and email to professor
@@ -155,7 +156,7 @@ class SessionReminderService {
         privateClass.teacher_id,
         privateClass.title,
         privateClass.student_name,
-        new Date(privateClass.scheduled_at).toLocaleString()
+        formatTimeForDisplay(privateClass.scheduled_at) + " " + formatDateForDisplay(privateClass.scheduled_at)
       );
       
       await sendPrivateClassReminderEmailToProfessor(
@@ -163,7 +164,7 @@ class SessionReminderService {
         privateClass.teacher_name,
         privateClass.title,
         privateClass.student_name,
-        new Date(privateClass.scheduled_at).toLocaleString()
+        formatTimeForDisplay(privateClass.scheduled_at) + " " + formatDateForDisplay(privateClass.scheduled_at)
       );
       
       console.log(`✅ Private class reminders sent for class ${privateClass.id}`);

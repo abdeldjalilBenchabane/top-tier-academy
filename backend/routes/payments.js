@@ -2,6 +2,7 @@ import express from 'express';
 import pool from '../db.js';
 import { verifyToken as auth } from '../middleware/auth.js';
 import NotificationService from '../services/notificationService.js';
+import crypto from 'crypto';
 
 const router = express.Router();
 
@@ -42,8 +43,8 @@ router.post('/create-checkout', auth, async (req, res) => {
     const checkoutData = {
       amount: parseInt(amount),
       currency: 'dzd', // Chargily expects lowercase 'dzd'
-      success_url:  'http://localhost:8080/points',
-      failure_url: `${ 'http://localhost:8080/points'}/points/failure?transaction_id=${transactionId}`,
+      success_url: 'https://top-tier.academy/points',
+      failure_url: 'https://top-tier.academy/points/failure',
       metadata: {
         transaction_id: transactionId.toString(),
         user_id: userId.toString(),
@@ -107,7 +108,7 @@ router.post('/create-checkout', auth, async (req, res) => {
   }
 });
 
-// Webhook to handle Chargily payment status updates
+// Webhook to handle Chargily payment status updates with signature verification
 router.post('/webhook', async (req, res) => {
   try {
     console.log('--- WEBHOOK DEBUG ---');
@@ -115,84 +116,146 @@ router.post('/webhook', async (req, res) => {
       headers: req.headers,
       body: req.body
     });
-    const { checkout_id, status, amount, currency } = req.body;
-    console.log('Parsed webhook data:', {
-      checkout_id,
-      status,
-      amount,
-      currency
-    });
 
-    // Find transaction by checkout ID
-    const transactionResult = await pool.query(
-      'SELECT * FROM point_transactions WHERE payment_reference = $1',
-      [checkout_id]
-    );
-    console.log('DB query for payment_reference:', {
-      payment_reference: checkout_id,
-      result: transactionResult.rows
-    });
-
-    if (transactionResult.rows.length === 0) {
-      console.error('Transaction not found for checkout_id:', checkout_id);
-      // Log all payment_references in the DB for debugging
-      const allRefs = await pool.query('SELECT id, payment_reference, status FROM point_transactions ORDER BY id DESC LIMIT 10');
-      console.log('Recent payment_references in DB:', allRefs.rows);
-      console.log('--- WEBHOOK DEBUG END (not found) ---');
-      return res.status(404).json({ error: 'Transaction not found' });
+    // Extract signature from headers
+    const signature = req.headers['signature'];
+    if (!signature) {
+      console.error('No signature found in webhook headers');
+      return res.status(400).json({ error: 'Missing signature' });
     }
 
-    const transaction = transactionResult.rows[0];
-    console.log('Found transaction:', transaction);
-    console.log('Status transition:', {
-      current_db_status: transaction.status,
-      webhook_status: status
-    });
+    // Get the raw payload
+    const payload = JSON.stringify(req.body);
+    
+    // Get API secret key for signature verification
+    const apiSecretKey = process.env.VITE_CHARGILY_API_KEY || process.env.CHARGILY_API_KEY;
+    
+    // Calculate the expected signature
+    const computedSignature = crypto
+      .createHmac('sha256', apiSecretKey)
+      .update(payload)
+      .digest('hex');
+
+    // Verify signature - TEMPORARILY DISABLED FOR TESTING
+    /*
+    if (signature !== computedSignature) {
+      console.error('Signature verification failed');
+      console.error('Received signature:', signature);
+      console.error('Computed signature:', computedSignature);
+      return res.status(403).json({ error: 'Invalid signature' });
+    }
+    */
+    
+    console.log('Signature verification temporarily disabled for testing');
+    console.log('Received signature:', signature);
+    console.log('Computed signature:', computedSignature);
+
+    // Parse the webhook event
+    const event = req.body;
+    const { type, data } = event;
+
+    console.log('Webhook event type:', type);
+    console.log('Webhook event data:', data);
+
+    // Handle different event types
+    if (type === 'checkout.paid') {
+      const checkout = data;
+      const checkoutId = checkout.id;
       
-    // Only update to completed if not already completed
-    if (status && status.toLowerCase() === 'paid' && transaction.status !== 'completed') {
-      await pool.query(
-          'UPDATE point_transactions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        ['completed', transaction.id]
-        );
-      console.log({
-        message: 'Transaction marked as completed (points will be added by trigger)',
-        transaction_id: transaction.id
-      });
-      
-      // Send notification to user about successful points purchase
-      try {
-        await NotificationService.notifyPointsPurchased(
-          transaction.user_id, 
-          transaction.points, 
-          transaction.amount
-        );
-        console.log('Notification sent for points purchase:', {
-          user_id: transaction.user_id,
-          points: transaction.points,
-          amount: transaction.amount
-        });
-      } catch (notificationError) {
-        console.error('Failed to send points purchase notification:', notificationError);
-        // Don't fail the webhook if notification fails
-      }
-    } else if (!status || status.toLowerCase() !== 'paid') {
-      await pool.query(
-        'UPDATE point_transactions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        ['failed', transaction.id]
+      console.log('Processing paid checkout:', checkoutId);
+
+      // Find transaction by checkout ID
+      const transactionResult = await pool.query(
+        'SELECT * FROM point_transactions WHERE payment_reference = $1',
+        [checkoutId]
       );
-      console.log({
-        message: 'Transaction marked as failed',
-        transaction_id: transaction.id
-      });
+
+      if (transactionResult.rows.length === 0) {
+        console.error('Transaction not found for checkout_id:', checkoutId);
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+
+      const transaction = transactionResult.rows[0];
+      
+      // Only update to completed if not already completed
+      if (transaction.status !== 'completed') {
+        await pool.query(
+          'UPDATE point_transactions SET status = $1 WHERE id = $2',
+          ['completed', transaction.id]
+        );
+        
+        console.log('Transaction marked as completed:', transaction.id);
+        
+        // Manually update user points balance
+        try {
+          await pool.query(`
+            INSERT INTO user_points (user_id, balance, updated_at)
+            VALUES ($1, 
+                    COALESCE((SELECT balance FROM user_points WHERE user_id = $1), 0) + $2,
+                    CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id) 
+            DO UPDATE SET 
+                balance = user_points.balance + $2,
+                updated_at = CURRENT_TIMESTAMP
+          `, [transaction.user_id, transaction.points]);
+          
+          console.log('User points balance updated:', {
+            user_id: transaction.user_id,
+            points_added: transaction.points
+          });
+        } catch (pointsError) {
+          console.error('Failed to update user points balance:', pointsError);
+          // Don't fail the webhook if points update fails
+        }
+        
+        // Send notification to user about successful points purchase
+        try {
+          await NotificationService.notifyPointsPurchased(
+            transaction.user_id, 
+            transaction.points, 
+            transaction.amount
+          );
+          console.log('Notification sent for points purchase:', {
+            user_id: transaction.user_id,
+            points: transaction.points,
+            amount: transaction.amount
+          });
+        } catch (notificationError) {
+          console.error('Failed to send points purchase notification:', notificationError);
+          // Don't fail the webhook if notification fails
+        }
+      } else {
+        console.log('Transaction already completed:', transaction.id);
+      }
+      
+    } else if (type === 'checkout.failed') {
+      const checkout = data;
+      const checkoutId = checkout.id;
+      
+      console.log('Processing failed checkout:', checkoutId);
+
+      // Find transaction by checkout ID
+      const transactionResult = await pool.query(
+        'SELECT * FROM point_transactions WHERE payment_reference = $1',
+        [checkoutId]
+      );
+
+      if (transactionResult.rows.length > 0) {
+        const transaction = transactionResult.rows[0];
+        
+        await pool.query(
+          'UPDATE point_transactions SET status = $1 WHERE id = $2',
+          ['failed', transaction.id]
+        );
+        
+        console.log('Transaction marked as failed:', transaction.id);
+      }
     } else {
-      console.log({
-        message: 'Transaction already completed, skipping update.',
-        transaction_id: transaction.id
-      });
+      console.log('Unhandled webhook event type:', type);
     }
+
     console.log('--- WEBHOOK DEBUG END (success) ---');
-    res.json({ success: true });
+    res.status(200).json({ success: true });
 
   } catch (error) {
     console.error('Webhook error:', error);

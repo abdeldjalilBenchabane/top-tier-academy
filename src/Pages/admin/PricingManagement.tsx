@@ -262,7 +262,7 @@ const PricingManagement = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Live Sections</CardTitle>
+            <CardTitle className="text-sm font-medium">الدورات</CardTitle>
             <Video className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -289,24 +289,26 @@ const PricingManagement = () => {
 
       {/* Pricing Tabs */}
       <Tabs defaultValue="materials" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="materials" className="flex items-center gap-2">
-            <School className="h-4 w-4" />
-            Education Materials
-          </TabsTrigger>
-          <TabsTrigger value="languages" className="flex items-center gap-2">
-            <Globe className="h-4 w-4" />
-            Language Courses
-          </TabsTrigger>
-          <TabsTrigger value="liveSections" className="flex items-center gap-2">
-            <Video className="h-4 w-4" />
-            Live Sections
-          </TabsTrigger>
-          <TabsTrigger value="liveSessions" className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Live Sessions
-          </TabsTrigger>
-        </TabsList>
+                <div className="overflow-x-auto">
+          <TabsList className="inline-flex min-w-full sm:min-w-0">
+            <TabsTrigger value="materials" className="flex items-center gap-2 whitespace-nowrap">
+              <School className="h-4 w-4" />
+              Education Materials
+            </TabsTrigger>
+            <TabsTrigger value="languages" className="flex items-center gap-2 whitespace-nowrap">
+              <Globe className="h-4 w-4" />
+              Language Courses
+            </TabsTrigger>
+            <TabsTrigger value="liveSections" className="flex items-center gap-2 whitespace-nowrap">
+              <Video className="h-4 w-4" />
+              الدورات
+            </TabsTrigger>
+            <TabsTrigger value="liveSessions" className="flex items-center gap-2 whitespace-nowrap">
+              <Clock className="h-4 w-4" />
+              Live Sessions
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Education Materials Tab */}
         <TabsContent value="materials" className="space-y-4">
@@ -434,7 +436,7 @@ const PricingManagement = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Video className="h-5 w-5" />
-                Live Sections Pricing (الحصص المباشرة)
+                الدورات Pricing (الحصص المباشرة)
               </CardTitle>
               <CardDescription>
                 Manage prices for live sections in both education and language paths

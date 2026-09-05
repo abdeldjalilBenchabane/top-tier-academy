@@ -32,11 +32,11 @@ const TTHLiveClassesSearchFilter = ({
         {/* Header */}
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg transform rotate-3 hover:rotate-0 transition-transform duration-300">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-[#194cbf] to-[#61a1ff] rounded-2xl flex items-center justify-center shadow-lg transform rotate-3 hover:rotate-0 transition-transform duration-300">
               <FaVideo className="text-white text-sm sm:text-lg" />
             </div>
             <div>
-              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-purple-600 bg-clip-text text-transparent">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 bg-clip-text text-transparent">
                 البحث في البث المباشر
               </h3>
             </div>
@@ -58,7 +58,7 @@ const TTHLiveClassesSearchFilter = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 w-full">
           {/* Level Filter */}
           <div className="group">
-            <label className="block text-gray-700 font-bold mb-3 text-sm lg:text-base text-right group-hover:text-blue-600 transition-colors duration-200">
+            <label className="block text-gray-700 font-bold mb-3 text-sm lg:text-base text-right group-hover:text-[#194cbf] transition-colors duration-200">
               <span className="inline-flex items-center gap-2">
                 <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                 المرحلة الدراسية
@@ -123,9 +123,9 @@ const TTHLiveClassesSearchFilter = ({
 
           {/* Speciality Filter */}
           <div className="group">
-            <label className="block text-gray-700 font-bold mb-3 text-sm lg:text-base text-right group-hover:text-purple-600 transition-colors duration-200">
+            <label className="block text-gray-700 font-bold mb-3 text-sm lg:text-base text-right group-hover:text-[#61a1ff] transition-colors duration-200">
               <span className="inline-flex items-center gap-2">
-                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                 التخصص
               </span>
             </label>
@@ -134,7 +134,7 @@ const TTHLiveClassesSearchFilter = ({
                 value={selectedSpeciality}
                 onChange={onSpecialityChange}
                 disabled={!selectedYear || hierarchyLoading}
-                className="appearance-none w-full bg-white/90 backdrop-blur-sm border-2 border-gray-200 hover:border-purple-300 focus:border-purple-500 text-sm lg:text-base font-semibold rounded-2xl py-3 lg:py-4 pr-4 pl-12 focus:outline-none focus:ring-4 focus:ring-purple-100 transition-all duration-300 shadow-sm hover:shadow-md text-right cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="appearance-none w-full bg-white/90 backdrop-blur-sm border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 text-sm lg:text-base font-semibold rounded-2xl py-3 lg:py-4 pr-4 pl-12 focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all duration-300 shadow-sm hover:shadow-md text-right cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 dir="rtl"
               >
                 <option value="">اختر التخصص</option>
@@ -147,7 +147,7 @@ const TTHLiveClassesSearchFilter = ({
                 )}
               </select>
               <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                <FaChevronDown className="text-gray-400 group-hover:text-purple-500 transition-colors duration-200" />
+                <FaChevronDown className="text-gray-400 group-hover:text-blue-500 transition-colors duration-200" />
               </div>
             </div>
           </div>
@@ -189,7 +189,7 @@ const TTHLiveClassesSearchFilter = ({
           <button
             onClick={onSearch}
             disabled={hierarchyLoading}
-            className="flex items-center justify-center gap-3 text-white px-6 py-3 lg:py-4 rounded-2xl text-sm lg:text-base font-bold shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-blue-600 via-purple-600 to-purple-600 hover:from-blue-700 hover:via-purple-700 hover:to-purple-700 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            className="flex items-center justify-center gap-3 text-white px-6 py-3 lg:py-4 rounded-2xl text-sm lg:text-base font-bold shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-700 hover:via-blue-600 hover:to-blue-700 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             <FaSearch className="relative z-10 text-lg" />
@@ -199,7 +199,7 @@ const TTHLiveClassesSearchFilter = ({
 
         {/* Selected Filters Summary */}
         {(selectedLevel || selectedYear || selectedSpeciality || selectedMaterial) && (
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-4 border border-blue-100">
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-2xl p-4 border border-blue-100">
             <h4 className="text-sm font-bold text-gray-700 mb-2 text-right">الفلاتر المحددة:</h4>
             <div className="flex flex-wrap gap-2 justify-end">
               {selectedLevel && (
@@ -213,7 +213,7 @@ const TTHLiveClassesSearchFilter = ({
                 </span>
               )}
               {selectedSpeciality && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                   {specialities.find(s => s.id === parseInt(selectedSpeciality))?.name}
                 </span>
               )}
@@ -228,8 +228,8 @@ const TTHLiveClassesSearchFilter = ({
 
         {/* Decorative Elements */}
         <div className="absolute top-8 right-8 w-3 h-3 bg-blue-400 rounded-full opacity-60 animate-pulse"></div>
-        <div className="absolute bottom-8 left-8 w-2 h-2 bg-purple-400 rounded-full opacity-40 animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/2 left-4 w-1 h-1 bg-purple-400 rounded-full opacity-50 animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute bottom-8 left-8 w-2 h-2 bg-blue-400 rounded-full opacity-40 animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-4 w-1 h-1 bg-blue-400 rounded-full opacity-50 animate-pulse" style={{ animationDelay: '2s' }}></div>
       </div>
     </div>
   );

@@ -51,7 +51,13 @@ interface ProfessorDetail {
     price: number;
     studentsCount: number;
     earnings: number;
-    type: 'education' | 'language';
+  }>;
+  liveSections: Array<{
+    id: number;
+    title: string;
+    price: number;
+    studentsCount: number;
+    earnings: number;
   }>;
   privateClasses: Array<{
     id: number;
@@ -69,6 +75,12 @@ const EarningsAnalytics: React.FC = () => {
   const [professorEarnings, setProfessorEarnings] = useState<ProfessorEarnings[]>([]);
   const [selectedProfessor, setSelectedProfessor] = useState<ProfessorDetail | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+
+  // Derived lists for details dialog
+  const educationCourses =
+    selectedProfessor?.courses.filter((course) => course.type === 'education') ?? [];
+  const languageCourses =
+    selectedProfessor?.courses.filter((course) => course.type === 'language') ?? [];
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
@@ -127,12 +139,21 @@ const EarningsAnalytics: React.FC = () => {
     return new Intl.NumberFormat('en-US').format(amount) + ' DZD';
   };
 
+  const formatMonthLabel = (monthValue: string) => {
+    const [yearStr, monthStr] = monthValue.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    if (Number.isNaN(year) || Number.isNaN(month)) return monthValue;
+    const date = new Date(year, month - 1, 1);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+  };
+
   const getMonthOptions = () => {
     const months = [];
     const currentDate = new Date();
     for (let i = 0; i < 12; i++) {
       const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-      const value = date.toISOString().slice(0, 7);
+      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       const label = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
       months.push({ value, label });
     }
@@ -219,7 +240,7 @@ const EarningsAnalytics: React.FC = () => {
         <CardHeader>
           <CardTitle>Professor Earnings</CardTitle>
           <CardDescription>
-            Earnings breakdown for all professors in {new Date(selectedMonth).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+            Earnings breakdown for all professors in {formatMonthLabel(selectedMonth)}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -235,7 +256,7 @@ const EarningsAnalytics: React.FC = () => {
                   <TableHead>Professor</TableHead>
                   <TableHead>Total Earnings</TableHead>
                   <TableHead>Courses</TableHead>
-                  <TableHead>Live Sections</TableHead>
+                  <TableHead>الدورات</TableHead>
                   <TableHead>Live Sessions</TableHead>
                   <TableHead>Private Classes</TableHead>
                   <TableHead>Language Courses</TableHead>
@@ -318,7 +339,7 @@ const EarningsAnalytics: React.FC = () => {
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {selectedProfessor?.professorName} - {new Date(selectedMonth).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+              {selectedProfessor?.professorName} - {formatMonthLabel(selectedMonth)}
             </DialogTitle>
             <DialogDescription>
               Detailed earnings breakdown for all courses and sessions
@@ -328,7 +349,7 @@ const EarningsAnalytics: React.FC = () => {
           {selectedProfessor && (
             <div className="space-y-6">
               {/* Education Courses */}
-              {selectedProfessor.courses.length > 0 && (
+              {educationCourses.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-3">Education Courses</h3>
                   <Table>
@@ -341,7 +362,7 @@ const EarningsAnalytics: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedProfessor.courses.map((course) => (
+                      {educationCourses.map((course) => (
                         <TableRow key={course.id}>
                           <TableCell className="font-medium">{course.title}</TableCell>
                           <TableCell>{formatCurrency(course.price)}</TableCell>
@@ -356,7 +377,36 @@ const EarningsAnalytics: React.FC = () => {
                 </div>
               )}
 
-              {/* Live Sessions */}
+              {/* Language Courses */}
+              {languageCourses.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Language Courses</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Course</TableHead>
+                        <TableHead>Price</TableHead>
+                        <TableHead>Students</TableHead>
+                        <TableHead>Earnings</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {languageCourses.map((course) => (
+                        <TableRow key={course.id}>
+                          <TableCell className="font-medium">{course.title}</TableCell>
+                          <TableCell>{formatCurrency(course.price)}</TableCell>
+                          <TableCell>{course.studentsCount}</TableCell>
+                          <TableCell className="font-bold text-green-600">
+                            {formatCurrency(course.earnings)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* Live Sessions (standalone) */}
               {selectedProfessor.liveSessions.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-3">Live Sessions</h3>
@@ -364,7 +414,6 @@ const EarningsAnalytics: React.FC = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Session</TableHead>
-                        <TableHead>Type</TableHead>
                         <TableHead>Price</TableHead>
                         <TableHead>Students</TableHead>
                         <TableHead>Earnings</TableHead>
@@ -374,15 +423,39 @@ const EarningsAnalytics: React.FC = () => {
                       {selectedProfessor.liveSessions.map((session) => (
                         <TableRow key={session.id}>
                           <TableCell className="font-medium">{session.title}</TableCell>
-                          <TableCell>
-                            <Badge variant={session.type === 'education' ? 'default' : 'secondary'}>
-                              {session.type}
-                            </Badge>
-                          </TableCell>
                           <TableCell>{formatCurrency(session.price)}</TableCell>
                           <TableCell>{session.studentsCount}</TableCell>
                           <TableCell className="font-bold text-green-600">
                             {formatCurrency(session.earnings)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* Live Sections */}
+              {selectedProfessor.liveSections.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">الدورات</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Section</TableHead>
+                        <TableHead>Price</TableHead>
+                        <TableHead>Students</TableHead>
+                        <TableHead>Earnings</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedProfessor.liveSections.map((section) => (
+                        <TableRow key={section.id}>
+                          <TableCell className="font-medium">{section.title}</TableCell>
+                          <TableCell>{formatCurrency(section.price)}</TableCell>
+                          <TableCell>{section.studentsCount}</TableCell>
+                          <TableCell className="font-bold text-green-600">
+                            {formatCurrency(section.earnings)}
                           </TableCell>
                         </TableRow>
                       ))}

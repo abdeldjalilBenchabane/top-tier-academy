@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,9 +19,19 @@ import { FaGraduationCap, FaBook, FaLayerGroup, FaVideo, FaClock, FaMoneyBill } 
 interface LiveSessionFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
+  /** Pass an existing session to edit it. Omit to create a new one. */
+  editingSession?: any;
+  /** Admins edit sessions they do not own, which needs the admin route. */
+  asAdmin?: boolean;
+  /** Already-resolved path and option lists. When the caller supplies these the
+   *  selects have their options on the very first render, which is what makes
+   *  the saved values actually display. */
+  initialPath?: any;
+  initialOptions?: { years?: any[]; specialities?: any[]; materials?: any[] };
 }
 
-const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
+const LiveSessionForm = ({ onSuccess, onCancel, editingSession, asAdmin, initialPath, initialOptions }: LiveSessionFormProps) => {
+  const isEditing = !!editingSession;
   const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -32,19 +42,165 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Helper function to format datetime for datetime-local input
+  const formatDateTimeForInput = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
   
   // Hierarchy data state
   const [levels, setLevels] = useState([]);
-  const [years, setYears] = useState([]);
-  const [specialities, setSpecialities] = useState([]);
-  const [materials, setMaterials] = useState([]);
+  const [years, setYears] = useState<any[]>(initialOptions?.years || []);
+  const [specialities, setSpecialities] = useState<any[]>(initialOptions?.specialities || []);
+  const [materials, setMaterials] = useState<any[]>(initialOptions?.materials || []);
   const [hierarchyLoading, setHierarchyLoading] = useState(false);
   
   // Selected values
-  const [selectedLevel, setSelectedLevel] = useState('');
-  const [selectedYear, setSelectedYear] = useState('');
-  const [selectedSpeciality, setSelectedSpeciality] = useState('');
-  const [selectedMaterial, setSelectedMaterial] = useState('');
+  const [selectedLevel, setSelectedLevel] = useState(initialPath?.level_id ? String(initialPath.level_id) : '');
+  const [selectedYear, setSelectedYear] = useState(initialPath?.year_id ? String(initialPath.year_id) : '');
+  const [selectedSpeciality, setSelectedSpeciality] = useState(initialPath?.speciality_id ? String(initialPath.speciality_id) : '');
+  const [selectedMaterial, setSelectedMaterial] = useState(initialPath?.material_id ? String(initialPath.material_id) : '');
+  // While restoring an existing session's path, the cascade below must apply
+  // the saved values instead of clearing each level as its parent changes.
+  const prefillPath = useRef<any>(initialPath || null);
+  // The session's current path, shown as text so it is visible even if the
+  // cascading selects below fail to populate for any reason.
+  const [currentPath, setCurrentPath] = useState<any>(null);
+  // A session can sit under an education material or a language level.
+  const [pathType, setPathType] = useState<'education' | 'language'>(initialPath?.root_type === 'language' ? 'language' : 'education');
+  const [languages, setLanguages] = useState<any[]>([]);
+  const [languageLevels, setLanguageLevels] = useState<any[]>([]);
+  const [selectedLanguage, setSelectedLanguage] = useState(initialPath?.language_id ? String(initialPath.language_id) : '');
+  const [selectedLanguageLevel, setSelectedLanguageLevel] = useState(initialPath?.language_level_id ? String(initialPath.language_level_id) : '');
+
+  // Load the existing values when editing.
+  useEffect(() => {
+    if (!editingSession) return;
+    setTitle(editingSession.title || '');
+    setDescription(editingSession.description || '');
+    setDuration(Number(editingSession.duration) || 60);
+    setPrice(Number(editingSession.price) || 0);
+    setTelegramChannel(editingSession.telegram_channel || '');
+    const start = editingSession.start_time || editingSession.startTime;
+    if (start) setScheduledAt(formatDateTimeForInput(new Date(start)));
+    if (editingSession.cover_image_url) setImagePreview(editingSession.cover_image_url);
+
+    // Pre-select the whole educational path. Ask by session id rather than
+    // material id: a session created inside a دورة stores no material of its
+    // own and inherits the section's, which the endpoint resolves for us.
+    if (!editingSession.id || initialPath) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/live-sessions/${editingSession.id}/path`);
+        if (!res.ok) return;
+        const path = await res.json();
+        setCurrentPath(path);
+
+        if (path.root_type === 'language' && path.language_level_id) {
+          setPathType('language');
+          if (path.language_id) setSelectedLanguage(String(path.language_id));
+          setSelectedLanguageLevel(String(path.language_level_id));
+          return;
+        }
+
+        const materialId = path.material_id;
+        if (!materialId) return;
+        setPathType('education');
+        // Seed the whole path, then set only the level. Each cascade step reads
+        // the ref and fills in the next value once its options have loaded —
+        // setting them all here would just be cleared by those same effects.
+        prefillPath.current = { ...path, material_id: materialId };
+
+        // Populate the option lists straight from the public endpoints and set
+        // all four values. The cascade effects still run, but prefillPath makes
+        // them preserve these instead of clearing them.
+        try {
+          // Years were the one list not preloaded, so the year Select often had
+          // no options yet and Radix showed its placeholder instead of the
+          // value — which then left speciality and material disabled.
+          if (path.level_id) {
+            const yRes = await fetch(`/api/public/levels/${path.level_id}/years`);
+            if (yRes.ok) {
+              const y = await yRes.json();
+              setYears(Array.isArray(y) ? y : (y.years || []));
+            }
+          }
+          if (path.year_id) {
+            const spRes = await fetch(`/api/public/years/${path.year_id}/specialities`);
+            if (spRes.ok) setSpecialities(await spRes.json());
+          }
+          if (path.speciality_id) {
+            const mRes = await fetch(`/api/public/specialities/${path.speciality_id}/materials`);
+            if (mRes.ok) setMaterials(await mRes.json());
+          } else if (path.year_id) {
+            const mRes = await fetch(`/api/public/years/${path.year_id}/materials`);
+            if (mRes.ok) setMaterials(await mRes.json());
+          }
+        } catch (e) {
+          console.error('Could not preload the path options:', e);
+        }
+
+        if (path.level_id) setSelectedLevel(String(path.level_id));
+        if (path.year_id) setSelectedYear(String(path.year_id));
+        if (path.speciality_id) setSelectedSpeciality(String(path.speciality_id));
+        setSelectedMaterial(String(materialId));
+      } catch (e) {
+        console.error('Could not resolve the session path:', e);
+      }
+    })();
+  }, [editingSession]);
+
+  const authHeaders = () => {
+    const t = localStorage.getItem('token');
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/languages', { headers: authHeaders() });
+        if (res.ok) {
+          const d = await res.json();
+          setLanguages(Array.isArray(d) ? d : (d.languages || []));
+        }
+      } catch (e) { console.error('Could not load languages:', e); }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedLanguage) { setLanguageLevels([]); return; }
+    (async () => {
+      try {
+        const res = await fetch(`/api/languages/${selectedLanguage}/levels`, { headers: authHeaders() });
+        if (res.ok) {
+          const d = await res.json();
+          setLanguageLevels(Array.isArray(d) ? d : (d.levels || []));
+        }
+      } catch (e) { console.error('Could not load language levels:', e); }
+    })();
+  }, [selectedLanguage]);
+
+  // Default to today. Before 10:00 that means 10:00; later in the day it means
+  // the next half-hour slot, so the suggestion is never already in the past.
+  useEffect(() => {
+    if (isEditing) return;
+    if (!scheduledAt) {
+      const start = new Date();
+      if (start.getHours() < 10) {
+        start.setHours(10, 0, 0, 0);
+      } else {
+        start.setTime(start.getTime() + 15 * 60 * 1000);
+        // setMinutes(60) rolls cleanly into the next hour.
+        start.setMinutes(start.getMinutes() < 30 ? 30 : 60, 0, 0);
+      }
+      setScheduledAt(formatDateTimeForInput(start));
+    }
+  }, [scheduledAt]);
 
   // Fetch hierarchy data
   useEffect(() => {
@@ -72,10 +228,19 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
     if (selectedLevel) {
       const level = levels.find(l => l.id === parseInt(selectedLevel));
       if (level) {
-        setYears(level.years || []);
-        setSelectedYear('');
-        setSelectedSpeciality('');
-        setSelectedMaterial('');
+        const restoring = prefillPath.current;
+        // Never replace a preloaded list with an empty one while restoring.
+        const nextYears = level.years || [];
+        if (!restoring || nextYears.length > 0) {
+          setYears(nextYears);
+        }
+        if (restoring?.year_id) {
+          setSelectedYear(String(restoring.year_id));
+        } else {
+          setSelectedYear('');
+          setSelectedSpeciality('');
+          setSelectedMaterial('');
+        }
       }
     } else {
       setYears([]);
@@ -116,12 +281,17 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
       
       if (specialitiesResponse.ok) {
         const specialitiesData = await specialitiesResponse.json();
+        const restoring = prefillPath.current;
         if (specialitiesData.length > 0) {
           // Year has specialities - 4-path structure
           setSpecialities(specialitiesData);
-          setSelectedSpeciality('');
-          setSelectedMaterial('');
-          setMaterials([]);
+          if (restoring?.speciality_id) {
+            setSelectedSpeciality(String(restoring.speciality_id));
+          } else {
+            setSelectedSpeciality('');
+            setSelectedMaterial('');
+            setMaterials([]);
+          }
         } else {
           // Year has no specialities - check for materials directly
           setSpecialities([]);
@@ -164,7 +334,12 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
       if (response.ok) {
         const data = await response.json();
         setMaterials(data);
-        setSelectedMaterial('');
+        const restoring = prefillPath.current;
+        if (restoring?.material_id) {
+          setSelectedMaterial(String(restoring.material_id));
+        } else {
+          setSelectedMaterial('');
+        }
       } else {
         toast.error('Failed to load materials for this speciality');
       }
@@ -189,7 +364,12 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
       if (response.ok) {
         const data = await response.json();
         setMaterials(data);
-        setSelectedMaterial('');
+        const restoring = prefillPath.current;
+        if (restoring?.material_id) {
+          setSelectedMaterial(String(restoring.material_id));
+        } else {
+          setSelectedMaterial('');
+        }
       } else {
         toast.error('Failed to load materials for this year');
       }
@@ -257,19 +437,50 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
       const formData = new FormData();
       formData.append('title', title);
       formData.append('description', description);
-      formData.append('start_time', scheduledAt);
+      // Send the datetime as-is to preserve local time
+      // Convert local time to UTC before sending
+      const localDate = new Date(scheduledAt);
+      const utcTime = localDate.toISOString();
+      formData.append('start_time', utcTime);
       formData.append('duration', duration.toString());
       formData.append('price', price.toString());
-      formData.append('material_id', selectedMaterial);
+      // Only send the path when one is actually chosen. When editing, leaving
+      // the selects untouched must keep the session's existing path.
+      if (pathType === 'language') {
+        if (selectedLanguageLevel) {
+          formData.append('root_type', 'language');
+          formData.append('language_id', selectedLanguage);
+          formData.append('language_level_id', selectedLanguageLevel);
+        }
+      } else if (selectedMaterial) {
+        formData.append('root_type', 'education');
+        formData.append('material_id', selectedMaterial);
+      }
       formData.append('professorId', user.id);
       formData.append('telegram_channel', telegramChannel);
       
+
+	console.log('[DEBUG] Form scheduledAt:', scheduledAt);
+      if (scheduledAt) {
+        const localDate = new Date(scheduledAt);
+        console.log('[DEBUG] Local date object:', localDate);
+        console.log('[DEBUG] Local date ISO string:', localDate.toISOString());
+        console.log('[DEBUG] Local date local string:', localDate.toString());
+      }
       if (coverImage) {
         formData.append('cover_image', coverImage);
       }
 
-      const response = await fetch(`/api/professors/${user.id}/live-sessions`, {
-        method: 'POST',
+      // The professor route is ownership-locked, so an admin must use the
+      // admin route or the update is rejected with 403.
+      const endpoint = isEditing
+        ? (asAdmin
+            ? `/api/admin/live-sessions/${editingSession.id}`
+            : `/api/live-sessions/${editingSession.id}`)
+        : `/api/professors/${user.id}/live-sessions`;
+
+      const response = await fetch(endpoint, {
+        method: isEditing ? 'PUT' : 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
@@ -277,7 +488,7 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
       });
 
       if (!response.ok) {
-        let errorMessage = 'Failed to create live session';
+        let errorMessage = isEditing ? 'Failed to update live session' : 'Failed to create live session';
         
         try {
           const errorData = await response.json();
@@ -405,14 +616,76 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
               <FaGraduationCap className="text-green-500 text-xl" />
               <h3 className="text-lg font-semibold">المسار التعليمي</h3>
             </div>
+
+            {isEditing && currentPath && !currentPath.material_id && (
+              <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
+                لا يوجد مسار تعليمي محفوظ لهذا البث. اختر مسارًا من القوائم بالأسفل.
+              </div>
+            )}
             
+            <div className="flex gap-2 mb-4">
+              {([['education', 'مسار تعليمي'], ['language', 'مسار لغات']] as const).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => { prefillPath.current = null; setPathType(k); }}
+                  className={`rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
+                    pathType === k
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {pathType === 'language' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">اللغة *</Label>
+                  <Select
+                    value={selectedLanguage}
+                    onValueChange={(v) => { prefillPath.current = null; setSelectedLanguage(v); setSelectedLanguageLevel(''); }}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="اختر اللغة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {languages.map((l: any) => (
+                        <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">المستوى *</Label>
+                  <Select
+                    value={selectedLanguageLevel}
+                    onValueChange={(v) => { prefillPath.current = null; setSelectedLanguageLevel(v); }}
+                    disabled={!selectedLanguage}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder={selectedLanguage ? 'اختر المستوى' : 'اختر اللغة أولاً'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {languageLevels.map((l: any) => (
+                        <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {pathType === 'education' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Level */}
               <div>
                 <Label htmlFor="level" className="text-sm font-medium">
                   المرحلة الدراسية *
                 </Label>
-                <Select value={selectedLevel} onValueChange={setSelectedLevel} disabled={hierarchyLoading}>
+                <Select value={selectedLevel} onValueChange={(v) => { prefillPath.current = null; setSelectedLevel(v); }} disabled={hierarchyLoading}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder={hierarchyLoading ? "جاري التحميل..." : "اختر المرحلة"} />
                   </SelectTrigger>
@@ -437,7 +710,7 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
                 <Label htmlFor="year" className="text-sm font-medium">
                   السنة الدراسية *
                 </Label>
-                <Select value={selectedYear} onValueChange={setSelectedYear} disabled={!selectedLevel}>
+                <Select value={selectedYear} onValueChange={(v) => { prefillPath.current = null; setSelectedYear(v); }} disabled={!selectedLevel}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="اختر السنة" />
                   </SelectTrigger>
@@ -464,7 +737,7 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
                 </Label>
                 <Select 
                   value={selectedSpeciality} 
-                  onValueChange={setSelectedSpeciality} 
+                  onValueChange={(v) => { prefillPath.current = null; setSelectedSpeciality(v); }} 
                   disabled={!selectedYear || specialities.length === 0}
                 >
                   <SelectTrigger className="mt-1">
@@ -499,7 +772,7 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
                 </Label>
                 <Select 
                   value={selectedMaterial} 
-                  onValueChange={setSelectedMaterial} 
+                  onValueChange={(v) => { prefillPath.current = null; setSelectedMaterial(v); }} 
                   disabled={!selectedYear || (specialities.length > 0 && !selectedSpeciality)}
                 >
                   <SelectTrigger className="mt-1">
@@ -527,6 +800,7 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
                 </Select>
               </div>
             </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -620,22 +894,30 @@ const LiveSessionForm = ({ onSuccess, onCancel }: LiveSessionFormProps) => {
         <Button
           type="submit"
           disabled={
-            isSubmitting || 
-            !title || 
-            !description || 
-            !scheduledAt || 
-            !selectedLevel ||
-            !selectedYear ||
-            (specialities.length > 0 && !selectedSpeciality) ||
-            !selectedMaterial
+            isSubmitting ||
+            !title ||
+            !description ||
+            !scheduledAt ||
+            // A new session must be filed under a path. An existing one already
+            // has one, so the selects stay optional unless the user changes it.
+            (!isEditing && (
+              pathType === 'language'
+                ? (!selectedLanguage || !selectedLanguageLevel)
+                : (!selectedLevel ||
+                   !selectedYear ||
+                   (specialities.length > 0 && !selectedSpeciality) ||
+                   !selectedMaterial)
+            ))
           }
           className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
         >
-          {isSubmitting ? 'جاري الإنشاء...' : 'إنشاء البث المباشر'}
+          {isSubmitting
+            ? (isEditing ? 'جاري الحفظ...' : 'جاري الإنشاء...')
+            : (isEditing ? 'حفظ التعديلات' : 'إنشاء البث المباشر')}
         </Button>
       </div>
     </form>
   );
 };
 
-export default LiveSessionForm; 
+export default LiveSessionForm;

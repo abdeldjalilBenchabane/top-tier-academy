@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Square Top Tier Academy mark, used for favicons and search results. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 752.58 752.58" width="512" height="512">
+  <style type="text/css">
+    .st4{fill:#4C85C5;}
+    .st5{fill:#2C51A0;}
+  </style>
+  <rect width="752.58" height="752.58" fill="#FFFFFF"/>
+  <g transform="translate(30.00,277.35)">
+    <path class="st4" d="M296.82,0v98.94h-98.94v98.94H98.94V98.94c0-27.32,11.07-52.06,28.98-69.96C145.82,11.08,170.56,0,197.88,0
+		H296.82z"/>
+    <path class="st4" d="M494.69,0v98.94h-98.94v98.94h-98.94V98.94c0-27.32,11.07-52.06,28.98-69.96C343.7,11.08,368.44,0,395.76,0
+		H494.69z"/>
+    <path class="st4" d="M98.94,98.94H0V0C54.64,0,98.94,44.3,98.94,98.94z"/>
+    <rect x="494.69" y="98.94" class="st4" width="98.94" height="98.94"/>
+    <rect x="593.64" y="98.94" class="st5" width="98.94" height="98.94"/>
+    <path class="st5" d="M593.64,0v98.94h-98.94C494.69,44.3,538.99,0,593.64,0L593.64,0z"/>
+    <path class="st4" d="M593.64,0v98.94h98.94C692.58,44.3,648.28,0,593.64,0L593.64,0z"/>
+    <path class="st5" d="M197.88,98.94H98.94C98.94,44.3,143.24,0,197.88,0V98.94z"/>
+    <path class="st5" d="M395.76,98.94h-98.94C296.82,44.3,341.11,0,395.76,0V98.94z"/>
+  </g>
+</svg>

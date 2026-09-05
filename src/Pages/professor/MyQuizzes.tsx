@@ -124,22 +124,25 @@ export default function MyQuizzes() {
 
   return (
     <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">My Quizzes</h1>
           <p className="text-gray-600 mt-2">Manage and edit your created quizzes</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <Button 
             onClick={fetchMyQuizzes} 
             variant="outline" 
-            className="flex items-center gap-2"
+            className="flex items-center justify-center gap-2 w-full sm:w-auto"
             disabled={loading}
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button onClick={() => navigate('/professor/quiz')} className="flex items-center gap-2">
+          <Button 
+            onClick={() => navigate('/professor/quiz')} 
+            className="flex items-center justify-center gap-2 w-full sm:w-auto"
+          >
             <Plus className="w-4 h-4" />
             Create New Quiz
           </Button>

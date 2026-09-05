@@ -1,53 +1,60 @@
 import express from 'express';
-import { query, getRow, getRows } from '../db.js';
 import { verifyToken, requireRole } from '../middleware/auth.js';
-import bcrypt from 'bcrypt';
+import { getRows, getRow, query } from '../db.js';
+import { createR2Multer } from '../middleware/r2MulterStorage.js';
+import { deleteFromR2, extractKeyFromUrl } from '../services/r2Service.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
+import bcrypt from 'bcrypt';
 
 const router = express.Router();
 
-// Get current directory
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Configure multer for avatar uploads
-const avatarStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'avatars');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'avatar-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const avatarUpload = multer({
-  storage: avatarStorage,
-  // Removed file size limit - no longer restricting file size
+// Configure multer for avatar uploads with R2 storage
+const avatarUpload = createR2Multer('avatars', null, {
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (mimetype && extname) {
+    console.log('Avatar upload attempt:', {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    });
+    
+    // Allow only image files for avatars
+    const allowedImageTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedImageTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedImageTypes.test(file.mimetype);
+    
+    if (extname && mimetype) {
       return cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed for avatars!'));
+      return cb(new Error('Only image files (jpeg, jpg, png, gif, webp) are allowed for avatars!'));
     }
   }
 });
+
+// Error handling middleware for multer
+const handleMulterError = (error, req, res, next) => {
+  console.error('Multer error:', error);
+  
+  if (error instanceof multer.MulterError) {
+    return res.status(400).json({ error: error.message });
+  } else if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  next();
+};
 
 // Get all users (admin only)
 router.get('/', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
-    const users = await getRows('SELECT id, name, email, role, avatar_url, created_at FROM users ORDER BY created_at DESC');
+    const users = await getRows(`
+      SELECT u.id, u.name, u.email, u.role, u.avatar_url, u.created_at,
+             u.level_id, l.name AS level_name
+      FROM users u
+      LEFT JOIN levels l ON u.level_id = l.id
+      ORDER BY u.created_at DESC
+    `);
     res.json(users);
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -59,12 +66,14 @@ router.get('/', verifyToken, requireRole(['admin']), async (req, res) => {
 router.get('/teachers', verifyToken, async (req, res) => {
   try {
     const teachers = await getRows(`
-      SELECT id, name, email, avatar_url, created_at 
-      FROM users 
-      WHERE role = 'professor' 
-      ORDER BY name ASC
+      SELECT u.id, u.name, u.email, u.avatar_url, u.created_at,
+             u.level_id, l.name AS level_name
+      FROM users u
+      LEFT JOIN levels l ON u.level_id = l.id
+      WHERE u.role = 'professor'
+      ORDER BY u.name ASC
     `);
-    
+
     res.json({ teachers });
   } catch (error) {
     console.error('Error fetching teachers:', error);
@@ -94,7 +103,7 @@ router.get('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
 // Create new user (admin only)
 router.post('/', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { name, email, password, confirmPassword, role } = req.body;
+    const { name, email, password, confirmPassword, role, level_id } = req.body;
 
     // Validate required fields
     if (!name || !email || !password || !role) {
@@ -117,14 +126,26 @@ router.post('/', verifyToken, requireRole(['admin']), async (req, res) => {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
+    // Only persist level_id when role is professor
+    let levelIdToStore = null;
+    if (role === 'professor' && level_id) {
+      const lvl = await getRow('SELECT id FROM levels WHERE id = $1', [level_id]);
+      if (!lvl) {
+        return res.status(400).json({ error: 'Invalid level_id' });
+      }
+      levelIdToStore = level_id;
+    }
+
     // Hash password
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
     // Insert new user
     const result = await query(
-      'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role, avatar_url, created_at',
-      [name, email, passwordHash, role]
+      `INSERT INTO users (name, email, password_hash, role, level_id)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, email, role, avatar_url, created_at, level_id`,
+      [name, email, passwordHash, role, levelIdToStore]
     );
 
     res.status(201).json(result.rows[0]);
@@ -137,11 +158,11 @@ router.post('/', verifyToken, requireRole(['admin']), async (req, res) => {
 // Update user (admin only)
 router.put('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { name, email, password, confirmPassword, role, avatar_url } = req.body;
+    const { name, email, password, confirmPassword, role, avatar_url, level_id } = req.body;
     const userId = req.params.id;
 
     // Check if user exists
-    const existingUser = await getRow('SELECT id FROM users WHERE id = $1', [userId]);
+    const existingUser = await getRow('SELECT id, role FROM users WHERE id = $1', [userId]);
     if (!existingUser) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -168,6 +189,26 @@ router.put('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
       updateValues.push(avatar_url);
     }
 
+    // level_id: only meaningful for professors. Clear it if role is being changed away from professor.
+    const finalRole = role !== undefined ? role : existingUser.role;
+    if (finalRole === 'professor') {
+      if (level_id !== undefined) {
+        if (level_id === null || level_id === '') {
+          updateFields.push(`level_id = $${paramCount++}`);
+          updateValues.push(null);
+        } else {
+          const lvl = await getRow('SELECT id FROM levels WHERE id = $1', [level_id]);
+          if (!lvl) return res.status(400).json({ error: 'Invalid level_id' });
+          updateFields.push(`level_id = $${paramCount++}`);
+          updateValues.push(level_id);
+        }
+      }
+    } else if (role !== undefined && role !== 'professor') {
+      // role changed to non-professor → clear level_id
+      updateFields.push(`level_id = $${paramCount++}`);
+      updateValues.push(null);
+    }
+
     // Handle password update if provided
     if (password) {
       if (password !== confirmPassword) {
@@ -191,7 +232,8 @@ router.put('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
 
     // Update user
     const result = await query(
-      `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramCount} RETURNING id, name, email, role, avatar_url, created_at`,
+      `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramCount}
+       RETURNING id, name, email, role, avatar_url, created_at, level_id`,
       updateValues
     );
 
@@ -203,7 +245,7 @@ router.put('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
 });
 
 // Upload avatar (admin only)
-router.post('/:id/avatar', verifyToken, requireRole(['admin']), avatarUpload.single('avatar'), async (req, res) => {
+router.post('/:id/avatar', verifyToken, requireRole(['admin']), avatarUpload.single('avatar'), async (req, res, next) => {
   try {
     const userId = req.params.id;
 
@@ -217,21 +259,52 @@ router.post('/:id/avatar', verifyToken, requireRole(['admin']), avatarUpload.sin
       return res.status(400).json({ error: 'No avatar file uploaded' });
     }
 
-    // Delete old avatar if it exists
-    if (existingUser.avatar_url) {
-      const oldAvatarPath = path.join(__dirname, '..', '..', 'public', existingUser.avatar_url);
+    // Handle R2 upload manually after file is buffered
+    if (req.file && req.file.buffer) {
       try {
-        if (fs.existsSync(oldAvatarPath)) {
-          fs.unlinkSync(oldAvatarPath);
-          console.log(`Old avatar deleted: ${oldAvatarPath}`);
-        }
-      } catch (fileError) {
-        console.error('Error deleting old avatar:', fileError);
+        console.log('📤 Processing R2 upload for avatar...');
+        
+        // Import R2 functions
+        const { uploadToR2, generateR2Key, deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
+        
+        // Generate R2 key
+        const r2Key = generateR2Key('avatars', null, req.file.originalname, 'avatar');
+        console.log('🔑 Generated R2 key:', r2Key);
+        
+        // Upload to R2
+        const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        console.log('✅ Avatar uploaded to R2:', publicUrl);
+        
+        // Update file object with R2 URL
+        req.file.path = publicUrl;
+        req.file.filename = r2Key;
+      } catch (error) {
+        console.error('❌ Error uploading avatar to R2:', error);
+        return res.status(500).json({ 
+          error: 'Failed to upload avatar to R2',
+          details: error.message 
+        });
       }
     }
 
-    // Save new avatar URL
-    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    // Delete old avatar from R2 if it exists
+    if (existingUser.avatar_url) {
+      try {
+        console.log('🗑️ Deleting old avatar from R2:', existingUser.avatar_url);
+        const { deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
+        const oldKey = extractKeyFromUrl(existingUser.avatar_url);
+        if (oldKey && oldKey !== existingUser.avatar_url) {
+          await deleteFromR2(oldKey);
+          console.log('✅ Old avatar deleted from R2:', oldKey);
+        }
+      } catch (fileError) {
+        console.error('⚠️ Error deleting old avatar from R2:', fileError);
+        // Continue with new avatar upload even if old avatar deletion fails
+      }
+    }
+
+    // Save new avatar URL (R2)
+    const avatarUrl = req.file.path; // R2 public URL
     await query(
       'UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, name, email, role, avatar_url, created_at',
       [avatarUrl, userId]
@@ -248,7 +321,7 @@ router.post('/:id/avatar', verifyToken, requireRole(['admin']), avatarUpload.sin
 });
 
 // Upload avatar for students (own profile only)
-router.post('/student/avatar', verifyToken, requireRole(['student']), avatarUpload.single('avatar'), async (req, res) => {
+router.post('/student/avatar', verifyToken, requireRole(['student']), avatarUpload.single('avatar'), async (req, res, next) => {
   try {
     console.log('Avatar upload request received');
     console.log('User:', req.user);
@@ -270,21 +343,52 @@ router.post('/student/avatar', verifyToken, requireRole(['student']), avatarUplo
       return res.status(400).json({ error: 'No avatar file uploaded' });
     }
 
-    // Delete old avatar if it exists
-    if (existingUser.avatar_url) {
-      const oldAvatarPath = path.join(__dirname, '..', '..', 'public', existingUser.avatar_url);
+    // Handle R2 upload manually after file is buffered
+    if (req.file && req.file.buffer) {
       try {
-        if (fs.existsSync(oldAvatarPath)) {
-          fs.unlinkSync(oldAvatarPath);
-          console.log(`Old avatar deleted: ${oldAvatarPath}`);
-        }
-      } catch (fileError) {
-        console.error('Error deleting old avatar:', fileError);
+        console.log('📤 Processing R2 upload for student avatar...');
+        
+        // Import R2 functions
+        const { uploadToR2, generateR2Key, deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
+        
+        // Generate R2 key
+        const r2Key = generateR2Key('avatars', null, req.file.originalname, 'avatar');
+        console.log('🔑 Generated R2 key:', r2Key);
+        
+        // Upload to R2
+        const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        console.log('✅ Student avatar uploaded to R2:', publicUrl);
+        
+        // Update file object with R2 URL
+        req.file.path = publicUrl;
+        req.file.filename = r2Key;
+      } catch (error) {
+        console.error('❌ Error uploading student avatar to R2:', error);
+        return res.status(500).json({ 
+          error: 'Failed to upload avatar to R2',
+          details: error.message 
+        });
       }
     }
 
-    // Save new avatar URL
-    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    // Delete old avatar from R2 if it exists
+    if (existingUser.avatar_url) {
+      try {
+        console.log('🗑️ Deleting old student avatar from R2:', existingUser.avatar_url);
+        const { deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
+        const oldKey = extractKeyFromUrl(existingUser.avatar_url);
+        if (oldKey && oldKey !== existingUser.avatar_url) {
+          await deleteFromR2(oldKey);
+          console.log('✅ Old student avatar deleted from R2:', oldKey);
+        }
+      } catch (fileError) {
+        console.error('⚠️ Error deleting old student avatar from R2:', fileError);
+        // Continue with new avatar upload even if old avatar deletion fails
+      }
+    }
+
+    // Save new avatar URL (R2)
+    const avatarUrl = req.file.path; // R2 public URL
     await query(
       'UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, name, email, role, avatar_url, created_at',
       [avatarUrl, studentId]
@@ -302,34 +406,69 @@ router.post('/student/avatar', verifyToken, requireRole(['student']), avatarUplo
 });
 
 // Upload avatar for current user (any role)
-router.post('/me/avatar', verifyToken, avatarUpload.single('avatar'), async (req, res) => {
+router.post('/me/avatar', verifyToken, avatarUpload.single('avatar'), async (req, res, next) => {
   try {
     console.log('Avatar upload (me) request received');
     console.log('User:', req.user);
     console.log('File:', req.file);
     const userId = req.user.id;
+    
     // Check if user exists
     const existingUser = await getRow('SELECT id, avatar_url FROM users WHERE id = $1', [userId]);
     if (!existingUser) {
       return res.status(404).json({ error: 'User not found' });
     }
+    
     if (!req.file) {
       return res.status(400).json({ error: 'No avatar file uploaded' });
     }
-    // Delete old avatar if it exists
-    if (existingUser.avatar_url) {
-      const oldAvatarPath = path.join(__dirname, '..', '..', 'public', existingUser.avatar_url);
+
+    // Handle R2 upload manually after file is buffered
+    if (req.file && req.file.buffer) {
       try {
-        if (fs.existsSync(oldAvatarPath)) {
-          fs.unlinkSync(oldAvatarPath);
-          console.log(`Old avatar deleted: ${oldAvatarPath}`);
-        }
-      } catch (fileError) {
-        console.error('Error deleting old avatar:', fileError);
+        console.log('📤 Processing R2 upload for user avatar...');
+        
+        // Import R2 functions
+        const { uploadToR2, generateR2Key, deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
+        
+        // Generate R2 key
+        const r2Key = generateR2Key('avatars', null, req.file.originalname, 'avatar');
+        console.log('🔑 Generated R2 key:', r2Key);
+        
+        // Upload to R2
+        const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        console.log('✅ User avatar uploaded to R2:', publicUrl);
+        
+        // Update file object with R2 URL
+        req.file.path = publicUrl;
+        req.file.filename = r2Key;
+      } catch (error) {
+        console.error('❌ Error uploading user avatar to R2:', error);
+        return res.status(500).json({ 
+          error: 'Failed to upload avatar to R2',
+          details: error.message 
+        });
       }
     }
-    // Save new avatar URL
-    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+
+    // Delete old avatar from R2 if it exists
+    if (existingUser.avatar_url) {
+      try {
+        console.log('🗑️ Deleting old user avatar from R2:', existingUser.avatar_url);
+        const { deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
+        const oldKey = extractKeyFromUrl(existingUser.avatar_url);
+        if (oldKey && oldKey !== existingUser.avatar_url) {
+          await deleteFromR2(oldKey);
+          console.log('✅ Old user avatar deleted from R2:', oldKey);
+        }
+      } catch (fileError) {
+        console.error('⚠️ Error deleting old user avatar from R2:', fileError);
+        // Continue with new avatar upload even if old avatar deletion fails
+      }
+    }
+
+    // Save new avatar URL (R2)
+    const avatarUrl = req.file.path; // R2 public URL
     await query(
       'UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, name, email, role, avatar_url, created_at',
       [avatarUrl, userId]
@@ -392,8 +531,8 @@ router.post('/avatar-profile', verifyToken, avatarUpload.single('avatar'), async
       }
     }
 
-    // Save new avatar URL
-    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    // Save new avatar URL (R2)
+    const avatarUrl = req.file.path; // R2 public URL
     await query(
       'UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, name, email, role, avatar_url, created_at',
       [avatarUrl, userId]

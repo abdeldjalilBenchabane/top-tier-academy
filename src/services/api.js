@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = '/api';
 
 // Helper function to get auth token from localStorage
 const getAuthToken = () => {
@@ -15,14 +15,31 @@ const removeAuthToken = () => {
   localStorage.removeItem('token');
 };
 
+// Helper function to get session token from localStorage
+const getSessionToken = () => {
+  return localStorage.getItem('sessionToken');
+};
+
+// Helper function to set session token in localStorage
+const setSessionToken = (sessionToken) => {
+  localStorage.setItem('sessionToken', sessionToken);
+};
+
+// Helper function to remove session token from localStorage
+const removeSessionToken = () => {
+  localStorage.removeItem('sessionToken');
+};
+
 // Helper function to make API requests
 const apiRequest = async (endpoint, options = {}) => {
   const token = getAuthToken();
+  const sessionToken = getSessionToken();
   
   const config = {
     headers: {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
+      ...(sessionToken && { 'X-Session-Token': sessionToken }),
       ...options.headers,
     },
     ...options,
@@ -33,6 +50,13 @@ const apiRequest = async (endpoint, options = {}) => {
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      
+      // Check if session was invalidated
+      if (errorData.sessionInvalid) {
+        // Trigger a custom event to notify the app that session is invalid
+        window.dispatchEvent(new CustomEvent('sessionInvalidated', { detail: errorData }));
+      }
+      
       throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
     
@@ -56,6 +80,10 @@ export const authAPI = {
       setAuthToken(response.token);
     }
     
+    if (response.sessionToken) {
+      setSessionToken(response.sessionToken);
+    }
+    
     return response;
   },
 
@@ -70,13 +98,23 @@ export const authAPI = {
       setAuthToken(response.token);
     }
     
+    if (response.sessionToken) {
+      setSessionToken(response.sessionToken);
+    }
+    
     return response;
   },
 
   // Logout
   logout: () => {
     removeAuthToken();
+    removeSessionToken();
     return apiRequest('/auth/logout', { method: 'POST' });
+  },
+  
+  // Validate session
+  validateSession: () => {
+    return apiRequest('/auth/validate-session', { method: 'POST' });
   },
 
   // Get current user
@@ -87,6 +125,11 @@ export const authAPI = {
   // Verify token
   verifyToken: () => {
     return apiRequest('/auth/verify', { method: 'POST' });
+  },
+
+  // Refresh token (for streaming sessions)
+  refreshToken: () => {
+    return apiRequest('/auth/refresh-token', { method: 'POST' });
   },
 
   // Forgot password
@@ -506,7 +549,7 @@ export const structureAPI = {
   deleteLanguageLevel: (id) => apiRequest(`/language-levels/${id}`, { method: 'DELETE' }),
 };
 
-export { getAuthToken, setAuthToken, removeAuthToken }; 
+export { getAuthToken, setAuthToken, removeAuthToken, getSessionToken, setSessionToken, removeSessionToken }; 
 
 // Chat notifications
 export const getChatNotifications = async (sessionId) => {

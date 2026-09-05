@@ -27,7 +27,7 @@ const PointsHistory: React.FC = () => {
       <div className="max-w-3xl mx-auto bg-white rounded-lg shadow p-6">
         <h2 className="text-2xl font-bold mb-6 text-blue-700">سجل معاملات النقاط</h2>
         {loading ? (
-          <div className="text-center text-blue-600">جاري التحميل...</div>
+          <div className="text-center text-[#194cbf]">جاري التحميل...</div>
         ) : error ? (
           <div className="text-center text-red-600">{error}</div>
         ) : transactions.length === 0 ? (

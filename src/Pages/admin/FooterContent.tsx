@@ -97,7 +97,13 @@ const FooterContent = () => {
 
   const handleSave = async () => {
     try {
-      console.log('Updating footer content:', editingContent);
+      // Ensure is_active is set to true
+      const dataToSave = {
+        ...editingContent,
+        is_active: true
+      };
+
+      console.log('Updating footer content:', dataToSave);
       console.log('Editing ID:', editingId);
 
       const response = await fetch(`/api/footer-content/${editingId}`, {
@@ -106,7 +112,7 @@ const FooterContent = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(editingContent)
+        body: JSON.stringify(dataToSave)
       });
 
       console.log('Update response status:', response.status);
@@ -118,7 +124,11 @@ const FooterContent = () => {
         });
         setEditingId(null);
         setEditingContent({});
-        fetchContent();
+        await fetchContent(); // Wait for fetch to complete
+        // Force a small delay to ensure database has updated
+        setTimeout(() => {
+          window.dispatchEvent(new Event('footer-updated'));
+        }, 100);
       } else {
         const errorData = await response.text();
         console.error('Update response error:', errorData);
@@ -176,7 +186,13 @@ const FooterContent = () => {
         return;
       }
 
-      console.log('Adding new footer content:', editingContent);
+      // Ensure is_active is set to true for new content
+      const dataToAdd = {
+        ...editingContent,
+        is_active: true
+      };
+
+      console.log('Adding new footer content:', dataToAdd);
 
       const response = await fetch('/api/footer-content', {
         method: 'POST',
@@ -184,7 +200,7 @@ const FooterContent = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(editingContent)
+        body: JSON.stringify(dataToAdd)
       });
 
       console.log('Add response status:', response.status);
@@ -196,7 +212,11 @@ const FooterContent = () => {
         });
         setEditingContent({});
         setEditingId(null);
-        fetchContent();
+        await fetchContent(); // Wait for fetch to complete
+        // Force a small delay to ensure database has updated
+        setTimeout(() => {
+          window.dispatchEvent(new Event('footer-updated'));
+        }, 100);
       } else {
         const errorData = await response.text();
         console.error('Add response error:', errorData);

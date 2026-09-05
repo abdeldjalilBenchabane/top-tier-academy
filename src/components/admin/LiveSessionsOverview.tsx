@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api';
 import { LiveSession, User } from '@/types';
 import { toast } from '@/lib/toast';
+import { formatTimeForDisplay, formatDateForDisplay } from '@/lib/utils';
 import { useLiveSessionsCount } from '@/contexts/LiveSessionsCountContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { API_BASE_URL } from '@/lib/api';
 import { 
   Video, 
   Calendar, 
@@ -49,6 +53,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea';
 
 const LiveSessionsOverview = () => {
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState<LiveSession[]>([]);
   const [professors, setProfessors] = useState<User[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -57,6 +62,34 @@ const LiveSessionsOverview = () => {
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedApproval, setSelectedApproval] = useState<string>('all');
   const [approvingSession, setApprovingSession] = useState<string | null>(null);
+  // Editing / deleting a session from this table.
+  const [deleting, setDeleting] = useState<any | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const authHeaders = () => {
+    const t = localStorage.getItem('token');
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  };
+
+  // datetime-local wants local time with no timezone suffix.
+
+
+
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/live-sessions/${deleting.id}`, {
+        method: 'DELETE', headers: authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Delete failed');
+      toast.success('Session deleted');
+      setDeleting(null);
+      fetchData();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  };
   const [rejectingSession, setRejectingSession] = useState<string | null>(null);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -573,14 +606,13 @@ const LiveSessionsOverview = () => {
                     <TableHead>Scheduled</TableHead>
                     <TableHead>Attendees</TableHead>
                     <TableHead>Duration</TableHead>
-                    <TableHead>Recording</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                     {filteredSessions.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8">
+                        <TableCell colSpan={7} className="text-center py-8">
                           <div className="text-center">
                             <Video className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                             <h3 className="text-lg font-medium text-gray-900">No sessions found</h3>
@@ -668,23 +700,6 @@ const LiveSessionsOverview = () => {
                       <TableCell>
                         <div className="text-sm">{session.duration}m</div>
                       </TableCell>
-                      <TableCell>
-                        {session.isRecorded ? (
-                          session.recordingUrl ? (
-                                <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => handleViewRecording(session)}>
-                              <Eye className="h-3 w-3 mr-1" />
-                              View
-                            </Button>
-                          ) : (
-                            <Badge variant="outline" className="text-xs">
-                              <FileVideo className="h-2 w-2 mr-1" />
-                              Recording
-                            </Badge>
-                          )
-                        ) : (
-                          <span className="text-xs text-gray-400">No recording</span>
-                        )}
-                      </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
                           {session.meetingUrl && (
@@ -740,11 +755,14 @@ const LiveSessionsOverview = () => {
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => navigate(`/admin/live-sessions/${session.id}/edit`)}>
                                     <Edit className="h-4 w-4 mr-2" />
                                     Edit Session
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem className="text-red-600">
+                                  <DropdownMenuItem
+                                    className="text-red-600"
+                                    onSelect={() => setDeleting(session)}
+                                  >
                                     <Trash2 className="h-4 w-4 mr-2" />
                                     Delete Session
                                   </DropdownMenuItem>
@@ -917,6 +935,25 @@ const LiveSessionsOverview = () => {
               disabled={!rejectReason.trim()}
             >
               Reject Session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete a session */}
+      <Dialog open={!!deleting} onOpenChange={(v) => { if (!busy && !v) setDeleting(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete this session?</DialogTitle>
+            <DialogDescription>
+              «{deleting?.title}» will be removed permanently, along with its purchase
+              records and attendance. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={busy} onClick={() => setDeleting(null)}>Cancel</Button>
+            <Button variant="destructive" disabled={busy} onClick={confirmDelete}>
+              {busy ? 'Deleting…' : 'Delete session'}
             </Button>
           </DialogFooter>
         </DialogContent>

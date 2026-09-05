@@ -161,22 +161,23 @@ router.post('/', verifyToken, async (req, res) => {
       level_id,
       year_id,
       speciality_id,
-      material_id
+      material_id,
+      phone
     } = req.body;
-    
+
     const student_id = req.user.id;
-    
+
     // Get current pricing and duration settings
     const settings = await getRow('SELECT price_per_session, session_duration FROM private_class_settings ORDER BY id DESC LIMIT 1');
     const price_per_session = settings ? settings.price_per_session : 0;
     const session_duration = settings ? settings.session_duration : 60;
-    
+
     const result = await query(`
-      INSERT INTO private_class_requests 
-      (student_id, teacher_name, subject, grade, date, time, sessions_count, title, description, level_id, year_id, speciality_id, material_id, price_per_session, session_duration)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      INSERT INTO private_class_requests
+      (student_id, teacher_name, subject, grade, date, time, sessions_count, title, description, level_id, year_id, speciality_id, material_id, price_per_session, session_duration, phone)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING *
-    `, [student_id, teacher_name, subject, grade, date, time, sessions_count, title, description, level_id, year_id, speciality_id, material_id, price_per_session, session_duration]);
+    `, [student_id, teacher_name, subject, grade, date, time, sessions_count, title, description, level_id, year_id, speciality_id, material_id, price_per_session, session_duration, phone || null]);
     
     // Get hierarchy path for the response
     const hierarchyPath = await getHierarchyPath(level_id, year_id, speciality_id, material_id);

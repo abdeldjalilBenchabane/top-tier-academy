@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { formatTimeForDisplay, formatDateForDisplay } from '../utils/timezone.js';
 
 // Helper function to get the current year
 const getCurrentYear = () => {
@@ -807,7 +808,7 @@ export const sendCoursePurchaseEmailToProfessor = async (professorEmail, profess
               <p><strong>Course:</strong> ${courseTitle}</p>
               <p><strong>Type:</strong> ${courseType}</p>
               <p><strong>Price:</strong> ${price} points</p>
-              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              <p><strong>Date:</strong> ${formatDateForDisplay(new Date().toISOString())}</p>
             </div>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -898,7 +899,7 @@ export const sendCoursePurchaseEmailToAdmin = async (adminEmail, adminName, stud
               <p><strong>Course:</strong> ${courseTitle}</p>
               <p><strong>Type:</strong> ${courseType}</p>
               <p><strong>Price:</strong> ${price} points</p>
-              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              <p><strong>Date:</strong> ${formatDateForDisplay(new Date().toISOString())}</p>
             </div>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -987,7 +988,7 @@ export const sendLiveSessionPurchaseEmailToProfessor = async (professorEmail, pr
               <p><strong>Student:</strong> ${studentName}</p>
               <p><strong>Session:</strong> ${sessionTitle}</p>
               <p><strong>Price:</strong> ${price} points</p>
-              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              <p><strong>Date:</strong> ${formatDateForDisplay(new Date().toISOString())}</p>
             </div>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -1076,7 +1077,7 @@ export const sendLiveSessionPurchaseEmailToAdmin = async (adminEmail, adminName,
               <p><strong>Student:</strong> ${studentName}</p>
               <p><strong>Session:</strong> ${sessionTitle}</p>
               <p><strong>Price:</strong> ${price} points</p>
-              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              <p><strong>Date:</strong> ${formatDateForDisplay(new Date().toISOString())}</p>
             </div>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -1165,7 +1166,7 @@ export const sendCourseCreatedEmailToAdmin = async (adminEmail, adminName, profe
               <p><strong>Course Title:</strong> ${courseTitle}</p>
               <p><strong>Created By:</strong> ${professorName}</p>
               <p><strong>Status:</strong> Pending Approval</p>
-              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              <p><strong>Date:</strong> ${formatDateForDisplay(new Date().toISOString())}</p>
             </div>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -1253,7 +1254,7 @@ export const sendCourseApprovedEmailToProfessor = async (professorEmail, profess
               <p><strong>Course Title:</strong> ${courseTitle}</p>
               <p><strong>Status:</strong> Approved</p>
               <p><strong>Approved By:</strong> ${adminName}</p>
-              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              <p><strong>Date:</strong> ${formatDateForDisplay(new Date().toISOString())}</p>
             </div>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -1342,7 +1343,7 @@ export const sendCourseRejectedEmailToProfessor = async (professorEmail, profess
               <p><strong>Course Title:</strong> ${courseTitle}</p>
               <p><strong>Status:</strong> Rejected</p>
               <p><strong>Rejected By:</strong> ${adminName}</p>
-              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              <p><strong>Date:</strong> ${formatDateForDisplay(new Date().toISOString())}</p>
               ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
             </div>
             
@@ -1432,7 +1433,7 @@ export const sendLiveSessionCreatedEmailToAdmin = async (adminEmail, adminName, 
               <p><strong>Session Title:</strong> ${sessionTitle}</p>
               <p><strong>Created By:</strong> ${professorName}</p>
               <p><strong>Status:</strong> Pending Approval</p>
-              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              <p><strong>Date:</strong> ${formatDateForDisplay(new Date().toISOString())}</p>
             </div>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -1520,7 +1521,7 @@ export const sendLiveSessionApprovedEmailToProfessor = async (professorEmail, pr
               <p><strong>Session Title:</strong> ${sessionTitle}</p>
               <p><strong>Status:</strong> Approved</p>
               <p><strong>Approved By:</strong> ${adminName}</p>
-              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              <p><strong>Date:</strong> ${formatDateForDisplay(new Date().toISOString())}</p>
             </div>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -1609,7 +1610,7 @@ export const sendLiveSessionRejectedEmailToProfessor = async (professorEmail, pr
               <p><strong>Session Title:</strong> ${sessionTitle}</p>
               <p><strong>Status:</strong> Rejected</p>
               <p><strong>Rejected By:</strong> ${adminName}</p>
-              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              <p><strong>Date:</strong> ${formatDateForDisplay(new Date().toISOString())}</p>
               ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
             </div>
             
@@ -1699,7 +1700,7 @@ export const sendLiveSectionCreatedEmailToAdmin = async (adminEmail, adminName, 
               <p><strong>Section Title:</strong> ${sectionTitle}</p>
               <p><strong>Created By:</strong> ${professorName}</p>
               <p><strong>Status:</strong> Pending Approval</p>
-              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              <p><strong>Date:</strong> ${formatDateForDisplay(new Date().toISOString())}</p>
             </div>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -1787,7 +1788,7 @@ export const sendLiveSectionApprovedEmailToProfessor = async (professorEmail, pr
               <p><strong>Section Title:</strong> ${sectionTitle}</p>
               <p><strong>Status:</strong> Approved</p>
               <p><strong>Approved By:</strong> ${adminName}</p>
-              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              <p><strong>Date:</strong> ${formatDateForDisplay(new Date().toISOString())}</p>
             </div>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -1876,7 +1877,7 @@ export const sendLiveSectionRejectedEmailToProfessor = async (professorEmail, pr
               <p><strong>Section Title:</strong> ${sectionTitle}</p>
               <p><strong>Status:</strong> Rejected</p>
               <p><strong>Rejected By:</strong> ${adminName}</p>
-              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              <p><strong>Date:</strong> ${formatDateForDisplay(new Date().toISOString())}</p>
               ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
             </div>
             

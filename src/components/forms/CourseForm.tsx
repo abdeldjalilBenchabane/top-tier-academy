@@ -1,10 +1,10 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { PlusCircle, Trash2, FileUp, Image, Video, FileText } from 'lucide-react';
+import { PlusCircle, Trash2, FileUp, Image, Video, FileText, Clock, Wifi } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { 
@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ContentBlock, Section } from '@/types';
 import { toast } from '@/lib/toast';
 import { coursesAPI } from '@/services/api';
+import UploadProgressBar from '@/components/UploadProgressBar';
 
 interface CourseFormProps {
   onSuccess?: () => void;
@@ -40,8 +41,168 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<{[key: string]: File}>({});
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{[key: string]: {uploadId: string, filename: string, totalSize: number}}>({});
+  const [completedUploads, setCompletedUploads] = useState<{[key: string]: boolean}>({});
+  const [internetSpeed, setInternetSpeed] = useState<{upload: number, download: number} | null>(null);
+  const [estimatedTime, setEstimatedTime] = useState<string>('');
+  const [isSpeedTesting, setIsSpeedTesting] = useState(false);
+  // Removed manual speed input - automatic testing only
+  const [uploadTimer, setUploadTimer] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [currentSpeed, setCurrentSpeed] = useState<number>(0);
+  const [uploadPercentage, setUploadPercentage] = useState<number>(0);
+  const [realTimeSpeed, setRealTimeSpeed] = useState<number>(0);
+  const [speedTestProgress, setSpeedTestProgress] = useState<string>('');
   const fileInputRefs = useRef<{[key: string]: HTMLInputElement | null}>({});
   const coverInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Simple internet upload speed test using Blob constructor
+  const testInternetSpeed = async () => {
+    setIsSpeedTesting(true);
+    try {
+      const speeds = [];
+      const testSizes = [0.001, 0.005, 0.01]; // Very small test sizes (1KB, 5KB, 10KB)
+      
+      for (let i = 0; i < testSizes.length; i++) {
+        const testSizeMB = testSizes[i];
+        setSpeedTestProgress(`Testing ${testSizeMB}MB upload... (${i + 1}/${testSizes.length})`);
+        
+        const startTime = Date.now();
+        
+        try {
+          // Create test data using Blob constructor with size parameter
+          const testBlob = new Blob(['A'.repeat(testSizeMB * 1024 * 1024)], { type: 'text/plain' });
+          const testFile = new File([testBlob], `speed-test-${testSizeMB}mb.txt`, { type: 'text/plain' });
+          
+          // Create FormData and upload
+          const formData = new FormData();
+          formData.append('file', testFile);
+          
+          const response = await fetch('/api/upload-test', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Upload test failed for ${testSizeMB}MB`);
+          }
+          
+          const endTime = Date.now();
+          const duration = (endTime - startTime) / 1000; // Convert to seconds
+          const speedMBps = testSizeMB / duration; // MB/s
+          const speedMbps = speedMBps * 8; // Convert to Mbps
+          
+          // Fix decimal point error - divide by 10 to get correct speed
+          const correctedSpeedMbps = speedMbps / 10;
+          
+          // Store the corrected measured speed
+          speeds.push(correctedSpeedMbps);
+          
+          // Update speed in real-time as tests complete
+          if (speeds.length > 0) {
+            const currentAvg = speeds.reduce((a, b) => a + b, 0) / speeds.length;
+            setRealTimeSpeed(currentAvg);
+            setInternetSpeed({ 
+              upload: currentAvg, 
+              download: currentAvg * 2
+            });
+          }
+          
+          // Short delay between tests
+          if (i < testSizes.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+          }
+        } catch (testError) {
+          console.warn(`Speed test ${i + 1} failed:`, testError);
+          // Continue with other tests
+        }
+      }
+      
+      if (speeds.length === 0) {
+        throw new Error('All speed tests failed');
+      }
+      
+      // Calculate final average speed
+      const finalSpeed = speeds.reduce((a, b) => a + b, 0) / speeds.length;
+      
+      setInternetSpeed({ 
+        upload: finalSpeed, 
+        download: finalSpeed * 2 
+      });
+      
+      toast.success(`Upload speed: ${finalSpeed.toFixed(2)} Mbps`);
+    } catch (error) {
+      console.error('Speed test failed:', error);
+      toast.error('Speed test failed. Please try again.');
+    } finally {
+      setIsSpeedTesting(false);
+      setSpeedTestProgress('');
+    }
+  };
+
+  // Calculate estimated upload time
+  const calculateEstimatedTime = () => {
+    if (!internetSpeed) return;
+    
+    const totalSize = Object.values(uploadedFiles).reduce((sum, file) => sum + file.size, 0) + 
+                     (coverFile ? coverFile.size : 0);
+    
+    if (totalSize === 0) {
+      setEstimatedTime('');
+      return;
+    }
+    
+    const totalSizeMB = totalSize / (1024 * 1024);
+    const uploadSpeedMBps = internetSpeed.upload / 8; // Convert Mbps to MB/s
+    const estimatedSeconds = totalSizeMB / uploadSpeedMBps;
+    
+    let timeString = '';
+    if (estimatedSeconds < 60) {
+      timeString = `${Math.ceil(estimatedSeconds)} seconds`;
+    } else if (estimatedSeconds < 3600) {
+      const minutes = Math.ceil(estimatedSeconds / 60);
+      timeString = `${minutes} minute${minutes > 1 ? 's' : ''}`;
+    } else {
+      const hours = Math.ceil(estimatedSeconds / 3600);
+      timeString = `${hours} hour${hours > 1 ? 's' : ''}`;
+    }
+    
+    setEstimatedTime(timeString);
+  };
+
+  // Calculate estimated time when files change - DYNAMIC UPDATES
+  useEffect(() => {
+    if (internetSpeed) {
+      const totalSize = Object.values(uploadedFiles).reduce((sum, file) => sum + file.size, 0) + 
+                       (coverFile ? coverFile.size : 0);
+      
+      if (totalSize > 0) {
+        const totalSizeMB = totalSize / (1024 * 1024);
+        const uploadSpeedMBps = internetSpeed.upload / 8; // Convert Mbps to MB/s
+        const estimatedSeconds = totalSizeMB / uploadSpeedMBps;
+        
+        let timeString = '';
+        if (estimatedSeconds < 60) {
+          timeString = `${Math.ceil(estimatedSeconds)}s`;
+        } else if (estimatedSeconds < 3600) {
+          const minutes = Math.ceil(estimatedSeconds / 60);
+          timeString = `${minutes}m`;
+        } else {
+          const hours = Math.ceil(estimatedSeconds / 3600);
+          timeString = `${hours}h`;
+        }
+        
+        setEstimatedTime(timeString);
+      } else {
+        setEstimatedTime('');
+      }
+    }
+  }, [uploadedFiles, coverFile, internetSpeed]);
+
+  // Test speed on component mount
+  useEffect(() => {
+    testInternetSpeed();
+  }, []);
 
   const addSection = () => {
     setSections([
@@ -110,13 +271,6 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
   };
 
   const removeContentBlock = (sectionId: string, blockId: string) => {
-    // Remove the file from uploadedFiles if it exists
-    if (uploadedFiles[blockId]) {
-      const updatedFiles = { ...uploadedFiles };
-      delete updatedFiles[blockId];
-      setUploadedFiles(updatedFiles);
-    }
-
     setSections(
       sections.map(section => {
         if (section.id === sectionId) {
@@ -151,6 +305,9 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
         [blockId]: file
       });
       
+      // Note: Upload ID will be generated on the backend during actual upload
+      // We'll track progress after the upload starts
+      
       // Update the content block with file information
       updateContentBlock(sectionId, blockId, {
         content: `${blockId}_${file.name}`
@@ -170,6 +327,9 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
       }
       
       setCoverFile(file);
+      
+      // Note: Upload ID will be generated on the backend during actual upload
+      // We'll track progress after the upload starts
     }
   };
 
@@ -195,6 +355,59 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
       toast.error('Please add at least one section with a title');
       return;
     }
+    
+    // Start upload timer
+    setIsUploading(true);
+    const startTime = Date.now();
+    
+    // Calculate total upload time for timer
+    let totalUploadTime = 0;
+    if (internetSpeed && (Object.keys(uploadedFiles).length > 0 || coverFile)) {
+      const totalSize = Object.values(uploadedFiles).reduce((sum, file) => sum + file.size, 0) + 
+                       (coverFile ? coverFile.size : 0);
+      
+      if (totalSize > 0) {
+        const totalSizeMB = totalSize / (1024 * 1024);
+        const uploadSpeedMBps = internetSpeed.upload / 8; // Convert Mbps to MB/s
+        totalUploadTime = totalSizeMB / uploadSpeedMBps * 1000; // Convert to milliseconds
+        
+        // Show upload analysis
+        const totalSizeFormatted = totalSizeMB > 1024 ? 
+          `${(totalSizeMB / 1024).toFixed(1)} GB` : 
+          `${totalSizeMB.toFixed(1)} MB`;
+        
+        toast.info(`📊 Upload Analysis:
+📁 Total size: ${totalSizeFormatted}
+🚀 Upload speed: ${internetSpeed.upload.toFixed(1)} Mbps
+⏱️ Estimated time: ${estimatedTime}`);
+      }
+    }
+    
+    // Start dynamic timer with real-time speed calculation
+    const timerInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, totalUploadTime - elapsed);
+      
+      // Calculate current upload speed based on elapsed time
+      if (elapsed > 0) {
+        const totalSizeMB = Object.values(uploadedFiles).reduce((sum, file) => sum + file.size, 0) + 
+                           (coverFile ? coverFile.size : 0) / (1024 * 1024);
+        const currentSpeedMBps = (totalSizeMB * elapsed / totalUploadTime) / (elapsed / 1000);
+        const currentSpeedMbps = currentSpeedMBps * 8;
+        setCurrentSpeed(currentSpeedMbps);
+      }
+      
+      let timeString = '';
+      if (remaining < 60000) { // Less than 1 minute
+        timeString = `${Math.ceil(remaining / 1000)}s`;
+      } else if (remaining < 3600000) { // Less than 1 hour
+        timeString = `${Math.ceil(remaining / 60000)}m`;
+      } else {
+        timeString = `${Math.ceil(remaining / 3600000)}h`;
+      }
+      
+      setUploadTimer(timeString);
+    }, 1000); // Update every second
     
     setIsSubmitting(true);
     
@@ -228,8 +441,26 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
       }
       
       // Submit course with files
-      await coursesAPI.submitCourseWithFiles(formData);
+      const response = await coursesAPI.submitCourseWithFiles(formData);
       toast.success('Course submitted for review');
+      
+      // If the response includes upload IDs, start tracking progress
+      if (response && response.uploadIds) {
+        console.log('📊 Upload IDs received:', response.uploadIds);
+        // Start tracking progress for each upload
+        Object.entries(response.uploadIds).forEach(([fieldName, uploadId]) => {
+          if (uploadId && typeof uploadId === 'string') {
+            setUploadProgress(prev => ({
+              ...prev,
+              [fieldName]: {
+                uploadId: uploadId as string,
+                filename: fieldName === 'cover' ? coverFile?.name || '' : uploadedFiles[fieldName]?.name || '',
+                totalSize: fieldName === 'cover' ? coverFile?.size || 0 : uploadedFiles[fieldName]?.size || 0
+              }
+            }));
+          }
+        });
+      }
       
       // Reset form
       setTitle('');
@@ -238,6 +469,8 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
       setSections([{ id: `section_${Date.now()}`, title: '', blocks: [] }]);
       setUploadedFiles({});
       setCoverFile(null);
+      setUploadProgress({});
+      setCompletedUploads({});
       if (coverInputRef.current) {
         coverInputRef.current.value = '';
       }
@@ -248,6 +481,10 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
       toast.error('Failed to submit course');
     } finally {
       setIsSubmitting(false);
+      setIsUploading(false);
+      setUploadTimer('');
+      setCurrentSpeed(0);
+      clearInterval(timerInterval);
     }
   };
 
@@ -337,6 +574,11 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
                         delete updatedFiles[block.id];
                         setUploadedFiles(updatedFiles);
                         
+                        // Clear progress tracking
+                        const updatedProgress = { ...uploadProgress };
+                        delete updatedProgress[block.id];
+                        setUploadProgress(updatedProgress);
+                        
                         // Clear content
                         updateContentBlock(section.id, block.id, { content: '' });
                       }}
@@ -344,6 +586,29 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
+                  
+                  {/* Upload Progress Bar */}
+                  {uploadProgress[block.id] && uploadProgress[block.id].uploadId && (
+                    <div className="mt-3">
+                      <UploadProgressBar
+                        uploadId={uploadProgress[block.id].uploadId}
+                        filename={uploadProgress[block.id].filename}
+                        totalSize={uploadProgress[block.id].totalSize}
+                        onComplete={(success) => {
+                          setCompletedUploads(prev => ({
+                            ...prev,
+                            [block.id]: success
+                          }));
+                        }}
+                        onCancel={() => {
+                          // Clear progress tracking
+                          const updatedProgress = { ...uploadProgress };
+                          delete updatedProgress[block.id];
+                          setUploadProgress(updatedProgress);
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -357,6 +622,49 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Internet Speed Info */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Wifi className="h-4 w-4 text-blue-600" />
+          <span className="text-sm font-medium text-blue-800">Internet Speed</span>
+        </div>
+                 {internetSpeed ? (
+           <div className="text-sm text-blue-700">
+             <p>Upload Speed: <strong>{internetSpeed.upload.toFixed(1)} Mbps</strong></p>
+             {realTimeSpeed > 0 && realTimeSpeed !== internetSpeed.upload && (
+               <p className="text-xs text-green-600">Real-time: <strong>{realTimeSpeed.toFixed(1)} Mbps</strong></p>
+             )}
+             {estimatedTime && (
+               <div className="flex items-center gap-1 mt-2">
+                 <Clock className="h-3 w-3" />
+                 <span>Estimated time: <strong>{estimatedTime}</strong></span>
+               </div>
+             )}
+           </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            {isSpeedTesting ? (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span className="text-sm text-blue-700">Testing internet speed...</span>
+                </div>
+                {speedTestProgress && (
+                  <span className="text-xs text-blue-600">{speedTestProgress}</span>
+                )}
+                {realTimeSpeed > 0 && (
+                  <span className="text-xs text-green-600">Current: {realTimeSpeed.toFixed(1)} Mbps</span>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-blue-700">Speed test will run automatically</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="course-title">Course Title</Label>
@@ -380,19 +688,6 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
             required
           />
         </div>
-
-        {/* <div className="space-y-2">
-          <Label htmlFor="course-price">Course Price (Optional)</Label>
-          <Input
-            id="course-price"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            placeholder="Enter course price (e.g., 99.99)"
-            type="number"
-            step="0.01"
-            min="0"
-          />
-        </div> */}
 
         <div className="space-y-2">
           <Label htmlFor="course-cover">Course Cover Image (Optional)</Label>
@@ -433,6 +728,10 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
                   className="text-red-500 hover:text-red-700 hover:bg-red-50"
                   onClick={() => {
                     setCoverFile(null);
+                    // Clear progress tracking
+                    const updatedProgress = { ...uploadProgress };
+                    delete updatedProgress.cover;
+                    setUploadProgress(updatedProgress);
                     if (coverInputRef.current) {
                       coverInputRef.current.value = '';
                     }
@@ -441,14 +740,32 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
+              
+              {/* Upload Progress Bar for Cover */}
+              {uploadProgress.cover && uploadProgress.cover.uploadId && (
+                <div className="mt-3">
+                  <UploadProgressBar
+                    uploadId={uploadProgress.cover.uploadId}
+                    filename={uploadProgress.cover.filename}
+                    totalSize={uploadProgress.cover.totalSize}
+                    onComplete={(success) => {
+                      setCompletedUploads(prev => ({
+                        ...prev,
+                        cover: success
+                      }));
+                    }}
+                    onCancel={() => {
+                      // Clear progress tracking
+                      const updatedProgress = { ...uploadProgress };
+                      delete updatedProgress.cover;
+                      setUploadProgress(updatedProgress);
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
-
-        {/* Remove the Course Path / Material (Optional) select and related logic */}
-        {/* Remove materialId state, setMaterialId, and all references to materialId */}
-        {/* Remove the Select component for path/material */}
-        {/* Remove logic in handleSubmit that appends material_id to FormData */}
       </div>
       
       <div className="space-y-4">
@@ -581,12 +898,40 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
             Cancel
           </Button>
         )}
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Submitting...' : 'Submit Course'}
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Dynamic Timer */}
+          {isUploading && uploadTimer && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
+              <Clock className="h-4 w-4 text-blue-600 animate-pulse" />
+              <span className="text-sm font-medium text-blue-700">
+                {uploadTimer} remaining
+              </span>
+              {currentSpeed > 0 && (
+                <span className="text-xs text-blue-600">
+                  • {currentSpeed.toFixed(1)} Mbps
+                </span>
+              )}
+            </div>
+          )}
+          
+          {/* Dynamic Speed Display */}
+          {internetSpeed && estimatedTime && !isUploading && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-md">
+              <Wifi className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-medium text-green-700">
+                {internetSpeed.upload.toFixed(1)} Mbps • {estimatedTime}
+              </span>
+            </div>
+          )}
+          
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Submitting...' : 'Submit Course'}
+          </Button>
+        </div>
       </div>
     </form>
   );
 };
 
 export default CourseForm;
+

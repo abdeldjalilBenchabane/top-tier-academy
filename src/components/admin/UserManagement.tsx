@@ -8,23 +8,34 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, UserPlus, Edit, Upload, User as UserIcon } from 'lucide-react';
+import { Trash2, UserPlus, Edit, Upload, User as UserIcon, Loader2, Search, Filter } from 'lucide-react';
 import { toast } from '@/lib/toast';
+
+interface LevelOption {
+  id: number;
+  name: string;
+}
 
 const UserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [levels, setLevels] = useState<LevelOption[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'student' as User['role']
+    role: 'student' as User['role'],
+    level_id: '' as string,
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingEditAvatar, setIsUploadingEditAvatar] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -38,8 +49,24 @@ const UserManagement = () => {
     }
   };
 
+  const fetchLevels = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/levels', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLevels(data || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch levels:', e);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchLevels();
   }, []);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -71,25 +98,39 @@ const UserManagement = () => {
       return;
     }
     
+    // Validate level when creating a professor
+    if (formData.role === 'professor' && !formData.level_id) {
+      toast.error('يرجى اختيار المرحلة الدراسية للأستاذ');
+      return;
+    }
+
     try {
-      const userData = {
+      const userData: any = {
         name: formData.name,
         email: formData.email,
         password: formData.password,
         confirmPassword: formData.confirmPassword,
-        role: formData.role
+        role: formData.role,
       };
+      if (formData.role === 'professor' && formData.level_id) {
+        userData.level_id = parseInt(formData.level_id);
+      }
 
       const newUser = await usersAPI.create(userData);
 
       // Upload avatar if provided
       if (avatarFile && newUser.id) {
-        await usersAPI.uploadAvatar(newUser.id, avatarFile);
+        setIsUploadingAvatar(true);
+        try {
+          await usersAPI.uploadAvatar(newUser.id, avatarFile);
+        } finally {
+          setIsUploadingAvatar(false);
+        }
       }
 
       toast.success('User created successfully');
       setShowCreateDialog(false);
-      setFormData({ name: '', email: '', password: '', confirmPassword: '', role: 'student' });
+      setFormData({ name: '', email: '', password: '', confirmPassword: '', role: 'student', level_id: '' });
       setAvatarFile(null);
       setAvatarPreview(null);
       fetchUsers();
@@ -115,29 +156,44 @@ const UserManagement = () => {
       return;
     }
     
+    // Require level when professor
+    if (formData.role === 'professor' && !formData.level_id) {
+      toast.error('يرجى اختيار المرحلة الدراسية للأستاذ');
+      return;
+    }
+
     try {
       const updateData: any = {
         name: formData.name,
         email: formData.email,
-        role: formData.role
+        role: formData.role,
       };
-      
+
+      if (formData.role === 'professor') {
+        updateData.level_id = formData.level_id ? parseInt(formData.level_id) : null;
+      }
+
       // Only include password fields if password is provided
       if (formData.password) {
         updateData.password = formData.password;
         updateData.confirmPassword = formData.confirmPassword;
       }
-      
+
       await usersAPI.update(editingUser.id, updateData);
 
       // Upload avatar if provided
       if (avatarFile) {
-        await usersAPI.uploadAvatar(editingUser.id, avatarFile);
+        setIsUploadingEditAvatar(true);
+        try {
+          await usersAPI.uploadAvatar(editingUser.id, avatarFile);
+        } finally {
+          setIsUploadingEditAvatar(false);
+        }
       }
 
       toast.success('User updated successfully');
       setEditingUser(null);
-      setFormData({ name: '', email: '', password: '', confirmPassword: '', role: 'student' });
+      setFormData({ name: '', email: '', password: '', confirmPassword: '', role: 'student', level_id: '' });
       setAvatarFile(null);
       setAvatarPreview(null);
       fetchUsers();
@@ -169,10 +225,23 @@ const UserManagement = () => {
     }
   };
 
+  // Filter users based on search term and role filter
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = searchTerm === '' || 
+      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+    
+    return matchesSearch && matchesRole;
+  });
+
   const resetForm = () => {
-    setFormData({ name: '', email: '', password: '', confirmPassword: '', role: 'student' });
+    setFormData({ name: '', email: '', password: '', confirmPassword: '', role: 'student', level_id: '' });
     setAvatarFile(null);
     setAvatarPreview(null);
+    setIsUploadingAvatar(false);
+    setIsUploadingEditAvatar(false);
   };
 
   if (isLoading) {
@@ -276,7 +345,7 @@ const UserManagement = () => {
               </div>
               <div>
                 <Label htmlFor="role">Role</Label>
-                <Select value={formData.role} onValueChange={(value: User['role']) => setFormData({ ...formData, role: value })}>
+                <Select value={formData.role} onValueChange={(value: User['role']) => setFormData({ ...formData, role: value, level_id: value === 'professor' ? formData.level_id : '' })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -287,8 +356,37 @@ const UserManagement = () => {
                   </SelectContent>
                 </Select>
               </div>
+              {formData.role === 'professor' && (
+                <div>
+                  <Label htmlFor="level">المرحلة الدراسية</Label>
+                  <Select
+                    value={formData.level_id}
+                    onValueChange={(value) => setFormData({ ...formData, level_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر المرحلة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {levels.map((lvl) => (
+                        <SelectItem key={lvl.id} value={String(lvl.id)}>
+                          {lvl.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="flex gap-2">
-                <Button type="submit">Create User</Button>
+                <Button type="submit" disabled={isUploadingAvatar}>
+                  {isUploadingAvatar ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating User...
+                    </>
+                  ) : (
+                    'Create User'
+                  )}
+                </Button>
                 <Button type="button" variant="outline" onClick={() => {
                   setShowCreateDialog(false);
                   resetForm();
@@ -301,15 +399,60 @@ const UserManagement = () => {
         </Dialog>
       </div>
 
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Search */}
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search by name or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            {/* Role Filter */}
+            <div className="md:w-48">
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger>
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Filter by role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="professor">Professor</SelectItem>
+                  <SelectItem value="student">Student</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {/* Results count */}
+          <div className="mt-4 text-sm text-gray-600">
+            Showing {filteredUsers.length} of {users.length} users
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {users.map((user) => (
+        {filteredUsers.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-gray-500">
+            <UserIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+            <p>No users found matching your criteria</p>
+          </div>
+        ) : (
+          filteredUsers.map((user) => (
           <Card key={user.id}>
             <CardHeader className="pb-2">
               <div className="flex justify-between items-start">
                 <div className="flex items-center space-x-3">
                   {user.avatar_url ? (
                     <img
-                      src={`http://localhost:5001${user.avatar_url}`}
+                      src={user.avatar_url}
                       alt={user.name}
                       className="w-12 h-12 rounded-full object-cover"
                     />
@@ -329,6 +472,16 @@ const UserManagement = () => {
               </div>
             </CardHeader>
             <CardContent>
+              {user.role === 'professor' && (
+                <div className="mb-2 text-sm">
+                  <span className="text-gray-500">المرحلة: </span>
+                  {(user as any).level_name ? (
+                    <span className="font-medium text-blue-700">{(user as any).level_name}</span>
+                  ) : (
+                    <span className="text-orange-600 font-medium">غير محددة</span>
+                  )}
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button
                   size="sm"
@@ -340,7 +493,8 @@ const UserManagement = () => {
                       email: user.email,
                       password: '',
                       confirmPassword: '',
-                      role: user.role
+                      role: user.role,
+                      level_id: (user as any).level_id ? String((user as any).level_id) : '',
                     });
                     setAvatarFile(null);
                     setAvatarPreview(null);
@@ -358,7 +512,8 @@ const UserManagement = () => {
               </div>
             </CardContent>
           </Card>
-        ))}
+          ))
+        )}
       </div>
 
       {editingUser && (
@@ -382,7 +537,7 @@ const UserManagement = () => {
                     />
                   ) : editingUser.avatar_url ? (
                     <img
-                      src={`http://localhost:5001${editingUser.avatar_url}`}
+                      src={editingUser.avatar_url}
                       alt={editingUser.name}
                       className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
                     />
@@ -449,7 +604,7 @@ const UserManagement = () => {
               </div>
               <div>
                 <Label htmlFor="edit-role">Role</Label>
-                <Select value={formData.role} onValueChange={(value: User['role']) => setFormData({ ...formData, role: value })}>
+                <Select value={formData.role} onValueChange={(value: User['role']) => setFormData({ ...formData, role: value, level_id: value === 'professor' ? formData.level_id : '' })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -460,8 +615,37 @@ const UserManagement = () => {
                   </SelectContent>
                 </Select>
               </div>
+              {formData.role === 'professor' && (
+                <div>
+                  <Label htmlFor="edit-level">المرحلة الدراسية</Label>
+                  <Select
+                    value={formData.level_id}
+                    onValueChange={(value) => setFormData({ ...formData, level_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر المرحلة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {levels.map((lvl) => (
+                        <SelectItem key={lvl.id} value={String(lvl.id)}>
+                          {lvl.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="flex gap-2">
-                <Button type="submit">Update User</Button>
+                <Button type="submit" disabled={isUploadingEditAvatar}>
+                  {isUploadingEditAvatar ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Updating User...
+                    </>
+                  ) : (
+                    'Update User'
+                  )}
+                </Button>
                 <Button type="button" variant="outline" onClick={() => {
                   setEditingUser(null);
                   resetForm();

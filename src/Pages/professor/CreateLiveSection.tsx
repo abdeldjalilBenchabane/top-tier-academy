@@ -15,7 +15,7 @@ const CreateLiveSectionPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader 
-        title="Create Live Sections" 
+        title="Create الدورات" 
         description="Create live sections and submit them for admin approval"
       />
       

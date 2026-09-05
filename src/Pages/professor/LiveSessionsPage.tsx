@@ -19,13 +19,15 @@ const LiveSessionsPage = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader 
-        title="Live Sessions"
-        description="Schedule and manage your live teaching sessions"
-      />
-      
-      <LiveSessions professorId={user.id} />
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <PageHeader 
+          title="Live Sessions"
+          description="Schedule and manage your live teaching sessions"
+        />
+        
+        <LiveSessions professorId={user.id} />
+      </div>
     </div>
   );
 };

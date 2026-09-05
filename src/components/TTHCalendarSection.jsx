@@ -92,7 +92,7 @@ const CalendarSection = () => {
 
     switch (status) {
       case 'upcoming':
-        return <Badge className="bg-blue-100 text-blue-600 hover:bg-blue-100">قادمة</Badge>;
+        return <Badge className="bg-blue-100 text-[#194cbf] hover:bg-blue-100">قادمة</Badge>;
       case 'live':
         return <Badge className="bg-orange-100 text-orange-500 hover:bg-orange-100 animate-pulse">مباشرة الآن</Badge>;
       case 'completed':

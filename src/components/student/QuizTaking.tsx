@@ -252,7 +252,7 @@ const QuizTaking: React.FC = () => {
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-2 gap-6 text-sm">
                   <div className="bg-blue-50 p-4 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-blue-600">{quiz.questions.length}</div>
+                    <div className="text-2xl font-bold text-[#194cbf]">{quiz.questions.length}</div>
                     <div className="text-gray-600">Questions</div>
                   </div>
                   <div className="bg-green-50 p-4 rounded-lg text-center">
@@ -264,7 +264,7 @@ const QuizTaking: React.FC = () => {
                     <div className="text-gray-600">Passing Score</div>
                   </div>
                   <div className="bg-purple-50 p-4 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-purple-600">{quiz.questions.reduce((sum, q) => sum + q.points, 0)}</div>
+                    <div className="text-2xl font-bold text-[#61a1ff]">{quiz.questions.reduce((sum, q) => sum + q.points, 0)}</div>
                     <div className="text-gray-600">Total Points</div>
                   </div>
                 </div>
@@ -284,7 +284,7 @@ const QuizTaking: React.FC = () => {
                 
                 <Button 
                   onClick={startQuiz} 
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 text-lg font-semibold"
+                  className="w-full bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-blue-700 hover:to-purple-700 text-white py-3 text-lg font-semibold"
                 >
                   Start Quiz Now
                 </Button>
@@ -336,7 +336,7 @@ const QuizTaking: React.FC = () => {
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-blue-50 p-4 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-blue-600">{results.correctAnswers}</div>
+                    <div className="text-2xl font-bold text-[#194cbf]">{results.correctAnswers}</div>
                     <div className="text-gray-600">Correct</div>
                   </div>
                   <div className="bg-orange-50 p-4 rounded-lg text-center">
@@ -348,7 +348,7 @@ const QuizTaking: React.FC = () => {
                     <div className="text-gray-600">Total Points</div>
                   </div>
                   <div className="bg-purple-50 p-4 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-purple-600">{quiz.passingScore}%</div>
+                    <div className="text-2xl font-bold text-[#61a1ff]">{quiz.passingScore}%</div>
                     <div className="text-gray-600">Required</div>
                   </div>
                 </div>
@@ -367,7 +367,7 @@ const QuizTaking: React.FC = () => {
                 
                 <Button 
                   onClick={() => navigate(-1)} 
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 text-lg font-semibold"
+                  className="w-full bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-blue-700 hover:to-purple-700 text-white py-3 text-lg font-semibold"
                 >
                   Back to Course
                 </Button>
@@ -473,7 +473,7 @@ const QuizTaking: React.FC = () => {
                 ) : (
                   <Button 
                     onClick={handleNextQuestion}
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6"
+                    className="bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-blue-700 hover:to-purple-700 text-white px-6"
                   >
                     Next
                     <ArrowRight className="h-4 w-4 ml-2" />

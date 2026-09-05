@@ -1,42 +1,18 @@
 import express from 'express';
-import { query, getRow, getRows } from '../db.js';
-import { verifyToken, requireRole } from '../middleware/auth.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
+import { verifyToken, requireRole } from '../middleware/auth.js';
+import { getRows, getRow, query } from '../db.js';
 import pool from '../db.js';
+import { createR2Multer } from '../middleware/r2MulterStorage.js';
+import { deleteFromR2, extractKeyFromUrl, uploadToR2, generateR2Key } from '../services/r2Service.js';
+import { uploadProgressService } from '../services/uploadProgressService.js';
 
 const router = express.Router();
 
-// Get current directory
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Configure multer for course file uploads
-const courseStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    let uploadDir;
-    if (file.fieldname === 'cover') {
-      uploadDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'courses', 'covers');
-    } else {
-      uploadDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'courses', 'content');
-    }
-    
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const courseUpload = multer({
-  storage: courseStorage,
-  // Removed file size limit - no longer restricting file size
+// Configure multer for course file uploads with R2 storage
+const courseUpload = createR2Multer('courses', null, {
   fileFilter: (req, file, cb) => {
     console.log('Course file upload attempt:', {
       fieldname: file.fieldname,
@@ -73,18 +49,36 @@ const courseUpload = multer({
 
 // Error handling middleware for multer
 const handleUploadError = (error, req, res, next) => {
-  console.error('Upload error:', error);
+  console.error('❌ Upload error:', error);
+  console.error('Error type:', error.constructor.name);
+  console.error('Error message:', error.message);
   
   if (error instanceof multer.MulterError) {
-    // No longer rejecting files based on size, just log a warning
+    console.error('Multer error code:', error.code);
+    
     if (error.code === 'LIMIT_FILE_SIZE') {
-      console.warn('Large file uploaded:', error.message);
-      // Continue processing the file instead of rejecting it
-      return next();
+      return res.status(400).json({ 
+        error: 'File too large. Maximum size is 100GB.',
+        code: 'FILE_TOO_LARGE'
+      });
     }
-    return res.status(400).json({ error: error.message });
+    
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({ 
+        error: 'Too many files. Maximum is 5 files.',
+        code: 'TOO_MANY_FILES'
+      });
+    }
+    
+    return res.status(400).json({ 
+      error: error.message,
+      code: error.code
+    });
   } else if (error) {
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ 
+      error: error.message,
+      code: 'UPLOAD_ERROR'
+    });
   }
   next();
 };
@@ -236,84 +230,206 @@ router.get('/:id', async (req, res) => {
 
 // Create new course with file uploads
 router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
+  console.log('📝 Course creation request received');
+  
   // Use multer.any() to accept all files (cover and content blocks)
-  courseUpload.any()(req, res, (err) => {
+  courseUpload.any()(req, res, async (err) => {
     if (err) {
+      console.error('❌ Multer error in course creation:', err);
       return handleUploadError(err, req, res, next);
     }
+    console.log('✅ Multer processing completed');
+    console.log('📦 Request body after multer:', req.body);
+    console.log('📦 Request body keys:', req.body ? Object.keys(req.body) : 'No body');
+    console.log('📦 Processed files:', req.files ? req.files.length : 'No files');
+    
+    // Upload files to R2 if they exist
+    if (req.files && req.files.length > 0) {
+      console.log('📤 Uploading files to R2...');
+      for (const file of req.files) {
+        console.log(`📁 Processing file: ${file.originalname}`);
+        console.log(`📊 File size: ${file.size}`);
+        console.log(`📦 Buffer available: ${!!file.buffer}`);
+        
+        if (file.buffer) {
+          try {
+            // Check file size and warn for large files
+            const fileSizeMB = file.size / (1024 * 1024);
+            if (fileSizeMB > 50) {
+              console.log(`⚠️ Large file detected: ${file.originalname} (${fileSizeMB.toFixed(1)}MB)`);
+            }
+            
+            // Generate upload ID for progress tracking
+            const uploadId = `upload_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            
+            // Start progress tracking
+            uploadProgressService.startUpload(uploadId, file.size, file.originalname);
+            console.log('📊 Started progress tracking for:', uploadId);
+            
+            // Generate R2 key
+            const r2Key = generateR2Key('courses', null, file.originalname, file.fieldname);
+            console.log('🔑 Generated R2 key:', r2Key);
+            
+            // Upload to R2
+            console.log(`📤 Starting upload for ${file.originalname} (${fileSizeMB.toFixed(1)}MB)...`);
+            const publicUrl = await uploadToR2(file.buffer, r2Key, file.mimetype);
+            console.log('✅ File uploaded to R2:', publicUrl);
+            
+            // Mark upload as completed
+            uploadProgressService.completeUpload(uploadId, true);
+            console.log('✅ Progress tracking completed for:', uploadId);
+            
+            // Update file object with R2 URL
+            file.path = publicUrl;
+            file.filename = r2Key;
+            file.uploadId = uploadId; // Store upload ID for frontend
+          } catch (error) {
+            console.error('❌ Error uploading file to R2:', error);
+            
+            // Mark upload as failed
+            if (file.uploadId) {
+              uploadProgressService.completeUpload(file.uploadId, false, error.message);
+            }
+            
+            if (error.message.includes('timeout')) {
+              console.log(`⚠️ File ${file.originalname} upload timed out, skipping...`);
+              // Continue with course creation but mark this file as failed
+              file.uploadFailed = true;
+              file.error = 'Upload timed out';
+            } else {
+              console.log(`⚠️ File ${file.originalname} upload failed, skipping...`);
+              file.uploadFailed = true;
+              file.error = error.message;
+            }
+          }
+        } else {
+          console.error('❌ File buffer not available for:', file.originalname);
+          return res.status(400).json({ error: 'File buffer not available' });
+        }
+      }
+    }
+    
     next();
   });
 }, async (req, res) => {
   try {
+    console.log('🎯 Starting course creation process...');
+    console.log('📋 Request body:', req.body || 'No body');
+    console.log('📁 Files received:', req.files ? req.files.length : 0);
+    
     const { title, description, material_id, price, sections } = req.body;
     const created_by = req.user.id;
+    
+    console.log('👤 User ID:', created_by);
+    console.log('📝 Course title:', title);
+    console.log('📝 Course description:', description);
+    
     // Set status: 'draft' if no material_id, else 'pending'
     const status = material_id ? 'pending' : 'draft';
+    console.log('📊 Course status:', status);
+    
     // Validate required fields
     if (!title || !description) {
+      console.error('❌ Missing required fields');
       return res.status(400).json({ error: 'Title and description are required' });
     }
+    
+    console.log('✅ Validation passed, starting database transaction...');
+    
     // Start transaction
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      console.log('✅ Database transaction started');
+      
       // Insert new course - set price to null if empty or '0' to use material price
       const coursePrice = (!price || price === '0' || price === 0) ? null : price;
+      console.log('💰 Course price:', coursePrice);
+      
       const courseResult = await client.query(
         'INSERT INTO courses (title, description, material_id, created_by, price, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
         [title, description, material_id || null, created_by, coursePrice, status]
       );
       const courseId = courseResult.rows[0].id;
+      console.log('✅ Course created with ID:', courseId);
+      
       // Handle cover upload
       if (req.files && req.files.length > 0) {
         const coverFile = req.files.find(f => f.fieldname === 'cover');
-        if (coverFile) {
-          const coverUrl = `/uploads/courses/covers/${coverFile.filename}`;
+        if (coverFile && !coverFile.uploadFailed) {
+          console.log('🖼️ Processing cover file:', coverFile.originalname);
+          // Use R2 URL instead of local path
+          const coverUrl = coverFile.path; // R2 public URL
           await client.query(
             'INSERT INTO course_covers (course_id, cover) VALUES ($1, $2)',
             [courseId, coverUrl]
           );
+          console.log('✅ Cover uploaded to R2:', coverUrl);
+        } else if (coverFile && coverFile.uploadFailed) {
+          console.log('⚠️ Cover file upload failed, skipping cover...');
         }
       }
+      
       // Handle sections and content files
       if (sections && Array.isArray(JSON.parse(sections))) {
         const sectionsData = JSON.parse(sections);
+        console.log('📚 Processing sections:', sectionsData.length);
+        
         for (let i = 0; i < sectionsData.length; i++) {
           const section = sectionsData[i];
+          console.log(`📖 Processing section ${i + 1}:`, section.title);
+          
           // Insert section
           const sectionResult = await client.query(
             'INSERT INTO course_sections (course_id, title, "order") VALUES ($1, $2, $3) RETURNING id',
             [courseId, section.title, i + 1]
           );
           const sectionId = sectionResult.rows[0].id;
+          console.log('✅ Section created with ID:', sectionId);
+          
           // Insert blocks
           if (section.blocks && Array.isArray(section.blocks)) {
+            console.log(`📝 Processing ${section.blocks.length} blocks for section ${sectionId}`);
+            
             for (let j = 0; j < section.blocks.length; j++) {
               const block = section.blocks[j];
+              console.log(`📄 Processing block ${j + 1}:`, block.type);
+              
               let contentValue = block.type === 'text' ? block.content || '' : '';
               const blockResult = await client.query(
                 'INSERT INTO section_blocks (section_id, type, title, content, "order") VALUES ($1, $2, $3, $4, $5) RETURNING id',
                 [sectionId, block.type, block.title || null, contentValue, j + 1]
               );
               const blockId = blockResult.rows[0].id;
+              console.log('✅ Block created with ID:', blockId);
+              
               // Handle content files for this block (image, pdf, video)
               if (block.type !== 'text' && req.files && req.files.length > 0) {
                 // The frontend sends files as content_{blockId}
                 const fileField = `content_${block.id}`;
                 const file = req.files.find(f => f.fieldname === fileField);
-                if (file) {
-                  const fileUrl = `/uploads/courses/content/${file.filename}`;
+                if (file && !file.uploadFailed) {
+                  console.log(`📁 Processing file for block ${blockId}:`, file.originalname);
+                  // Use R2 URL instead of local path
+                  const fileUrl = file.path; // R2 public URL
                   await client.query(
                     'INSERT INTO course_files (course_id, section_id, block_id, file_name, file_path, file_type, file_size, original_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
                     [courseId, sectionId, blockId, file.filename, fileUrl, file.mimetype, file.size, file.originalname]
                   );
+                  console.log('✅ File uploaded to R2:', fileUrl);
+                } else if (file && file.uploadFailed) {
+                  console.log(`⚠️ File upload failed for block ${blockId}: ${file.originalname}`);
+                } else {
+                  console.log(`⚠️ No file found for block ${blockId} with field ${fileField}`);
                 }
               }
             }
           }
         }
       }
+      
       await client.query('COMMIT');
+      console.log('✅ Database transaction committed');
       
       // Get the created course with all details
       const createdCourse = await getRow(`
@@ -330,16 +446,39 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
         LEFT JOIN course_covers cc ON c.id = cc.course_id
         WHERE c.id = $1
       `, [courseId]);
-      res.status(201).json(createdCourse);
+      
+      console.log('✅ Course creation completed successfully');
+      
+      // Collect upload IDs from processed files
+      const uploadIds = {};
+      if (req.files && req.files.length > 0) {
+        req.files.forEach(file => {
+          if (file.uploadId) {
+            uploadIds[file.fieldname] = file.uploadId;
+          }
+        });
+      }
+      
+      res.status(201).json({
+        ...createdCourse,
+        uploadIds
+      });
+      
     } catch (error) {
+      console.error('❌ Database error:', error);
       await client.query('ROLLBACK');
       throw error;
     } finally {
       client.release();
     }
+    
   } catch (error) {
-    console.error('Error creating course:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('❌ Course creation error:', error);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to create course',
+      details: error.message 
+    });
   }
 });
 
@@ -349,7 +488,7 @@ router.get('/:id/path', verifyToken, async (req, res) => {
     const courseId = req.params.id;
     
     // Get course with complete path details
-    const result = await pool.query(`
+    const result = await query(`
       SELECT 
         c.id, 
         c.title, 
@@ -635,7 +774,7 @@ router.put('/:id/assign-material', verifyToken, requireRole(['professor']), asyn
       const { sendCourseCreatedEmailToAdmin } = await import('../services/emailService.js');
 
       // Get professor information
-      const professorRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [req.user.id]);
+      const professorRes = await query('SELECT name, email FROM users WHERE id = $1', [req.user.id]);
       const professor = professorRes.rows[0];
 
       // Get course title
@@ -650,7 +789,7 @@ router.put('/:id/assign-material', verifyToken, requireRole(['professor']), asyn
       );
 
       // Send emails to all admins
-      const adminRes = await pool.query('SELECT name, email FROM users WHERE role = $1', ['admin']);
+      const adminRes = await query('SELECT name, email FROM users WHERE role = $1', ['admin']);
       for (const admin of adminRes.rows) {
         await sendCourseCreatedEmailToAdmin(
           admin.email,
@@ -743,7 +882,7 @@ router.put('/:id/create-material', verifyToken, requireRole(['professor']), asyn
         const { sendCourseCreatedEmailToAdmin } = await import('../services/emailService.js');
 
         // Get professor information
-        const professorRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [req.user.id]);
+        const professorRes = await query('SELECT name, email FROM users WHERE id = $1', [req.user.id]);
         const professor = professorRes.rows[0];
 
         // Get course title
@@ -758,7 +897,7 @@ router.put('/:id/create-material', verifyToken, requireRole(['professor']), asyn
         );
 
         // Send emails to all admins
-        const adminRes = await pool.query('SELECT name, email FROM users WHERE role = $1', ['admin']);
+        const adminRes = await query('SELECT name, email FROM users WHERE role = $1', ['admin']);
         for (const admin of adminRes.rows) {
           await sendCourseCreatedEmailToAdmin(
             admin.email,
@@ -808,7 +947,7 @@ router.put('/:id/approve', verifyToken, requireRole(['admin']), async (req, res)
     }
     
     // Get course creator information
-    const courseCreatorRes = await pool.query(
+    const courseCreatorRes = await query(
       'SELECT created_by FROM courses WHERE id = $1',
       [courseId]
     );
@@ -820,7 +959,7 @@ router.put('/:id/approve', verifyToken, requireRole(['admin']), async (req, res)
     const professorId = courseCreatorRes.rows[0].created_by;
     
     // Get professor information
-    const professorRes = await pool.query(
+    const professorRes = await query(
       'SELECT name, email FROM users WHERE id = $1',
       [professorId]
     );
@@ -840,7 +979,7 @@ router.put('/:id/approve', verifyToken, requireRole(['admin']), async (req, res)
       const { sendCourseApprovedEmailToProfessor } = await import('../services/emailService.js');
 
       // Get admin information
-      const adminRes = await pool.query('SELECT name FROM users WHERE id = $1', [req.user.id]);
+      const adminRes = await query('SELECT name FROM users WHERE id = $1', [req.user.id]);
       const admin = adminRes.rows[0];
 
       // Send notification to professor
@@ -886,7 +1025,7 @@ router.put('/:id/reject', verifyToken, requireRole(['admin']), async (req, res) 
     }
     
     // Get course creator information
-    const courseCreatorRes = await pool.query(
+    const courseCreatorRes = await query(
       'SELECT created_by FROM courses WHERE id = $1',
       [courseId]
     );
@@ -898,7 +1037,7 @@ router.put('/:id/reject', verifyToken, requireRole(['admin']), async (req, res) 
     const professorId = courseCreatorRes.rows[0].created_by;
     
     // Get professor information
-    const professorRes = await pool.query(
+    const professorRes = await query(
       'SELECT name, email FROM users WHERE id = $1',
       [professorId]
     );
@@ -918,7 +1057,7 @@ router.put('/:id/reject', verifyToken, requireRole(['admin']), async (req, res) 
       const { sendCourseRejectedEmailToProfessor } = await import('../services/emailService.js');
 
       // Get admin information
-      const adminRes = await pool.query('SELECT name FROM users WHERE id = $1', [req.user.id]);
+      const adminRes = await query('SELECT name FROM users WHERE id = $1', [req.user.id]);
       const admin = adminRes.rows[0];
 
       // Send notification to professor
@@ -982,7 +1121,7 @@ router.put('/:id/language-path', verifyToken, requireRole(['professor']), async 
       const { sendCourseCreatedEmailToAdmin } = await import('../services/emailService.js');
 
       // Get professor information
-      const professorRes = await pool.query('SELECT name, email FROM users WHERE id = $1', [req.user.id]);
+      const professorRes = await query('SELECT name, email FROM users WHERE id = $1', [req.user.id]);
       const professor = professorRes.rows[0];
 
       // Get course title
@@ -997,7 +1136,7 @@ router.put('/:id/language-path', verifyToken, requireRole(['professor']), async 
       );
 
       // Send emails to all admins
-      const adminRes = await pool.query('SELECT name, email FROM users WHERE role = $1', ['admin']);
+      const adminRes = await query('SELECT name, email FROM users WHERE role = $1', ['admin']);
       for (const admin of adminRes.rows) {
         await sendCourseCreatedEmailToAdmin(
           admin.email,
@@ -1021,45 +1160,132 @@ router.put('/:id/language-path', verifyToken, requireRole(['professor']), async 
 });
 
 // Add endpoint to update course cover (admin or professor who owns the course)
-router.put('/:id/cover', verifyToken, requireRole(['admin', 'professor']), courseUpload.single('cover'), async (req, res) => {
+router.put('/:id/cover', (req, res, next) => {
+  console.log('🔄 Cover upload request received');
+  console.log('📋 Request headers:', req.headers);
+  console.log('📋 Request method:', req.method);
+  console.log('📋 Request URL:', req.url);
+  console.log('📋 Request body type:', typeof req.body);
+  next();
+}, (req, res, next) => {
+  console.log('🔐 Verifying token...');
+  next();
+}, verifyToken, (req, res, next) => {
+  console.log('✅ Token verified, user:', req.user);
+  next();
+}, requireRole(['admin', 'professor']), (req, res, next) => {
+  console.log('✅ Role verified, processing upload...');
+  next();
+}, courseUpload.single('cover'), async (req, res, next) => {
+  console.log('📁 File upload processed:', req.file);
+  
+  // Handle R2 upload manually after file is buffered
+  if (req.file && req.file.buffer) {
+    try {
+      console.log('📤 Processing R2 upload for cover...');
+      
+      // Generate R2 key
+      const r2Key = generateR2Key('courses', null, req.file.originalname, 'cover');
+      console.log('🔑 Generated R2 key:', r2Key);
+      
+      // Upload to R2
+      const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+      console.log('✅ Cover uploaded to R2:', publicUrl);
+      
+      // Update file object with R2 URL
+      req.file.path = publicUrl;
+      req.file.filename = r2Key;
+    } catch (error) {
+      console.error('❌ Error uploading cover to R2:', error);
+      return res.status(500).json({ 
+        error: 'Failed to upload cover to R2',
+        details: error.message 
+      });
+    }
+  }
+  
+  next();
+}, async (req, res) => {
   try {
+    console.log('🔄 Cover upload started for course:', req.params.id);
+  } catch (error) {
+    console.error('❌ Error in cover upload middleware:', error);
+    console.error('Stack trace:', error.stack);
+    return res.status(500).json({ 
+      error: 'Middleware error',
+      details: error.message 
+    });
+  }
+  
+  try {
+    
     const courseId = req.params.id;
+    
     // Check if course exists
     const course = await getRow('SELECT * FROM courses WHERE id = $1', [courseId]);
     if (!course) {
+      console.log('❌ Course not found:', courseId);
       return res.status(404).json({ error: 'Course not found' });
     }
+    
     // If professor, check ownership
     if (req.user.role === 'professor' && course.created_by !== req.user.id) {
+      console.log('❌ Permission denied for course:', courseId);
       return res.status(403).json({ error: 'You can only update your own courses' });
     }
-    // Get old cover if exists
-    const oldCover = await getRow('SELECT cover FROM course_covers WHERE course_id = $1', [courseId]);
+    
     // Handle new cover upload
     if (!req.file) {
+      console.log('❌ No file uploaded');
       return res.status(400).json({ error: 'No cover file uploaded' });
     }
-    const coverUrl = `/uploads/courses/covers/${req.file.filename}`;
-    // Delete old cover file if exists
+    
+    console.log('📁 File uploaded:', req.file.originalname, 'Size:', req.file.size);
+    
+    // Use R2 URL instead of local path
+    const coverUrl = req.file.path; // R2 public URL
+    console.log('🔗 New cover URL:', coverUrl);
+    
+    // Get old cover if exists
+    const oldCover = await getRow('SELECT cover FROM course_covers WHERE course_id = $1', [courseId]);
+    console.log('📷 Old cover:', oldCover?.cover);
+    
+    // Delete old cover file from R2 if exists
     if (oldCover && oldCover.cover) {
-      const oldCoverPath = path.join(__dirname, '..', '..', 'public', oldCover.cover);
       try {
-        if (fs.existsSync(oldCoverPath)) {
-          fs.unlinkSync(oldCoverPath);
+        console.log('🗑️ Deleting old cover from R2...');
+        const oldKey = extractKeyFromUrl(oldCover.cover);
+        console.log('🔑 Old key extracted:', oldKey);
+        
+        if (oldKey && oldKey !== oldCover.cover) {
+          await deleteFromR2(oldKey);
+          console.log('✅ Old cover deleted from R2');
         }
       } catch (err) {
-        console.error('Error deleting old cover:', err);
+        console.error('⚠️ Error deleting old cover from R2:', err);
+        // Don't fail the upload if old cover deletion fails
       }
-      // Update cover row
+    }
+    
+    // Update or insert cover row
+    if (oldCover) {
+      console.log('📝 Updating existing cover row...');
       await query('UPDATE course_covers SET cover = $1 WHERE course_id = $2', [coverUrl, courseId]);
     } else {
-      // Insert new cover row
+      console.log('📝 Inserting new cover row...');
       await query('INSERT INTO course_covers (course_id, cover) VALUES ($1, $2) ON CONFLICT (course_id) DO UPDATE SET cover = EXCLUDED.cover', [courseId, coverUrl]);
     }
+    
+    console.log('✅ Cover upload completed successfully');
     res.json({ cover_url: coverUrl });
+    
   } catch (error) {
-    console.error('Error updating course cover:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('❌ Error updating course cover:', error);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message 
+    });
   }
 });
 
@@ -1095,22 +1321,275 @@ router.put('/:id', verifyToken, requireRole(['professor', 'admin']), async (req,
 
 // Delete course
 router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (req, res) => {
+  const client = await pool.connect();
+  let transactionStarted = false;
   try {
+    await client.query('BEGIN');
+    transactionStarted = true;
     const courseId = req.params.id;
-    // Get all sections in the course
-    const sections = await getRows('SELECT id FROM course_sections WHERE course_id = $1', [courseId]);
-    for (const section of sections) {
-      const blocks = await getRows('SELECT id FROM section_blocks WHERE section_id = $1', [section.id]);
-      for (const block of blocks) {
-        await deleteBlockFiles(block.id);
-      }
+    
+    // Check if course exists and verify ownership (for professors)
+    const courseResult = await client.query('SELECT id, created_by FROM courses WHERE id = $1', [courseId]);
+    if (courseResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      transactionStarted = false;
+      return res.status(404).json({ error: 'Course not found' });
     }
-    // Now delete course (this will cascade delete sections, blocks, covers, and files in DB)
-    await query('DELETE FROM courses WHERE id = $1', [courseId]);
+    const course = courseResult.rows[0];
+    
+    // Verify professor can only delete their own courses
+    if (req.user.role === 'professor' && course.created_by !== req.user.id) {
+      await client.query('ROLLBACK');
+      transactionStarted = false;
+      return res.status(403).json({ error: 'You can only delete your own courses' });
+    }
+    
+    console.log(`🗑️ Starting deletion of course ${courseId} and all related data...`);
+    
+    // Helper function to execute query with savepoint for non-critical operations
+    const executeWithSavepoint = async (queryFn, operationName) => {
+      const savepointName = `sp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      try {
+        await client.query(`SAVEPOINT ${savepointName}`);
+        await queryFn();
+        await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+      } catch (err) {
+        await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`).catch(() => {});
+        console.log(`⚠️ Error in ${operationName}, continuing...`, err.message);
+      }
+    };
+    
+    // 1. Delete quiz-related data
+    console.log('Deleting quiz data...');
+    await executeWithSavepoint(async () => {
+      await client.query(`
+        DELETE FROM quiz_attempt_answers 
+        WHERE attempt_id IN (
+          SELECT id FROM quiz_attempts 
+          WHERE quiz_id IN (SELECT id FROM quizzes WHERE course_id = $1)
+        )
+      `, [courseId]);
+      
+      await client.query(`
+        DELETE FROM quiz_attempts 
+        WHERE quiz_id IN (SELECT id FROM quizzes WHERE course_id = $1)
+      `, [courseId]);
+      
+      await client.query(`
+        DELETE FROM quiz_answers 
+        WHERE question_id IN (
+          SELECT id FROM quiz_questions 
+          WHERE quiz_id IN (SELECT id FROM quizzes WHERE course_id = $1)
+        )
+      `, [courseId]);
+      
+      await client.query(`
+        DELETE FROM quiz_questions 
+        WHERE quiz_id IN (SELECT id FROM quizzes WHERE course_id = $1)
+      `, [courseId]);
+      
+      await client.query('DELETE FROM quizzes WHERE course_id = $1', [courseId]);
+    }, 'quiz data deletion');
+    
+    // 2. Delete comment-related data
+    console.log('Deleting comment data...');
+    await executeWithSavepoint(async () => {
+      await client.query(`
+        DELETE FROM comment_replies 
+        WHERE comment_id IN (SELECT id FROM course_comments WHERE course_id = $1)
+      `, [courseId]);
+      
+      await client.query('DELETE FROM course_comments WHERE course_id = $1', [courseId]);
+    }, 'comment data deletion');
+    
+    // 3. Delete course files from R2 and database
+    console.log('Deleting course files...');
+    await executeWithSavepoint(async () => {
+      const courseFilesResult = await client.query('SELECT file_path FROM course_files WHERE course_id = $1', [courseId]);
+      for (const file of courseFilesResult.rows) {
+        if (file.file_path) {
+          try {
+            const fileKey = extractKeyFromUrl(file.file_path);
+            if (fileKey && fileKey !== file.file_path) {
+              await deleteFromR2(fileKey);
+              console.log('✅ Deleted file from R2:', fileKey);
+            }
+          } catch (err) {
+            console.error('⚠️ Error deleting file from R2:', err);
+          }
+        }
+      }
+      await client.query('DELETE FROM course_files WHERE course_id = $1', [courseId]);
+    }, 'course files deletion');
+    
+    // 4. Delete section blocks and their files
+    console.log('Deleting section blocks...');
+    await executeWithSavepoint(async () => {
+      const sectionsResult = await client.query('SELECT id FROM course_sections WHERE course_id = $1', [courseId]);
+      for (const section of sectionsResult.rows) {
+        const blocksResult = await client.query('SELECT id FROM section_blocks WHERE section_id = $1', [section.id]);
+        for (const block of blocksResult.rows) {
+          // Delete block files from R2
+          const blockFilesResult = await client.query('SELECT file_path FROM course_files WHERE block_id = $1', [block.id]);
+          for (const file of blockFilesResult.rows) {
+            if (file.file_path) {
+              try {
+                const fileKey = extractKeyFromUrl(file.file_path);
+                if (fileKey && fileKey !== file.file_path) {
+                  await deleteFromR2(fileKey);
+                }
+              } catch (err) {
+                console.error('⚠️ Error deleting block file from R2:', err);
+              }
+            }
+          }
+          await client.query('DELETE FROM course_files WHERE block_id = $1', [block.id]);
+        }
+        await client.query('DELETE FROM section_blocks WHERE section_id = $1', [section.id]);
+      }
+    }, 'section blocks deletion');
+    
+    // 5. Delete course sections
+    await executeWithSavepoint(async () => {
+      await client.query('DELETE FROM course_sections WHERE course_id = $1', [courseId]);
+    }, 'course sections deletion');
+    
+    // 6. Delete student course enrollments and purchases
+    console.log('Deleting student enrollments and purchases...');
+    // Try to delete from course_purchases if table exists
+    await executeWithSavepoint(async () => {
+      await client.query('DELETE FROM course_purchases WHERE course_id = $1', [courseId]);
+    }, 'course_purchases deletion');
+    
+    // Delete from course_enrollments if table exists (do this first as it might have CASCADE)
+    await executeWithSavepoint(async () => {
+      await client.query('DELETE FROM course_enrollments WHERE course_id = $1', [courseId]);
+      console.log('✅ Deleted course_enrollments records');
+    }, 'course_enrollments deletion');
+    
+    // Delete from student_courses (this is where purchases are actually stored)
+    // This MUST succeed - it's critical for purchased courses
+    // Don't use savepoint here - if this fails, we need to know about it
+    const deleteResult = await client.query('DELETE FROM student_courses WHERE course_id = $1', [courseId]);
+    console.log(`✅ Deleted ${deleteResult.rowCount} student_courses records`);
+    
+    // 7. Delete activities related to this course
+    console.log('Deleting activities...');
+    await executeWithSavepoint(async () => {
+      await client.query(`
+        DELETE FROM activities 
+        WHERE related_id = $1 OR extra::text LIKE '%"course_id":' || $1 || '%'
+      `, [courseId]);
+    }, 'activities deletion');
+    
+    // 8. Delete course cover from R2 if exists
+    await executeWithSavepoint(async () => {
+      const courseCoverResult = await client.query('SELECT cover FROM course_covers WHERE course_id = $1', [courseId]);
+      if (courseCoverResult.rows.length > 0 && courseCoverResult.rows[0].cover) {
+        try {
+          console.log('🗑️ Deleting course cover from R2:', courseCoverResult.rows[0].cover);
+          const coverKey = extractKeyFromUrl(courseCoverResult.rows[0].cover);
+          if (coverKey && coverKey !== courseCoverResult.rows[0].cover) {
+            await deleteFromR2(coverKey);
+            console.log('✅ Course cover deleted from R2:', coverKey);
+          }
+        } catch (err) {
+          console.error('⚠️ Error deleting course cover from R2:', err);
+        }
+      }
+    }, 'course cover R2 deletion');
+    
+    // 9. Delete course cover from database
+    await executeWithSavepoint(async () => {
+      await client.query('DELETE FROM course_covers WHERE course_id = $1', [courseId]);
+    }, 'course cover database deletion');
+    
+    // 10. Delete point transactions related to this course (in metadata)
+    console.log('Deleting point transactions related to course...');
+    await executeWithSavepoint(async () => {
+      await client.query(`
+        DELETE FROM point_transactions 
+        WHERE metadata::text LIKE '%"course_id":' || $1 || '%'
+      `, [courseId]);
+    }, 'point transactions deletion');
+    
+    // 11. Delete video views and security logs
+    console.log('Deleting video views and security logs...');
+    await executeWithSavepoint(async () => {
+      await client.query('DELETE FROM video_views WHERE course_id = $1', [courseId]);
+    }, 'video_views deletion');
+    await executeWithSavepoint(async () => {
+      await client.query('DELETE FROM video_security_logs WHERE course_id = $1', [courseId]);
+    }, 'video_security_logs deletion');
+    
+    // 12. Delete language course prices if exists
+    await executeWithSavepoint(async () => {
+      await client.query('DELETE FROM language_course_prices WHERE course_id = $1', [courseId]);
+    }, 'language_course_prices deletion');
+    
+    // 13. Delete live_sessions that reference this course (if course_id column exists)
+    await executeWithSavepoint(async () => {
+      // First check if column exists by trying to query it
+      const liveSessionsResult = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'live_sessions' AND column_name = 'course_id'
+      `);
+      if (liveSessionsResult.rows.length > 0) {
+        // Delete purchases for live sessions related to this course
+        await client.query(`
+          DELETE FROM purchases 
+          WHERE session_id IN (SELECT id FROM live_sessions WHERE course_id = $1)
+        `, [courseId]);
+        // Delete live sessions
+        await client.query('DELETE FROM live_sessions WHERE course_id = $1', [courseId]);
+        console.log('✅ Deleted live_sessions related to course');
+      }
+    }, 'live_sessions deletion');
+    
+    // 15. Finally, delete the course itself
+    // If there are still foreign key constraints, this will fail and we'll catch it
+    console.log('Deleting course...');
+    await client.query('DELETE FROM courses WHERE id = $1', [courseId]);
+    
+    await client.query('COMMIT');
+    transactionStarted = false;
+    console.log('✅ Course and all related data deleted successfully!');
     res.json({ message: 'Course deleted successfully' });
   } catch (error) {
-    console.error('Error deleting course:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    // Only rollback if transaction is still active
+    if (transactionStarted) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackErr) {
+        console.error('Error during rollback:', rollbackErr);
+      }
+    }
+    console.error('❌ Error deleting course:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      constraint: error.constraint,
+      table: error.table,
+      schema: error.schema,
+      column: error.column
+    });
+    
+    // Return detailed error for debugging
+    const errorResponse = {
+      error: 'Failed to delete course',
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      constraint: error.constraint,
+      table: error.table
+    };
+    
+    res.status(500).json(errorResponse);
+  } finally {
+    client.release();
   }
 });
 
@@ -1124,13 +1603,26 @@ router.delete('/blocks/:blockId', verifyToken, requireRole(['professor', 'admin'
     if (block.type !== 'text') {
       const files = await getRows('SELECT file_path FROM course_files WHERE block_id = $1', [blockId]);
       for (const file of files) {
-        const filePath = path.join(__dirname, '..', '..', 'public', file.file_path);
         try {
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
+          // Check if it's an R2 URL
+          if (file.file_path && (file.file_path.startsWith('http') || file.file_path.startsWith('https'))) {
+            console.log('🗑️ Deleting R2 file:', file.file_path);
+            const key = extractKeyFromUrl(file.file_path);
+            if (key && key !== file.file_path) {
+              await deleteFromR2(key);
+              console.log('✅ R2 file deleted:', key);
+            }
+          } else {
+            // Local file deletion (fallback)
+            const filePath = path.join(__dirname, '..', '..', 'public', file.file_path);
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+              console.log('✅ Local file deleted:', filePath);
+            }
           }
         } catch (err) {
-          console.error('Error deleting file:', err);
+          console.error('⚠️ Error deleting file:', err);
+          // Continue with other files even if one fails
         }
       }
       // Delete file records
@@ -1149,13 +1641,26 @@ router.delete('/blocks/:blockId', verifyToken, requireRole(['professor', 'admin'
 async function deleteBlockFiles(blockId) {
   const files = await getRows('SELECT file_path FROM course_files WHERE block_id = $1', [blockId]);
   for (const file of files) {
-    const filePath = path.join(__dirname, '..', '..', 'public', file.file_path);
     try {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      // Check if it's an R2 URL
+      if (file.file_path && (file.file_path.startsWith('http') || file.file_path.startsWith('https'))) {
+        console.log('🗑️ Deleting R2 file:', file.file_path);
+        const key = extractKeyFromUrl(file.file_path);
+        if (key && key !== file.file_path) {
+          await deleteFromR2(key);
+          console.log('✅ R2 file deleted:', key);
+        }
+      } else {
+        // Local file deletion (fallback)
+        const filePath = path.join(__dirname, '..', '..', 'public', file.file_path);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log('✅ Local file deleted:', filePath);
+        }
       }
     } catch (err) {
-      console.error('Error deleting file:', err);
+      console.error('⚠️ Error deleting file:', err);
+      // Continue with other files even if one fails
     }
   }
   await query('DELETE FROM course_files WHERE block_id = $1', [blockId]);
@@ -1223,23 +1728,63 @@ router.put('/blocks/:blockId', verifyToken, requireRole(['professor', 'admin']),
 });
 
 // Create a new block in a section
-router.post('/blocks', verifyToken, requireRole(['professor', 'admin']), courseUpload.single('file'), async (req, res) => {
+router.post('/blocks', verifyToken, requireRole(['professor', 'admin']), courseUpload.single('file'), async (req, res, next) => {
+  console.log('📁 Block creation request received');
+  
+  // Handle R2 upload manually after file is buffered
+  if (req.file && req.file.buffer) {
+    try {
+      console.log('📤 Processing R2 upload for block file...');
+      
+      // Generate R2 key
+      const r2Key = generateR2Key('courses', null, req.file.originalname, 'content');
+      console.log('🔑 Generated R2 key:', r2Key);
+      
+      // Upload to R2
+      const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+      console.log('✅ Block file uploaded to R2:', publicUrl);
+      
+      // Update file object with R2 URL
+      req.file.path = publicUrl;
+      req.file.filename = r2Key;
+    } catch (error) {
+      console.error('❌ Error uploading block file to R2:', error);
+      return res.status(500).json({ 
+        error: 'Failed to upload block file to R2',
+        details: error.message 
+      });
+    }
+  }
+  
+  next();
+}, async (req, res) => {
   try {
     const { section_id, type, title, content } = req.body;
     if (!section_id || !type) return res.status(400).json({ error: 'section_id and type are required' });
+    
+    console.log('📝 Creating block with data:', { section_id, type, title, content });
+    
     // Insert block
     const blockResult = await query(
       'INSERT INTO section_blocks (section_id, type, title, content, "order") VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [section_id, type, title || null, type === 'text' ? content : '', 1]
     );
     const block = blockResult.rows[0];
+    console.log('✅ Block created:', block.id);
+    
     let fileInfo = null;
     if (type !== 'text' && req.file) {
-      const fileUrl = `/uploads/courses/content/${req.file.filename}`;
+      console.log('📁 Processing file for block:', req.file.originalname);
+      
+      // Use R2 URL instead of local path
+      const fileUrl = req.file.path; // R2 public URL
+      console.log('🔗 File URL:', fileUrl);
+      
       await query(
         'INSERT INTO course_files (section_id, block_id, file_name, file_path, file_type, file_size, original_name) VALUES ($1, $2, $3, $4, $5, $6, $7)',
         [section_id, block.id, req.file.filename, fileUrl, req.file.mimetype, req.file.size, req.file.originalname]
       );
+      
       fileInfo = {
         file_name: req.file.filename,
         file_path: fileUrl,
@@ -1247,10 +1792,15 @@ router.post('/blocks', verifyToken, requireRole(['professor', 'admin']), courseU
         file_size: req.file.size,
         original_name: req.file.originalname
       };
+      
+      console.log('✅ File info saved to database');
     }
+    
+    console.log('✅ Block creation completed successfully');
     res.status(201).json({ ...block, files: fileInfo ? [fileInfo] : [] });
   } catch (error) {
-    console.error('Error creating block:', error);
+    console.error('❌ Error creating block:', error);
+    console.error('Stack trace:', error.stack);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1373,7 +1923,7 @@ router.get('/professor/comments/:courseId', verifyToken, requireRole(['professor
     const { courseId } = req.params;
     
     // First verify that the course belongs to this professor
-    const courseCheck = await pool.query(
+    const courseCheck = await query(
       'SELECT id FROM courses WHERE id = $1 AND created_by = $2',
       [courseId, professorId]
     );
@@ -1382,7 +1932,7 @@ router.get('/professor/comments/:courseId', verifyToken, requireRole(['professor
       return res.status(403).json({ error: 'Not authorized to view comments for this course' });
     }
     
-    const result = await pool.query(
+    const result = await query(
       `SELECT 
          c.id, c.course_id, c.name, c.comment, c.tab, c.rating, c.created_at, c.reply,
          COALESCE(u.name, c.name) as student_name
@@ -1396,7 +1946,7 @@ router.get('/professor/comments/:courseId', verifyToken, requireRole(['professor
     // Get threaded replies for each comment
     const commentsWithReplies = await Promise.all(
       result.rows.map(async (comment) => {
-        const repliesResult = await pool.query(
+        const repliesResult = await query(
           `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
            FROM comment_replies r
            WHERE r.comment_id = $1
@@ -1421,7 +1971,7 @@ router.get('/professor/comments/:courseId', verifyToken, requireRole(['professor
 router.get('/professor/courses-with-comments', verifyToken, requireRole(['professor']), async (req, res) => {
   try {
     const professorId = req.user.id;
-    const result = await pool.query(
+    const result = await query(
       `SELECT 
          c.id, c.title, c.description, c.price, c.status, c.created_at,
          cc.cover as cover_url,
@@ -1449,7 +1999,7 @@ router.get('/professor/courses-with-comments', verifyToken, requireRole(['profes
 router.get('/professor/comments', verifyToken, requireRole(['professor']), async (req, res) => {
   try {
     const professorId = req.user.id;
-    const result = await pool.query(
+    const result = await query(
       `SELECT 
          c.id, c.course_id, c.name, c.comment, c.tab, c.rating, c.created_at, c.reply,
          COALESCE(u.name, c.name) as student_name,
@@ -1465,7 +2015,7 @@ router.get('/professor/comments', verifyToken, requireRole(['professor']), async
     // Get threaded replies for each comment
     const commentsWithReplies = await Promise.all(
       result.rows.map(async (comment) => {
-        const repliesResult = await pool.query(
+        const repliesResult = await query(
           `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
            FROM comment_replies r
            WHERE r.comment_id = $1
@@ -1497,7 +2047,7 @@ router.get('/:id/comments', async (req, res) => {
     
     // If id is 'user', get all comments by a specific user
     if (id === 'user' && userId) {
-      result = await pool.query(
+      result = await query(
         `SELECT c.id, c.user_id, u.name, c.comment, c.course_id, c.section_id, c.created_at, c.reply, c.tab, c.rating,
                 crs.title as course_title
          FROM course_comments c
@@ -1509,7 +2059,7 @@ router.get('/:id/comments', async (req, res) => {
       );
     } else {
       // Get comments for a specific course
-      result = await pool.query(
+      result = await query(
         `SELECT c.id, c.user_id, u.name, c.comment, c.course_id, c.section_id, c.created_at, c.reply, c.tab, c.rating
          FROM course_comments c
          LEFT JOIN users u ON c.user_id = u.id
@@ -1522,7 +2072,7 @@ router.get('/:id/comments', async (req, res) => {
     // Get threaded replies for each comment
     const commentsWithReplies = await Promise.all(
       result.rows.map(async (comment) => {
-        const repliesResult = await pool.query(
+        const repliesResult = await query(
           `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
            FROM comment_replies r
            WHERE r.comment_id = $1
@@ -1551,7 +2101,7 @@ router.post('/:id/comments', async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
   try {
-    const result = await pool.query(
+    const result = await query(
       `INSERT INTO course_comments (user_id, course_id, section_id, name, comment, tab, rating, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING id, user_id, course_id, section_id, name, comment, tab, rating, created_at` ,
       [user_id, id, section_id || null, name, comment, tab, rating || null]
     );
@@ -1572,13 +2122,13 @@ router.post('/comments/:commentId/replies', verifyToken, async (req, res) => {
     if (!reply_text) return res.status(400).json({ error: 'Reply text is required' });
     
     // Get user info
-    const userResult = await pool.query('SELECT name, role FROM users WHERE id = $1', [userId]);
+    const userResult = await query('SELECT name, role FROM users WHERE id = $1', [userId]);
     if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
     
     const user = userResult.rows[0];
     
     // Check if comment exists and get course info
-    const commentResult = await pool.query(
+    const commentResult = await query(
       `SELECT c.id, c.course_id, crs.created_by as course_creator_id 
        FROM course_comments c 
        JOIN courses crs ON c.course_id = crs.id 
@@ -1597,7 +2147,7 @@ router.post('/comments/:commentId/replies', verifyToken, async (req, res) => {
     }
     
     // Add the reply
-    const replyResult = await pool.query(
+    const replyResult = await query(
       `INSERT INTO comment_replies (comment_id, user_id, user_name, reply_text, user_role, created_at) 
        VALUES ($1, $2, $3, $4, $5, NOW()) 
        RETURNING id, user_id, user_name, reply_text, user_role, created_at`,
@@ -1616,7 +2166,7 @@ router.get('/comments/:commentId/replies', async (req, res) => {
   try {
     const { commentId } = req.params;
     
-    const repliesResult = await pool.query(
+    const repliesResult = await query(
       `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
        FROM comment_replies r
        WHERE r.comment_id = $1
@@ -1641,7 +2191,7 @@ router.get('/all-comments-by-user/:userId', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to view these comments' });
     }
     
-    const result = await pool.query(
+    const result = await query(
       `SELECT 
          c.id, c.course_id, c.user_id, c.name, c.comment, c.tab, c.rating, c.created_at, c.reply,
          COALESCE(u.name, c.name) as student_name,
@@ -1657,7 +2207,7 @@ router.get('/all-comments-by-user/:userId', verifyToken, async (req, res) => {
     // Get threaded replies for each comment
     const commentsWithReplies = await Promise.all(
       result.rows.map(async (comment) => {
-        const repliesResult = await pool.query(
+        const repliesResult = await query(
           `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
            FROM comment_replies r
            WHERE r.comment_id = $1
@@ -1689,18 +2239,169 @@ router.post('/professor/comments/:commentId/reply', verifyToken, requireRole(['p
     const { reply } = req.body;
     if (!reply) return res.status(400).json({ error: 'Reply is required' });
     // Ensure the comment belongs to a course created by this professor
-    const check = await pool.query(
+    const check = await query(
       `SELECT c.id FROM course_comments c JOIN courses crs ON c.course_id = crs.id WHERE c.id = $1 AND crs.created_by = $2`,
       [commentId, professorId]
     );
     if (check.rows.length === 0) return res.status(403).json({ error: 'Not allowed' });
-    await pool.query(
+    await query(
       `UPDATE course_comments SET reply = $1 WHERE id = $2`,
       [reply, commentId]
     );
     res.json({ success: true });
   } catch (err) {
     console.error('Error replying to comment:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============ ADMIN COMMENT MANAGEMENT ============
+
+// Get all professors/teachers with comment counts (Admin only)
+router.get('/admin/professors-with-comments', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT 
+         u.id, u.name, u.email, u.avatar_url,
+         COALESCE(comment_counts.total_comments, 0) as total_comments,
+         COALESCE(course_counts.total_courses, 0) as total_courses
+       FROM users u
+       LEFT JOIN (
+         SELECT crs.created_by, COUNT(DISTINCT cc.id) as total_comments
+         FROM course_comments cc
+         JOIN courses crs ON cc.course_id = crs.id
+         GROUP BY crs.created_by
+       ) comment_counts ON u.id = comment_counts.created_by
+       LEFT JOIN (
+         SELECT created_by, COUNT(*) as total_courses
+         FROM courses
+         GROUP BY created_by
+       ) course_counts ON u.id = course_counts.created_by
+       WHERE u.role = 'professor'
+       ORDER BY comment_counts.total_comments DESC NULLS LAST, u.name ASC`
+    );
+    
+    res.json({ professors: result.rows });
+  } catch (err) {
+    console.error('Error fetching professors with comments:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all courses for a specific professor with comment counts (Admin only)
+router.get('/admin/professor/:professorId/courses-with-comments', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { professorId } = req.params;
+    
+    const result = await query(
+      `SELECT 
+         c.id, c.title, c.description, c.price, c.status, c.created_at,
+         cc.cover as cover_url,
+         COALESCE(comment_counts.comment_count, 0) as comment_count
+       FROM courses c
+       LEFT JOIN course_covers cc ON c.id = cc.course_id
+       LEFT JOIN (
+         SELECT course_id, COUNT(*) as comment_count
+         FROM course_comments
+         GROUP BY course_id
+       ) comment_counts ON c.id = comment_counts.course_id
+       WHERE c.created_by = $1
+       ORDER BY c.created_at DESC`,
+      [professorId]
+    );
+    
+    res.json({ courses: result.rows });
+  } catch (err) {
+    console.error('Error fetching professor courses with comments:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all comments for a specific course (Admin only)
+router.get('/admin/comments/:courseId', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    
+    const result = await query(
+      `SELECT 
+         c.id, c.course_id, c.name, c.comment, c.tab, c.rating, c.created_at, c.reply,
+         COALESCE(u.name, c.name) as student_name,
+         u.id as user_id
+       FROM course_comments c
+       LEFT JOIN users u ON c.user_id = u.id
+       WHERE c.course_id = $1
+       ORDER BY c.created_at DESC`,
+      [courseId]
+    );
+    
+    // Get threaded replies for each comment
+    const commentsWithReplies = await Promise.all(
+      result.rows.map(async (comment) => {
+        const repliesResult = await query(
+          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+           FROM comment_replies r
+           WHERE r.comment_id = $1
+           ORDER BY r.created_at ASC`,
+          [comment.id]
+        );
+        return {
+          ...comment,
+          threaded_replies: repliesResult.rows
+        };
+      })
+    );
+    
+    res.json({ comments: commentsWithReplies });
+  } catch (err) {
+    console.error('Error fetching course comments for admin:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete a comment (Admin only)
+router.delete('/admin/comments/:commentId', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    
+    // First delete all threaded replies
+    await query('DELETE FROM comment_replies WHERE comment_id = $1', [commentId]);
+    
+    // Then delete the comment
+    const result = await query('DELETE FROM course_comments WHERE id = $1 RETURNING id', [commentId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+    
+    res.json({ success: true, message: 'Comment deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting comment:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin reply to a comment (threaded reply)
+router.post('/admin/comments/:commentId/reply', verifyToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    const adminName = req.user.name;
+    const { commentId } = req.params;
+    const { reply } = req.body;
+    
+    if (!reply) {
+      return res.status(400).json({ error: 'Reply text is required' });
+    }
+    
+    const result = await query(
+      `INSERT INTO comment_replies (comment_id, user_id, user_name, reply_text, user_role)
+       VALUES ($1, $2, $3, $4, 'admin')
+       RETURNING id, comment_id, user_id, user_name, reply_text, user_role, created_at`,
+      [commentId, adminId, adminName, reply]
+    );
+    
+    res.json({ success: true, reply: result.rows[0] });
+  } catch (err) {
+    console.error('Error adding admin reply:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

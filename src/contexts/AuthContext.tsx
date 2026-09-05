@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { User } from '@/types';
-import { authAPI, getAuthToken, removeAuthToken } from '@/services/api';
+import { authAPI, getAuthToken, removeAuthToken, removeSessionToken, getSessionToken } from '@/services/api';
 
 type AuthContextType = {
   user: User | null;
@@ -11,6 +11,7 @@ type AuthContextType = {
   register: (userData: any) => Promise<User>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
+  refreshToken: () => Promise<User>;
 };
 
 // Create the context with default values
@@ -23,11 +24,47 @@ const AuthContext = createContext<AuthContextType>({
   register: async () => { throw new Error('Register function not implemented'); },
   logout: () => { },
   updateUser: () => { },
+  refreshToken: async () => { throw new Error('RefreshToken function not implemented'); },
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const sessionCheckInterval = useRef<NodeJS.Timeout | null>(null);
+
+  // Function to handle session invalidation
+  const handleSessionInvalidation = () => {
+    console.log('Session has been invalidated on another device');
+    setUser(null);
+    removeAuthToken();
+    removeSessionToken();
+    
+    // Clear the interval
+    if (sessionCheckInterval.current) {
+      clearInterval(sessionCheckInterval.current);
+      sessionCheckInterval.current = null;
+    }
+    
+    // Redirect to login
+    window.location.href = '/login';
+  };
+
+  // Function to validate session periodically
+  const validateSession = async () => {
+    const token = getAuthToken();
+    const sessionToken = getSessionToken();
+    
+    if (!token || !sessionToken) {
+      return;
+    }
+    
+    try {
+      await authAPI.validateSession();
+    } catch (error: any) {
+      console.error('Session validation failed:', error);
+      handleSessionInvalidation();
+    }
+  };
 
   useEffect(() => {
     // Check if we have a token and validate it
@@ -38,10 +75,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Attach agoraUid/agoraRtmToken to user object
           setUser({ ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken });
           console.log('[DEBUG] AuthContext setUser (getCurrentUser):', { ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken });
+          
+          // Start periodic session validation (every 30 seconds)
+          if (getSessionToken()) {
+            sessionCheckInterval.current = setInterval(validateSession, 30000);
+          }
         })
         .catch((error) => {
           console.error('Token validation failed:', error);
           removeAuthToken();
+          removeSessionToken();
         })
         .finally(() => {
           setIsLoading(false);
@@ -49,6 +92,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       setIsLoading(false);
     }
+    
+    // Listen for session invalidation events
+    const handleSessionInvalidatedEvent = (event: Event) => {
+      handleSessionInvalidation();
+    };
+    
+    window.addEventListener('sessionInvalidated', handleSessionInvalidatedEvent as EventListener);
+    
+    // Cleanup
+    return () => {
+      if (sessionCheckInterval.current) {
+        clearInterval(sessionCheckInterval.current);
+      }
+      window.removeEventListener('sessionInvalidated', handleSessionInvalidatedEvent as EventListener);
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -58,10 +116,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await authAPI.login(email, password);
       setUser({ ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken });
       console.log('[DEBUG] AuthContext setUser (login):', { ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken });
+      
+      // Start periodic session validation
+      if (response.sessionToken && sessionCheckInterval.current === null) {
+        sessionCheckInterval.current = setInterval(validateSession, 30000);
+      }
+      
       setIsLoading(false);
       return { ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken };
     } catch (error) {
       setIsLoading(false);
+      throw error;
+    }
+  };
+
+  // Refresh token function for streaming sessions
+  const refreshToken = async () => {
+    try {
+      const response = await authAPI.refreshToken();
+      setUser({ ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken });
+      console.log('[DEBUG] AuthContext setUser (refreshToken):', { ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken });
+      return { ...response.user, agoraUid: response.agoraUid, agoraRtmToken: response.agoraRtmToken };
+    } catch (error) {
+      console.error('Token refresh failed:', error);
       throw error;
     }
   };
@@ -84,6 +161,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setUser(null);
     removeAuthToken();
+    removeSessionToken();
+    
+    // Clear the session validation interval
+    if (sessionCheckInterval.current) {
+      clearInterval(sessionCheckInterval.current);
+      sessionCheckInterval.current = null;
+    }
+    
     // Optionally call the logout endpoint
     authAPI.logout().catch(console.error);
   };
@@ -103,6 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         logout,
         updateUser,
+        refreshToken,
       }}
     >
       {children}

@@ -23,17 +23,23 @@ const PrivateClassFilter = ({
   onMaterialChange,
   onDateChange,
   onTeacherChange,
-  onSearch 
+  onSearch
 }) => {
+  // If a level is picked (and no teacher is locked-in yet), restrict teacher list to that level
+  const teachersForDropdown =
+    selectedLevel && !selectedTeacher
+      ? availableTeachers.filter((t) => String(t.level_id) === String(selectedLevel))
+      : availableTeachers;
+
   return (
     <div className="w-full flex justify-center mb-8 sm:mb-10" dir="rtl">
       <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-2xl shadow-xl px-4 sm:px-6 py-6 sm:py-8 flex flex-col items-center gap-6 w-full max-w-7xl backdrop-blur-sm relative z-10">
         {/* Header */}
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+          <div className="w-10 h-10 bg-gradient-to-r from-[#194cbf] to-[#61a1ff] rounded-full flex items-center justify-center shadow-lg">
             <FaFilter className="text-white text-lg" />
           </div>
-          <h3 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h3 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#194cbf] to-[#61a1ff] bg-clip-text text-transparent">
             {isProfessor ? 'إدارة حصصك الخاصة' : 'حدد المرحلة الدراسية المناسبة لك'}
           </h3>
         </div>
@@ -56,9 +62,13 @@ const PrivateClassFilter = ({
                   dir="rtl"
                 >
                   <option value="">
-                    {loading ? 'جاري التحميل...' : 'اختر الأستاذ'}
+                    {loading
+                      ? 'جاري التحميل...'
+                      : selectedLevel && teachersForDropdown.length === 0
+                      ? 'لا يوجد أساتذة في هذه المرحلة'
+                      : 'اختر الأستاذ'}
                   </option>
-                  {!loading && availableTeachers.map(teacher => (
+                  {!loading && teachersForDropdown.map(teacher => (
                     <option key={teacher.id} value={teacher.name}>{teacher.name}</option>
                   ))}
                 </select>
@@ -73,7 +83,7 @@ const PrivateClassFilter = ({
 
           {/* Level */}
           <div className="relative w-full group">
-            <label className="block text-gray-700 font-bold mb-2 pr-1 text-sm sm:text-base text-right group-hover:text-blue-600 transition-colors">
+            <label className="block text-gray-700 font-bold mb-2 pr-1 text-sm sm:text-base text-right group-hover:text-[#194cbf] transition-colors">
               <FaGraduationCap className="inline mr-2" />
               المرحلة
             </label>
@@ -81,7 +91,8 @@ const PrivateClassFilter = ({
               <select
                 value={selectedLevel}
                 onChange={onLevelChange}
-                disabled={hierarchyLoading}
+                disabled={hierarchyLoading || !!selectedTeacher}
+                title={selectedTeacher ? 'المرحلة محددة من الأستاذ المختار' : ''}
                 className="appearance-none w-full bg-white border-2 border-gray-200 text-sm sm:text-base font-bold font-poppins rounded-xl py-3 pr-4 pl-10 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all duration-300 shadow-sm text-right group-hover:border-blue-300 group-hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 dir="rtl"
               >
@@ -136,7 +147,7 @@ const PrivateClassFilter = ({
           {/* Speciality - Only show if specialities exist */}
           {specialities.length > 0 ? (
             <div className="relative w-full group">
-              <label className="block text-gray-700 font-bold mb-2 pr-1 text-sm sm:text-base text-right group-hover:text-purple-600 transition-colors">
+              <label className="block text-gray-700 font-bold mb-2 pr-1 text-sm sm:text-base text-right group-hover:text-[#61a1ff] transition-colors">
                 <FaLayerGroup className="inline mr-2" />
                 التخصص
               </label>
@@ -145,7 +156,7 @@ const PrivateClassFilter = ({
                   value={selectedSpeciality}
                   onChange={onSpecialityChange}
                   disabled={!selectedYear || hierarchyLoading}
-                  className="appearance-none w-full bg-white border-2 border-gray-200 text-sm sm:text-base font-bold font-poppins rounded-xl py-3 pr-4 pl-10 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition-all duration-300 shadow-sm text-right group-hover:border-purple-300 group-hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="appearance-none w-full bg-white border-2 border-gray-200 text-sm sm:text-base font-bold font-poppins rounded-xl py-3 pr-4 pl-10 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all duration-300 shadow-sm text-right group-hover:border-blue-300 group-hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                   dir="rtl"
                 >
                   <option value="">
@@ -160,7 +171,7 @@ const PrivateClassFilter = ({
                     <option key={speciality.id} value={speciality.id}>{speciality.name}</option>
                   ))}
                 </select>
-                <FaChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-purple-500 transition-colors" />
+                <FaChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-blue-500 transition-colors" />
               </div>
             </div>
           ) : selectedYear && !hierarchyLoading ? (
@@ -244,7 +255,7 @@ const PrivateClassFilter = ({
         <button 
           onClick={onSearch}
           disabled={hierarchyLoading || loading}
-          className="flex items-center gap-3 text-white px-8 py-4 rounded-xl text-lg font-bold font-poppins leading-6 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+          className="flex items-center gap-3 text-white px-8 py-4 rounded-xl text-lg font-bold font-poppins leading-6 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-[#1340a0] hover:to-[#4a8de8] w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           style={{ minWidth: '150px' }}
         >
           <FaSearch className="text-xl" />
@@ -253,7 +264,7 @@ const PrivateClassFilter = ({
 
         {/* Decorative Elements */}
         <div className="absolute top-4 right-4 w-2 h-2 bg-blue-400 rounded-full opacity-60"></div>
-        <div className="absolute bottom-4 left-4 w-3 h-3 bg-purple-400 rounded-full opacity-40"></div>
+        <div className="absolute bottom-4 left-4 w-3 h-3 bg-blue-400 rounded-full opacity-40"></div>
       </div>
     </div>
   );

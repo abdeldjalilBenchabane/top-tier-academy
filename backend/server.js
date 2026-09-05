@@ -24,10 +24,17 @@ import footerContentRoutes from './routes/footer-content.js';
 import notificationsRoutes from './routes/notifications.js';
 import quizzesRoutes from './routes/quizzes.js';
 import adminRoutes from './routes/admin.js';
+import yearResetRoutes from './routes/year-reset.js';
+import purchasesAdminRoutes from './routes/purchases-admin.js';
+import mobileConfigRoutes from './routes/mobile-config.js';
 import professorRoutes from './routes/professor.js';
 import chatNotificationsRouter from './routes/chat-notifications.js';
 import chatMessagesRouter from './routes/chat-messages.js';
 import sessionReminderScheduler from './session-reminder-scheduler.js';
+import { getUploadProgress, getActiveUploads } from './middleware/uploadProgressMiddleware.js';
+import speedTestRouter from './routes/speed-test.js';
+import uploadTestRouter from './routes/upload-test.js';
+import videoProtectionRoutes from './routes/video-protection.js';
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 
@@ -53,9 +60,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Middlewares
-app.use(cors({ origin: '*' }));     // En dev : '*' ; en prod, remplace par ton domaine
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cors({ 
+  origin: ['http://5.135.200.148:8080', 'http://localhost:8080', 'http://5.135.200.148:5173'],
+  credentials: true 
+}));    // En dev : '*' ; en prod, remplace par ton domaine
+app.use(express.json({ limit: '100gb' }));
+app.use(express.urlencoded({ extended: true, limit: '100gb' }));
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '..', 'public', 'uploads')));
@@ -105,10 +115,22 @@ app.use('/api/homepage-materials', homepageMaterialsRoutes);
 app.use('/api/footer-content', footerContentRoutes);
 app.use('/api', notificationsRoutes);
 app.use('/api/quizzes', quizzesRoutes);
+app.use('/api/admin/year-reset', yearResetRoutes);
+app.use('/api/admin/purchases', purchasesAdminRoutes);
+app.use('/api', mobileConfigRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/professor', professorRoutes);
 app.use('/api/chat-notifications', chatNotificationsRouter);
 app.use('/api/chat-messages', chatMessagesRouter);
+app.use('/api/video-protection', videoProtectionRoutes);
+
+// Upload progress endpoints
+app.get('/api/upload-progress/:uploadId', getUploadProgress);
+app.get('/api/upload-progress', getActiveUploads);
+app.use('/api/upload-test', uploadTestRouter);
+
+// Speed test endpoint
+app.use('/api/speed-test', speedTestRouter);
 
 // Socket.IO chat functionality
 io.on('connection', (socket) => {
@@ -125,6 +147,28 @@ io.on('connection', (socket) => {
     socket.emit('students-muted-state', isMuted);
 
     console.log(`User ${userData.name} (${userData.role}) joined room ${roomId}`);
+
+    // Record attendance. This is the only point that knows a student actually
+    // entered the room, so the admin attendee counter is built from it.
+    // One row per user per session, so reconnecting never inflates the number.
+    if (userData?.id && userData.role === 'student' && /^\d+$/.test(String(roomId))) {
+      (async () => {
+        try {
+          await pool.query(
+            `INSERT INTO live_session_participants (session_id, user_id, joined_at)
+             SELECT $1, $2, NOW()
+             WHERE NOT EXISTS (
+               SELECT 1 FROM live_session_participants WHERE session_id = $1 AND user_id = $2
+             )`, [roomId, userData.id]);
+          await pool.query(
+            `UPDATE live_sessions SET attendees_count = (
+               SELECT COUNT(DISTINCT user_id) FROM live_session_participants WHERE session_id = $1
+             ) WHERE id = $1`, [roomId]);
+        } catch (e) {
+          console.error('[attendance] could not record join:', e.message);
+        }
+      })();
+    }
 
     // Remove any existing socket for this user (in case of reconnection)
     const roomSockets = io.sockets.adapter.rooms.get(roomId);
@@ -336,7 +380,7 @@ pool.query('SELECT NOW()', (err, result) => {
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`DB → ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
   

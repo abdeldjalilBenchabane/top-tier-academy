@@ -120,8 +120,8 @@ const ProfileSection = () => {
   // Keep achievements static as requested
   const achievements = [
     { id: 1, title: 'أول دورة مكتملة', icon: Award, color: 'text-yellow-600', earned: true },
-    { id: 2, title: 'مبرمج نشط', icon: Shield, color: 'text-blue-600', earned: true },
-    { id: 3, title: 'طالب مثابر', icon: Calendar, color: 'text-blue-600', earned: false }
+    { id: 2, title: 'مبرمج نشط', icon: Shield, color: 'text-[#194cbf]', earned: true },
+    { id: 3, title: 'طالب مثابر', icon: Calendar, color: 'text-[#194cbf]', earned: false }
   ];
 
   const settingsOptions = [

@@ -93,7 +93,7 @@ const TTHEducationFilter = ({ onFilterChange }) => {
 
         {/* Action Buttons */}
         <div className="flex gap-2">
-          <button onClick={handleFilter} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex-grow">
+          <button onClick={handleFilter} className="bg-[#194cbf] text-white px-4 py-2 rounded-lg flex-grow">
             تصفية
           </button>
           <button onClick={handleReset} className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg">

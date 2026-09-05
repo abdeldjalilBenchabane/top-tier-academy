@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Coins, Check, Star, Zap, Key } from 'lucide-react';
+import { Loader2, Coins, Check, Star, Zap, Key, ArrowLeft, Lock } from 'lucide-react';
 import { PointPackage } from '@/types';
 import { toast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Link } from 'react-router-dom';
 
 declare global {
   interface Window {
@@ -26,8 +27,11 @@ const PointsPurchase: React.FC = () => {
   const [redeemCode, setRedeemCode] = useState('');
   const [codeLoading, setCodeLoading] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<string>('');
+  // Which feature the student picked inside each package card.
+  const [chosenFeature, setChosenFeature] = useState<Record<string, string>>({});
   const [codeQuantity, setCodeQuantity] = useState<number>(1);
   const [pointsBalance, setPointsBalance] = useState<number>(user?.pointsBalance || 0);
+  const cardsEnabled = false; // Cards are permanently disabled
 
   useEffect(() => {
     fetchPackages();
@@ -58,17 +62,19 @@ const PointsPurchase: React.FC = () => {
     }
   };
 
-  const handlePurchase = async (packageId: string, amount: number, packageName: string) => {
+  const handlePurchase = async (packageId: string, amount: number, packageName: string, featureId?: string, featureName?: string) => {
     try {
       setPurchaseLoading(packageId);
       setAlert(null);
 
-      // Create Chargily checkout
+      // Create Chargily checkout. A feature, when chosen, is the thing being
+      // bought; the package is only its title.
       const checkoutData = {
         amount,
         currency: 'dzd',
         packageId,
-        packageName
+        packageName,
+        ...(featureId ? { featureId, featureName } : {})
       };
 
       const response = await paymentsAPI.createCheckout(checkoutData);
@@ -121,7 +127,7 @@ const PointsPurchase: React.FC = () => {
     
     setCodeLoading(true);
     try {
-      const response = await fetch('http://localhost:5001/api/points/codes/redeem', {
+      const response = await fetch('/api/points/codes/redeem', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -173,7 +179,7 @@ const PointsPurchase: React.FC = () => {
 
     setCodeLoading(true);
     try {
-      const response = await fetch('http://localhost:5001/api/points/codes/generate', {
+      const response = await fetch('/api/points/codes/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -209,7 +215,7 @@ const PointsPurchase: React.FC = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center" dir="rtl">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#194cbf]" />
           <p className="text-gray-600">جاري تحميل الباقات...</p>
         </div>
       </div>
@@ -219,27 +225,39 @@ const PointsPurchase: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-50 to-orange-50" dir="rtl">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg border-b">
-        <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-extrabold text-white mb-1">شراء النقاط</h1>
-            <p className="text-blue-100 text-lg font-semibold">اختر الباقة المناسبة لك وادفع بأمان</p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <div className="text-right bg-white/80 rounded-2xl px-6 py-4 shadow-md border border-blue-100">
-              <p className="text-sm text-blue-700 font-semibold mb-1">رصيدك الحالي</p>
-              <p className="text-3xl font-extrabold text-blue-700 tracking-widest">
-                {pointsBalance} <span className="text-lg font-bold">نقطة</span>
-              </p>
-            </div>
-            <Button 
-              variant="secondary"
-              className="w-full bg-white text-blue-700 hover:bg-blue-50"
-              onClick={() => setIsRedeemDialogOpen(true)}
-            >
-              <Key className="h-4 w-4 ml-2" />
-              استخدام رمز النقاط
+      <div className="bg-gradient-to-r from-[#194cbf] to-[#61a1ff] shadow-lg border-b">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          {/* Back Button */}
+          <div className="mb-4">
+            <Button asChild variant="secondary" className="bg-white text-blue-700 hover:bg-gray-100">
+              <Link to="/">
+                <ArrowLeft className="h-5 w-5 ml-2" />
+                العودة للرئيسية
+              </Link>
             </Button>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div>
+              <h1 className="text-3xl font-extrabold text-white mb-1">شراء النقاط</h1>
+              <p className="text-blue-100 text-lg font-semibold">اختر الباقة المناسبة لك وادفع بأمان</p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="text-right bg-white/80 rounded-2xl px-6 py-4 shadow-md border border-blue-100">
+                <p className="text-sm text-blue-700 font-semibold mb-1">رصيدك الحالي</p>
+                <p className="text-3xl font-extrabold text-blue-700 tracking-widest">
+                  {pointsBalance} <span className="text-lg font-bold">نقطة</span>
+                </p>
+              </div>
+              <Button 
+                variant="secondary"
+                className="w-full bg-white text-blue-700 hover:bg-blue-50"
+                onClick={() => setIsRedeemDialogOpen(true)}
+              >
+                <Key className="h-4 w-4 ml-2" />
+                استخدام رمز النقاط
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -294,13 +312,12 @@ const PointsPurchase: React.FC = () => {
 
       {/* Packages */}
       <div className="max-w-7xl mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 items-stretch">
           {packages.map((pkg, index) => (
             <Card
               key={pkg.id}
-              onClick={() => !purchaseLoading && handlePurchase(pkg.id, pkg.price, pkg.name)}
-              className={`relative overflow-hidden shadow-xl rounded-3xl border-0 transition-all duration-300 cursor-pointer ${index === 1 ? 'scale-105 z-10 ring-4 ring-yellow-400/30' : 'hover:scale-105'} ${purchaseLoading === pkg.id ? 'opacity-70 pointer-events-none' : ''}`}
-              style={{ minHeight: 420 }}
+              onClick={undefined}
+              className={`relative overflow-hidden shadow-xl rounded-3xl border-0 transition-all duration-300 ${cardsEnabled ? 'cursor-pointer hover:scale-105' : 'cursor-not-allowed opacity-60'} ${index === 1 ? 'scale-105 z-10 ring-4 ring-yellow-400/30' : ''} ${purchaseLoading === pkg.id ? 'opacity-70 pointer-events-none' : ''}`}
             >
               {/* Popular badge for middle package */}
               {index === 1 && (
@@ -316,42 +333,80 @@ const PointsPurchase: React.FC = () => {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="p-8 flex flex-col items-center justify-between h-full">
-                <div className="text-center mb-6">
-                  <div className="text-5xl font-extrabold text-gray-900 mb-2 drop-shadow-sm">
-                    {pkg.points.toLocaleString()}
-                  </div>
-                  <p className="text-blue-700 text-lg font-bold">نقطة</p>
-                </div>
-                <div className="text-center mb-6">
-                  <div className="text-4xl font-extrabold text-purple-700 mb-1 drop-shadow-sm">
-                    {pkg.price.toLocaleString()}
-                  </div>
-                  <p className="text-gray-500 font-semibold">دينار جزائري</p>
-                </div>
-                <div className="space-y-3 mb-8 w-full">
-                  <div className="flex items-center space-x-2 space-x-reverse">
-                    <Check className="w-5 h-5 text-green-500" />
-                    <span className="text-base text-gray-700 font-semibold">نقاط صالحة مدى الحياة</span>
-                  </div>
-                  <div className="flex items-center space-x-2 space-x-reverse">
-                    <Check className="w-5 h-5 text-green-500" />
-                    <span className="text-base text-gray-700 font-semibold">دفع آمن عبر Chargily</span>
-                  </div>
-                  <div className="flex items-center space-x-2 space-x-reverse">
-                    <Check className="w-5 h-5 text-green-500" />
-                    <span className="text-base text-gray-700 font-semibold">تأكيد فوري</span>
-                  </div>
-                </div>
+              <CardContent className="p-6 sm:p-8 flex flex-col items-center gap-1">
+                {(() => {
+                  const features = (pkg as any).features || [];
+                  const activeId = chosenFeature[pkg.id] ?? (features[0]?.id != null ? String(features[0].id) : '');
+                  const active = features.find((f: any) => String(f.id) === String(activeId));
+                  // Only the features carry points and a price. Nothing about
+                  // the package itself is priced, so nothing is shown for it.
+                  return (
+                    <>
+                      {features.length > 0 ? (
+                        <div className="space-y-2 mb-5 w-full">
+                          {features.map((f: any) => {
+                            const isActive = String(f.id) === String(activeId);
+                            return (
+                              <button
+                                key={f.id}
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setChosenFeature(prev => ({ ...prev, [pkg.id]: String(f.id) })); }}
+                                className={`w-full text-right rounded-2xl border-2 px-4 py-3 transition-all ${isActive ? 'border-[#61a1ff] bg-blue-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="flex items-center gap-2 min-w-0">
+                                    <Check className={`w-5 h-5 shrink-0 ${isActive ? 'text-[#61a1ff]' : 'text-gray-300'}`} />
+                                    <span className="truncate text-base font-bold text-gray-800">{f.name}</span>
+                                  </span>
+                                  <span className="shrink-0 text-left">
+                                    <span className="block text-xl font-extrabold text-blue-700 leading-tight">
+                                      {Number(f.points).toLocaleString()}
+                                      <span className="text-xs font-bold"> نقطة</span>
+                                    </span>
+                                    <span className="block text-sm font-bold text-[#61a1ff]">
+                                      {Number(f.price).toLocaleString()}
+                                      <span className="text-xs font-semibold text-gray-500"> دج</span>
+                                    </span>
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="mb-5 w-full text-center text-sm text-gray-400">
+                          لا توجد خيارات متاحة في هذه الباقة بعد
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
                 <Button
-                  onClick={() => handlePurchase(pkg.id, pkg.price, pkg.name)}
-                  disabled={purchaseLoading === pkg.id}
-                  className={`w-full bg-gradient-to-r ${getPackageColor(index)} hover:opacity-90 text-white font-extrabold text-lg py-4 rounded-2xl shadow-lg`}
+                  onClick={cardsEnabled ? (e) => {
+                    e.stopPropagation();
+                    const features = (pkg as any).features || [];
+                    const activeId = chosenFeature[pkg.id] ?? (features[0]?.id != null ? String(features[0].id) : '');
+                    const active = features.find((f: any) => String(f.id) === String(activeId));
+                    // Nothing is purchasable without a feature: the package
+                    // itself has no price to fall back on.
+                    if (!active) {
+                      setAlert({ type: 'error', message: 'اختر أحد الخيارات أولاً.' });
+                      return;
+                    }
+                    handlePurchase(pkg.id, active.price, pkg.name, String(active.id), active.name);
+                  } : undefined}
+                  disabled={!cardsEnabled || purchaseLoading === pkg.id}
+                  className={`w-full mt-auto bg-gradient-to-r ${getPackageColor(index)} ${cardsEnabled ? 'hover:opacity-90' : 'opacity-50 cursor-not-allowed'} text-white font-extrabold text-lg py-4 rounded-2xl shadow-lg`}
                 >
                   {purchaseLoading === pkg.id ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin ml-2" />
                       جاري إنشاء الدفع...
+                    </>
+                  ) : !cardsEnabled ? (
+                    <>
+                      <Lock className="w-5 h-5 ml-2" />
+                      معطل
                     </>
                   ) : (
                     'شراء الآن'

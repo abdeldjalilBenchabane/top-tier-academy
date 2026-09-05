@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import { BookOpen, GraduationCap, ChevronLeft, ChevronRight } from "lucide-react"
 import { Card } from "./ui/Card"
 import { Button } from "./ui/Button"
@@ -13,6 +14,31 @@ export default function FanCard() {
   const [educationMaterials, setEducationMaterials] = useState([])
   const [languageMaterials, setLanguageMaterials] = useState([])
   const [loading, setLoading] = useState(true)
+  // How many approved live sections exist per material, so the landing page
+  // reflects what is actually on the platform instead of a static list.
+  const [contentByMaterial, setContentByMaterial] = useState({})
+  const navigate = useNavigate()
+
+  // Arabic level names as stored in the levels table, keyed by the level_type
+  // used on the homepage.
+  const LEVEL_NAME = {
+    primary: "التعليم الابتدائي",
+    middle: "التعليم المتوسط",
+    high: "التعليم الثانوي",
+  }
+
+  const openEducation = (levelType, materialName) => {
+    const params = new URLSearchParams()
+    if (LEVEL_NAME[levelType]) params.set("level", LEVEL_NAME[levelType])
+    if (materialName) params.set("material", materialName)
+    navigate(`/TTHSession?${params.toString()}`)
+  }
+
+  const openLanguage = (languageName) => {
+    const params = new URLSearchParams()
+    if (languageName) params.set("language", languageName)
+    navigate(`/TTHLanguages?${params.toString()}`)
+  }
 
   // Fetch materials data
   useEffect(() => {
@@ -57,6 +83,21 @@ export default function FanCard() {
     }
 
     fetchMaterials()
+
+    // Count approved live sections per material name.
+    ;(async () => {
+      try {
+        const res = await fetch('/api/live-sections/approved')
+        if (!res.ok) return
+        const data = await res.json()
+        const list = Array.isArray(data) ? data : (data.liveSections || data.sections || [])
+        const counts = {}
+        list.forEach(s => { if (s.material_name) counts[s.material_name] = (counts[s.material_name] || 0) + 1 })
+        setContentByMaterial(counts)
+      } catch (e) {
+        // Availability is a nice-to-have; the list still renders without it.
+      }
+    })()
   }, [])
 
   // Helper functions to get filtered materials
@@ -96,7 +137,7 @@ export default function FanCard() {
             نقدم ثلاث لغات رئيسية مع مستويات تعليمية متنوعة وفقًا للإطار الأوروبي المرجعي المشترك للغات:
           </div>
 
-          <div className="flex justify-start gap-3 mb-4">
+          <div className="flex flex-wrap justify-start gap-2 sm:gap-3 mb-4">
             {loading ? (
               <div className="text-gray-500">جاري التحميل...</div>
             ) : getUniqueLanguages().length > 0 ? (
@@ -106,7 +147,7 @@ export default function FanCard() {
                   "bg-cyan-50 border-cyan-300 text-cyan-700", 
                   "bg-orange-50 border-orange-300 text-orange-700",
                   "bg-green-50 border-green-300 text-green-700",
-                  "bg-purple-50 border-purple-300 text-purple-700"
+                  "bg-blue-50 border-blue-300 text-[#61a1ff]"
                 ]
                 const colorClass = colors[index % colors.length]
                 
@@ -115,7 +156,7 @@ export default function FanCard() {
                     key={language}
                     variant="outline"
                     onClick={() => setSelectedLanguage(language)}
-                    className={`transition-all ${selectedLanguage === language ? colorClass : ""}`}
+                    className={`text-xs sm:text-sm transition-all ${selectedLanguage === language ? colorClass : ""}`}
                   >
                     {language}
                   </Button>
@@ -127,39 +168,39 @@ export default function FanCard() {
           </div>
 
           {selectedLanguage && (
-            <div className="bg-blue-50 p-4 w-2/3 rounded-lg border border-blue-100">
-              <h4 className="font-bold text-blue-700 mb-2">{selectedLanguage}</h4>
+            <div className="bg-blue-50 p-3 sm:p-4 w-full sm:w-2/3 rounded-lg border border-blue-100">
+              <h4 className="font-bold text-blue-700 mb-2 text-sm sm:text-base">{selectedLanguage}</h4>
               <div className="space-y-2">
                 {loading ? (
                   <div className="text-center text-gray-500">جاري التحميل...</div>
                 ) : (
                   <>
                     {getLanguageMaterialsByLevel("beginner").map((material, index) => (
-                      <div key={material.id || index} className="flex justify-between items-center">
-                        <span className="text-blue-600">{material.name}</span>
-                        <div className="flex gap-2">
-                          <span className="font-medium text-blue-800">A1</span>
-                          <span className="font-medium text-blue-800">A2</span>
+                      <button key={material.id || index} type="button" onClick={() => openLanguage(material.name)} className="w-full flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 text-right hover:underline">
+                        <span className="text-[#194cbf] text-xs sm:text-sm">{material.name}</span>
+                        <div className="flex gap-1 sm:gap-2">
+                          <span className="font-medium text-blue-800 text-xs sm:text-sm">A1</span>
+                          <span className="font-medium text-blue-800 text-xs sm:text-sm">A2</span>
                         </div>
-                      </div>
+                      </button>
                     ))}
                     {getLanguageMaterialsByLevel("intermediate").map((material, index) => (
-                      <div key={material.id || index} className="flex justify-between items-center">
-                        <span className="text-blue-600">{material.name}</span>
-                        <div className="flex gap-2">
-                          <span className="font-medium text-blue-800">B1</span>
-                          <span className="font-medium text-blue-800">B2</span>
+                      <button key={material.id || index} type="button" onClick={() => openLanguage(material.name)} className="w-full flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 text-right hover:underline">
+                        <span className="text-[#194cbf] text-xs sm:text-sm">{material.name}</span>
+                        <div className="flex gap-1 sm:gap-2">
+                          <span className="font-medium text-blue-800 text-xs sm:text-sm">B1</span>
+                          <span className="font-medium text-blue-800 text-xs sm:text-sm">B2</span>
                         </div>
-                      </div>
+                      </button>
                     ))}
                     {getLanguageMaterialsByLevel("advanced").map((material, index) => (
-                      <div key={material.id || index} className="flex justify-between items-center">
-                        <span className="text-blue-600">{material.name}</span>
-                        <div className="flex gap-2">
-                          <span className="font-medium text-blue-800">C1</span>
-                          <span className="font-medium text-blue-800">C2</span>
+                      <button key={material.id || index} type="button" onClick={() => openLanguage(material.name)} className="w-full flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 text-right hover:underline">
+                        <span className="text-[#194cbf] text-xs sm:text-sm">{material.name}</span>
+                        <div className="flex gap-1 sm:gap-2">
+                          <span className="font-medium text-blue-800 text-xs sm:text-sm">C1</span>
+                          <span className="font-medium text-blue-800 text-xs sm:text-sm">C2</span>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </>
                 )}
@@ -173,7 +214,7 @@ export default function FanCard() {
       icon: <BookOpen className="h-8 w-8" />,
       gradient: "from-blue-400 via-blue-500 to-blue-600",
       shadowColor: "shadow-blue-500/25",
-      borderColor: "border-blue-600",
+      borderColor: "border-[#194cbf]",
     },
     science: {
       title: "جميع المواد",
@@ -218,10 +259,20 @@ export default function FanCard() {
                   <div className="col-span-2 text-center text-gray-500">جاري التحميل...</div>
                 ) : getEducationMaterialsByLevel("primary").length > 0 ? (
                   getEducationMaterialsByLevel("primary").map((material, index) => (
-                    <div key={material.id || index} className="flex items-center gap-2">
+                    <button
+                      key={material.id || index}
+                      type="button"
+                      onClick={() => openEducation("primary", material.name)}
+                      className="flex items-center gap-2 text-right hover:text-blue-700 hover:underline transition-colors"
+                    >
                       <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                       <span>{material.name}</span>
-                    </div>
+                      {contentByMaterial[material.name] > 0 && (
+                        <span className="text-[10px] font-bold text-blue-700 bg-blue-100 rounded-full px-1.5">
+                          {contentByMaterial[material.name]}
+                        </span>
+                      )}
+                    </button>
                   ))
                 ) : (
                   <div className="col-span-2 text-center text-gray-500">لا توجد مواد متاحة</div>
@@ -238,10 +289,20 @@ export default function FanCard() {
                   <div className="col-span-2 text-center text-gray-500">جاري التحميل...</div>
                 ) : getEducationMaterialsByLevel("middle").length > 0 ? (
                   getEducationMaterialsByLevel("middle").map((material, index) => (
-                    <div key={material.id || index} className="flex items-center gap-2">
+                    <button
+                      key={material.id || index}
+                      type="button"
+                      onClick={() => openEducation("middle", material.name)}
+                      className="flex items-center gap-2 text-right hover:text-orange-700 hover:underline transition-colors"
+                    >
                       <div className="w-2 h-2 rounded-full bg-orange-500"></div>
                       <span>{material.name}</span>
-                    </div>
+                      {contentByMaterial[material.name] > 0 && (
+                        <span className="text-[10px] font-bold text-orange-700 bg-orange-100 rounded-full px-1.5">
+                          {contentByMaterial[material.name]}
+                        </span>
+                      )}
+                    </button>
                   ))
                 ) : (
                   <div className="col-span-2 text-center text-gray-500">لا توجد مواد متاحة</div>
@@ -258,10 +319,20 @@ export default function FanCard() {
                   <div className="col-span-2 text-center text-gray-500">جاري التحميل...</div>
                 ) : getEducationMaterialsByLevel("high").length > 0 ? (
                   getEducationMaterialsByLevel("high").map((material, index) => (
-                    <div key={material.id || index} className="flex items-center gap-2">
+                    <button
+                      key={material.id || index}
+                      type="button"
+                      onClick={() => openEducation("high", material.name)}
+                      className="flex items-center gap-2 text-right hover:text-cyan-700 hover:underline transition-colors"
+                    >
                       <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
                       <span>{material.name}</span>
-                    </div>
+                      {contentByMaterial[material.name] > 0 && (
+                        <span className="text-[10px] font-bold text-cyan-700 bg-cyan-100 rounded-full px-1.5">
+                          {contentByMaterial[material.name]}
+                        </span>
+                      )}
+                    </button>
                   ))
                 ) : (
                   <div className="col-span-2 text-center text-gray-500">لا توجد مواد متاحة</div>
@@ -287,7 +358,14 @@ export default function FanCard() {
   }
 
   return (
-    <div className="flex mt-10   flex-col md:flex-row gap-8 p-6 max-w-5xl mx-auto" dir="rtl">
+    <div className="mt-10 max-w-5xl mx-auto px-6" dir="rtl">
+      <div className='w-full py-12 md:py-16 lg:py-20 relative z-20'>
+        <h1 className='text-[#2F327D] text-2xl md:text-3xl lg:text-4xl text-center font-semibold px-4'>
+          ما يمكنك <span className='text-cyan-400'>دراسته </span>هنا
+        </h1>
+      </div>
+
+    <div className="flex flex-col md:flex-row gap-8 py-2">
       <div className="w-full md:w-1/2 relative">
 
         <div className="flex justify-center gap-4 mb-9">
@@ -409,6 +487,7 @@ export default function FanCard() {
           تبديل البطاقة
         </Button>
       </div>
+    </div>
     </div>
   )
 }

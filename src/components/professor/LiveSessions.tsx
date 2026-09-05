@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Video, Plus, Calendar, Clock, Zap, Play } from 'lucide-react';
+import { Video, Plus, Calendar, Clock, Zap, Play, Trash2, Pencil } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import LiveSessionForm from '@/components/forms/LiveSessionForm';
+import { API_BASE_URL } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import StatusControl from '../live-sessions/StatusControl';
 import { LiveSession } from '@/types';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { formatTimeForDisplay, formatDateForDisplay } from '@/lib/utils';
 
 interface LiveSessionsProps {
   professorId: string;
@@ -145,6 +149,87 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
     }
   };
 
+  // Editing a session. Changing the time notifies students who paid.
+  const [editing, setEditing] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({ title: '', description: '', start_time: '', duration: '', price: '' });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const toLocalInput = (value: string) => {
+    if (!value) return '';
+    const d = new Date(value);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const openEdit = (session: any) => {
+    setEditing(session);
+    setEditForm({
+      title: session.title || '',
+      description: session.description || '',
+      start_time: toLocalInput(session.start_time || session.startTime),
+      duration: String(session.duration ?? 60),
+      price: String(session.price ?? 0),
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    setSavingEdit(true);
+    try {
+      // The professor update route accepts multipart (it also handles covers).
+      const fd = new FormData();
+      fd.append('title', editForm.title);
+      fd.append('description', editForm.description);
+      fd.append('start_time', new Date(editForm.start_time).toISOString());
+      fd.append('duration', String(parseInt(editForm.duration, 10) || 60));
+      fd.append('price', String(parseInt(editForm.price, 10) || 0));
+
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/live-sessions/${editing.id}`, {
+        method: 'PUT',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Update failed');
+      toast({
+        title: 'تم التحديث',
+        description: 'سيتم إشعار الطلاب الذين اشتروا البث إذا تغير الموعد.',
+      });
+      setEditing(null);
+      fetchSessions();
+    } catch (e: any) {
+      toast({
+        title: 'فشل التحديث',
+        description: e.message || 'حدث خطأ',
+        variant: 'destructive',
+      });
+    } finally { setSavingEdit(false); }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!window.confirm('Are you sure you want to delete this live session? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await api.deleteLiveSession(sessionId);
+      toast({
+        title: "Success",
+        description: "Live session deleted successfully",
+      });
+      // Refresh the sessions list
+      fetchSessions();
+    } catch (error: any) {
+      console.error('Failed to delete live session:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete live session",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusColor = (status: LiveSession['status']) => {
     switch (status) {
       case 'scheduled': return 'default';
@@ -188,15 +273,16 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
   }
 
   return (
+    <>
     <div className="space-y-6">
 
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Live Sessions</h2>
           <p className="text-gray-600">Schedule and manage your live teaching sessions</p>
         </div>
 
-        <Button onClick={() => navigate('/professor/create-live-session')}>
+        <Button onClick={() => navigate('/professor/create-live-session')} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Schedule Session
         </Button>
@@ -219,45 +305,35 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
             </Button>
           </div>
         ) : (
-          sortedSessions.map((session) => (
-            <Card key={session.id}>
+          <div className="overflow-x-auto">
+            <div className="flex flex-col gap-4 min-w-full">
+              {sortedSessions.map((session) => (
+                <Card key={session.id} className="min-w-full">
               <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    {/* Cover Image */}
-                    {/* {session.cover_image_url && (
-                      <div className="mb-3">
-                        <img
-                          src={session.cover_image_url}
-                          alt={`${session.title} Cover`}
-                          className="w-full h-32 object-cover rounded-lg border"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <CardTitle className="text-lg truncate">{session.title}</CardTitle>
+                      <div className="flex flex-wrap gap-1">
+                        {getApprovalStatusBadge(session)}
+                        <Badge variant={getStatusColor(getSessionStatus(session))}>
+                          {getSessionStatus(session) === 'live' ? 'مباشر الآن' : 
+                           getSessionStatus(session) === 'upcoming' ? 'قريباً' :
+                           getSessionStatus(session) === 'ended' ? 'منتهي' :
+                           session.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : 'Unknown'}
+                        </Badge>
                       </div>
-                    )} */}
-                    
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-lg">{session.title}</CardTitle>
-                      {getApprovalStatusBadge(session)}
-                      <Badge variant={getStatusColor(getSessionStatus(session))}>
-                        {getSessionStatus(session) === 'live' ? 'مباشر الآن' : 
-                         getSessionStatus(session) === 'upcoming' ? 'قريباً' :
-                         getSessionStatus(session) === 'ended' ? 'منتهي' :
-                         session.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : 'Unknown'}
-                      </Badge>
                     </div>
-                      <CardDescription className="mt-1">
-                        {session.description}
-                      </CardDescription>
+                    <CardDescription className="mt-1 line-clamp-2">
+                      {session.description}
+                    </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2 ml-4">
+                  <div className="flex flex-wrap items-center gap-2 lg:flex-shrink-0">
                     {getSessionStatus(session) === 'live' && (
                       <Button
                         onClick={() => handleStartSession(session.id)}
                         variant="default"
-                        className="bg-blue-600 hover:bg-blue-700 animate-pulse"
+                        className="bg-blue-600 hover:bg-blue-700 animate-pulse whitespace-nowrap"
                       >
                         <Zap className="h-4 w-4 mr-2" />
                         انضم للبث المباشر
@@ -267,7 +343,7 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                       <Button
                         onClick={() => handleStartSession(session.id)}
                         variant="default"
-                        className="bg-green-600 hover:bg-green-700"
+                        className="bg-green-600 hover:bg-green-700 whitespace-nowrap"
                       >
                         <Play className="h-4 w-4 mr-2" />
                         Start Live Session
@@ -279,19 +355,37 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                       userRole="professor"
                       isOwner={true}
                     />
+                    <Button
+                      onClick={() => navigate(`/professor/live-sessions/${session.id}/edit`)}
+                      variant="outline"
+                      size="sm"
+                      className="whitespace-nowrap"
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      تعديل
+                    </Button>
+                    <Button
+                      onClick={() => handleDeleteSession(session.id)}
+                      variant="destructive"
+                      size="sm"
+                      className="whitespace-nowrap"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
 
               <CardContent>
-                <div className="flex items-center gap-4 text-sm text-gray-600">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-600">
                   <div className="flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
-                    {new Date(session.start_time || session.scheduledAt).toLocaleDateString()}
+                    <span className="whitespace-nowrap">{formatDateForDisplay(session.start_time || session.scheduledAt)}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Clock className="h-4 w-4" />
-                    {new Date(session.start_time || session.scheduledAt).toLocaleTimeString()} ({session.duration} min)
+                    <span className="whitespace-nowrap">{formatTimeForDisplay(session.start_time || session.scheduledAt)} ({session.duration} min)</span>
                   </div>
                   {/* Timer Display */}
                   {/* sessionTimers[session.id] && (
@@ -331,10 +425,14 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                 )}
               </CardContent>
             </Card>
-          ))
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
+
+    </>
   );
 };
 

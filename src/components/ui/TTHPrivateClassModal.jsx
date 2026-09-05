@@ -52,7 +52,7 @@ const PrivateClassModal = ({
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-r from-[#194cbf] to-[#61a1ff] rounded-full flex items-center justify-center">
                 <FaBook className="text-white text-lg" />
               </div>
               <h2 className="text-xl font-bold text-gray-800">طلب حصة خاصة</h2>
@@ -69,31 +69,31 @@ const PrivateClassModal = ({
           <div className="p-6">
             <div className="space-y-6">
               {/* Selected Info Display */}
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 border border-blue-200">
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
                 <h3 className="font-semibold text-blue-800 mb-3">المعلومات المحددة</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                   <div className="flex items-center gap-2">
-                    <FaUserTie className="text-blue-600" />
+                    <FaUserTie className="text-[#194cbf]" />
                     <span className="text-gray-700">الأستاذ: <span className="font-semibold">{selectedTeacher || 'لم يتم الاختيار'}</span></span>
               </div>
                   <div className="flex items-center gap-2">
-                    <FaCalendarAlt className="text-blue-600" />
+                    <FaCalendarAlt className="text-[#194cbf]" />
                     <span className="text-gray-700">التاريخ: <span className="font-semibold">{selectedDate || 'لم يتم الاختيار'}</span></span>
               </div>
                   <div className="flex items-center gap-2">
-                    <FaGraduationCap className="text-blue-600" />
+                    <FaGraduationCap className="text-[#194cbf]" />
                     <span className="text-gray-700">المرحلة: <span className="font-semibold">{getLevelName(selectedLevel) || 'لم يتم الاختيار'}</span></span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <FaBook className="text-blue-600" />
+                    <FaBook className="text-[#194cbf]" />
                     <span className="text-gray-700">السنة: <span className="font-semibold">{getYearName(selectedYear) || 'لم يتم الاختيار'}</span></span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <FaLayerGroup className="text-blue-600" />
+                    <FaLayerGroup className="text-[#194cbf]" />
                     <span className="text-gray-700">التخصص: <span className="font-semibold">{getSpecialityName(selectedSpeciality) || 'لم يتم الاختيار'}</span></span>
             </div>
                   <div className="flex items-center gap-2">
-                    <FaBook className="text-blue-600" />
+                    <FaBook className="text-[#194cbf]" />
                     <span className="text-gray-700">المادة: <span className="font-semibold">{getMaterialName(selectedMaterial) || 'لم يتم الاختيار'}</span></span>
               </div>
             </div>
@@ -152,7 +152,25 @@ const PrivateClassModal = ({
                     className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
                     dir="rtl"
                   />
-            </div>
+                </div>
+
+                {/* Phone Number */}
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2 text-right">رقم الهاتف</label>
+                  <input
+                    type="tel"
+                    value={requestForm.phone || ''}
+                    onChange={(e) => onRequestFormChange('phone', e.target.value)}
+                    placeholder="مثال: 0555 123 456"
+                    className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
+                    dir="rtl"
+                  />
+                  <div className="mt-2 bg-green-50 border border-green-200 rounded-lg p-3">
+                    <p className="text-sm text-green-800 text-right leading-relaxed">
+                      📞 سيتواصل معك فريقنا قريباً على هذا الرقم لتأكيد حصتك الخاصة
+                    </p>
+                  </div>
+                </div>
 
                 {/* Note about session scheduling */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -171,7 +189,7 @@ const PrivateClassModal = ({
                     className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 text-right focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all resize-none"
                     dir="rtl"
                   />
-              </div>
+                </div>
               </div>
               </div>
             </div>
@@ -187,7 +205,7 @@ const PrivateClassModal = ({
             <button
               onClick={onSubmitRequest}
               disabled={submitLoading}
-              className="px-6 py-3 text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl font-semibold transition-all hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 text-white bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-[#1340a0] hover:to-[#4a8de8] rounded-xl font-semibold transition-all hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitLoading ? (
                 <>
@@ -214,7 +232,7 @@ const PrivateClassModal = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-r from-[#194cbf] to-[#61a1ff] rounded-full flex items-center justify-center">
               <FaBook className="text-white text-lg" />
             </div>
             <h2 className="text-xl font-bold text-gray-800">تفاصيل الحصة الخاصة</h2>
@@ -246,7 +264,7 @@ const PrivateClassModal = ({
               {/* Session Info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                  <FaUserTie className="text-blue-600 text-xl" />
+                  <FaUserTie className="text-[#194cbf] text-xl" />
                   <div>
                     <p className="text-sm text-gray-600">الأستاذ</p>
                     <p className="font-semibold text-gray-800">{session.teacher}</p>
@@ -254,7 +272,7 @@ const PrivateClassModal = ({
                 </div>
                 
                 <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                  <FaBook className="text-purple-600 text-xl" />
+                  <FaBook className="text-[#61a1ff] text-xl" />
                   <div>
                     <p className="text-sm text-gray-600">المادة</p>
                     <p className="font-semibold text-gray-800">{session.subject}</p>
@@ -329,7 +347,7 @@ const PrivateClassModal = ({
         <div className="flex items-center justify-end p-6 border-t border-gray-200">
           <button
             onClick={onClose}
-            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all hover:shadow-lg"
+            className="px-6 py-3 bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-[#1340a0] hover:to-[#4a8de8] text-white rounded-xl font-semibold transition-all hover:shadow-lg"
           >
             إغلاق
           </button>

@@ -39,8 +39,9 @@ const TTHLiveClasses = () => {
     refreshSessions
   } = useLiveClasses();
 
-  // Handle session status changes with debouncing
-  const handleSessionStatusChange = (sessionId: string, newStatus: string) => {
+  // Handle session status changes with debouncing.
+  // Stable identity, or memoising the cards below achieves nothing.
+  const handleSessionStatusChange = React.useCallback((sessionId: string, newStatus: string) => {
     console.log(`🔄 Session ${sessionId} status changed to: ${newStatus}`);
     // Only refresh if the status change is significant (live/ended)
     if (newStatus === 'live' || newStatus === 'ended') {
@@ -51,19 +52,19 @@ const TTHLiveClasses = () => {
         }
       }, 2000); // Wait 2 seconds before refreshing
     }
-  };
+  }, [refreshSessions]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-blue-100" dir="rtl">
       <Navbar />
       
       <main className="flex-grow">
         
-        <section className="relative overflow-hidden mt-[2px] bg-gradient-to-r from-blue-600 via-blue-700 to-purple-700">
+        <section className="relative overflow-hidden mt-[2px] bg-gradient-to-r from-[#194cbf] via-[#2d6fd8] to-[#61a1ff]">
           {/* Background Pattern */}
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-0 left-0 w-72 h-72 bg-white rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
-            <div className="absolute top-0 right-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-2000"></div>
+            <div className="absolute top-0 right-0 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-2000"></div>
             <div className="absolute bottom-0 left-1/2 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-4000"></div>
           </div>
           
@@ -72,7 +73,7 @@ const TTHLiveClasses = () => {
             <div className="max-w-4xl mx-auto text-center">
               <h1 className="text-white text-3xl md:text-5xl lg:text-6xl font-bold font-nunito leading-tight mb-6">
                 <span className="block mb-2">انضم الى</span>
-                <span className="bg-gradient-to-r from-purple-300 to-purple-100 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-blue-200 to-blue-50 bg-clip-text text-transparent">
                   نخبة من البث المباشر الفريد
                 </span>
               </h1>
@@ -170,7 +171,9 @@ const TTHLiveClasses = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                     {filteredSessions.map((session) => (
                       <TTHLiveCard 
-                        key={`${session.id}-${Date.now()}`} 
+                        /* Date.now() here made the key change on every render,
+                           remounting the card and resetting all of its state. */
+                        key={session.id}
                         session={session} 
                         onStatusChange={handleSessionStatusChange}
                       />
@@ -185,7 +188,7 @@ const TTHLiveClasses = () => {
                     <p className="text-gray-600 mb-6">جرب تغيير الفلاتر أو العودة لاحقاً</p>
                     <button 
                       onClick={clearFilters}
-                      className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-bold hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
+                      className="bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white px-6 py-3 rounded-xl font-bold hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
                     >
                       عرض جميع البث المباشر
                     </button>
@@ -216,7 +219,7 @@ const TTHLiveClasses = () => {
                           style={{ animationDelay: `${index * 100}ms` }}
                         >
                           <TTHLiveCard 
-                            key={`${session.id}-${Date.now()}`}
+                            key={session.id}
                             session={session} 
                             onStatusChange={handleSessionStatusChange}
                           />

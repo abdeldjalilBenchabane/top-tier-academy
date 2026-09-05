@@ -253,7 +253,7 @@ const MyStudents = () => {
               <GraduationCap className="h-5 w-5 text-purple-600" />
               <div>
                 <div className="text-2xl font-bold">{stats.liveSections}</div>
-                <div className="text-sm text-gray-500">Live Sections</div>
+                <div className="text-sm text-gray-500">الدورات</div>
               </div>
             </div>
           </CardContent>
@@ -291,7 +291,7 @@ const MyStudents = () => {
           <CardContent>
             <div className="space-y-3">
               {uniqueStudents.map((student) => (
-                <div key={student.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div key={student.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-gray-50 rounded-lg gap-3">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                       <span className="text-blue-600 font-semibold text-sm">
@@ -303,24 +303,24 @@ const MyStudents = () => {
                       <p className="text-sm text-gray-500">{student.email}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2 sm:gap-4 text-sm overflow-x-auto">
+                    <div className="flex items-center gap-1 whitespace-nowrap">
                       <BookOpen className="h-4 w-4 text-blue-600" />
                       <span>{student.course_count} courses</span>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 whitespace-nowrap">
                       <Video className="h-4 w-4 text-green-600" />
                       <span>{student.live_session_count} sessions</span>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 whitespace-nowrap">
                       <GraduationCap className="h-4 w-4 text-purple-600" />
                       <span>{student.live_section_count} sections</span>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 whitespace-nowrap">
                       <Users className="h-4 w-4 text-orange-600" />
                       <span>{student.private_class_count} private</span>
                     </div>
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs whitespace-nowrap">
                       {student.content_count} total
                     </Badge>
                   </div>
@@ -355,7 +355,7 @@ const MyStudents = () => {
                 <SelectItem value="all">All Content Types</SelectItem>
                 <SelectItem value="course">Courses</SelectItem>
                 <SelectItem value="live_session">Live Sessions</SelectItem>
-                <SelectItem value="live_section">Live Sections</SelectItem>
+                <SelectItem value="live_section">الدورات</SelectItem>
                 <SelectItem value="private_class">Private Classes</SelectItem>
               </SelectContent>
             </Select>
@@ -365,25 +365,27 @@ const MyStudents = () => {
 
       {/* Students Tabs */}
       <Tabs defaultValue="all" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="all">All Students ({uniqueStudents.length})</TabsTrigger>
-          <TabsTrigger value="courses">Courses ({filteredStudents.filter(s => s.content_type === 'course').reduce((acc, student) => {
-            if (!acc.has(student.id)) acc.set(student.id, true);
-            return acc;
-          }, new Map()).size})</TabsTrigger>
-          <TabsTrigger value="live_sessions">Live Sessions ({filteredStudents.filter(s => s.content_type === 'live_session').reduce((acc, student) => {
-            if (!acc.has(student.id)) acc.set(student.id, true);
-            return acc;
-          }, new Map()).size})</TabsTrigger>
-          <TabsTrigger value="live_sections">Live Sections ({filteredStudents.filter(s => s.content_type === 'live_section').reduce((acc, student) => {
-            if (!acc.has(student.id)) acc.set(student.id, true);
-            return acc;
-          }, new Map()).size})</TabsTrigger>
-          <TabsTrigger value="private_classes">Private Classes ({filteredStudents.filter(s => s.content_type === 'private_class').reduce((acc, student) => {
-            if (!acc.has(student.id)) acc.set(student.id, true);
-            return acc;
-          }, new Map()).size})</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto">
+          <TabsList className="inline-flex min-w-full sm:min-w-0">
+            <TabsTrigger value="all" className="whitespace-nowrap">All Students ({uniqueStudents.length})</TabsTrigger>
+            <TabsTrigger value="courses" className="whitespace-nowrap">Courses ({filteredStudents.filter(s => s.content_type === 'course').reduce((acc, student) => {
+              if (!acc.has(student.id)) acc.set(student.id, true);
+              return acc;
+            }, new Map()).size})</TabsTrigger>
+            <TabsTrigger value="live_sessions" className="whitespace-nowrap">Live Sessions ({filteredStudents.filter(s => s.content_type === 'live_session').reduce((acc, student) => {
+              if (!acc.has(student.id)) acc.set(student.id, true);
+              return acc;
+            }, new Map()).size})</TabsTrigger>
+            <TabsTrigger value="live_sections" className="whitespace-nowrap">الدورات ({filteredStudents.filter(s => s.content_type === 'live_section').reduce((acc, student) => {
+              if (!acc.has(student.id)) acc.set(student.id, true);
+              return acc;
+            }, new Map()).size})</TabsTrigger>
+            <TabsTrigger value="private_classes" className="whitespace-nowrap">Private Classes ({filteredStudents.filter(s => s.content_type === 'private_class').reduce((acc, student) => {
+              if (!acc.has(student.id)) acc.set(student.id, true);
+              return acc;
+            }, new Map()).size})</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="all" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -436,7 +438,7 @@ const MyStudents = () => {
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-1">
                         <GraduationCap className="h-3 w-3 text-purple-600" />
-                        <span className="text-gray-700">Live Sections:</span>
+                        <span className="text-gray-700">الدورات:</span>
                       </div>
                       <Badge variant="outline" className="text-xs">{student.live_section_count}</Badge>
                     </div>
@@ -465,9 +467,19 @@ const MyStudents = () => {
                           </ul>
                         </div>
                       )}
+                      {student.live_sessions.length > 0 && (
+                        <div>
+                          <p className="font-medium text-gray-600">Live Sessions:</p>
+                          <ul className="list-disc list-inside text-gray-500 ml-2">
+                            {student.live_sessions.map((session, index) => (
+                              <li key={index}>{session}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                       {student.live_sections.length > 0 && (
                         <div>
-                          <p className="font-medium text-gray-600">Live Sections:</p>
+                          <p className="font-medium text-gray-600">الدورات:</p>
                           <ul className="list-disc list-inside text-gray-500 ml-2">
                             {student.live_sections.map((section, index) => (
                               <li key={index}>{section}</li>

@@ -15,7 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Inbox, User, Calendar, CheckCircle, XCircle, Video, BookOpen, Globe, Clock, RotateCw } from 'lucide-react';
+import { Inbox, User, Calendar, CheckCircle, XCircle, Video, BookOpen, Globe, Clock, RotateCw, Eye } from 'lucide-react';
+import ContentPreviewDialog, { PreviewTarget } from '@/components/admin/ContentPreviewDialog';
 import PathSelector from '@/components/admin/PathSelector';
 import { toast } from '@/lib/toast';
 import { useNavigate } from 'react-router-dom';
@@ -54,6 +55,7 @@ const PendingPage = () => {
   const [liveSectionRejectReason, setLiveSectionRejectReason] = useState('');
   const [sectionToReject, setSectionToReject] = useState<PendingLiveSection | null>(null);
   const [approvingCourse, setApprovingCourse] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState<PreviewTarget | null>(null);
   const [rejectingCourse, setRejectingCourse] = useState<string | null>(null);
   const [approvingLiveSection, setApprovingLiveSection] = useState<number | null>(null);
   const [rejectingLiveSection, setRejectingLiveSection] = useState<number | null>(null);
@@ -202,7 +204,7 @@ const PendingPage = () => {
                 )}
               </TabsTrigger>
               <TabsTrigger value="live-sections">
-                Live Sections
+                الدورات
                 {(pendingLiveSectionsCount + rejectedLiveSectionsCount) > 0 && (
                   <Badge variant="secondary" className="ml-2">
                     {pendingLiveSectionsCount + rejectedLiveSectionsCount}
@@ -258,7 +260,14 @@ const PendingPage = () => {
                             </div>
                           </CardContent>
                           
-                          <CardFooter className="flex justify-end gap-2">
+                          <CardFooter className="flex justify-end gap-2 flex-wrap">
+                            <Button
+                              variant="outline"
+                              onClick={() => setPreviewing({ kind: 'course', id: course.id, title: course.title, subtitle: undefined })}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              معاينة المحتوى
+                            </Button>
                             <Button 
                               variant="destructive"
                               disabled={approvingCourse === course.id || rejectingCourse === course.id}
@@ -353,6 +362,40 @@ const PendingPage = () => {
                               <span>Rejected on: {formatDate(course.rejectedAt || '')}</span>
                             </div>
                           </CardContent>
+
+                          {/* Lets an admin undo a rejection made by mistake. */}
+                          <CardFooter className="pt-0 flex gap-2 flex-wrap">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setPreviewing({ kind: 'course', id: course.id, title: course.title })}
+                            >
+                              <Eye className="h-4 w-4 mr-1" /> معاينة
+                            </Button>
+                            <Button
+                              size="sm"
+                              disabled={approvingCourse === course.id}
+                              onClick={async () => {
+                                setApprovingCourse(course.id);
+                                try {
+                                  await api.approveCourseAdmin(course.id);
+                                  toast.success('Course approved');
+                                  fetchPendingCourses();
+                                } catch (error) {
+                                  console.error(error);
+                                  toast.error('Failed to approve course');
+                                } finally {
+                                  setApprovingCourse(null);
+                                }
+                              }}
+                            >
+                              {approvingCourse === course.id ? (
+                                <><RotateCw className="h-4 w-4 mr-1 animate-spin" /> Approving…</>
+                              ) : (
+                                <><CheckCircle className="h-4 w-4 mr-1" /> Change to approved</>
+                              )}
+                            </Button>
+                          </CardFooter>
                         </Card>
                       ))}
                   </div>
@@ -413,7 +456,14 @@ const PendingPage = () => {
                             </div>
                           </CardContent>
                           
-                          <CardFooter className="flex justify-end gap-2">
+                          <CardFooter className="flex justify-end gap-2 flex-wrap">
+                            <Button
+                              variant="outline"
+                              onClick={() => setPreviewing({ kind: 'live', id: section.id, title: section.title, subtitle: section.professor_name })}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              معاينة المحتوى
+                            </Button>
                             <Button 
                               variant="destructive"
                               disabled={approvingLiveSection === section.id || rejectingLiveSection === section.id}
@@ -472,7 +522,7 @@ const PendingPage = () => {
                   </div>
                 ) : (
                   <EmptyState
-                    title="No Pending Live Sections"
+                    title="لا توجد دورات قيد المراجعة"
                     description="All live sections have been reviewed."
                     icon={<Video className="h-12 w-12 text-gray-400" />}
                   />
@@ -507,12 +557,51 @@ const PendingPage = () => {
                               <span>Rejected on: {formatDate(section.updated_at || '')}</span>
                             </div>
                           </CardContent>
+
+                          {/* Preview the content, and undo a rejection made by mistake. */}
+                          <CardFooter className="pt-0 flex gap-2 flex-wrap">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setPreviewing({ kind: 'live', id: section.id, title: section.title, subtitle: section.professor_name })}
+                            >
+                              <Eye className="h-4 w-4 mr-1" /> معاينة
+                            </Button>
+                            <Button
+                              size="sm"
+                              disabled={approvingLiveSection === section.id}
+                              onClick={async () => {
+                                setApprovingLiveSection(section.id);
+                                try {
+                                  const res = await fetch(`/api/admin/live-sections/${section.id}/approve`, {
+                                    method: 'POST',
+                                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                                  });
+                                  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Request failed');
+                                  fetchPendingLiveSections();
+                                  refreshPendingCount();
+                                  toast.success('تم تغيير الحالة إلى مقبولة');
+                                } catch (error: any) {
+                                  console.error(error);
+                                  toast.error(error.message || 'Failed to approve');
+                                } finally {
+                                  setApprovingLiveSection(null);
+                                }
+                              }}
+                            >
+                              {approvingLiveSection === section.id ? (
+                                <><RotateCw className="h-4 w-4 mr-1 animate-spin" /> جاري…</>
+                              ) : (
+                                <><CheckCircle className="h-4 w-4 mr-1" /> تغيير إلى مقبولة</>
+                              )}
+                            </Button>
+                          </CardFooter>
                         </Card>
                       ))}
                   </div>
                 ) : (
                   <EmptyState
-                    title="No Rejected Live Sections"
+                    title="لا توجد دورات مرفوضة"
                     description="There are no rejected live sections."
                     icon={<XCircle className="h-12 w-12 text-gray-400" />}
                   />
@@ -523,11 +612,13 @@ const PendingPage = () => {
         </Tabs>
       )}
 
+      <ContentPreviewDialog target={previewing} onClose={() => setPreviewing(null)} />
+
       {/* Live Section Rejection Dialog */}
       <Dialog open={liveSectionRejectDialogOpen} onOpenChange={setLiveSectionRejectDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reject Live Section</DialogTitle>
+            <DialogTitle>رفض الدورة</DialogTitle>
             <DialogDescription>
               Are you sure you want to reject "{sectionToReject?.title}"? Please provide a reason for the rejection.
             </DialogDescription>

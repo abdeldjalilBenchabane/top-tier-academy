@@ -52,17 +52,17 @@ const AboutUs = () => {
             {/* Images décoratives - Responsive */}
             <img
                 className='hidden md:block absolute h-16 md:h-20 lg:h-24 w-48 md:w-64 lg:w-72 right-0 top-16 md:top-24 z-10'
-                src="/public/form1.PNG"
+                src="/form1.PNG"
                 alt="Decoration"
             />
             <img
                 className='hidden md:block absolute h-16 md:h-20 lg:h-24 w-40 md:w-48 lg:w-56 left-0 top-[50rem] z-10'
-                src="/public/form3.PNG"
+                src="/form3.PNG"
                 alt="Decoration"
             />
             <img
                 className='hidden md:block absolute h-20 md:h-24 lg:h-28 w-48 md:w-64 lg:w-72 left-0 bottom-0 z-10'
-                src="/public/form2.PNG"
+                src="/form2.PNG"
                 alt="Decoration"
             />
 
@@ -103,7 +103,7 @@ const AboutUs = () => {
                         >
                             <motion.img
                                 whileHover={{ scale: 1.02 }}
-                                src='public/photo1.PNG'
+                                src='photo1.PNG'
                                 alt='حصص مباشرة'
                                 className='w-full max-w-md md:max-w-lg lg:max-w-xl h-auto '
                             />
@@ -136,7 +136,7 @@ const AboutUs = () => {
                             <motion.img
                                 whileHover={{ scale: 1.02 }}
                                 className='w-full max-w-md md:max-w-lg lg:max-w-xl h-auto '
-                                src='public/photo2.PNG'
+                                src='photo2.PNG'
                                 alt='كل ما تحتاجه'
                             />
                         </motion.div>
@@ -165,7 +165,7 @@ const AboutUs = () => {
                         >
                             <motion.img
                                 whileHover={{ scale: 1.02 }}
-                                src='public/photo3.PNG'
+                                src='photo3.PNG'
                                 alt='دروس خصوصية'
                                 className='w-full max-w-md md:max-w-lg lg:max-w-xl h-auto '
                             />
@@ -174,12 +174,6 @@ const AboutUs = () => {
                 </div>
             </motion.section>
 
-            {/* Titre de fin */}
-            <div className='w-full py-12 md:py-16 lg:py-20 relative z-20'>
-                <h1 className='text-[#2F327D] text-2xl md:text-3xl lg:text-4xl text-center font-semibold px-4'>
-                    ما يمكنك <span className='text-cyan-400'>دراسته </span>هنا
-                </h1>
-            </div>
         </section>
     )
 }

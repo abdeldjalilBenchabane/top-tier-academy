@@ -49,8 +49,8 @@ const Home = () => {
             <NavBar/>
             <TTHSlides />
             <Cardes />
-            <AboutUs />
             <FanCard/>
+            <AboutUs />
             <Avis/>
             <Footer />
         </div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 import CourseCard from "../components/ui/TTHCourseCard";
@@ -26,8 +27,15 @@ export default function Languages() {
   const [selectedProfessor, setSelectedProfessor] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLanguageFilter, setSelectedLanguageFilter] = useState(null);
+
+  // Coming from the landing page's اللغات card with ?language=
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const language = searchParams.get('language');
+    if (language) setSelectedLanguage(language);
+  }, [searchParams]);
   const [showFilters, setShowFilters] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('all'); // 'all' or 'live'
+  const [activeFilter, setActiveFilter] = useState('live'); // 'all' or 'live' - default to 'live'
 
   useEffect(() => {
     async function fetchData() {
@@ -386,17 +394,17 @@ export default function Languages() {
     <div dir="rtl" className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 flex flex-col">
       <Navbar />
       <main className="flex-grow">
-        <section className="relative overflow-hidden mt-[2px] bg-gradient-to-r from-blue-600 via-blue-700 to-purple-700">
+        <section className="relative overflow-hidden mt-[2px] bg-gradient-to-r from-[#194cbf] via-[#2d6fd8] to-[#61a1ff]">
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-0 left-0 w-72 h-72 bg-white rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
-            <div className="absolute top-0 right-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-2000"></div>
+            <div className="absolute top-0 right-0 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-2000"></div>
             <div className="absolute bottom-0 left-1/2 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-4000"></div>
           </div>
           <div className="relative container mx-auto px-4 py-12 md:py-16">
             <div className="text-right max-w-4xl mx-auto">
               <h1 className="text-white text-2xl md:text-4xl lg:text-5xl font-bold font-nunito leading-tight mb-4">
                 <span className="block mb-1">تعلّم</span>
-                <span className="bg-gradient-to-r from-purple-300 to-purple-100 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-blue-200 to-blue-50 bg-clip-text text-transparent">
                   اللغات العالمية
                 </span>
               </h1>
@@ -456,20 +464,20 @@ export default function Languages() {
                   {/* Container principal */}
                   <div className="bg-white/80 backdrop-blur-xl border border-gray-200/50 rounded-3xl shadow-2xl overflow-hidden relative">
                     {/* Background animé */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-purple-50/20 to-purple-50/30"></div>
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/10 to-purple-400/10 rounded-full blur-3xl"></div>
-                    <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-br from-purple-400/10 to-blue-400/10 rounded-full blur-3xl"></div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-blue-100/20 to-blue-50/30"></div>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/10 to-blue-300/10 rounded-full blur-3xl"></div>
+                    <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-br from-blue-300/10 to-blue-400/10 rounded-full blur-3xl"></div>
 
                     {/* Header */}
                     <div className="relative z-10 p-4 sm:p-6 border-b border-gray-100/50">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg transform rotate-3 hover:rotate-0 transition-transform duration-300">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-[#194cbf] to-[#61a1ff] rounded-2xl flex items-center justify-center shadow-lg transform rotate-3 hover:rotate-0 transition-transform duration-300">
                           <svg className="text-white text-sm sm:text-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
                           </svg>
                         </div>
                         <div>
-                          <h3 className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-purple-600 bg-clip-text text-transparent">
+                          <h3 className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 bg-clip-text text-transparent">
                             فلاتر متقدمة
                           </h3>
                           <p className="text-sm text-gray-600 mt-1 hidden sm:block">
@@ -486,7 +494,7 @@ export default function Languages() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-6">
                           {/* Language Filter */}
                           <div className="group">
-                            <label className="block text-gray-700 font-bold mb-3 text-sm lg:text-base text-right group-hover:text-blue-600 transition-colors duration-200">
+                            <label className="block text-gray-700 font-bold mb-3 text-sm lg:text-base text-right group-hover:text-[#194cbf] transition-colors duration-200">
                               <span className="inline-flex items-center gap-2">
                                 <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                                 اللغة
@@ -549,9 +557,9 @@ export default function Languages() {
 
                           {/* Professor Filter */}
                           <div className="group">
-                            <label className="block text-gray-700 font-bold mb-3 text-sm lg:text-base text-right group-hover:text-purple-600 transition-colors duration-200">
+                            <label className="block text-gray-700 font-bold mb-3 text-sm lg:text-base text-right group-hover:text-[#61a1ff] transition-colors duration-200">
                               <span className="inline-flex items-center gap-2">
-                                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                                 الأستاذ
                               </span>
                             </label>
@@ -559,7 +567,7 @@ export default function Languages() {
                               <select
                                 value={selectedProfessor}
                                 onChange={(e) => setSelectedProfessor(e.target.value)}
-                                className="appearance-none w-full bg-white/90 backdrop-blur-sm border-2 border-gray-200 hover:border-purple-300 focus:border-purple-500 text-sm lg:text-base font-semibold rounded-2xl py-3 lg:py-4 pr-4 pl-12 focus:outline-none focus:ring-4 focus:ring-purple-100 transition-all duration-300 shadow-sm hover:shadow-md text-right cursor-pointer"
+                                className="appearance-none w-full bg-white/90 backdrop-blur-sm border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 text-sm lg:text-base font-semibold rounded-2xl py-3 lg:py-4 pr-4 pl-12 focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all duration-300 shadow-sm hover:shadow-md text-right cursor-pointer"
                                 dir="rtl"
                               >
                                 <option value="">جميع الأساتذة</option>
@@ -570,7 +578,7 @@ export default function Languages() {
                                 ))}
                               </select>
                               <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <svg className="text-gray-400 group-hover:text-purple-500 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="text-gray-400 group-hover:text-blue-500 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
                               </div>
@@ -579,7 +587,7 @@ export default function Languages() {
                         </div>
 
                         {/* Selected Filters Summary */}
-                        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-4 border border-blue-100">
+                        <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-2xl p-4 border border-blue-100">
                           <h4 className="text-sm font-bold text-gray-700 mb-2 text-right">الفلاتر المحددة:</h4>
                           <div className="flex flex-wrap gap-2 justify-end">
                             {selectedLanguage && (
@@ -593,7 +601,7 @@ export default function Languages() {
                               </span>
                             )}
                             {selectedProfessor && (
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                 {(activeFilter === 'all' ? professors : liveProfessors).find(p => p.id === selectedProfessor)?.name || selectedProfessor}
                               </span>
                             )}
@@ -607,8 +615,8 @@ export default function Languages() {
 
                     {/* Decorative Elements */}
                     <div className="absolute top-8 right-8 w-3 h-3 bg-blue-400 rounded-full opacity-60 animate-pulse"></div>
-                    <div className="absolute bottom-8 left-8 w-2 h-2 bg-purple-400 rounded-full opacity-40 animate-pulse" style={{ animationDelay: '1s' }}></div>
-                    <div className="absolute top-1/2 left-4 w-1 h-1 bg-purple-400 rounded-full opacity-50 animate-pulse" style={{ animationDelay: '2s' }}></div>
+                    <div className="absolute bottom-8 left-8 w-2 h-2 bg-blue-400 rounded-full opacity-40 animate-pulse" style={{ animationDelay: '1s' }}></div>
+                    <div className="absolute top-1/2 left-4 w-1 h-1 bg-blue-400 rounded-full opacity-50 animate-pulse" style={{ animationDelay: '2s' }}></div>
                   </div>
                 </div>
               </div>
@@ -620,90 +628,20 @@ export default function Languages() {
         {!loading && (Object.keys(groupedCourses).length > 0 || Object.keys(groupedLiveSections).length > 0) && (
           <section className="py-8 bg-white shadow-sm">
             <div className="container mx-auto px-4">
-              {/* Combined Filter Buttons - Main Filters and Language Specific Filters */}
+              {/* Combined Filter Buttons - Language Specific Filters Only */}
               <div className="flex flex-col md:flex-row md:justify-between items-center gap-4 mb-6 px-4 md:px-10">
-                {/* First Group - Main Filter Buttons */}
-                <div className="flex flex-wrap justify-center md:justify-start gap-2 md:gap-4 w-full md:w-auto">
-                  <button
-                    onClick={() => setActiveFilter('live')}
-                    className={`px-4 md:px-6 py-2 md:py-3 rounded-full font-semibold transition-all duration-300 text-sm md:text-base ${
-                      activeFilter === 'live' 
-                        ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg' 
-                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-red-300 hover:shadow-md'
-                    }`}
-                  >
-                    لغات لايف
-                    {activeFilter === 'live' && (
-                      <span className="ml-1 md:ml-2 bg-white/20 px-1 md:px-2 py-0.5 md:py-1 rounded-full text-xs">
-                        {Object.values(groupedLiveSections).flat().length}
-                      </span>
-                    )}
-                  </button>
-                  
+                {/* Hidden - الدورات المحفوظة button removed per client request */}
+                <div className="hidden">
                   <button
                     onClick={() => setActiveFilter('all')}
-                    className={`px-4 md:px-6 py-2 md:py-3 rounded-full font-semibold transition-all duration-300 text-sm md:text-base ${
-                      activeFilter === 'all' 
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
-                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
-                    }`}
+                    className="px-4 md:px-6 py-2 md:py-3 rounded-full font-semibold transition-all duration-300 text-sm md:text-base bg-white text-gray-700 border-2 border-gray-200"
                   >
                     الدورات المحفوظة 
-                    {activeFilter === 'all' && (
-                      <span className="ml-1 md:ml-2 bg-white/20 px-1 md:px-2 py-0.5 md:py-1 rounded-full text-xs">
-                        {Object.values(groupedCourses).flat().length}
-                      </span>
-                    )}
                   </button>
                 </div>
 
-                {/* Second Group - Language Specific Filter Buttons */}
-                {activeFilter === 'all' && Object.keys(groupedCourses).length > 0 && (
-                  <div className="flex flex-wrap justify-center md:justify-end gap-2 md:gap-4 w-full md:w-auto">
-                    <button
-                      onClick={() => handleLanguageFilter(null)}
-                      className={`px-4 md:px-6 py-2 md:py-3 rounded-full font-semibold transition-all duration-300 text-sm md:text-base ${
-                        selectedLanguageFilter === null 
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
-                          : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
-                      }`}
-                    >
-                      جميع اللغات
-                      {selectedLanguageFilter === null && (
-                        <span className="ml-1 md:ml-2 bg-white/20 px-1 md:px-2 py-0.5 md:py-1 rounded-full text-xs">
-                          {Object.values(groupedCourses).flat().length}
-                        </span>
-                      )}
-                    </button>
-                    
-                    {Object.keys(groupedCourses).map((languageName) => {
-                      const languageCourseCount = groupedCourses[languageName].length;
-                      
-                      return (
-                        <button
-                          key={languageName}
-                          onClick={() => handleLanguageFilter(languageName)}
-                          className={`px-4 md:px-6 py-2 md:py-3 rounded-full font-semibold transition-all duration-300 text-sm md:text-base ${
-                            selectedLanguageFilter === languageName 
-                              ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
-                              : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
-                          }`}
-                        >
-                          {languageName}
-                          <span className={`ml-1 md:ml-2 px-1 md:px-2 py-0.5 md:py-1 rounded-full text-xs ${
-                            selectedLanguageFilter === languageName 
-                              ? 'bg-white/20' 
-                              : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {languageCourseCount}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {activeFilter === 'live' && Object.keys(groupedLiveSections).length > 0 && (
+                {/* Language Specific Filter Buttons - Show only for live sections */}
+                {Object.keys(groupedLiveSections).length > 0 && (
                   <div className="flex flex-wrap justify-center md:justify-end gap-2 md:gap-4 w-full md:w-auto">
                     <button
                       onClick={() => handleLanguageFilter(null)}
@@ -760,7 +698,7 @@ export default function Languages() {
             <div className="text-center py-16">Loading...</div>
           ) : (activeFilter === 'all' && filteredCourses.length === 0) || (activeFilter === 'live' && filteredLiveSections.length === 0) ? (
             <div className="text-center py-16">
-              <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+              <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-full flex items-center justify-center">
                 <svg className="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>

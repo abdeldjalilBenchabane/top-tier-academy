@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useConfirmPurchase } from '@/components/ui/TTHPurchaseConfirm';
 import { Link } from 'react-router-dom';
 import { Clock, BookOpen, ArrowRight, CheckCircle, AlertTriangle, Loader2, Lock } from 'lucide-react';
 import { pointsAPI } from '@/services/api';
@@ -29,10 +30,26 @@ const CourseCard = ({ course }) => {
     path = 'مسار غير محدد'; // Fallback
   }
 
+  // Check localStorage on mount to restore purchased status (iOS Safari fix)
+  useEffect(() => {
+    try {
+      const purchasedCourses = JSON.parse(localStorage.getItem('purchasedCourses') || '[]');
+      if (purchasedCourses.includes(course.id)) {
+        course.purchased = true;
+      }
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+  }, [course.id]);
+
   const price = course.price ? `${course.price} دج` : 'مجاني';
   const purchased = course.purchased || buySuccess;
 
-  const handleBuyWithPoints = async () => {
+  const confirmPurchase = useConfirmPurchase();
+
+  const handleBuyWithPoints = async (e) => {
+    e.stopPropagation(); // Prevent card click from triggering
+    
     if (!user) {
       alert('يجب تسجيل الدخول كطالب لشراء هذا الكورس.');
       return;
@@ -41,7 +58,11 @@ const CourseCard = ({ course }) => {
       alert('يجب أن تكون مسجلاً كطالب لشراء هذا الكورس.');
       return;
     }
-    if (!window.confirm('هل أنت متأكد أنك تريد شراء هذا الكورس بالنقاط؟')) {
+    if (!(await confirmPurchase({
+      title: course.title,
+      price: course.price,
+      kindLabel: 'شراء درس بالنقاط',
+    }))) {
       return;
     }
     setBuyLoading(true);
@@ -50,15 +71,38 @@ const CourseCard = ({ course }) => {
     try {
       const res = await pointsAPI.buyCourse(course.id);
       if (res.success) {
+        // Update state immediately
         setBuySuccess(true);
-        alert('تم شراء الكورس بنجاح! سيتم توجيهك إلى محتوى الكورس.');
+        
+        // Update the course object directly (mutable update for immediate UI feedback)
+        course.purchased = true;
         
         // Trigger points update event to refresh navbar
         window.dispatchEvent(new CustomEvent('pointsUpdated', { 
           detail: { points: res.newBalance } 
         }));
         
-        window.location.href = `/coursesList/courses/${course.id}`;
+        // Force a re-render by updating state
+        // Use requestAnimationFrame to ensure state updates before alert
+        requestAnimationFrame(() => {
+          // Store purchase in localStorage for persistence (iOS Safari fix)
+          try {
+            const purchasedCourses = JSON.parse(localStorage.getItem('purchasedCourses') || '[]');
+            if (!purchasedCourses.includes(course.id)) {
+              purchasedCourses.push(course.id);
+              localStorage.setItem('purchasedCourses', JSON.stringify(purchasedCourses));
+            }
+          } catch (e) {
+            console.error('Error saving to localStorage:', e);
+          }
+          
+          // Show alert and redirect after state has updated
+          setTimeout(() => {
+            alert('تم شراء الكورس بنجاح! سيتم توجيهك إلى محتوى الكورس.');
+            // Use window.location.replace for iOS Safari compatibility
+            window.location.replace(`/coursesList/courses/${course.id}`);
+          }, 50);
+        });
       } else {
         setBuyError(res.error || 'حدث خطأ أثناء الشراء');
       }
@@ -67,6 +111,19 @@ const CourseCard = ({ course }) => {
         setBuyError('ليس لديك نقاط كافية. يرجى شراء المزيد من النقاط.');
       } else if (err && err.message && err.message.includes('already purchased')) {
         setBuyError('لقد اشتريت هذا الكورس من قبل.');
+        // Mark as purchased even if error says already purchased
+        setBuySuccess(true);
+        course.purchased = true;
+        // Save to localStorage
+        try {
+          const purchasedCourses = JSON.parse(localStorage.getItem('purchasedCourses') || '[]');
+          if (!purchasedCourses.includes(course.id)) {
+            purchasedCourses.push(course.id);
+            localStorage.setItem('purchasedCourses', JSON.stringify(purchasedCourses));
+          }
+        } catch (e) {
+          // Ignore localStorage errors
+        }
       } else {
         setBuyError('حدث خطأ أثناء الشراء');
       }
@@ -108,7 +165,7 @@ const CourseCard = ({ course }) => {
         <div className="flex items-center justify-between py-3 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-blue-50 rounded-lg">
-              <BookOpen className="w-4 h-4 text-blue-600" />
+              <BookOpen className="w-4 h-4 text-[#194cbf]" />
             </div>
             <span className="text-sm font-medium text-gray-700">{path}</span>
           </div>
@@ -119,13 +176,13 @@ const CourseCard = ({ course }) => {
             <span className="text-sm font-medium text-gray-700">{course.duration || ''}</span>
           </div>
         </div>
-        <h3 className="text-xl font-bold text-blue-800 leading-tight hover:text-blue-600 transition-colors duration-300 text-right font-rowdies">
+        <h3 className="text-xl font-bold text-blue-800 leading-tight hover:text-[#194cbf] transition-colors duration-300 text-right font-rowdies">
           {course.title}
         </h3>
         {course.created_by_name && (
           <div className="flex items-center justify-end gap-2 text-sm text-gray-600">
             <span className="font-medium">الأستاذ:</span>
-            <span className="text-blue-600 font-semibold">{course.created_by_name}</span>
+            <span className="text-[#194cbf] font-semibold">{course.created_by_name}</span>
           </div>
         )}
         <p className="text-gray-600 text-sm leading-relaxed line-clamp-3 text-right font-poppins">
@@ -136,7 +193,7 @@ const CourseCard = ({ course }) => {
           {user && purchased && (
             <Link to={`/coursesList/courses/${course.id}`}>
               <button
-                className="group flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transform transition-all duration-300 ease-out shadow-lg hover:shadow-xl"
+                className="group flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-[#1340a0] hover:to-[#4a8de8] transform transition-all duration-300 ease-out shadow-lg hover:shadow-xl"
                 onClick={e => { e.stopPropagation(); }}
               >
                 مشاهدة
@@ -153,8 +210,11 @@ const CourseCard = ({ course }) => {
         {user && user.role === 'student' && course.price !== null && course.price !== undefined && !purchased && (
           <div className="mt-4 flex flex-col gap-2">
             <button
-              className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-extrabold text-lg shadow-lg transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
-              onClick={handleBuyWithPoints}
+              className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-[#1340a0] hover:to-[#4a8de8] text-white font-extrabold text-lg shadow-lg transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleBuyWithPoints(e);
+              }}
               disabled={buyLoading}
             >
               {buyLoading ? (
@@ -179,7 +239,7 @@ const CourseCard = ({ course }) => {
         {!user && course.price !== null && course.price !== undefined && !purchased && (
           <div className="mt-4 flex flex-col gap-2">
             <button
-              className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-extrabold text-lg shadow-lg transition-all duration-300"
+              className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-[#1340a0] hover:to-[#4a8de8] text-white font-extrabold text-lg shadow-lg transition-all duration-300"
               onClick={e => {
                 e.stopPropagation();
                 alert('يجب تسجيل الدخول كطالب لشراء هذا الكورس.');

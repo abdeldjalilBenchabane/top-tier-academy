@@ -181,7 +181,7 @@ const TTHSlides = () => {
 
   if (isLoading) {
     return (
-      <div className="h-[120vh] md:h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center">
+      <div className="h-[120vh] md:h-screen bg-gradient-to-br from-[#194cbf] to-[#61a1ff] flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
       </div>
     );
@@ -199,11 +199,10 @@ const TTHSlides = () => {
   console.log('CTA Link:', currentSlideData?.ctaLink);
 
   return (
-    <section className="relative text-white bg-cover bg-center h-[120vh] md:h-screen min-h-screen flex flex-col md:flex-row items-center justify-between p-6 mt-[0.1rem] md:p-12 transition-all duration-1000 ease-in-out"
+    <section className="relative text-white bg-cover bg-center h-[120vh] md:h-screen min-h-screen flex flex-col md:flex-row items-center justify-between p-6 mt-0 md:p-12 transition-all duration-1000 ease-in-out"
       style={{
-        backgroundImage: currentSlideData.imageUrl 
-          ? `url('public/Etudiente1.PNG')`
-          : `url('public/Etudiente1.PNG')`
+        backgroundImage: 
+           `url('/Etudiente1.PNG')`
       }}
     >
       {/* Overlay */}
@@ -259,7 +258,7 @@ const TTHSlides = () => {
       </div>
 
       {/* Right Side - Video or Image */}
-      <div className="relative z-10 mt-10 md:mt-0 md:ml-8">
+      <div className="relative z-10 mt-2 md:mt-0 md:ml-8 self-start md:self-center" style={{ margin: 'auto' }}>
         {currentSlideData.mediaType === 'video' && currentSlideData.videoUrl ? (
           <video
             ref={videoRef}
@@ -271,13 +270,13 @@ const TTHSlides = () => {
             onPlay={handleVideoPlay}
             onPause={handleVideoPause}
           >
-            <source src={`http://localhost:5001${currentSlideData.videoUrl}`} type="video/mp4" />
-            <source src={`http://localhost:5001${currentSlideData.videoUrl}`} type="video/webm" />
-            <source src={`http://localhost:5001${currentSlideData.videoUrl}`} type="video/ogg" />
+            <source src={currentSlideData.videoUrl} type="video/mp4" />
+            <source src={currentSlideData.videoUrl} type="video/webm" />
+            <source src={currentSlideData.videoUrl} type="video/ogg" />
           </video>
         ) : (
           <img
-            src={currentSlideData.imageUrl ? `http://localhost:5001${currentSlideData.imageUrl}` : "/public/phoo2.PNG"}
+            src={currentSlideData.imageUrl || "/phoo2.PNG"}
             alt={currentSlideData.altText || "Étudiante"}
             className="w-72 md:w-96 object-cover drop-shadow-lg"
           />
@@ -304,7 +303,7 @@ const TTHSlides = () => {
 
       {/* Slide Indicators */}
       {slides.length > 1 && (
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-2 z-20">
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-20">
           {slides.map((_, index) => (
             <button
               key={index}

@@ -109,9 +109,9 @@ const ProfessorAnalytics = ({ stats }: ProfessorAnalyticsProps) => {
 
   // Live sections status distribution
   const liveSectionStatusData = [
-    { name: 'Active', value: parseInt(stats.liveSectionStats?.active_sections) || 0 },
-    { name: 'Inactive', value: parseInt(stats.liveSectionStats?.inactive_sections) || 0 },
-    { name: 'Pending', value: parseInt(stats.liveSectionStats?.pending_sections) || 0 }
+    { name: 'مقبولة', value: parseInt(stats.liveSectionStats?.active_sections) || 0 },
+    { name: 'مرفوضة', value: parseInt(stats.liveSectionStats?.inactive_sections) || 0 },
+    { name: 'قيد المراجعة', value: parseInt(stats.liveSectionStats?.pending_sections) || 0 }
   ];
 
   // Private classes status distribution
@@ -357,11 +357,11 @@ const ProfessorAnalytics = ({ stats }: ProfessorAnalyticsProps) => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Video className="h-5 w-5" />
-              Live Sections Status
+              حالة الدورات
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {renderPieChart(liveSectionStatusData, 'Live Sections')}
+            {renderPieChart(liveSectionStatusData, 'الدورات')}
           </CardContent>
         </Card>
       </div>

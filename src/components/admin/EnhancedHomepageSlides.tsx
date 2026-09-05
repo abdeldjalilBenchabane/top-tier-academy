@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FileUpload } from '@/components/ui/file-upload';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { Plus, Edit, Trash2, Eye, EyeOff, Image, Video, Calendar, Users, TrendingUp, Settings, ArrowUp, ArrowDown, Play, Pause } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, Image, Video, Calendar, Users, TrendingUp, Settings, ArrowUp, ArrowDown, Play, Pause, Loader2 } from 'lucide-react';
 import { HomeSlide } from '@/types';
 import { slidesAPI } from '@/services/api';
 import { toast } from '@/lib/toast';
@@ -25,6 +25,7 @@ const EnhancedHomepageSlides = () => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [analytics, setAnalytics] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSavingSlide, setIsSavingSlide] = useState(false);
 
   // Transform snake_case to camelCase
   const transformSlideData = (slide: any): HomeSlide => {
@@ -74,6 +75,7 @@ const EnhancedHomepageSlides = () => {
   };
 
   const handleSaveSlide = async (slideData: Partial<HomeSlide>) => {
+    setIsSavingSlide(true);
     try {
     if (editingSlide) {
         // Update existing slide
@@ -102,6 +104,8 @@ const EnhancedHomepageSlides = () => {
     } catch (error) {
       console.error('Error saving slide:', error);
       toast.error('Failed to save slide');
+    } finally {
+      setIsSavingSlide(false);
     }
   };
 
@@ -354,7 +358,7 @@ const EnhancedHomepageSlides = () => {
                         slide.videoUrl ? (
                           <div className="relative w-full h-full">
                             <video
-                              src={`http://localhost:5001${slide.videoUrl}`}
+                              src={slide.videoUrl}
                               className="w-full h-full object-cover"
                               muted
                               preload="metadata"
@@ -370,7 +374,7 @@ const EnhancedHomepageSlides = () => {
                         )
                       ) : slide.imageUrl ? (
                         <img
-                          src={`http://localhost:5001${slide.imageUrl}`}
+                          src={slide.imageUrl}
                           alt={slide.title}
                           className="w-full h-full object-cover"
                         />
@@ -460,8 +464,15 @@ const EnhancedHomepageSlides = () => {
             <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" form="slide-form">
-              {editingSlide ? 'Update' : 'Create'} Slide
+            <Button type="submit" form="slide-form" disabled={isSavingSlide}>
+              {isSavingSlide ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {editingSlide ? 'Updating' : 'Creating'}...
+                </>
+              ) : (
+                `${editingSlide ? 'Update' : 'Create'} Slide`
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -481,7 +492,7 @@ const EnhancedHomepageSlides = () => {
               <div className="relative w-full bg-gray-900 rounded-lg overflow-hidden">
                 {previewSlide.mediaType === 'video' ? (
                   <video
-                    src={`http://localhost:5001${previewSlide.videoUrl}`}
+                    src={previewSlide.videoUrl}
                     controls
                     autoPlay
                     muted
@@ -489,14 +500,14 @@ const EnhancedHomepageSlides = () => {
                     className="w-full object-cover"
                     style={{ maxHeight: '70vh' }}
                   >
-                    <source src={`http://localhost:5001${previewSlide.videoUrl}`} type="video/mp4" />
-                    <source src={`http://localhost:5001${previewSlide.videoUrl}`} type="video/webm" />
-                    <source src={`http://localhost:5001${previewSlide.videoUrl}`} type="video/ogg" />
+                    <source src={previewSlide.videoUrl} type="video/mp4" />
+                    <source src={previewSlide.videoUrl} type="video/webm" />
+                    <source src={previewSlide.videoUrl} type="video/ogg" />
                     Your browser does not support the video tag.
                   </video>
                 ) : (
                   <img
-                    src={`http://localhost:5001${previewSlide.imageUrl}`}
+                    src={previewSlide.imageUrl}
                     alt={previewSlide.title}
                     className="w-full object-contain"
                     style={{ maxHeight: '70vh' }}

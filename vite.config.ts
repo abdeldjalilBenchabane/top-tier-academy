@@ -6,14 +6,28 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
+    host: "0.0.0.0",
     port: 8080,
+    allowedHosts: ['top-tier.academy', 'www.top-tier.academy'],
     proxy: {
-      '/api': 'http://localhost:5001',
-      '/uploads': 'http://localhost:5001',
-      '/images': 'http://localhost:5001'
+      '/api': {
+        target: 'https://top-tier.academy',
+        changeOrigin: true,
+        secure: false
+      },
+      '/uploads': {
+        target: 'https://top-tier.academy',
+        changeOrigin: true,
+        secure: false
+      },
+      '/images': {
+        target: 'https://top-tier.academy',
+        changeOrigin: true,
+        secure: false
+      }
     }
   },
+  publicDir: 'public',
   plugins: [
     react(),
     mode === 'development' &&

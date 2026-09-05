@@ -95,6 +95,7 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Cairo', 'Raleway', sans-serif;
   }
 }
 
@@ -110,5 +111,42 @@
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  .animate-mesh {
+    background: linear-gradient(
+      45deg,
+      #f3f4f6 0%,
+      #e5e7eb 25%,
+      #d1d5db 50%,
+      #9ca3af 75%,
+      #6b7280 100%
+    );
+    background-size: 400% 400%;
+    animation: mesh 15s ease infinite;
+  }
+
+  @keyframes mesh {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .glass-card {
+    @apply bg-white/40 backdrop-blur-2xl border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.37)];
+  }
+
+  .premium-input {
+    @apply w-full px-4 py-3 border-2 border-gray-200/50 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 bg-white/50 backdrop-blur-md transition-all duration-300;
+  }
+
+  .premium-button {
+    @apply w-full bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white font-bold py-4 px-6 rounded-xl hover:from-[#1340a0] hover:to-[#4a8de8] focus:outline-none focus:ring-4 focus:ring-blue-500/30 transform transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-[0_10px_20px_-10px_rgba(25,76,191,0.5)];
   }
 }

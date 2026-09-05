@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useConfirmPurchase } from '@/components/ui/TTHPurchaseConfirm';
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 import PrivateClassFilter from "../components/ui/TTHPrivateClassFilter";
@@ -70,6 +71,8 @@ const PrivateClasses = () => {
     navigate(`/streaming/${channel}`);
   };
 
+  const confirmPurchase = useConfirmPurchase();
+
   const [purchaseLoading, setPurchaseLoading] = useState({});
 
   const handlePurchase = async (session) => {
@@ -78,6 +81,14 @@ const PrivateClasses = () => {
       return;
     }
     
+    if (!(await confirmPurchase({
+      title: session.title || session.subject,
+      price: session.price_per_session,
+      kindLabel: 'شراء حصة خاصة بالنقاط',
+    }))) {
+      return;
+    }
+
     setPurchaseLoading(prev => ({ ...prev, [session.id]: true }));
     
     try {
@@ -116,22 +127,22 @@ const PrivateClasses = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-blue-100" dir="rtl">
       <Navbar />
       <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
         {/* Page Header */}
         <div className="mr-28 mt-10 mb-8 sm:mb-12">
           <div className="inline-flex flex-col sm:flex-row items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-[#194cbf] to-[#61a1ff] rounded-full flex items-center justify-center shadow-2xl">
               <svg className="w-8 h-8 sm:w-10 sm:h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
             </div>
             <div className="text-center sm:text-right">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-blue-600  mb-4">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#194cbf]  mb-4">
                 {isProfessor ? 'إدارة الحصص الخاصة' : 'تحتاج دعم أكثر؟'}
               </h1>
-              <h2 className="text-sm sm:text-lg md:text-lg lg:text-2xl  opacity-75     font-semibold text-purple-600 ">
+              <h2 className="text-sm sm:text-lg md:text-lg lg:text-2xl  opacity-75     font-semibold text-[#61a1ff] ">
                 {isProfessor ? 'عرض وإدارة طلبات الحصص الخاصة' : 'اطلب حصة خاصة مع أستاذك المفضل'}
               </h2>
             </div>
@@ -183,7 +194,7 @@ const PrivateClasses = () => {
                   ]);
                 }}
                 disabled={requestsLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-[#194cbf] text-white rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg className={`w-4 h-4 ${requestsLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

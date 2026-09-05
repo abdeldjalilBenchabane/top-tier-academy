@@ -30,7 +30,7 @@ import {
   X,
   Tag,
   LayoutDashboard
-} from 'lucide-react';
+, RotateCcw, Smartphone} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SidebarLink {
@@ -73,6 +73,7 @@ const Sidebar = () => {
     { name: 'Dashboard', path: '/admin/dashboard', icon: <Home className="h-5 w-5" /> },
     { name: 'Education Structure', path: '/admin/structure', icon: <Layers className="h-5 w-5" /> },
     { name: 'Courses', path: '/admin/courses', icon: <BookOpen className="h-5 w-5" /> },
+    { name: 'الدورات', path: '/admin/live-sections', icon: <Video className="h-5 w-5" /> },
     { name: 'Pending Approvals', path: '/admin/pending', icon: <Clock className="h-5 w-5" />, badge: pendingCount },
     { name: 'Quiz Management', path: '/admin/quizzes', icon: <HelpCircle className="h-5 w-5" />, badge: pendingQuizzesCount.total },
     { name: 'Live Sessions', path: '/admin/live-sessions', icon: <Video className="h-5 w-5" />, badge: liveSessionsCount.total },
@@ -81,12 +82,17 @@ const Sidebar = () => {
     { name: 'Points', path: '/admin/points', icon: <DollarSign className="h-5 w-5" /> },
     { name: 'Point Codes', path: '/admin/point-codes', icon: <Key className="h-5 w-5" /> },
     { name: 'Point Transactions', path: '/admin/point-transactions', icon: <TrendingUp className="h-5 w-5" /> },
+    { name: 'المشتريات', path: '/admin/purchases', icon: <RotateCcw className="h-5 w-5" /> },
+    { name: 'تطبيق الجوال', path: '/admin/mobile', icon: <Smartphone className="h-5 w-5" /> },
     { name: 'Private Classes', path: '/admin/private-classes', icon: <Shield className="h-5 w-5" /> },
     { name: 'Private Class Settings', path: '/admin/private-class-settings', icon: <Settings className="h-5 w-5" /> },
+    { name: 'تعليقات الدورات', path: '/admin/comments', icon: <MessageCircle className="h-5 w-5" /> },
+    { name: 'تعليقات حزمة الدورات', path: '/admin/live-section-comments', icon: <MessageCircle className="h-5 w-5" /> },
     { name: 'Homepage Materials', path: '/admin/homepage-materials', icon: <Globe className="h-5 w-5" /> },
     { name: 'Footer Content', path: '/admin/footer-content', icon: <FileText className="h-5 w-5" /> },
     { name: 'Pricing Management', path: '/admin/pricing', icon: <Tag className="h-5 w-5" /> },
     { name: 'Earnings Analytics', path: '/admin/earnings', icon: <TrendingUp className="h-5 w-5" /> },
+    { name: 'Settings', path: '/admin/settings', icon: <Settings className="h-5 w-5" /> },
   ];
 
   const professorLinks: SidebarLink[] = [
@@ -95,11 +101,12 @@ const Sidebar = () => {
     { name: 'Create Course', path: '/professor/create', icon: <FileText className="h-5 w-5" /> },
     { name: 'Live Sessions', path: '/professor/live-sessions', icon: <Video className="h-5 w-5" />, badge: hasLiveNow ? -1 : undefined },
     { name: 'Create Live Session', path: '/professor/create-live-session', icon: <Video className="h-5 w-5" /> },
-    { name: 'Live Sections', path: '/professor/live-sections', icon: <Video className="h-5 w-5" /> },
+    { name: 'الدورات', path: '/professor/live-sections', icon: <Video className="h-5 w-5" /> },
     { name: 'Create Quiz', path: '/professor/quiz', icon: <HelpCircle className="h-5 w-5" /> },
     { name: 'My Quizzes', path: '/professor/my-quizzes', icon: <FileText className="h-5 w-5" /> },
     { name: 'Quiz Results', path: '/professor/results', icon: <BarChart className="h-5 w-5" /> },
-    { name: 'تعليقات الطلاب', path: '/professor/comments', icon: <MessageCircle className="h-5 w-5" /> },
+    { name: 'تعليقات الدورات', path: '/professor/comments', icon: <MessageCircle className="h-5 w-5" /> },
+    { name: 'تعليقات حزمة الدورات', path: '/professor/live-section-comments', icon: <MessageCircle className="h-5 w-5" /> },
     { name: 'الحصص الخاصة', path: '/professor/private-classes', icon: <Clock className="h-5 w-5" />, badge: pendingPrivateClassesCount },
     { name: 'My Students', path: '/professor/my-students', icon: <Users className="h-5 w-5" /> },
   ];

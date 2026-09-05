@@ -189,9 +189,9 @@ const DashboardStats = ({ userRole }: DashboardStatsProps) => {
         trend: { value: stats.liveSessionStats.scheduled_sessions, isPositive: true }
       },
       {
-        title: 'Live Sections',
+        title: 'الدورات',
         value: stats.liveSectionStats.total_sections,
-        description: `${stats.liveSectionStats.active_sections} active, ${stats.liveSectionStats.pending_sections} pending`,
+        description: `${stats.liveSectionStats.active_sections} مقبولة, ${stats.liveSectionStats.pending_sections} قيد المراجعة`,
         icon: <Video className="h-4 w-4" />,
         trend: { value: stats.liveSectionStats.active_sections, isPositive: true }
       },

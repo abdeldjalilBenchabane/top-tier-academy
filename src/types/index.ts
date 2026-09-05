@@ -5,6 +5,7 @@ export type User = {
   name: string;
   email: string;
   role: 'admin' | 'professor' | 'student';
+  avatar_url?: string;
   pointsBalance?: number;
   agoraUid?: string;
   agoraRtmToken?: string;

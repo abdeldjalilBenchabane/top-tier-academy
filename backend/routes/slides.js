@@ -1,6 +1,9 @@
 import express from 'express';
-import { query, getRow, getRows } from '../db.js';
 import { verifyToken, requireRole } from '../middleware/auth.js';
+import { getRows, getRow, query } from '../db.js';
+import pool from '../db.js';
+import { createR2Multer } from '../middleware/r2MulterStorage.js';
+import { deleteFromR2, extractKeyFromUrl } from '../services/r2Service.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -12,24 +15,8 @@ const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'slides');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({ 
-  storage: storage,
-  // Removed file size limit - no longer restricting file size
+// Configure multer for file uploads with R2 storage
+const upload = createR2Multer('slides', null, {
   fileFilter: (req, file, cb) => {
     console.log('File upload attempt:', {
       originalname: file.originalname,
@@ -147,11 +134,40 @@ router.get('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
 
 // Create new slide
 router.post('/', verifyToken, requireRole(['admin']), (req, res, next) => {
-  upload.single('media')(req, res, (err) => {
+  upload.single('media')(req, res, async (err) => {
     if (err) {
       console.error('Multer error:', err);
       return handleUploadError(err, req, res, next);
     }
+    
+    // Handle R2 upload manually after file is buffered
+    if (req.file && req.file.buffer) {
+      try {
+        console.log('📤 Processing R2 upload for slide media...');
+        
+        // Import R2 functions
+        const { uploadToR2, generateR2Key } = await import('../services/r2Service.js');
+        
+        // Generate R2 key
+        const r2Key = generateR2Key('slides', null, req.file.originalname, 'media');
+        console.log('🔑 Generated R2 key:', r2Key);
+        
+        // Upload to R2
+        const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        console.log('✅ Slide media uploaded to R2:', publicUrl);
+        
+        // Update file object with R2 URL
+        req.file.path = publicUrl;
+        req.file.filename = r2Key;
+      } catch (error) {
+        console.error('❌ Error uploading slide media to R2:', error);
+        return res.status(500).json({ 
+          error: 'Failed to upload slide media to R2',
+          details: error.message 
+        });
+      }
+    }
+    
     next();
   });
 }, async (req, res) => {
@@ -187,7 +203,8 @@ router.post('/', verifyToken, requireRole(['admin']), (req, res, next) => {
     let videoUrl = null;
     
     if (req.file) {
-      const fileUrl = `/uploads/slides/${req.file.filename}`;
+      // Use R2 URL instead of local path
+      const fileUrl = req.file.path; // R2 public URL
       if (mediaType === 'image') {
         imageUrl = fileUrl;
       } else if (mediaType === 'video') {
@@ -244,11 +261,40 @@ router.post('/', verifyToken, requireRole(['admin']), (req, res, next) => {
 
 // Update slide
 router.put('/:id', verifyToken, requireRole(['admin']), (req, res, next) => {
-  upload.single('media')(req, res, (err) => {
+  upload.single('media')(req, res, async (err) => {
     if (err) {
       console.error('Multer error:', err);
       return handleUploadError(err, req, res, next);
     }
+    
+    // Handle R2 upload manually after file is buffered
+    if (req.file && req.file.buffer) {
+      try {
+        console.log('📤 Processing R2 upload for slide media update...');
+        
+        // Import R2 functions
+        const { uploadToR2, generateR2Key, deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
+        
+        // Generate R2 key
+        const r2Key = generateR2Key('slides', null, req.file.originalname, 'media');
+        console.log('🔑 Generated R2 key:', r2Key);
+        
+        // Upload to R2
+        const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        console.log('✅ Slide media uploaded to R2:', publicUrl);
+        
+        // Update file object with R2 URL
+        req.file.path = publicUrl;
+        req.file.filename = r2Key;
+      } catch (error) {
+        console.error('❌ Error uploading slide media to R2:', error);
+        return res.status(500).json({ 
+          error: 'Failed to upload slide media to R2',
+          details: error.message 
+        });
+      }
+    }
+    
     next();
   });
 }, async (req, res) => {
@@ -283,22 +329,24 @@ router.put('/:id', verifyToken, requireRole(['admin']), (req, res, next) => {
     let videoUrl = existingSlide.video_url;
     
     if (req.file) {
-      // Delete old file if it exists
+      // Delete old file from R2 if it exists
       const oldFilePath = existingSlide.image_url || existingSlide.video_url;
       if (oldFilePath) {
-        const oldFullPath = path.join(__dirname, '..', '..', 'public', oldFilePath);
         try {
-          if (fs.existsSync(oldFullPath)) {
-            fs.unlinkSync(oldFullPath);
-            console.log(`Old file deleted: ${oldFullPath}`);
+          console.log('🗑️ Deleting old slide media from R2:', oldFilePath);
+          const oldKey = extractKeyFromUrl(oldFilePath);
+          if (oldKey && oldKey !== oldFilePath) {
+            await deleteFromR2(oldKey);
+            console.log('✅ Old slide media deleted from R2:', oldKey);
           }
         } catch (fileError) {
-          console.error('Error deleting old file:', fileError);
+          console.error('⚠️ Error deleting old slide media from R2:', fileError);
           // Continue with new file upload even if old file deletion fails
         }
       }
       
-      const fileUrl = `/uploads/slides/${req.file.filename}`;
+      // Use R2 URL instead of local path
+      const fileUrl = req.file.path; // R2 public URL
       if (mediaType === 'image') {
         imageUrl = fileUrl;
         videoUrl = null; // Clear video URL if switching to image
@@ -383,20 +431,20 @@ router.delete('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
       return res.status(404).json({ error: 'Slide not found' });
     }
 
-    // Delete the actual file from uploads folder
+    // Delete the actual file from R2
     if (slide.image_url || slide.video_url) {
       const filePath = slide.image_url || slide.video_url;
-      const fullPath = path.join(__dirname, '..', '..', 'public', filePath);
       
       try {
-        if (fs.existsSync(fullPath)) {
-          fs.unlinkSync(fullPath);
-          console.log(`File deleted: ${fullPath}`);
-        } else {
-          console.log(`File not found: ${fullPath}`);
+        console.log('🗑️ Deleting slide media from R2:', filePath);
+        const { deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
+        const key = extractKeyFromUrl(filePath);
+        if (key && key !== filePath) {
+          await deleteFromR2(key);
+          console.log('✅ Slide media deleted from R2:', key);
         }
       } catch (fileError) {
-        console.error('Error deleting file:', fileError);
+        console.error('⚠️ Error deleting slide media from R2:', fileError);
         // Continue with database deletion even if file deletion fails
       }
     }

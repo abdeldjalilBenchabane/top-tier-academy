@@ -157,7 +157,7 @@ const PrivateClassesSection = () => {
           <p className="text-gray-500">قم بإنشاء طلب جديد للحصول على حصة خاصة</p>
           <a 
             href="/TTHPrivateClasses" 
-            className="inline-block mt-4 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-bold hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
+            className="inline-block mt-4 px-6 py-3 bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white rounded-lg font-bold hover:from-[#1340a0] hover:to-[#4a8de8] transition-all duration-300"
           >
             طلب حصة خاصة
           </a>

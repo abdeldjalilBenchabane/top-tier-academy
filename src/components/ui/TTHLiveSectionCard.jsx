@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useConfirmPurchase } from '@/components/ui/TTHPurchaseConfirm';
 import { Link } from 'react-router-dom';
 import { Clock, BookOpen, ArrowRight, CheckCircle, AlertTriangle, Loader2, Lock, Video } from 'lucide-react';
 import { pointsAPI } from '@/services/api';
@@ -12,7 +13,24 @@ const LiveSectionCard = ({ section }) => {
   const { user } = useAuth ? useAuth() : { user: null };
   const cover = section.cover_url || section.cover_image_url || '/default-course-cover.png';
   
-  const path = 'جلسة لايف';
+  // Create the path string like TTHCourseCard
+  const getPathString = () => {
+    if (section.speciality_name && section.material_name) {
+      // Show: "Speciality - Material" (like education courses)
+      return `${section.speciality_name} - ${section.material_name}`;
+    } else if (section.material_name) {
+      // Show: Just "Material" (no speciality)
+      return section.material_name;
+    } else if (section.speciality_name) {
+      // Show: Just "Speciality" (no material)
+      return section.speciality_name;
+    } else {
+      return 'جلسة لايف'; // Fallback
+    }
+  };
+
+  const title = section.title; // Keep original title like course cards
+  const path = getPathString();
   const price = section.price ? `${section.price} دج` : 'مجاني';
   const purchased = section.purchased || buySuccess;
 
@@ -42,6 +60,8 @@ const LiveSectionCard = ({ section }) => {
     }
   };
 
+  const confirmPurchase = useConfirmPurchase();
+
   const handleBuyLiveSection = async () => {
     if (!user) {
       alert('يجب تسجيل الدخول كطالب لشراء هذه الجلسة.');
@@ -54,7 +74,11 @@ const LiveSectionCard = ({ section }) => {
     
     // For free live sections, don't ask for confirmation
     if (section.price && section.price > 0) {
-      if (!window.confirm('هل أنت متأكد أنك تريد شراء هذه الجلسة بالنقاط؟')) {
+      if (!(await confirmPurchase({
+        title: section.title,
+        price: section.price,
+        kindLabel: 'شراء دورة بالنقاط',
+      }))) {
         return;
       }
     }
@@ -92,9 +116,8 @@ const LiveSectionCard = ({ section }) => {
       onMouseLeave={() => setIsHovered(false)}
       style={{ fontFamily: 'Nunito, Rowdies, Poppins, sans-serif' }}
       onClick={() => {
-        if (purchased) {
-          window.location.href = `/TTHLanguages/livesection/${section.id}`;
-        }
+        // Allow navigation for everyone - they'll see locked content if not purchased
+        window.location.href = `/TTHLanguages/livesection/${section.id}`;
       }}
     >
       <div className="relative mt-9 border overflow-hidden">
@@ -126,7 +149,7 @@ const LiveSectionCard = ({ section }) => {
         <div className="flex items-center justify-between py-3 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-blue-50 rounded-lg">
-              <Video className="w-4 h-4 text-blue-600" />
+              <Video className="w-4 h-4 text-[#194cbf]" />
             </div>
             <span className="text-sm font-medium text-gray-700">{path}</span>
           </div>
@@ -134,18 +157,19 @@ const LiveSectionCard = ({ section }) => {
             <div className="p-2 bg-green-50 rounded-lg">
               <Clock className="w-4 h-4 text-green-600" />
             </div>
-            <span className="text-sm font-medium text-gray-700">جلسة مباشرة</span>
+            <span className="text-sm font-medium text-gray-700">جلسة لايف</span>
           </div>
         </div>
-        <h3 className="text-xl font-bold text-blue-800 leading-tight hover:text-blue-600 transition-colors duration-300 text-right font-rowdies">
-          {section.title}
+        <h3 className="text-xl font-bold text-blue-800 leading-tight hover:text-[#194cbf] transition-colors duration-300 text-right font-rowdies">
+          {title}
         </h3>
-        {section.created_by_name && (
+        {section.professor_name && (
           <div className="flex items-center justify-end gap-2 text-sm text-gray-600">
             <span className="font-medium">الأستاذ:</span>
-            <span className="text-blue-600 font-semibold">{section.created_by_name}</span>
+            <span className="text-[#194cbf] font-semibold">{section.professor_name}</span>
           </div>
         )}
+        
         <p className="text-gray-600 text-sm leading-relaxed line-clamp-3 text-right font-poppins">
           {section.description}
         </p>
@@ -154,7 +178,7 @@ const LiveSectionCard = ({ section }) => {
           {user && purchased && (
             <Link to={`/TTHLanguages/livesection/${section.id}`}>
               <button
-                className="group flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transform transition-all duration-300 ease-out shadow-lg hover:shadow-xl"
+                className="group flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-[#1340a0] hover:to-[#4a8de8] transform transition-all duration-300 ease-out shadow-lg hover:shadow-xl"
                 onClick={e => { e.stopPropagation(); }}
               >
                 انضم الآن
@@ -171,7 +195,7 @@ const LiveSectionCard = ({ section }) => {
         {user && user.role === 'student' && !purchased && (
           <div className="mt-4 flex flex-col gap-2">
             <button
-              className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-extrabold text-lg shadow-lg transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-[#1340a0] hover:to-[#4a8de8] text-white font-extrabold text-lg shadow-lg transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={handleBuyLiveSection}
               disabled={buyLoading}
             >
@@ -197,7 +221,7 @@ const LiveSectionCard = ({ section }) => {
         {!user && !purchased && (
           <div className="mt-4 flex flex-col gap-2">
             <button
-              className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-extrabold text-lg shadow-lg transition-all duration-300"
+              className="w-full py-3 px-4 rounded-full bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-[#1340a0] hover:to-[#4a8de8] text-white font-extrabold text-lg shadow-lg transition-all duration-300"
               onClick={e => {
                 e.stopPropagation();
                 alert('يجب تسجيل الدخول كطالب لشراء هذه الجلسة.');
@@ -208,6 +232,7 @@ const LiveSectionCard = ({ section }) => {
             </button>
           </div>
         )}
+
       </div>
       <div className={`absolute inset-0 opacity-0 pointer-events-none transition-opacity duration-500 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-x-12 translate-x-full ${isHovered ? 'opacity-100' : ''}`} />
     </div>

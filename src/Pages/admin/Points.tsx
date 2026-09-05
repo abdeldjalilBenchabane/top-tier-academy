@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import PackageFeaturesManager from '@/components/admin/PackageFeaturesManager';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -137,7 +138,7 @@ const AdminPoints: React.FC = () => {
   };
 
   const handleAdd = async () => {
-    if (!newPack.name || !newPack.points || !newPack.price) {
+    if (!newPack.name) {
       toast.error('Please fill all fields');
       return;
     }
@@ -299,8 +300,7 @@ const AdminPoints: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Package Name</TableHead>
-                  <TableHead>Points</TableHead>
-                  <TableHead>Price</TableHead>
+                  <TableHead>الميزات</TableHead>
                   <TableHead>Currency</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
@@ -317,20 +317,9 @@ const AdminPoints: React.FC = () => {
                       />
                     </TableCell>
                     <TableCell>
-                      <Input 
-                        type="number" 
-                        value={pack.points} 
-                        onChange={e => handleChange(idx, 'points', parseInt(e.target.value))}
-                        className="w-24"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input 
-                        type="number" 
-                        value={pack.price} 
-                        onChange={e => handleChange(idx, 'price', parseFloat(e.target.value))}
-                        className="w-24"
-                      />
+                      <span className="text-sm text-gray-500">
+                        {((pack as any).features?.length ?? 0)} ميزة
+                      </span>
                     </TableCell>
                     <TableCell>
                       <Input 
@@ -408,32 +397,9 @@ const AdminPoints: React.FC = () => {
                 placeholder="e.g., Basic Package"
               />
             </div>
-            <div>
-              <Label htmlFor="points">Points</Label>
-              <Input
-                id="points"
-                type="number"
-                value={editingPackage ? editingPackage.points : newPack.points}
-                onChange={e => editingPackage 
-                  ? setEditingPackage({ ...editingPackage, points: parseInt(e.target.value) })
-                  : setNewPack({ ...newPack, points: parseInt(e.target.value) })
-                }
-                placeholder="100"
-              />
-            </div>
-            <div>
-              <Label htmlFor="price">Price</Label>
-              <Input
-                id="price"
-                type="number"
-                value={editingPackage ? editingPackage.price : newPack.price}
-                onChange={e => editingPackage 
-                  ? setEditingPackage({ ...editingPackage, price: parseFloat(e.target.value) })
-                  : setNewPack({ ...newPack, price: parseFloat(e.target.value) })
-                }
-                placeholder="1000"
-              />
-            </div>
+            <p className="rounded-md bg-blue-50 p-3 text-sm text-blue-800">
+              الباقة أصبحت عنوانًا فقط. النقاط والسعر يحددان في ميزات الباقة بالأسفل.
+            </p>
             <div>
               <Label htmlFor="currency">Currency</Label>
               <Input
@@ -471,6 +437,8 @@ const AdminPoints: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PackageFeaturesManager />
     </div>
   );
 };

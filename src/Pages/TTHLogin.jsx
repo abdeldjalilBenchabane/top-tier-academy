@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { FaEnvelope, FaLock } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from '@/lib/toast';
+import { CheckCircle, AlertCircle } from 'lucide-react';
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 
@@ -43,10 +45,34 @@ const Login = () => {
                 navigate('/'); // Student or fallback
             }
 
-            alert('تم تسجيل الدخول بنجاح!');
+            // Modern success notification
+            toast.success('Welcome back!', {
+                description: `Successfully logged in as ${user.name || user.email}`,
+                duration: 3000,
+                icon: <CheckCircle className="h-4 w-4 text-white" />,
+                style: {
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 25px rgba(102, 126, 234, 0.3)',
+                },
+            });
         } catch (error) {
             console.error('Login error:', error);
-            alert(`فشل تسجيل الدخول: ${error.message || 'حاول مرة أخرى لاحقًا'}`);
+            // Modern error notification
+            toast.error('Login Failed', {
+                description: error.message || 'Please check your credentials and try again',
+                duration: 5000,
+                icon: <AlertCircle className="h-4 w-4 text-white" />,
+                style: {
+                    background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 25px rgba(255, 107, 107, 0.3)',
+                },
+            });
         } finally {
             setLoading(false);
         }
@@ -59,119 +85,142 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-            <Navbar />
-            <div className="flex items-center justify-center min-h-screen px-4 py-12">
-                <div className="w-full max-w-md">
-                    {/* Header */}
-                    <div className="text-center mb-8">
-                        {/* Logo */}
-                        <div className="mb-6 flex justify-center">
-                            <img 
-                                src="/2.svg" 
-                                alt="Schoolhouse Logo" 
-                                className="h-16 w-auto"
-                            />
+        <div className="min-h-screen relative overflow-hidden bg-[#f8fafc]">
+            {/* Animated Background Elements */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-200/30 blur-[120px] animate-pulse"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-200/30 blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+            
+            <div className="relative z-10 flex flex-col min-h-screen">
+                <Navbar />
+                
+                <div className="flex-grow flex items-center justify-center px-4 py-12">
+                    <div className="w-full max-w-md animate-fadeIn">
+                        {/* Header */}
+                        <div className="text-center mb-10">
+                            <div className="mb-6 flex justify-center transform hover:scale-110 transition-transform duration-500">
+                                <img 
+                                    src="/2.svg" 
+                                    alt="Schoolhouse Logo" 
+                                    className="h-20 w-auto drop-shadow-lg"
+                                />
+                            </div>
+                            <h1 className="text-5xl font-black text-gray-900 mb-3 tracking-tight">مرحباً بك</h1>
+                            <p className="text-lg text-gray-500 font-medium">سجل دخولك للوصول إلى عالم المعرفة</p>
                         </div>
-                        <h1 className="text-4xl font-bold text-gray-800 mb-2">مرحباً بك مرة أخرى</h1>
-                        <p className="text-gray-600">سجل دخولك للوصول إلى حسابك</p>
-                    </div>
-                    
-                    {/* Login Form */}
-                    <div className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl p-8 border border-white/20">
-                    <form onSubmit={handleSubmit}>
-                        {/* Email Field */}
-                        <div className="mb-6">
-                            <label className="block text-gray-700 font-semibold mb-3" htmlFor="email">
-                                <FaEnvelope className="inline ml-2 text-blue-600" /> البريد الإلكتروني
-                            </label>
-                            <input
-                                type="email"
-                                id="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80 backdrop-blur placeholder-gray-400 transition-all duration-300"
-                                placeholder="أدخل بريدك الإلكتروني"
-                                required
-                                    disabled={Loading}
-                            />
-                            {errors.email && <p className="text-red-500 text-sm mt-2 flex items-center">
-                                <svg className="w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                </svg>
-                                {errors.email}
-                            </p>}
-                        </div>
-
-                        {/* Password Field */}
-                        <div className="mb-6">
-                            <label className="block text-gray-700 font-semibold mb-3" htmlFor="password">
-                                <FaLock className="inline ml-2 text-blue-600" /> كلمة المرور
-                            </label>
-                            <input
-                                type="password"
-                                id="password"
-                                name="password"
-                                value={formData.password}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80 backdrop-blur placeholder-gray-400 transition-all duration-300"
-                                placeholder="أدخل كلمة المرور"
-                                required
-                                    disabled={Loading}
-                            />
-                            {errors.password && <p className="text-red-500 text-sm mt-2 flex items-center">
-                                <svg className="w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                </svg>
-                                {errors.password}
-                            </p>}
-                        </div>
-
-                        {/* Forgot Password Link */}
-                        <div className="mb-6 text-right">
-                            <button
-                                type="button"
-                                onClick={() => navigate('/forgot-password')}
-                                className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors duration-200"
-                            >
-                                نسيت كلمة المرور؟
-                            </button>
-                        </div>
-
-                            {/* Submit Button */}
-                        <button
-                            type="submit"
-                            disabled={Loading}
-                                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold py-3 px-6 rounded-xl hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transform transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {Loading ? (
-                                <div className="flex items-center justify-center">
-                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white ml-2"></div>
-                                    جاري تسجيل الدخول...
+                        
+                        {/* Login Card */}
+                        <div className="glass-card rounded-[2.5rem] p-10 relative overflow-hidden">
+                            {/* Inner Glow */}
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
+                            
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                {/* Email Field */}
+                                <div className="space-y-2">
+                                    <label className="block text-gray-800 font-bold text-sm mr-1" htmlFor="email">
+                                        <FaEnvelope className="inline ml-2 text-[#194cbf]" /> البريد الإلكتروني
+                                    </label>
+                                    <div className="relative group">
+                                        <input
+                                            type="email"
+                                            id="email"
+                                            name="email"
+                                            value={formData.email}
+                                            onChange={handleChange}
+                                            className="premium-input group-hover:border-blue-300 transition-colors"
+                                            placeholder="أدخل بريدك الإلكتروني"
+                                            required
+                                            disabled={Loading}
+                                        />
+                                    </div>
+                                    {errors.email && (
+                                        <p className="text-red-500 text-xs mt-1 mr-1 flex items-center animate-bounce">
+                                            <AlertCircle className="w-3 h-3 ml-1" />
+                                            {errors.email}
+                                        </p>
+                                    )}
                                 </div>
-                            ) : (
-                                'تسجيل الدخول'
-                            )}
-                        </button>
-                    </form>
 
-                        {/* Additional Links */}
-                        <div className="mt-6 text-center">
-                            <p className="text-gray-600">
-                                ليس لديك حساب؟{' '}
+                                {/* Password Field */}
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center px-1">
+                                        <label className="block text-gray-800 font-bold text-sm" htmlFor="password">
+                                            <FaLock className="inline ml-2 text-[#194cbf]" /> كلمة المرور
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/forgot-password')}
+                                            className="text-[#194cbf] hover:text-blue-800 text-xs font-bold transition-colors duration-200"
+                                        >
+                                            نسيت كلمة المرور؟
+                                        </button>
+                                    </div>
+                                    <div className="relative group">
+                                        <input
+                                            type="password"
+                                            id="password"
+                                            name="password"
+                                            value={formData.password}
+                                            onChange={handleChange}
+                                            className="premium-input group-hover:border-blue-300 transition-colors"
+                                            placeholder="أدخل كلمة المرور"
+                                            required
+                                            disabled={Loading}
+                                        />
+                                    </div>
+                                    {errors.password && (
+                                        <p className="text-red-500 text-xs mt-1 mr-1 flex items-center animate-bounce">
+                                            <AlertCircle className="w-3 h-3 ml-1" />
+                                            {errors.password}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Submit Button */}
                                 <button
-                                    onClick={() => navigate('/register')}
-                                    className="text-blue-600 hover:text-blue-800 font-semibold transition-colors duration-200"
+                                    type="submit"
+                                    disabled={Loading}
+                                    className="premium-button mt-4"
                                 >
-                                    إنشاء حساب جديد
+                                    {Loading ? (
+                                        <div className="flex items-center justify-center">
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white ml-3"></div>
+                                            جاري التحميل...
+                                        </div>
+                                    ) : (
+                                        <span className="flex items-center justify-center gap-2">
+                                            تسجيل الدخول
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                                            </svg>
+                                        </span>
+                                    )}
                                 </button>
-                            </p>
+                            </form>
+
+                            {/* Divider */}
+                            <div className="my-8 flex items-center">
+                                <div className="flex-grow border-t border-gray-200/50"></div>
+                                <span className="mx-4 text-gray-400 text-sm font-medium">أو</span>
+                                <div className="flex-grow border-t border-gray-200/50"></div>
+                            </div>
+
+                            {/* Additional Links */}
+                            <div className="text-center">
+                                <p className="text-gray-500 font-medium">
+                                    ليس لديك حساب؟{' '}
+                                    <button
+                                        onClick={() => navigate('/register')}
+                                        className="text-[#194cbf] hover:text-blue-800 font-black transition-all duration-200 hover:underline underline-offset-4"
+                                    >
+                                        انضم إلينا الآن
+                                    </button>
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
+                <Footer />
             </div>
-            <Footer />
         </div>
     );
 };

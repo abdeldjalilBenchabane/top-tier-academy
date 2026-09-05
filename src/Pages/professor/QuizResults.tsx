@@ -102,10 +102,10 @@ const QuizResults: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Quiz Results</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Quiz Results</h1>
           <p className="text-gray-600">View performance of your quizzes</p>
         </div>
       </div>
@@ -122,59 +122,59 @@ const QuizResults: React.FC = () => {
           {results.map((quiz) => (
             <Card key={quiz.id}>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      {quiz.title}
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className="truncate">{quiz.title}</span>
                       {getQuizStatusBadge(quiz.status)}
                     </CardTitle>
-                    <CardDescription>{quiz.courseTitle}</CardDescription>
+                    <CardDescription className="truncate">{quiz.courseTitle}</CardDescription>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="grid grid-cols-3 gap-4 lg:flex lg:items-center lg:gap-6">
                     <div className="text-center">
-                      <div className="text-2xl font-bold">{quiz.totalAttempts}</div>
-                      <div className="text-sm text-gray-600">Attempts</div>
+                      <div className="text-xl lg:text-2xl font-bold">{quiz.totalAttempts}</div>
+                      <div className="text-xs lg:text-sm text-gray-600">Attempts</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold">
+                      <div className="text-xl lg:text-2xl font-bold">
                         {typeof quiz.averageScore === 'number' && !isNaN(quiz.averageScore) ? quiz.averageScore.toFixed(1) : '0.0'}%
                       </div>
-                      <div className="text-sm text-gray-600">Avg Score</div>
+                      <div className="text-xs lg:text-sm text-gray-600">Avg Score</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold">
+                      <div className="text-xl lg:text-2xl font-bold">
                         {(() => {
                           const rate = calculatePassRate(quiz.passedAttempts, quiz.totalAttempts);
                           return isNaN(rate) ? '0.0' : rate.toFixed(1);
                         })()}%
                       </div>
-                      <div className="text-sm text-gray-600">Pass Rate</div>
+                      <div className="text-xs lg:text-sm text-gray-600">Pass Rate</div>
                     </div>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
                       <span className="text-sm font-medium">Student Performance</span>
                     </div>
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" className="w-full sm:w-auto">
                           View Details
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto w-[95vw] sm:w-auto">
                         <DialogHeader>
-                          <DialogTitle>{quiz.title} - Student Results</DialogTitle>
+                          <DialogTitle className="text-lg sm:text-xl">{quiz.title} - Student Results</DialogTitle>
                           <DialogDescription>
                             Detailed performance for {quiz.courseTitle}
                           </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
-                          <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                          <div className="grid grid-cols-3 gap-2 sm:gap-4 p-3 sm:p-4 bg-gray-50 rounded-lg">
                             <div className="text-center">
                               <div className="text-2xl font-bold text-blue-600">{quiz.totalAttempts}</div>
                               <div className="text-sm text-gray-600">Total Attempts</div>
@@ -194,24 +194,25 @@ const QuizResults: React.FC = () => {
                             </div>
                           </div>
                           
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Student</TableHead>
-                                <TableHead>Email</TableHead>
-                                <TableHead>Score</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Completed</TableHead>
-                              </TableRow>
-                            </TableHeader>
+                          <div className="overflow-x-auto">
+                            <Table>
+                                                          <TableHeader>
+                                <TableRow>
+                                  <TableHead className="whitespace-nowrap">Student</TableHead>
+                                  <TableHead className="whitespace-nowrap">Email</TableHead>
+                                  <TableHead className="whitespace-nowrap">Score</TableHead>
+                                  <TableHead className="whitespace-nowrap">Status</TableHead>
+                                  <TableHead className="whitespace-nowrap">Completed</TableHead>
+                                </TableRow>
+                              </TableHeader>
                             <TableBody>
                               {quiz.attempts.map((attempt) => (
                                 <TableRow key={attempt.id}>
-                                  <TableCell className="font-medium">{attempt.studentName}</TableCell>
-                                  <TableCell>{attempt.studentEmail}</TableCell>
+                                  <TableCell className="font-medium whitespace-nowrap">{attempt.studentName}</TableCell>
+                                  <TableCell className="whitespace-nowrap">{attempt.studentEmail}</TableCell>
                                   <TableCell>
                                     <div className="flex items-center gap-2">
-                                      <span className="font-medium">
+                                                                              <span className="font-medium whitespace-nowrap">
                                         {(() => {
                                           if (typeof attempt.score === 'number' && !isNaN(attempt.score)) {
                                             return attempt.score.toFixed(1);
@@ -226,16 +227,17 @@ const QuizResults: React.FC = () => {
                                           }
                                           return 0;
                                         })()} 
-                                        className="w-20" 
+                                        className="w-16 sm:w-20" 
                                       />
                                     </div>
                                   </TableCell>
-                                  <TableCell>{getStatusBadge(attempt.passed)}</TableCell>
-                                  <TableCell>{formatDate(attempt.completedAt)}</TableCell>
+                                  <TableCell className="whitespace-nowrap">{getStatusBadge(attempt.passed)}</TableCell>
+                                  <TableCell className="whitespace-nowrap">{formatDate(attempt.completedAt)}</TableCell>
                                 </TableRow>
                               ))}
-                            </TableBody>
-                          </Table>
+                                                          </TableBody>
+                            </Table>
+                          </div>
                         </div>
                       </DialogContent>
                     </Dialog>

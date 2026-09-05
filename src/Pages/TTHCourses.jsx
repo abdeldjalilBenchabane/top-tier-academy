@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import useStickySearch from "../hooks/useStickySearch";
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 import CourseCard from "../components/ui/TTHCourseCard";
@@ -21,6 +22,28 @@ export default function Courses() {
   const [selectedSpeciality, setSelectedSpeciality] = useState('');
   const [selectedMaterial, setSelectedMaterial] = useState('');
   const [selectedProfessor, setSelectedProfessor] = useState(''); // Added professor filter state
+
+  // The search box on this page was rendered with no value and no onChange,
+  // so typing in it did nothing at all. Wire it up and keep it across
+  // navigation so returning from a course does not reset it.
+  const [searchTerm, setSearchTerm] = useStickySearch('courses');
+
+  function applySearch(grouped) {
+    const q = (searchTerm || '').trim().toLowerCase();
+    if (!q) return grouped;
+    const out = {};
+    Object.keys(grouped || {}).forEach(pathName => {
+      const matches = (grouped[pathName] || []).filter(course =>
+        course.title?.toLowerCase().includes(q) ||
+        course.description?.toLowerCase().includes(q) ||
+        course.material_name?.toLowerCase().includes(q) ||
+        course.created_by_name?.toLowerCase().includes(q) ||
+        pathName?.toLowerCase().includes(q)
+      );
+      if (matches.length > 0) out[pathName] = matches;
+    });
+    return out;
+  }
   const [levels, setLevels] = useState([]);
   const [years, setYears] = useState([]);
   const [specialities, setSpecialities] = useState([]);
@@ -40,6 +63,14 @@ export default function Courses() {
             const purchasedRes = await pointsAPI.getMyCourses();
             purchasedIds = purchasedRes.courseIds || [];
           } catch (e) { /* ignore if not logged in */ }
+        }
+
+        // Also check localStorage for purchased courses (iOS Safari fallback)
+        try {
+          const localPurchased = JSON.parse(localStorage.getItem('purchasedCourses') || '[]');
+          purchasedIds = [...new Set([...purchasedIds, ...localPurchased])];
+        } catch (e) {
+          // Ignore localStorage errors
         }
 
         allCourses = allCourses.map(course => ({ ...course, purchased: purchasedIds.includes(course.id) }));
@@ -521,11 +552,11 @@ export default function Courses() {
       
       <main className="flex-grow">
         
-        <section className="relative overflow-hidden mt-[2px] bg-gradient-to-r from-blue-600 via-blue-700 to-purple-700">
+        <section className="relative overflow-hidden mt-[2px] bg-gradient-to-r from-[#194cbf] via-[#2d6fd8] to-[#61a1ff]">
           {/* Background Pattern */}
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-0 left-0 w-72 h-72 bg-white rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
-            <div className="absolute top-0 right-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-2000"></div>
+            <div className="absolute top-0 right-0 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-2000"></div>
             <div className="absolute bottom-0 left-1/2 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-4000"></div>
           </div>
           
@@ -533,7 +564,7 @@ export default function Courses() {
             <div className="text-right max-w-4xl mx-auto">
               <h1 className="text-white text-2xl md:text-4xl lg:text-5xl font-bold font-nunito leading-tight mb-4">
                 <span className="block mb-1">انضم الى</span>
-                <span className="bg-gradient-to-r from-purple-300 to-purple-100 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-blue-200 to-blue-50 bg-clip-text text-transparent">
                   نخبة من الحصص الفريدة
                 </span>
               </h1>
@@ -575,6 +606,8 @@ export default function Courses() {
                 <input
                   type="text"
                   placeholder="البحث في الدورات..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full px-4 py-2 rounded-full border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors duration-300"
                 />
               </div>
@@ -591,20 +624,20 @@ export default function Courses() {
                   {/* Container principal */}
                   <div className="bg-white/80 backdrop-blur-xl border border-gray-200/50 rounded-3xl shadow-2xl overflow-hidden relative">
                     {/* Background animé */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-purple-50/20 to-purple-50/30"></div>
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/10 to-purple-400/10 rounded-full blur-3xl"></div>
-                    <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-br from-purple-400/10 to-blue-400/10 rounded-full blur-3xl"></div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-blue-100/20 to-blue-50/30"></div>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/10 to-blue-300/10 rounded-full blur-3xl"></div>
+                    <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-br from-blue-300/10 to-blue-400/10 rounded-full blur-3xl"></div>
 
                     {/* Header */}
                     <div className="relative z-10 p-4 sm:p-6 border-b border-gray-100/50">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg transform rotate-3 hover:rotate-0 transition-transform duration-300">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-[#194cbf] to-[#61a1ff] rounded-2xl flex items-center justify-center shadow-lg transform rotate-3 hover:rotate-0 transition-transform duration-300">
                           <svg className="text-white text-sm sm:text-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
                           </svg>
                         </div>
                         <div>
-                          <h3 className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-purple-600 bg-clip-text text-transparent">
+                          <h3 className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 bg-clip-text text-transparent">
                             البحث المتقدم
                           </h3>
                           <p className="text-sm text-gray-600 mt-1 hidden sm:block">
@@ -621,7 +654,7 @@ export default function Courses() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 lg:gap-6 mb-6">
                           {/* Level Filter */}
                           <div className="group">
-                            <label className="block text-gray-700 font-bold mb-3 text-sm lg:text-base text-right group-hover:text-blue-600 transition-colors duration-200">
+                            <label className="block text-gray-700 font-bold mb-3 text-sm lg:text-base text-right group-hover:text-[#194cbf] transition-colors duration-200">
                               <span className="inline-flex items-center gap-2">
                                 <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                                 المرحلة الدراسية
@@ -687,9 +720,9 @@ export default function Courses() {
 
                           {/* Speciality Filter */}
                           <div className="group">
-                            <label className="block text-gray-700 font-bold mb-3 text-sm lg:text-base text-right group-hover:text-purple-600 transition-colors duration-200">
+                            <label className="block text-gray-700 font-bold mb-3 text-sm lg:text-base text-right group-hover:text-[#61a1ff] transition-colors duration-200">
                               <span className="inline-flex items-center gap-2">
-                                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                                 التخصص
                               </span>
                             </label>
@@ -704,7 +737,7 @@ export default function Courses() {
                                   const isDisabled = !selectedYearId || getFilteredSpecialities().length === 0;
                                   return isDisabled;
                                 })()}
-                                className="appearance-none w-full bg-white/90 backdrop-blur-sm border-2 border-gray-200 hover:border-purple-300 focus:border-purple-500 text-sm lg:text-base font-semibold rounded-2xl py-3 lg:py-4 pr-4 pl-12 focus:outline-none focus:ring-4 focus:ring-purple-100 transition-all duration-300 shadow-sm hover:shadow-md text-right cursor-pointer disabled:bg-gray-100"
+                                className="appearance-none w-full bg-white/90 backdrop-blur-sm border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 text-sm lg:text-base font-semibold rounded-2xl py-3 lg:py-4 pr-4 pl-12 focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all duration-300 shadow-sm hover:shadow-md text-right cursor-pointer disabled:bg-gray-100"
                                 dir="rtl"
                               >
                                 <option value="">جميع التخصصات</option>
@@ -717,7 +750,7 @@ export default function Courses() {
                                 )}
                               </select>
                               <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <svg className="text-gray-400 group-hover:text-purple-500 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="text-gray-400 group-hover:text-blue-500 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
                               </div>
@@ -805,7 +838,7 @@ export default function Courses() {
                                 setSelectedMaterial('');
                                 setSelectedProfessor('');
                               }}
-                              className="flex items-center justify-center gap-2 text-white px-5 py-2 rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-blue-600 via-purple-600 to-purple-600 hover:from-blue-700 hover:via-purple-700 hover:to-purple-700 relative overflow-hidden group"
+                              className="flex items-center justify-center gap-2 text-white px-5 py-2 rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-700 hover:via-blue-600 hover:to-blue-700 relative overflow-hidden group"
                             >
                               <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                               <svg className="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -817,7 +850,7 @@ export default function Courses() {
                         </div>
 
                         {/* Selected Filters Summary */}
-                        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-4 border border-blue-100">
+                        <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-2xl p-4 border border-blue-100">
                           <h4 className="text-sm font-bold text-gray-700 mb-2 text-right">الفلاتر المحددة:</h4>
                           <div className="flex flex-wrap gap-2 justify-end">
                             {selectedLevelId && (
@@ -831,7 +864,7 @@ export default function Courses() {
                               </span>
                             )}
                             {selectedSpeciality && (
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                 {selectedSpeciality}
                               </span>
                             )}
@@ -855,8 +888,8 @@ export default function Courses() {
 
                     {/* Decorative Elements */}
                     <div className="absolute top-8 right-8 w-3 h-3 bg-blue-400 rounded-full opacity-60 animate-pulse"></div>
-                    <div className="absolute bottom-8 left-8 w-2 h-2 bg-purple-400 rounded-full opacity-40 animate-pulse" style={{ animationDelay: '1s' }}></div>
-                    <div className="absolute top-1/2 left-4 w-1 h-1 bg-purple-400 rounded-full opacity-50 animate-pulse" style={{ animationDelay: '2s' }}></div>
+                    <div className="absolute bottom-8 left-8 w-2 h-2 bg-blue-400 rounded-full opacity-40 animate-pulse" style={{ animationDelay: '1s' }}></div>
+                    <div className="absolute top-1/2 left-4 w-1 h-1 bg-blue-400 rounded-full opacity-50 animate-pulse" style={{ animationDelay: '2s' }}></div>
                   </div>
                 </div>
               </div>
@@ -875,7 +908,7 @@ export default function Courses() {
                   onClick={() => handleLevelFilter(null)}
                   className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
                     selectedLevel === null 
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
+                      ? 'bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white shadow-lg' 
                       : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
                   }`}
                 >
@@ -898,7 +931,7 @@ export default function Courses() {
                       onClick={() => handleLevelFilter(level)}
                       className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
                         selectedLevel === level 
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
+                          ? 'bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white shadow-lg' 
                           : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
                       }`}
                     >
@@ -923,15 +956,15 @@ export default function Courses() {
           <div className="container mx-auto px-4 space-y-16">
             {loading ? (
               <div className="text-center">Loading...</div>
-            ) : Object.keys(getDisplayCourses()).length > 0 ? (
-              Object.keys(getDisplayCourses()).map(pathName => {
-                const filteredCourses = getDisplayCourses()[pathName];
+            ) : Object.keys(applySearch(getDisplayCourses())).length > 0 ? (
+              Object.keys(applySearch(getDisplayCourses())).map(pathName => {
+                const filteredCourses = applySearch(getDisplayCourses())[pathName];
                 return filteredCourses && filteredCourses.length > 0 ? (
                   <div key={pathName}>
             <div className="text-center mb-12">
                 <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold font-rowdies mb-4 relative">
                   <span className="text-gray-800">حصص </span>
-                  <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-[#194cbf] to-[#61a1ff] bg-clip-text text-transparent">
                           {pathName}
                   </span>
                 </h2>
@@ -955,7 +988,7 @@ export default function Courses() {
               })
             ) : (
                 <div className="text-center py-16">
-                  <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+                  <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-full flex items-center justify-center">
                     <svg className="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                     </svg>

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Edit, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Edit, ArrowLeft, Loader2 } from 'lucide-react';
 import PathSelector from '@/components/admin/PathSelector';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +57,7 @@ const ProfessorCourseDetails = () => {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [isUploadingBlock, setIsUploadingBlock] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   // Remove localSections state and all inline editing handlers
 
@@ -86,16 +87,26 @@ const ProfessorCourseDetails = () => {
   }, [course]);
 
   const handleDeleteCourse = async () => {
-    if (!window.confirm('Are you sure you want to delete this course?')) return;
+    if (!window.confirm('Are you sure you want to delete this course? This action cannot be undone and will delete all related data including quizzes, comments, files, and student enrollments.')) return;
     try {
       const res = await fetch(`/api/courses/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
       });
-      if (!res.ok) throw new Error('Failed to delete course');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Show detailed error message
+        const errorMessage = data.detail || data.message || data.error || 'Failed to delete course';
+        console.error('Delete course error:', data);
+        throw new Error(errorMessage);
+      }
+      toast.success('Course deleted successfully');
       navigate('/professor/courses');
-    } catch (err) {
-      setError('Failed to delete course');
+    } catch (err: any) {
+      const errorMessage = err.message || 'Failed to delete course';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      console.error('Delete course error details:', err);
     }
   };
 
@@ -196,6 +207,7 @@ const ProfessorCourseDetails = () => {
   // Block handlers
   const handleAddBlock = async (sectionId: string, type: string, title: string, content: string, file: File | null) => {
     if (!title.trim() && type !== 'text') return toast.error('Block title required');
+    setIsUploadingBlock(true);
     try {
       const formData = new FormData();
       formData.append('section_id', sectionId);
@@ -222,6 +234,8 @@ const ProfessorCourseDetails = () => {
       toast.success('Block added');
     } catch (err) {
       toast.error('Failed to add block');
+    } finally {
+      setIsUploadingBlock(false);
     }
   };
 
@@ -403,7 +417,14 @@ const ProfessorCourseDetails = () => {
                 onClick={() => document.getElementById('cover-upload-input')?.click()}
                 disabled={isUploadingCover}
               >
-                {isUploadingCover ? 'Uploading...' : 'Change Cover'}
+                {isUploadingCover ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  'Change Cover'
+                )}
               </Button>
             </>
           ) : (
@@ -447,7 +468,14 @@ const ProfessorCourseDetails = () => {
                 onClick={() => document.getElementById('cover-upload-input')?.click()}
                 disabled={isUploadingCover}
               >
-                {isUploadingCover ? 'Uploading...' : 'Add Cover Image'}
+                {isUploadingCover ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  'Add Cover Image'
+                )}
               </Button>
             </>
           )}
@@ -758,13 +786,23 @@ const ProfessorCourseDetails = () => {
                 onChange={e => setAddBlockFile(e.target.files?.[0] || null)}
               />
             )}
-            <Button onClick={async () => {
-              if (addBlockSectionId) {
-                await handleAddBlock(addBlockSectionId, addBlockType, addBlockTitle, addBlockContent, addBlockFile);
-              }
-              setShowAddBlockDialog(false);
-            }}>
-              Add Block
+            <Button 
+              onClick={async () => {
+                if (addBlockSectionId) {
+                  await handleAddBlock(addBlockSectionId, addBlockType, addBlockTitle, addBlockContent, addBlockFile);
+                }
+                setShowAddBlockDialog(false);
+              }}
+              disabled={isUploadingBlock}
+            >
+              {isUploadingBlock ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Adding Block...
+                </>
+              ) : (
+                'Add Block'
+              )}
             </Button>
             
             <Button variant="outline" onClick={() => setShowAddBlockDialog(false)}>Cancel</Button>

@@ -102,7 +102,7 @@ const StudentCommentsSection = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+          <div className="w-8 h-8 bg-gradient-to-r from-[#194cbf] to-[#61a1ff] rounded-full flex items-center justify-center">
             <MessageSquare className="w-4 h-4 text-white" />
           </div>
           <h2 className="text-xl font-bold text-gray-800">تعليقاتي</h2>
@@ -110,7 +110,7 @@ const StudentCommentsSection = () => {
         <button 
           onClick={fetchStudentComments}
           disabled={loading}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-[#194cbf] disabled:opacity-50"
         >
           {loading ? 'جاري التحميل...' : 'تحديث'}
         </button>
@@ -145,7 +145,7 @@ const StudentCommentsSection = () => {
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                    <div className="w-8 h-8 bg-gradient-to-r from-[#194cbf] to-[#61a1ff] rounded-full flex items-center justify-center">
                       <User className="w-4 h-4 text-white" />
                     </div>
                     <div>
@@ -159,7 +159,7 @@ const StudentCommentsSection = () => {
                     <BookOpen className="w-4 h-4" />
                     <Link 
                       to={`/course/${comment.course_id}`} 
-                      className="text-blue-600 hover:text-blue-800 font-medium"
+                      className="text-[#194cbf] hover:text-blue-800 font-medium"
                     >
                       {comment.course_title}
                     </Link>
@@ -192,7 +192,7 @@ const StudentCommentsSection = () => {
                     >
                       <div className="flex items-center gap-2 mb-2">
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                          reply.user_role === 'professor' ? 'bg-blue-600' : 'bg-green-600'
+                          reply.user_role === 'professor' ? 'bg-[#194cbf]' : 'bg-green-600'
                         }`}>
                           {reply.user_name?.charAt(0) || '?'}
                         </div>
@@ -222,7 +222,7 @@ const StudentCommentsSection = () => {
               {comment.reply && (!comment.threaded_replies || comment.threaded_replies.length === 0) && (
                 <div className="bg-blue-50 border-r-4 border-blue-400 p-4 rounded-lg mb-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                    <div className="w-6 h-6 bg-[#194cbf] rounded-full flex items-center justify-center">
                       <User className="w-3 h-3 text-white" />
                     </div>
                     <span className="font-semibold text-blue-900">رد المدرس</span>
@@ -235,7 +235,7 @@ const StudentCommentsSection = () => {
               <div className="flex justify-end">
                 <button
                   onClick={() => setShowReplyForm(comment.id)}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-2"
+                  className="text-[#194cbf] hover:text-blue-800 text-sm font-medium flex items-center gap-2"
                 >
                   <Reply className="w-4 h-4" />
                   رد على هذا التعليق
@@ -255,7 +255,7 @@ const StudentCommentsSection = () => {
                   <div className="flex gap-2 mt-3">
                     <button
                       onClick={() => handleAddThreadedReply(comment.id)}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
+                      className="px-4 py-2 bg-[#194cbf] text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
                     >
                       إرسال الرد
                     </button>

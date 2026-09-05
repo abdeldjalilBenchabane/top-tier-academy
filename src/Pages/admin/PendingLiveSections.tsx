@@ -139,7 +139,7 @@ const PendingLiveSections = () => {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Pending Live Sections</h1>
+          <h1 className="text-3xl font-bold">Pending الدورات</h1>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
@@ -162,7 +162,7 @@ const PendingLiveSections = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Pending Live Sections</h1>
+        <h1 className="text-3xl font-bold">Pending الدورات</h1>
         <Badge variant="outline" className="bg-yellow-50">
           <Clock className="h-3 w-3 mr-1 text-yellow-500" />
           <span className="text-yellow-700">{liveSections.length} Pending</span>
@@ -173,7 +173,7 @@ const PendingLiveSections = () => {
         <Card>
           <CardContent className="pt-6 text-center">
             <Video className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Pending Live Sections</h3>
+            <h3 className="text-lg font-semibold mb-2">لا توجد دورات قيد المراجعة</h3>
             <p className="text-gray-600">All live sections have been reviewed.</p>
           </CardContent>
         </Card>
@@ -185,7 +185,7 @@ const PendingLiveSections = () => {
                 {section.cover_image_url && (
                   <img
                     src={section.cover_image_url}
-                    alt="Live Section Cover"
+                    alt="الدورة Cover"
                     className="w-full h-28 object-cover rounded-t-md mb-2 border"
                     style={{ minHeight: '7rem', background: '#f3f4f6' }}
                   />
@@ -272,7 +272,7 @@ const PendingLiveSections = () => {
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reject Live Section</DialogTitle>
+            <DialogTitle>رفض الدورة</DialogTitle>
             <DialogDescription>
               Please provide a reason for rejecting "{selectedSection?.title}".
             </DialogDescription>

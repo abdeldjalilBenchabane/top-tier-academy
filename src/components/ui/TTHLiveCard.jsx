@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useConfirmPurchase } from './TTHPurchaseConfirm';
 import { FaVideo, FaUser, FaClock, FaUsers, FaPlay, FaStop, FaShoppingCart, FaCheck } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -6,20 +7,28 @@ import { useAuth } from '../../contexts/AuthContext';
 const TTHLiveCard = ({ session, onStatusChange }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const confirmPurchase = useConfirmPurchase();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [timeUntilStart, setTimeUntilStart] = useState('');
   const [sessionStatus, setSessionStatus] = useState('upcoming');
   const [isLive, setIsLive] = useState(false);
   const [isEnded, setIsEnded] = useState(false);
-  const [hasPurchased, setHasPurchased] = useState(false);
+  const [canJoin, setCanJoin] = useState(false);
+  const [hasPurchased, setHasPurchased] = useState(!!session.is_paid);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [userPoints, setUserPoints] = useState(0);
-  const [forceUpdate, setForceUpdate] = useState(0); // Force re-render
-  const [purchaseStatusLoading, setPurchaseStatusLoading] = useState(true); // NEW
+  // Only unknown when the list did not say. When it did, there is nothing to
+  // wait for and no placeholder is ever shown.
+  const [purchaseStatusLoading, setPurchaseStatusLoading] = useState(session.is_paid === undefined);
   const prevSessionStatus = useRef(sessionStatus);
+  const lastCheckTime = useRef(0);
+  const isCheckingPurchase = useRef(false);
+  const hasCheckedOnce = useRef(false);
+
   const formatTime = (timeString) => {
     if (!timeString) return '';
     try {
+      // Parse the time as local time
       const date = new Date(timeString);
       return date.toLocaleTimeString('en-US', { 
         hour: '2-digit', 
@@ -59,18 +68,66 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
   };
 
   // Real-time timer effect
+  // The clock drove a re-render every single second even when nothing on the
+  // card changed, which is what made the badge and the points flicker. Now the
+  // tick only lands when the text it produces would actually differ.
+  const displayKeyRef = useRef(null);
   useEffect(() => {
+    const displayKey = (now) => {
+      if (!session.start_time) return 'none';
+      if (session.status === 'ended' || session.is_ended) return 'ended';
+      if (session.status === 'live') return 'live';
+      const start = new Date(session.start_time);
+      const end = new Date(start.getTime() + (session.duration || 60) * 60 * 1000);
+      if (now >= start && now <= end) return 'live';
+      if (now > end) return 'ended';
+      const diff = start - now;
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const sec = Math.floor((diff % 60000) / 1000);
+      // Matches the strings rendered below, so the key changes exactly when
+      // the visible countdown does — every second only in the final minute.
+      const text = h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+      return `up:${text}:${now >= new Date(start.getTime() - 15 * 60 * 1000) ? 1 : 0}`;
+    };
+
+    displayKeyRef.current = displayKey(new Date());
     const timer = setInterval(() => {
-      setCurrentTime(new Date());
+      const now = new Date();
+      const key = displayKey(now);
+      if (key !== displayKeyRef.current) {
+        displayKeyRef.current = key;
+        setCurrentTime(now);
+      }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [session.start_time, session.duration, session.status, session.is_ended]);
 
-  // Check if user has purchased this session and get user points
-  const checkPurchaseStatus = async () => {
-    if (!user) return;
-    setPurchaseStatusLoading(true); // NEW
+  // Memoized check purchase status function
+  useEffect(() => {
+    if (session.is_paid !== undefined) {
+      setHasPurchased(!!session.is_paid);
+      setPurchaseStatusLoading(false);
+    }
+  }, [session.is_paid]);
+
+  const checkPurchaseStatus = useCallback(async () => {
+    if (!user || isCheckingPurchase.current) return;
+    
+    // Prevent multiple simultaneous calls
+    const now = Date.now();
+    if (now - lastCheckTime.current < 2000) return; // Debounce to 2 seconds
+    
+    isCheckingPurchase.current = true;
+    lastCheckTime.current = now;
+    
+    // Only show loading on the very first check, and never when the sessions
+    // list already told us whether this was purchased.
+    if (!hasCheckedOnce.current && session.is_paid === undefined) {
+      setPurchaseStatusLoading(true);
+    }
+    
     try {
       console.log(`[TTHLiveCard] Checking purchase status for session ${session.id}, user: ${user.id}`);
       
@@ -90,7 +147,6 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
         console.log(`[TTHLiveCard] hasPurchased property:`, accessData.hasPurchased);
         console.log(`[TTHLiveCard] Setting hasPurchased to: ${accessData.hasPurchased}`);
         setHasPurchased(accessData.hasPurchased);
-        setForceUpdate(prev => prev + 1); // Force re-render
       } else {
         console.error(`[TTHLiveCard] Failed to check access for session ${session.id}:`, accessResponse.status);
         const errorText = await accessResponse.text();
@@ -125,12 +181,14 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
       console.log(`[TTHLiveCard] Fallback local purchase check:`, hasLocalPurchase);
       setHasPurchased(hasLocalPurchase);
     } finally {
-      setPurchaseStatusLoading(false); // NEW
+      setPurchaseStatusLoading(false);
+      hasCheckedOnce.current = true;
+      isCheckingPurchase.current = false;
     }
-  };
+  }, [user?.id, session.id]);
 
-  // Initialize local purchases from database
-  const initializeLocalPurchases = async () => {
+  // Memoized initialize local purchases function
+  const initializeLocalPurchases = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -150,48 +208,79 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
     } catch (error) {
       console.error('Failed to initialize local purchases:', error);
     }
-  };
+  }, [user?.id]);
 
+  // Single useEffect for purchase status check - only check when user or session.id changes
   useEffect(() => {
-    checkPurchaseStatus();
-  }, [user, session.id]);
-
-  // Initialize local purchases on mount
-  useEffect(() => {
-    initializeLocalPurchases();
-  }, [user]);
-
-  // Refresh purchase status when component mounts and when session changes
-  useEffect(() => {
-    if (user && session.id) {
+    if (user?.id && session.id) {
+      // Do NOT reset hasCheckedOnce here: that flag is what stops the loading
+      // placeholder from flashing on every re-check.
       checkPurchaseStatus();
     }
-  }, [user, session.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, session.id]);
 
-  // Force re-render when purchase status changes
+  // Initialize local purchases on mount only
   useEffect(() => {
-    console.log(`[TTHLiveCard] Force update triggered: ${forceUpdate}, hasPurchased: ${hasPurchased}`);
-  }, [forceUpdate, hasPurchased]);
+    if (user?.id) {
+      initializeLocalPurchases();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
-  // Calculate session status and countdown
-  useEffect(() => {
+  // Memoized session status calculation
+  const sessionStatusData = useMemo(() => {
     if (!session.start_time) {
-      setSessionStatus('upcoming');
-      setTimeUntilStart('');
-      return;
+      return {
+        status: 'upcoming',
+        timeUntilStart: '',
+        isLive: false,
+        isEnded: false,
+        canJoin: false
+      };
     }
 
     const now = currentTime;
     const sessionTime = new Date(session.start_time);
     const sessionEndTime = new Date(sessionTime.getTime() + (session.duration || 60) * 60 * 1000);
-    
+    // Students may enter this long before the scheduled start.
+    const JOIN_EARLY_MS = 15 * 60 * 1000;
+    const doorsOpen = new Date(sessionTime.getTime() - JOIN_EARLY_MS);
+
     // Check if session is manually ended
     if (session.status === 'ended' || session.is_ended) {
-      setSessionStatus('ended');
-      setIsEnded(true);
-      setIsLive(false);
-      setTimeUntilStart('');
-      return;
+      return {
+        status: 'ended',
+        timeUntilStart: '',
+        isLive: false,
+        isEnded: true,
+        canJoin: false
+      };
+    }
+
+    // States the professor can set that students must be able to see.
+    if (session.status === 'cancelled') {
+      return { status: 'cancelled', timeUntilStart: 'ملغاة', isLive: false, isEnded: true, canJoin: false };
+    }
+    if (session.status === 'paused') {
+      return { status: 'paused', timeUntilStart: 'متوقفة مؤقتاً', isLive: false, isEnded: false, canJoin: true };
+    }
+    if (session.status === 'technical_issues') {
+      return { status: 'technical_issues', timeUntilStart: 'مشكلة تقنية', isLive: false, isEnded: false, canJoin: true };
+    }
+    if (session.status === 'starting') {
+      return { status: 'starting', timeUntilStart: 'على وشك البدء', isLive: false, isEnded: false, canJoin: true };
+    }
+
+    // The professor started the stream: let students in regardless of the clock.
+    if (session.status === 'live') {
+      return {
+        status: 'live',
+        timeUntilStart: 'مباشر الآن',
+        isLive: true,
+        isEnded: false,
+        canJoin: true
+      };
     }
 
     if (now < sessionTime) {
@@ -201,37 +290,58 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
       const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
       
+      let timeText = '';
       if (hours > 0) {
-        setTimeUntilStart(`${hours}h ${minutes}m`);
+        timeText = `${hours}h ${minutes}m`;
       } else if (minutes > 0) {
-        setTimeUntilStart(`${minutes}m ${seconds}s`);
+        timeText = `${minutes}m ${seconds}s`;
       } else {
-        setTimeUntilStart(`${seconds}s`);
+        timeText = `${seconds}s`;
       }
       
-      setSessionStatus('upcoming');
-      setIsLive(false);
-      setIsEnded(false);
+      return {
+        status: 'upcoming',
+        timeUntilStart: timeText,
+        isLive: false,
+        isEnded: false,
+        // Doors open a quarter of an hour early.
+        canJoin: now >= doorsOpen
+      };
     } else if (now >= sessionTime && now <= sessionEndTime) {
       // Session is live
-      setSessionStatus('live');
-      setIsLive(true);
-      setIsEnded(false);
-      setTimeUntilStart('مباشر الآن');
+      return {
+        status: 'live',
+        timeUntilStart: 'مباشر الآن',
+        isLive: true,
+        isEnded: false,
+        canJoin: true
+      };
     } else {
       // Session has ended
-      setSessionStatus('ended');
-      setIsLive(false);
-      setIsEnded(true);
-      setTimeUntilStart('منتهي');
+      return {
+        status: 'ended',
+        timeUntilStart: 'منتهي',
+        isLive: false,
+        isEnded: true,
+        canJoin: false
+      };
     }
+  }, [currentTime, session.start_time, session.duration, session.status, session.is_ended]);
+
+  // Update session status based on memoized calculation
+  useEffect(() => {
+    setSessionStatus(sessionStatusData.status);
+    setTimeUntilStart(sessionStatusData.timeUntilStart);
+    setIsLive(sessionStatusData.isLive);
+    setIsEnded(sessionStatusData.isEnded);
+    setCanJoin(!!sessionStatusData.canJoin);
 
     // Only notify parent component of status change when status actually changes
-    if (onStatusChange && sessionStatus !== prevSessionStatus.current) {
-      prevSessionStatus.current = sessionStatus;
-      onStatusChange(session.id, sessionStatus);
+    if (onStatusChange && sessionStatusData.status !== prevSessionStatus.current) {
+      prevSessionStatus.current = sessionStatusData.status;
+      onStatusChange(session.id, sessionStatusData.status);
     }
-  }, [currentTime, session.start_time, session.duration, session.status, session.is_ended, onStatusChange]);
+  }, [sessionStatusData, onStatusChange, session.id]);
 
   const getSessionStatus = () => {
     return sessionStatus;
@@ -241,6 +351,14 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
     switch (status) {
       case 'live':
         return 'مباشر الآن';
+      case 'starting':
+        return 'على وشك البدء';
+      case 'paused':
+        return 'متوقفة مؤقتاً';
+      case 'technical_issues':
+        return 'مشكلة تقنية';
+      case 'cancelled':
+        return 'ملغاة';
       case 'upcoming':
         return 'قريباً';
       case 'ended':
@@ -262,6 +380,15 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
       return;
     }
 
+    if (!(await confirmPurchase({
+      title: session.title,
+      price: session.price,
+      balance: userPoints,
+      kindLabel: 'شراء بث مباشر بالنقاط',
+    }))) {
+      return;
+    }
+
     console.log(`[TTHLiveCard] Starting purchase for session ${session.id}`);
     setIsPurchasing(true);
     try {
@@ -279,7 +406,6 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
         const data = await response.json();
         console.log(`[TTHLiveCard] Purchase successful:`, data);
         setHasPurchased(true);
-        setForceUpdate(prev => prev + 1); // Force re-render
         setUserPoints(data.newBalance);
         
         // Store purchase locally for fallback
@@ -303,7 +429,7 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
         // Immediately check purchase status again to ensure UI is updated
         setTimeout(() => {
           checkPurchaseStatus();
-        }, 500);
+        }, 1000);
       } else {
         const errorData = await response.json();
         console.error(`[TTHLiveCard] Purchase failed:`, errorData);
@@ -325,12 +451,12 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
       return;
     }
     
-    if (status === 'live') {
-      // Session is live, navigate to streaming
+    if (canJoin) {
+      // Live, or within the early-entry window.
       navigate(`/streaming/${session.id}`);
     } else if (status === 'upcoming') {
       // Session is upcoming, show message
-      alert('هذا البث المباشر سيبدأ قريباً. يرجى الانتظار.');
+      alert('يمكنك الدخول قبل 15 دقيقة من موعد البداية.');
     } else {
       // Session has ended
       alert('انتهى هذا البث المباشر.');
@@ -355,11 +481,11 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
       {/* Header with status */}
       <div className="p-6 relative">
         {/* Background pattern */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
         
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors duration-200">
+            <h3 className="text-xl font-bold text-gray-800 group-hover:text-[#194cbf] transition-colors duration-200">
               {session.title || 'بث مباشر'}
             </h3>
             <span className={`px-3 py-1 rounded-full text-sm font-medium shadow-sm ${getStatusColor(getSessionStatus())}`}>
@@ -376,7 +502,7 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
           <div className="space-y-3 mb-6">
             {/* Teacher */}
             <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-gray-600 transition-colors duration-200">
-              <FaUser className="text-blue-500 group-hover:text-blue-600 transition-colors duration-200" />
+              <FaUser className="text-blue-500 group-hover:text-[#194cbf] transition-colors duration-200" />
               <span>الأستاذ: {session.professor_name || 'أستاذ مباشر'}</span>
             </div>
 
@@ -384,7 +510,7 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
             {session.start_time && (
               <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-gray-600 transition-colors duration-200">
                 <FaClock className={`${isLive ? 'text-blue-500' : isEnded ? 'text-gray-500' : 'text-green-500'} group-hover:scale-110 transition-all duration-200`} />
-                <span className={`font-medium ${isLive ? 'text-blue-600' : isEnded ? 'text-gray-600' : 'text-green-600'}`}>
+                <span className={`font-medium ${isLive ? 'text-[#194cbf]' : isEnded ? 'text-gray-600' : 'text-green-600'}`}>
                   {timeUntilStart || formatTime(session.start_time)}
                 </span>
               </div>
@@ -393,7 +519,7 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
             {/* Date */}
             {session.start_time && (
               <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-gray-600 transition-colors duration-200">
-                <FaClock className="text-purple-500 group-hover:text-purple-600 transition-colors duration-200" />
+                <FaClock className="text-blue-500 group-hover:text-[#61a1ff] transition-colors duration-200" />
                 <span>{formatDate(session.start_time)}</span>
               </div>
             )}
@@ -413,14 +539,14 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600 group-hover:text-gray-700 transition-colors duration-200">السعر:</span>
-                  <span className="text-lg font-bold text-blue-600 group-hover:text-blue-700 transition-colors duration-200">
+                  <span className="text-lg font-bold text-[#194cbf] group-hover:text-blue-700 transition-colors duration-200">
                     {session.price} نقطة
                   </span>
                 </div>
                 {user && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600 group-hover:text-gray-700 transition-colors duration-200">نقاطك:</span>
-                    <span className={`text-sm font-medium ${userPoints >= session.price ? 'text-blue-600' : 'text-gray-500'}`}>
+                    <span className={`text-sm font-medium ${userPoints >= session.price ? 'text-[#194cbf]' : 'text-gray-500'}`}>
                       {userPoints} نقطة
                     </span>
                   </div>
@@ -431,34 +557,40 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
 
           {/* Purchase/Join button */}
           {purchaseStatusLoading ? (
-            <button
-              className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-gradient-to-r from-gray-300 to-gray-400 text-gray-500 cursor-not-allowed animate-pulse"
-              disabled
-            >
-              <span className="loader mr-2" />
-              جاري التحقق...
-            </button>
+            /* Hold the layout while the purchase state loads, without showing
+               a "checking" message that flashes past. */
+            <div className="w-full py-3 rounded-xl bg-gray-100/70" aria-hidden="true" />
           ) : hasPurchased ? (
             <button 
               onClick={handleJoinSession}
+              /* A slow pulse signals "live". The flashing you saw earlier was the
+                 card remounting, not this animation. */
+              style={isLive ? { animationDuration: '3.5s' } : undefined}
               className={`w-full py-3 rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2 group-hover:scale-[1.02] shadow-lg hover:shadow-xl transform hover:-translate-y-1 ${
-                isLive 
-                  ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 animate-pulse' 
+                canJoin
+                  ? `bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 ${isLive ? 'animate-pulse' : ''}`
                   : sessionStatus === 'upcoming'
-                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700'
+                  ? 'bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white hover:from-[#1340a0] hover:to-[#4a8de8]'
                   : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed'
               }`}
               disabled={isEnded}
             >
-              {isLive ? (
-                <FaPlay className="text-lg group-hover:scale-110 transition-transform duration-200 animate-pulse" />
+              {canJoin ? (
+                <FaPlay className="text-lg group-hover:scale-110 transition-transform duration-200" />
               ) : isEnded ? (
                 <FaStop className="text-lg group-hover:scale-110 transition-transform duration-200" />
               ) : (
                 <FaCheck className="text-lg group-hover:scale-110 transition-transform duration-200" />
               )}
+              {isLive && (
+                <span className="inline-block h-2 w-2 rounded-full bg-white/90" aria-hidden="true" />
+              )}
               <span>
-                {isLive ? 'انضم الآن - مباشر' : 
+                {sessionStatus === 'cancelled' ? 'تم إلغاء البث' :
+                 sessionStatus === 'paused' ? 'متوقفة مؤقتاً - يمكنك الدخول' :
+                 sessionStatus === 'technical_issues' ? 'مشكلة تقنية - يمكنك الدخول' :
+                 isLive ? 'انضم الآن - مباشر' :
+                 canJoin ? 'انضم الآن' :
                  sessionStatus === 'upcoming' ? 'تم الشراء - انتظار البداية' : 'انتهى البث'}
               </span>
             </button>
@@ -473,7 +605,7 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
                   ? 'bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed'
                   : user && session.price && session.price > 0 && userPoints < session.price
                   ? 'bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed'
-                  : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700'
+                  : 'bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white hover:from-[#1340a0] hover:to-[#4a8de8]'
               }`}
             >
               <FaShoppingCart className="text-lg group-hover:scale-110 transition-transform duration-200" />
@@ -491,4 +623,24 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
   );
 };
 
-export default TTHLiveCard; 
+// Compare only what the card renders. Without this, every parent refresh hands
+// down brand new session objects and repaints all cards even when nothing changed.
+const sameSession = (prev, next) => {
+  const a = prev.session, b = next.session;
+  return (
+    a.id === b.id &&
+    a.title === b.title &&
+    a.description === b.description &&
+    a.start_time === b.start_time &&
+    a.duration === b.duration &&
+    a.price === b.price &&
+    a.status === b.status &&
+    a.is_ended === b.is_ended &&
+    a.is_paid === b.is_paid &&
+    a.cover_image_url === b.cover_image_url &&
+    a.professor_name === b.professor_name &&
+    prev.onStatusChange === next.onStatusChange
+  );
+};
+
+export default React.memo(TTHLiveCard, sameSession); 

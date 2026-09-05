@@ -17,13 +17,14 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Search, Layers, User, Calendar, FileText } from 'lucide-react';
+import { BookOpen, Search, Layers, User, Calendar, FileText, XCircle, RotateCw } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import Breadcrumbs from '@/components/common/Breadcrumbs';
 import { Breadcrumb } from '@/types';
 
 const CoursesPage = () => {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [levels, setLevels] = useState<Level[]>([]);
   const [years, setYears] = useState<Year[]>([]);
   const [specialities, setSpecialities] = useState<Speciality[]>([]);
@@ -75,6 +76,19 @@ const CoursesPage = () => {
         setLanguages(languagesData);
         setLanguageLevels(languageLevelsData);
         
+        // Breadcrumbs link to ?level= / ?year= / ?speciality= / ?language=.
+        // These were parsed nowhere, so those links silently showed everything.
+        const levelFromUrl = searchParams.get('level');
+        const yearFromUrl = searchParams.get('year');
+        const specialityFromUrl = searchParams.get('speciality');
+        const languageFromUrl = searchParams.get('language');
+        const languageLevelFromUrl = searchParams.get('languageLevel');
+        if (levelFromUrl) setSelectedLevel(levelFromUrl);
+        if (yearFromUrl) setSelectedYear(yearFromUrl);
+        if (specialityFromUrl) setSelectedSpeciality(specialityFromUrl);
+        if (languageFromUrl) { setSelectedLanguage(languageFromUrl); setCourseType('language'); }
+        if (languageLevelFromUrl) { setSelectedLanguageLevel(languageLevelFromUrl); setCourseType('language'); }
+
         const materialIdFromUrl = searchParams.get('materialId');
         if (materialIdFromUrl) {
           setSelectedMaterialId(materialIdFromUrl);
@@ -702,7 +716,7 @@ const CoursesPage = () => {
                       </div>
                     </CardContent>
                     
-                    <CardFooter className="pt-0">
+                    <CardFooter className="pt-0 flex flex-col gap-2">
                       <Button 
                         variant="outline" 
                         className="w-full flex items-center justify-center"
@@ -712,6 +726,35 @@ const CoursesPage = () => {
                           <FileText className="h-4 w-4 mr-2" />
                           View Course
                         </Link>
+                      </Button>
+
+                      {/* Undo an approval made by mistake. */}
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="w-full flex items-center justify-center"
+                        disabled={rejectingId === course.id}
+                        onClick={async () => {
+                          const reason = window.prompt('Reason for rejecting this course (sent to the professor):');
+                          if (reason === null) return;
+                          setRejectingId(course.id);
+                          try {
+                            await api.rejectCourseAdmin(course.id, reason);
+                            toast.success('Course changed to rejected');
+                            setCourses(prev => prev.filter(c => c.id !== course.id));
+                          } catch (error) {
+                            console.error(error);
+                            toast.error('Failed to change the course state');
+                          } finally {
+                            setRejectingId(null);
+                          }
+                        }}
+                      >
+                        {rejectingId === course.id ? (
+                          <><RotateCw className="h-4 w-4 mr-2 animate-spin" /> Working…</>
+                        ) : (
+                          <><XCircle className="h-4 w-4 mr-2" /> Change to rejected</>
+                        )}
                       </Button>
                     </CardFooter>
                   </Card>

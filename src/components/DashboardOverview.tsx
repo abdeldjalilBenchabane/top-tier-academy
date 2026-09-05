@@ -29,7 +29,7 @@ const DashboardOverview = () => {
   return (
     <div className="space-y-6">
       {/* Salutation personnalisée */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
+      <div className="bg-gradient-to-r from-[#194cbf] to-[#61a1ff] rounded-xl p-6 text-white">
         <div className="flex items-center space-x-4 space-x-reverse">
           <Avatar className="h-16 w-16 border-2 border-white/20">
             <AvatarImage src={student.avatar} alt={student.name} />

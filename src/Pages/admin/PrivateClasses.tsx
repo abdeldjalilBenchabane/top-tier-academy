@@ -13,6 +13,7 @@ interface PrivateClassRequest {
   student_id: number;
   student_email: string;
   student_name: string;
+  phone: string | null;
   teacher_name: string;
   subject: string;
   grade: string;
@@ -71,9 +72,10 @@ const PrivateClasses = () => {
   }, []);
 
   const filteredRequests = requests.filter(request => {
-    const matchesSearch = 
+    const matchesSearch =
       request.student_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       request.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      request.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       request.teacher_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       request.subject?.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -94,29 +96,31 @@ const PrivateClasses = () => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, paymentFilter]);
 
+  const badgeBase = 'whitespace-nowrap px-2.5 py-1 text-xs font-medium';
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'في الانتظار':
-        return <Badge variant="default" className="bg-red-500 text-center min-w-[120px]">Not Confirmed</Badge>;
+        return <Badge variant="default" className={`${badgeBase} bg-red-500 hover:bg-red-600`}>Not Confirmed</Badge>;
       case 'مؤكد':
-        return <Badge variant="default" className="bg-green-500 text-center min-w-[120px]">Confirmed</Badge>;
+        return <Badge variant="default" className={`${badgeBase} bg-green-500 hover:bg-green-600`}>Confirmed</Badge>;
       case 'مرفوض':
-        return <Badge variant="destructive" className="bg-red-500 text-center min-w-[120px]">Rejected</Badge>;
+        return <Badge variant="destructive" className={`${badgeBase} bg-red-500`}>Rejected</Badge>;
       default:
-        return <Badge variant="default" className="bg-red-500 text-center min-w-[120px]">Not Confirmed</Badge>;
+        return <Badge variant="default" className={`${badgeBase} bg-red-500 hover:bg-red-600`}>Not Confirmed</Badge>;
     }
   };
 
   const getPaymentStatusBadge = (paymentStatus: string) => {
     switch (paymentStatus) {
       case 'pending':
-        return <Badge variant="default" className="bg-yellow-500 text-white text-center min-w-[120px] hover:bg-yellow-600">Pending Payment</Badge>;
+        return <Badge variant="default" className={`${badgeBase} bg-yellow-500 text-white hover:bg-yellow-600`}>Pending Payment</Badge>;
       case 'paid':
-        return <Badge variant="default" className="bg-green-500 text-center min-w-[120px] hover:bg-green-600">Paid</Badge>;
+        return <Badge variant="default" className={`${badgeBase} bg-green-500 hover:bg-green-600`}>Paid</Badge>;
       case 'cancelled':
-        return <Badge variant="destructive" className="text-center min-w-[120px]">Cancelled</Badge>;
+        return <Badge variant="destructive" className={badgeBase}>Cancelled</Badge>;
       default:
-        return <Badge variant="default" className="bg-yellow-500 text-white text-center min-w-[120px] hover:bg-yellow-600">Not Set</Badge>;
+        return <Badge variant="default" className={`${badgeBase} bg-yellow-500 text-white hover:bg-yellow-600`}>Not Set</Badge>;
     }
   };
 
@@ -138,13 +142,13 @@ const PrivateClasses = () => {
 
   const getConfirmationStatus = (request: PrivateClassRequest) => {
     if (request.status === 'مؤكد' && request.payment_status === 'paid') {
-      return <Badge variant="default" className="bg-blue-500 text-center min-w-[120px] hover:bg-blue-600">Confirmed & Paid</Badge>;
+      return <Badge variant="default" className={`${badgeBase} bg-blue-500 hover:bg-blue-600`}>Confirmed & Paid</Badge>;
     } else if (request.status === 'مؤكد' && request.payment_status === 'pending') {
-      return <Badge variant="default" className="bg-yellow-500 text-white text-center min-w-[120px] hover:bg-yellow-600">Confirmed - Pending Payment</Badge>;
+      return <Badge variant="default" className={`${badgeBase} bg-yellow-500 text-white hover:bg-yellow-600`}>Confirmed · Pending Payment</Badge>;
     } else if (request.status === 'في الانتظار') {
-      return <Badge variant="default" className="bg-yellow-500 text-white text-center min-w-[120px] hover:bg-yellow-600">Waiting for Approval</Badge>;
+      return <Badge variant="default" className={`${badgeBase} bg-yellow-500 text-white hover:bg-yellow-600`}>Waiting for Approval</Badge>;
     } else {
-      return <Badge variant="default" className="bg-yellow-500 text-white text-center min-w-[120px] hover:bg-yellow-600">Not Set</Badge>;
+      return <Badge variant="default" className={`${badgeBase} bg-gray-400 text-white hover:bg-gray-500`}>Not Set</Badge>;
     }
   };
 
@@ -240,7 +244,7 @@ const PrivateClasses = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search by student email, name, teacher, or subject..."
+                placeholder="Search by student email, name, phone, teacher, or subject..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -271,81 +275,80 @@ const PrivateClasses = () => {
           </div>
 
           {/* Table */}
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student Email</TableHead>
-                  <TableHead>Teacher</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Payment</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Confirmed</TableHead>
-                  <TableHead>Created</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {currentRequests.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                      No private class requests found
-                    </TableCell>
+          <div className="rounded-md border overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table className="text-sm">
+                <TableHeader>
+                  <TableRow className="bg-gray-50 hover:bg-gray-50">
+                    <TableHead className="py-3 font-semibold text-gray-700">Student</TableHead>
+                    <TableHead className="py-3 font-semibold text-gray-700">Teacher</TableHead>
+                    <TableHead className="py-3 font-semibold text-gray-700">Subject</TableHead>
+                    <TableHead className="py-3 font-semibold text-gray-700">Status</TableHead>
+                    <TableHead className="py-3 font-semibold text-gray-700">Payment</TableHead>
+                    <TableHead className="py-3 font-semibold text-gray-700">Time</TableHead>
+                    <TableHead className="py-3 font-semibold text-gray-700">Confirmation</TableHead>
+                    <TableHead className="py-3 font-semibold text-gray-700">Created</TableHead>
                   </TableRow>
-                ) : (
-                  currentRequests.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{request.student_email}</div>
-                          <div className="text-sm text-gray-500">{request.student_name}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{request.teacher_name}</div>
-                        <div className="text-sm text-gray-500">ID: {request.id}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{request.subject}</div>
-                          <div className="text-sm text-gray-500">{request.hierarchy_path}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(request.status)}</TableCell>
-                      <TableCell>
-                        <div>
-                          {getPaymentStatusBadge(request.payment_status)}
-                          {request.payment_status === 'paid' && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              {request.points_used} points
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div>{formatTime(request.time)}</div>
-                          {request.date && (
-                            <div className="text-gray-500">{request.date}</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{getConfirmationStatus(request)}</TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div>{formatDate(request.created_at)}</div>
-                          {request.payment_date && (
-                            <div className="text-gray-500">
-                              Paid: {formatDate(request.payment_date)}
-                            </div>
-                          )}
-                        </div>
+                </TableHeader>
+                <TableBody>
+                  {currentRequests.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-12 text-gray-500">
+                        No private class requests found
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    currentRequests.map((request) => (
+                      <TableRow key={request.id} className="hover:bg-gray-50/60 align-top">
+                        <TableCell className="py-3 max-w-[220px]">
+                          <div className="font-medium text-gray-900 truncate">{request.student_name || '-'}</div>
+                          <div className="text-xs text-gray-500 truncate">{request.student_email}</div>
+                          {request.phone ? (
+                            <a
+                              href={`tel:${request.phone}`}
+                              className="text-xs text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap"
+                              dir="ltr"
+                            >
+                              📞 {request.phone}
+                            </a>
+                          ) : (
+                            <div className="text-xs text-gray-400 italic">no phone</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <div className="font-medium text-gray-900 whitespace-nowrap">{request.teacher_name}</div>
+                          <div className="text-xs text-gray-500">ID: {request.id}</div>
+                        </TableCell>
+                        <TableCell className="py-3 max-w-[220px]">
+                          <div className="font-medium text-gray-900 truncate">{request.subject}</div>
+                          <div className="text-xs text-gray-500 truncate" title={request.hierarchy_path}>
+                            {request.hierarchy_path}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3">{getStatusBadge(request.status)}</TableCell>
+                        <TableCell className="py-3">
+                          {getPaymentStatusBadge(request.payment_status)}
+                          {request.payment_status === 'paid' && (
+                            <div className="text-xs text-gray-500 mt-1">{request.points_used} points</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-3 whitespace-nowrap">
+                          <div>{formatTime(request.time)}</div>
+                          {request.date && <div className="text-xs text-gray-500">{request.date}</div>}
+                        </TableCell>
+                        <TableCell className="py-3">{getConfirmationStatus(request)}</TableCell>
+                        <TableCell className="py-3 whitespace-nowrap">
+                          <div className="text-xs">{formatDate(request.created_at)}</div>
+                          {request.payment_date && (
+                            <div className="text-xs text-gray-500">Paid: {formatDate(request.payment_date)}</div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
 
           {/* Pagination */}

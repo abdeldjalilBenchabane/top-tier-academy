@@ -940,6 +940,29 @@ router.get('/public/years/:yearId/materials', async (req, res) => {
 });
 
 // GET /api/public/hierarchy → get complete hierarchy structure (public)
+// Resolve a material back up to its speciality / year / level, so an edit form
+// can pre-select the whole path from just a material_id.
+router.get('/public/materials/:id/path', async (req, res) => {
+  try {
+    const row = await getRow(`
+      SELECT m.id   AS material_id,   m.name AS material_name,
+             s.id   AS speciality_id, s.name AS speciality_name,
+             y.id   AS year_id,       y.name AS year_name,
+             l.id   AS level_id,      l.name AS level_name
+        FROM materials m
+        LEFT JOIN specialities s ON s.id = m.speciality_id
+        LEFT JOIN years y        ON y.id = COALESCE(s.year_id, m.year_id)
+        LEFT JOIN levels l       ON l.id = y.level_id
+       WHERE m.id = $1`, [req.params.id]);
+
+    if (!row) return res.status(404).json({ error: 'Material not found' });
+    res.json(row);
+  } catch (error) {
+    console.error('Error resolving material path:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/public/hierarchy', async (req, res) => {
   try {
     const levels = await getRows('SELECT * FROM levels ORDER BY name');

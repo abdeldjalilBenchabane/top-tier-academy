@@ -10,63 +10,63 @@ export default function TestimonialsSection() {
   const testimonials = [
     {
       id: 1,
-      name: "أحمد محمد",
+      name: "محسن كفوس",
       avatar: "/placeholder.svg?height=40&width=40",
-      role: "طالب هندسة",
+      role: "تلميذ ابتدائي",
       rating: 5,
-      text: "هذه المنصة غيرت طريقة دراستي بشكل كامل. المحتوى ممتاز والمدرسون رائعون!",
-      course: "الهندسة الكهربائية",
-      gradient: "from-blue-500 to-purple-600"
+      text: "هادي المنصة عاونتني بزاف في قرايتي. الدروس ساهلة نفهمها والمعلّمين يشرحو مليح.",
+      course: "السنة الخامسة ابتدائي",
+      gradient: "from-[#194cbf] to-[#61a1ff]"
     },
     {
       id: 2,
-      name: "سارة أحمد",
+      name: "سميرة بن عيسى",
       avatar: "/placeholder.svg?height=40&width=40",
-      role: "طالبة طب",
+      role: "تلميذة متوسطة",
       rating: 5,
-      text: "أنا سعيدة جدًا بالتقدم الذي أحرزته منذ بدأت التعلم على هذه المنصة. الدروس منظمة بشكل رائع.",
-      course: "الطب العام",
+      text: "فرحانة كي وليت نفهم المواد خير. المنصة منظّمة وتسهّل علينا القراءة.",
+      course: "السنة الرابعة متوسط",
       gradient: "from-pink-500 to-red-500"
     },
     {
       id: 3,
-      name: "محمد علي",
+      name: "كمال زروقي",
       avatar: "/placeholder.svg?height=40&width=40",
-      role: "طالب علوم حاسوب",
-      rating: 4,
-      text: "المنصة سهلة الاستخدام والمحتوى التعليمي عالي الجودة. أوصي بها لجميع الطلاب.",
-      course: "علوم الحاسوب",
+      role: "تلميذ ثانوي",
+      rating: 5,
+      text: "المنصة هايلة بزاف. الشرح واضح والتطبيقات عاونوني نراجع للبكالوريا.",
+      course: "شعبة علوم تجريبية",
       gradient: "from-green-500 to-teal-500"
     },
     {
       id: 4,
-      name: "فاطمة حسن",
+      name: "فاطمة الزهراء رحماني",
       avatar: "/placeholder.svg?height=40&width=40",
-      role: "طالبة أدب",
+      role: "تلميذة ثانوي",
       rating: 5,
-      text: "لقد ساعدتني هذه المنصة على تحسين مهاراتي بشكل كبير. المدرسون متفاعلون ويقدمون دعمًا ممتازًا.",
-      course: "الأدب العربي",
+      text: "بدّلتلي طريقة المراجعة كامل. المحتوى عصري والأساتذة يجاوبو على كامل أسئلتي.",
+      course: "الهندسة الكهربائية – جامعة سطيف",
       gradient: "from-orange-500 to-yellow-500"
     },
     {
       id: 5,
-      name: "خالد عمر",
+      name: "إلياس قادة",
       avatar: "/placeholder.svg?height=40&width=40",
-      role: "طالب اقتصاد",
-      rating: 4,
-      text: "تجربة تعليمية فريدة من نوعها. المحتوى حديث ومواكب للتطورات في مجال تخصصي.",
-      course: "الاقتصاد والتجارة",
-      gradient: "from-indigo-500 to-blue-600"
+      role: "تلميذ ثانوي",
+      rating: 5,
+      text: "المنصة ساهلة الاستعمال والمحتوى في المستوى. ننصح كامل الطلبة بيها.",
+      course: "علوم الحاسوب – جامعة الجزائر",
+      gradient: "from-[#194cbf] to-[#61a1ff]"
     },
     {
       id: 6,
-      name: "نور الهدى",
+      name: "نور الهدى عماري",
       avatar: "/placeholder.svg?height=40&width=40",
-      role: "طالبة علم نفس",
+      role: "تلميذة متوسطة",
       rating: 5,
       text: "أفضل منصة تعليمية جربتها حتى الآن. الشروحات واضحة والتمارين مفيدة جدًا.",
-      course: "علم النفس",
-      gradient: "from-purple-500 to-pink-500"
+      course: "الطب العام – جامعة وهران",
+      gradient: "from-[#194cbf] to-[#61a1ff]"
     },
   ]
 
@@ -131,7 +131,7 @@ export default function TestimonialsSection() {
           animate={floatingAnimation}
         />
         <motion.div
-          className="absolute top-40 right-40 w-16 h-16 bg-purple-300 rounded-full opacity-20"
+          className="absolute top-40 right-40 w-16 h-16 bg-blue-300 rounded-full opacity-20"
           animate={{ ...floatingAnimation, transition: { ...floatingAnimation.transition, delay: 1 } }}
         />
         <motion.div
@@ -147,7 +147,7 @@ export default function TestimonialsSection() {
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, type: "spring", stiffness: 100 }}
-            className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mb-6"
+            className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-[#194cbf] to-[#61a1ff] rounded-full mb-6"
           >
             <Heart className="w-8 h-8 text-white" />
           </motion.div>
@@ -229,7 +229,7 @@ export default function TestimonialsSection() {
                       <div className="mr-4">
                         <p className="font-bold text-lg text-slate-800 dark:text-white">{testimonial.name}</p>
                         <p className="text-sm text-slate-600 dark:text-slate-400">{testimonial.role}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{testimonial.course}</p>
+                        {/* <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{testimonial.course}</p> */}
                       </div>
                     </div>
 
@@ -265,7 +265,7 @@ export default function TestimonialsSection() {
 
                     {/* Hover effect overlay */}
                     <motion.div
-                      className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-600/5 rounded-lg"
+                      className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-blue-600/5 rounded-lg"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: hoveredCard === testimonial.id ? 1 : 0 }}
                       transition={{ duration: 0.3 }}
@@ -287,7 +287,7 @@ export default function TestimonialsSection() {
           >
             <motion.button
               onClick={() => setVisibleTestimonials((prev) => Math.min(prev + 3, testimonials.length))}
-              className="group relative overflow-hidden bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-full font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+              className="group relative overflow-hidden bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white px-8 py-4 rounded-full font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               dir="rtl"
@@ -297,7 +297,7 @@ export default function TestimonialsSection() {
                 <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </span>
               <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600"
+                className="absolute inset-0 bg-gradient-to-r from-[#194cbf] to-[#61a1ff]"
                 initial={{ x: "100%" }}
                 whileHover={{ x: "0%" }}
                 transition={{ duration: 0.3 }}

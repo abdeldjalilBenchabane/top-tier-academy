@@ -117,8 +117,18 @@ router.get('/packages', async (req, res) => {
     const result = await pool.query(
       'SELECT id, name, points, price, currency, is_active FROM point_packages WHERE is_active = true ORDER BY points ASC'
     );
-    
-    res.json({ packages: result.rows });
+    const features = await pool.query(
+      `SELECT id, package_id, name, points, price, currency, display_order
+         FROM point_package_features
+        WHERE is_active = true
+        ORDER BY display_order ASC, id ASC`
+    );
+    const byPackage = features.rows.reduce((acc, f) => {
+      (acc[f.package_id] = acc[f.package_id] || []).push(f);
+      return acc;
+    }, {});
+
+    res.json({ packages: result.rows.map(p => ({ ...p, features: byPackage[p.id] || [] })) });
   } catch (error) {
     console.error('Error fetching point packages:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -131,10 +141,82 @@ router.get('/packages/all', auth, requireAdmin, async (req, res) => {
     const result = await pool.query(
       'SELECT id, name, points, price, currency, is_active FROM point_packages ORDER BY points ASC'
     );
-    
-    res.json({ packages: result.rows });
+    const features = await pool.query(
+      `SELECT id, package_id, name, points, price, currency, display_order, is_active
+         FROM point_package_features
+        ORDER BY display_order ASC, id ASC`
+    );
+    const byPackage = features.rows.reduce((acc, f) => {
+      (acc[f.package_id] = acc[f.package_id] || []).push(f);
+      return acc;
+    }, {});
+
+    res.json({ packages: result.rows.map(p => ({ ...p, features: byPackage[p.id] || [] })) });
   } catch (error) {
     console.error('Error fetching all point packages:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// --- Package features (admin) -------------------------------------------
+// Add a feature to a package
+router.post('/packages/:id/features', auth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, points, price, currency, display_order } = req.body;
+    if (!name || !String(name).trim()) return res.status(400).json({ error: 'Name is required' });
+
+    const pkg = await pool.query('SELECT id FROM point_packages WHERE id = $1', [id]);
+    if (pkg.rowCount === 0) return res.status(404).json({ error: 'Package not found' });
+
+    const result = await pool.query(
+      `INSERT INTO point_package_features (package_id, name, points, price, currency, display_order)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [id, String(name).trim(), parseInt(points, 10) || 0, parseFloat(price) || 0,
+       currency || 'DZD', parseInt(display_order, 10) || 0]
+    );
+    res.status(201).json({ feature: result.rows[0] });
+  } catch (error) {
+    console.error('Error creating package feature:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update a feature
+router.put('/features/:featureId', auth, requireAdmin, async (req, res) => {
+  try {
+    const { featureId } = req.params;
+    const { name, points, price, currency, display_order, is_active } = req.body;
+    const result = await pool.query(
+      `UPDATE point_package_features
+          SET name = COALESCE($1, name),
+              points = COALESCE($2, points),
+              price = COALESCE($3, price),
+              currency = COALESCE($4, currency),
+              display_order = COALESCE($5, display_order),
+              is_active = COALESCE($6, is_active),
+              updated_at = CURRENT_TIMESTAMP
+        WHERE id = $7 RETURNING *`,
+      [name ?? null, points ?? null, price ?? null, currency ?? null,
+       display_order ?? null, is_active ?? null, featureId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Feature not found' });
+    res.json({ feature: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating package feature:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete a feature
+router.delete('/features/:featureId', auth, requireAdmin, async (req, res) => {
+  try {
+    const { featureId } = req.params;
+    const result = await pool.query('DELETE FROM point_package_features WHERE id = $1 RETURNING *', [featureId]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Feature not found' });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting package feature:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -163,7 +245,8 @@ router.post('/packages', auth, requireAdmin, async (req, res) => {
   try {
     const { name, points, price, currency, is_active } = req.body;
     const result = await pool.query(
-      `INSERT INTO point_packages (name, points, price, currency, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      // A package is a title; points and price live on its features.
+      `INSERT INTO point_packages (name, points, price, currency, is_active) VALUES ($1, COALESCE($2, 0), COALESCE($3, 0), $4, $5) RETURNING *`,
       [name, points, price, currency, is_active ?? true]
     );
     res.json({ success: true, package: result.rows[0] });
@@ -243,7 +326,7 @@ router.get('/transactions', auth, async (req, res) => {
 router.post('/purchase', auth, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { packageId, amount, currency, successUrl, metadata } = req.body;
+    const { packageId, featureId, amount, currency, successUrl, metadata } = req.body;
     
     // Validate package exists and is active
     const packageResult = await pool.query(
@@ -256,11 +339,28 @@ router.post('/purchase', auth, async (req, res) => {
     }
     
     const packageData = packageResult.rows[0];
-    
-    // Validate amount matches package price
-    if (parseFloat(amount) !== parseFloat(packageData.price)) {
-      return res.status(400).json({ error: 'Amount does not match package price' });
+
+    // A feature is what the student actually buys; the package is its title.
+    // Its points and price take precedence over the package's own values.
+    let feature = null;
+    if (featureId) {
+      const featureResult = await pool.query(
+        'SELECT * FROM point_package_features WHERE id = $1 AND package_id = $2 AND is_active = true',
+        [featureId, packageId]
+      );
+      if (featureResult.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid feature for this package' });
+      }
+      feature = featureResult.rows[0];
     }
+
+    // Never trust the amount from the client: it must match what is being sold.
+    const expectedPrice = parseFloat(feature ? feature.price : packageData.price);
+    if (parseFloat(amount) !== expectedPrice) {
+      return res.status(400).json({ error: 'Amount does not match the price' });
+    }
+
+    const pointsAwarded = feature ? feature.points : packageData.points;
     
     // Create transaction record (status: 'pending')
     const transactionResult = await pool.query(
@@ -272,11 +372,14 @@ router.post('/purchase', auth, async (req, res) => {
         userId,
         packageId,
         'purchase',
-        packageData.points,
+        pointsAwarded,
         amount,
         currency || 'DZD',
         'pending', // Mark as pending until payment is confirmed
-        JSON.stringify(metadata)
+        JSON.stringify({
+          ...(metadata || {}),
+          ...(feature ? { feature_id: feature.id, feature_name: feature.name } : {}),
+        })
       ]
     );
     
@@ -457,9 +560,11 @@ router.post('/buy-course', auth, async (req, res) => {
       }
       
       // Record purchase
+      // points_spent freezes what was charged, so a later price change never
+      // rewrites this student's history or the professor's past earnings.
       await client.query(
-        'INSERT INTO student_courses (student_id, course_id, completed, progress, hours_spent, last_accessed, buy_at) VALUES ($1, $2, FALSE, 0, 0, NOW(), NOW())',
-        [userId, courseId]
+        'INSERT INTO student_courses (student_id, course_id, completed, progress, hours_spent, last_accessed, buy_at, points_spent) VALUES ($1, $2, FALSE, 0, 0, NOW(), NOW(), $3)',
+        [userId, courseId, price]
       );
       
       await client.query('COMMIT');
@@ -565,13 +670,20 @@ router.post('/buy-live-session', auth, async (req, res) => {
     try {
       await client.query('BEGIN');
       
-      // Only deduct points if live section is not free
+      // Only deduct points if live section is not free.
+      // Recording the transaction is what deducts the balance: the
+      // trigger_update_user_points_balance trigger subtracts on a 'spend' insert.
+      // This mirrors the course purchase flow and makes the purchase auditable
+      // and cancellable from the admin panel.
       if (price > 0) {
-        // Deduct points
-        await client.query(
-          'UPDATE user_points SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
-          [price, userId]
-        );
+        await client.query(`
+          INSERT INTO point_transactions (user_id, transaction_type, points, amount, status, metadata)
+          VALUES ($1, 'spend', $2, $3, 'completed', $4)
+        `, [userId, price, price, JSON.stringify({
+          type: 'live_section_purchase',
+          live_section_id: sessionId,
+          live_section_title: section.title || 'Unknown'
+        })]);
       }
       
       // Record purchase (using live_section_purchases table)

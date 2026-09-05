@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useConfirmPurchase } from '@/components/ui/TTHPurchaseConfirm';
 import { useParams, useNavigate } from "react-router-dom";
 import { Play, Download, FileText, Star, Clock, Globe, CheckCircle, BookOpen, Award, Users, Calendar, Eye, X, Image as ImageIcon, Video as VideoIcon, FileText as FileTextIcon, ChevronLeft, ChevronRight, Lock, HelpCircle } from "lucide-react";
 import { Button } from "../components/ui/Button";
@@ -23,6 +24,7 @@ const subjectLabels = {
 };
 
 export default function CourseDetail() {
+    const confirmPurchase = useConfirmPurchase();
     const { id } = useParams();
     const navigate = useNavigate();
     const [isVideoPlaying, setIsVideoPlaying] = useState(false);
@@ -66,6 +68,8 @@ export default function CourseDetail() {
     const { user } = useAuth();
     const [hasAccess, setHasAccess] = useState(false);
     const [isPreview, setIsPreview] = useState(false);
+    const [userPoints, setUserPoints] = useState(0);
+    const [buyLoading, setBuyLoading] = useState(false);
 
     useEffect(() => {
         const fetchCourseData = async () => {
@@ -85,6 +89,15 @@ export default function CourseDetail() {
                         const purchasedRes = await import('@/services/api').then(m => m.pointsAPI.getMyCourses());
                         const purchasedIds = purchasedRes.courseIds || purchasedRes.courses || [];
                         purchased = purchasedIds.includes(courseData.id);
+                        
+                        // Fetch user points balance
+                        try {
+                            const pointsRes = await import('@/services/api').then(m => m.pointsAPI.getBalance());
+                            setUserPoints(pointsRes.balance || 0);
+                        } catch (e) {
+                            console.error('Error fetching user points:', e);
+                            setUserPoints(0);
+                        }
                     } catch (e) { /* ignore */ }
                 }
                 courseData.purchased = purchased;
@@ -236,6 +249,43 @@ export default function CourseDetail() {
         }
     }, [id, user]);
 
+    // Prevent video download
+    const preventDownload = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    };
+
+    // Prevent right-click context menu
+    const handleContextMenu = (e) => {
+        e.preventDefault();
+        return false;
+    };
+
+    // Prevent drag and drop
+    const handleDragStart = (e) => {
+        e.preventDefault();
+        return false;
+    };
+
+    // Prevent keyboard shortcuts (Ctrl+S, Ctrl+U, etc.)
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Prevent Ctrl+S (Save), Ctrl+U (View Source), F12 (DevTools), Ctrl+Shift+I (DevTools)
+            if ((e.ctrlKey && (e.key === 's' || e.key === 'S' || e.key === 'u' || e.key === 'U' || e.key === 'i' || e.key === 'I')) ||
+                (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'C')) ||
+                e.key === 'F12') {
+                e.preventDefault();
+                return false;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
+
     useEffect(() => {
         // Determine access: purchased, admin, or professor
         if (!course) return;
@@ -250,6 +300,98 @@ export default function CourseDetail() {
             setIsPreview(true);
         }
     }, [user, course]);
+
+    // Handle course purchase
+    const handlePurchaseCourse = async () => {
+        // If not logged in, redirect to login
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        // If not a student, show alert
+        if (user.role !== 'student') {
+            alert('يجب أن تكون مسجلاً كطالب لشراء هذا الكورس.');
+            return;
+        }
+
+        // Calculate course price
+        let coursePrice = 0;
+        if (course.material_price) {
+            coursePrice = parseInt(course.material_price) || 0;
+        } else if (course.price) {
+            coursePrice = parseInt(course.price) || 0;
+        } else if (course.language_level_id && languageCoursePrices[`${course.id}-${course.language_level_id}`]) {
+            coursePrice = parseInt(languageCoursePrices[`${course.id}-${course.language_level_id}`]) || 0;
+        }
+
+        // Check if user has enough points
+        if (coursePrice > 0 && userPoints < coursePrice) {
+            // Not enough points, redirect to points page
+            navigate('/points');
+            return;
+        }
+
+        // Confirm purchase
+        if (!(await confirmPurchase({
+          title: course?.title,
+          price: course?.price,
+          kindLabel: 'شراء درس بالنقاط',
+        }))) {
+            return;
+        }
+
+        setBuyLoading(true);
+        try {
+            const pointsAPI = (await import('@/services/api')).pointsAPI;
+            const res = await pointsAPI.buyCourse(course.id);
+            
+            if (res.success) {
+                // Update course as purchased
+                setCourse(prev => ({ ...prev, purchased: true }));
+                
+                // Update user points
+                setUserPoints(res.newBalance || 0);
+                
+                // Trigger points update event to refresh navbar
+                window.dispatchEvent(new CustomEvent('pointsUpdated', { 
+                    detail: { points: res.newBalance } 
+                }));
+                
+                // Save to localStorage for persistence
+                try {
+                    const purchasedCourses = JSON.parse(localStorage.getItem('purchasedCourses') || '[]');
+                    if (!purchasedCourses.includes(course.id)) {
+                        purchasedCourses.push(course.id);
+                        localStorage.setItem('purchasedCourses', JSON.stringify(purchasedCourses));
+                    }
+                } catch (e) {
+                    console.error('Error saving to localStorage:', e);
+                }
+                
+                alert('تم شراء الكورس بنجاح! يمكنك الآن الوصول إلى جميع المحتويات.');
+                
+                // Refresh the page to update access
+                window.location.reload();
+            } else {
+                alert(res.error || 'حدث خطأ أثناء الشراء');
+            }
+        } catch (err) {
+            if (err && err.message && err.message.includes('Not enough points')) {
+                alert('ليس لديك نقاط كافية. سيتم توجيهك إلى صفحة شراء النقاط.');
+                navigate('/points');
+            } else if (err && err.message && err.message.includes('already purchased')) {
+                alert('لقد اشتريت هذا الكورس من قبل.');
+                // Mark as purchased
+                setCourse(prev => ({ ...prev, purchased: true }));
+                window.location.reload();
+            } else {
+                alert('حدث خطأ أثناء الشراء. يرجى المحاولة مرة أخرى.');
+            }
+        } finally {
+            setBuyLoading(false);
+        }
+    };
 
     // New functions for interactive curriculum
     const toggleSection = (sectionIndex) => {
@@ -544,7 +686,7 @@ export default function CourseDetail() {
             <div className="border-b border-blue-100" />
             
             {/* Hero Section */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-16 shadow-lg">
+            <div className="bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white py-16 shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center gap-10">
                     {/* Video Preview */}
                     <div className="w-full lg:w-1/2 order-2 lg:order-1 mt-8 lg:mt-0">
@@ -573,38 +715,49 @@ export default function CourseDetail() {
                                 </>
                             )}
                             
-                            <div className="relative aspect-video">
+                            <div className="relative aspect-video" onContextMenu={handleContextMenu} style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
                                 {!hasAccess ? (
                                     <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[2px] text-white">
                                         <Lock className="w-16 h-16 mb-4 text-white/90" />
                                         <span className="font-bold text-2xl mb-2">محتوى الدرس مغلق</span>
                                         <span className="text-md mb-4">قم بشراء الدرس للوصول الكامل إلى جميع الدروس والفيديوهات</span>
                                         <button
-                                            className="px-8 py-3 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-lg shadow-lg"
-                                            onClick={() => user ? navigate('/points') : navigate('/login')}
+                                            className="px-8 py-3 rounded-full bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-[#1340a0] hover:to-[#4a8de8] text-white font-bold text-lg shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                                            onClick={handlePurchaseCourse}
+                                            disabled={buyLoading}
                                         >
-                                            {user ? 'شراء الدرس بالنقاط' : 'سجّل الدخول للوصول الكامل'}
+                                            {buyLoading ? 'جاري الشراء...' : user ? 'شراء الدرس بالنقاط' : 'سجّل الدخول للوصول الكامل'}
                                         </button>
                                     </div>
                                 ) : (
                                     currentContent?.type === 'video' && mainVideoUrl ? (
                                     <video
                                         controls
-                                            src={mainVideoUrl}
-                                        className="w-full h-full rounded-2xl"
-                                            poster={course.cover_url || "/placeholder.svg"}
+                                        controlsList="nodownload noplaybackrate"
+                                        src={mainVideoUrl}
+                                        className="w-full h-full rounded-2xl select-none"
+                                        style={{ userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'auto' }}
+                                        poster={course.cover_url || "/placeholder.svg"}
                                         onPlay={() => setIsVideoPlaying(true)}
                                         onPause={() => setIsVideoPlaying(false)}
+                                        onContextMenu={handleContextMenu}
+                                        onDragStart={handleDragStart}
+                                        onSelectStart={preventDownload}
+                                        disablePictureInPicture
+                                        playsInline
                                     >
                                             <source src={mainVideoUrl} type="video/mp4" />
                                         متصفحك لا يدعم عرض الفيديو.
                                     </video>
                                     ) : currentContent?.type === 'image' ? (
-                                        <div className="w-full h-full flex items-center justify-center bg-gray-900">
+                                        <div className="w-full h-full flex items-center justify-center bg-gray-900" onContextMenu={handleContextMenu}>
                                             <img
                                                 src={currentContent.url}
                                                 alt={currentContent.title}
-                                                className="max-w-full max-h-full object-contain rounded-2xl"
+                                                className="max-w-full max-h-full object-contain rounded-2xl select-none"
+                                                style={{ userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'auto' }}
+                                                onContextMenu={handleContextMenu}
+                                                onDragStart={handleDragStart}
                                             />
                                         </div>
                                     ) : currentContent?.type === 'pdf' ? (
@@ -615,7 +768,7 @@ export default function CourseDetail() {
                                                 <p className="text-gray-300 mb-4">ملف PDF</p>
                                                 <button
                                                     onClick={() => handleDownload(currentContent.url, currentContent.fileName)}
-                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 mx-auto"
+                                                    className="bg-[#194cbf] hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 mx-auto"
                                                 >
                                                     <Download size={16} />
                                                     تحميل الملف
@@ -651,7 +804,7 @@ export default function CourseDetail() {
                             {currentContent && (
                                 <div className="bg-white/10 backdrop-blur-sm p-3 text-center">
                                     <div className="flex items-center justify-center gap-2 mb-1">
-                                        <span className="text-xs text-blue-200 bg-blue-600/30 px-2 py-1 rounded">
+                                        <span className="text-xs text-blue-200 bg-[#194cbf]/30 px-2 py-1 rounded">
                                             {currentContent.sectionTitle}
                                         </span>
                                         <span className="text-xs text-gray-300">
@@ -704,11 +857,11 @@ export default function CourseDetail() {
                         <div className="bg-white rounded-xl shadow-lg mb-8 p-6 border border-blue-100">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div className="text-center">
-                                    <div className="text-2xl font-bold text-blue-600">{totalLessons}</div>
+                                    <div className="text-2xl font-bold text-[#194cbf]">{totalLessons}</div>
                                     <div className="text-sm text-gray-600">درس</div>
                                 </div>
                                 <div className="text-center">
-                                    <div className="text-2xl font-bold text-purple-600">{Math.round(totalDuration / 60)}</div>
+                                    <div className="text-2xl font-bold text-[#61a1ff]">{Math.round(totalDuration / 60)}</div>
                                     <div className="text-sm text-gray-600">ساعة</div>
                                 </div>
                                 <div className="text-center">
@@ -724,20 +877,19 @@ export default function CourseDetail() {
 
                         {/* Tabs */}
                         <div className="bg-white rounded-xl shadow-lg mb-8 border border-blue-100">
-                            <div className="border-b border-purple-100 bg-gradient-to-r from-purple-50 to-purple-50 rounded-t-3xl">
-                                <nav className="flex px-8">
+                            <div className="border-b border-blue-100 bg-gradient-to-r from-blue-50 to-blue-50 rounded-t-3xl">
+                                <nav className="flex flex-wrap px-2 sm:px-4 md:px-8 overflow-x-auto">
                                     {[
                                         { id: "curriculum", label: "المنهج" },
-                                        { id: "overview", label: "نظرة عامة" },
                                         { id: "quizzes", label: "الاختبارات" },
                                         { id: "reviews", label: "إسأل الاستاذ" }
                                     ].map((tab) => (
                                         <button
                                             key={tab.id}
                                             onClick={() => setActiveTab(tab.id)}
-                                            className={`py-5 ml-9 px-2 border-b-4 font-bold text-base transition-all duration-200 ${activeTab === tab.id
-                                                ? "border-purple-500 text-purple-700 bg-purple-50 rounded-t-2xl shadow"
-                                                : "border-transparent text-purple-400 hover:text-purple-700 hover:border-purple-200"
+                                            className={`py-3 sm:py-4 md:py-5 px-2 sm:px-3 md:px-4 mx-1 sm:mx-2 md:ml-9 border-b-4 font-bold text-xs sm:text-sm md:text-base transition-all duration-200 whitespace-nowrap flex-shrink-0 ${activeTab === tab.id
+                                                ? "border-blue-500 text-[#61a1ff] bg-blue-50 rounded-t-2xl shadow"
+                                                : "border-transparent text-blue-400 hover:text-[#61a1ff] hover:border-blue-200"
                                                 }`}
                                         >
                                             {tab.label}
@@ -751,7 +903,7 @@ export default function CourseDetail() {
                                         {/* Learning Objectives */}
                                         <div>
                                             <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                                <Award className="text-blue-600" size={24} />
+                                                <Award className="text-[#194cbf]" size={24} />
                                                 ما ستتعلمه
                                             </h3>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -765,26 +917,7 @@ export default function CourseDetail() {
                                         </div>
 
                                         {/* Prerequisites */}
-                                        <div>
-                                            <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                                <BookOpen className="text-purple-400" size={24} />
-                                                المتطلبات المسبقة
-                                            </h3>
-                                            <ul className="space-y-2">
-                                                <li className="flex items-start gap-3">
-                                                        <div className="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div>
-                                                    <span className="text-gray-700">معرفة أساسية باللغة العربية</span>
-                                                    </li>
-                                                <li className="flex items-start gap-3">
-                                                    <div className="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div>
-                                                    <span className="text-gray-700">الرغبة في التعلم والتطوير</span>
-                                                </li>
-                                                <li className="flex items-start gap-3">
-                                                    <div className="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div>
-                                                    <span className="text-gray-700">لا حاجة لخبرة سابقة</span>
-                                                </li>
-                                            </ul>
-                                        </div>
+                                        
 
                                         {/* Course Description */}
                                         <div>
@@ -842,7 +975,7 @@ export default function CourseDetail() {
                                                                             {block.type === 'video' && fileUrl && (
                                                                                 <button
                                                                                     onClick={() => handleVideoClick(fileUrl, block.title)}
-                                                                                    className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                                                                    className="flex items-center gap-1 text-[#194cbf] hover:text-blue-700 text-sm font-medium"
                                                                                 >
                                                                                     <Play size={14} />
                                                                                     مشاهدة
@@ -863,7 +996,7 @@ export default function CourseDetail() {
                                                                                 <div className="flex items-center gap-2">
                                                                                     <button
                                                                                         onClick={() => handlePdfClick(fileUrl, block.title)}
-                                                                                        className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                                                                        className="flex items-center gap-1 text-[#194cbf] hover:text-blue-700 text-sm font-medium"
                                                                                     >
                                                                                         <Eye size={14} />
                                                                                         عرض
@@ -887,9 +1020,9 @@ export default function CourseDetail() {
                                                         {section.blocks?.map((block, blockIndex) => {
                                                             if (block.type === 'text' && block.content) {
                                                                 return (
-                                                                    <div key={`text-${blockIndex}`} className="mt-4 p-4 bg-gray-50 rounded-lg border-r-4 border-purple-500">
+                                                                    <div key={`text-${blockIndex}`} className="mt-4 p-4 bg-gray-50 rounded-lg border-r-4 border-blue-500">
                                                                         <div className="flex items-center gap-2 mb-2">
-                                                                            <FileTextIcon className="text-purple-500" size={16} />
+                                                                            <FileTextIcon className="text-blue-500" size={16} />
                                                                             <span className="text-sm font-medium text-gray-700">{block.title || `نص ${blockIndex + 1}`}</span>
                                                                             <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
                                                                                 نص
@@ -914,7 +1047,7 @@ export default function CourseDetail() {
                                     <div className="space-y-6">
                                         <div className="flex items-center justify-between">
                                             <h3 className="text-xl font-bold text-blue-900 flex items-center gap-2">
-                                                <HelpCircle className="text-blue-600" size={24} />
+                                                <HelpCircle className="text-[#194cbf]" size={24} />
                                                 اختبارات الدورة
                                             </h3>
                                             <div className="flex items-center gap-2">
@@ -964,7 +1097,7 @@ export default function CourseDetail() {
                                                                     <span>تم الإنشاء: {new Date(quiz.createdAt).toLocaleDateString('ar-SA')}</span>
                                                                 </div>
                                                                                           <Button 
-                            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                            className="bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-[#1340a0] hover:to-[#4a8de8] text-white"
                             onClick={() => {
                               localStorage.setItem('currentCourseId', id);
                               navigate(`/quiz/${quiz.id}`);
@@ -1031,7 +1164,7 @@ export default function CourseDetail() {
                                             <div className="flex justify-end">
                                                 <button
                                                     type="submit"
-                                                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-normal py-2 px-6 rounded-sm shadow transition"
+                                                    className="bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-[#1340a0] hover:to-[#4a8de8] text-white font-normal py-2 px-6 rounded-sm shadow transition"
                                                 >
                                                     أضف تقييمك
                                                 </button>
@@ -1073,7 +1206,7 @@ export default function CourseDetail() {
                                                                 >
                                                                     <div className="flex items-center gap-2 mb-2">
                                                                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                                                                            reply.user_role === 'professor' ? 'bg-blue-600' : 'bg-green-600'
+                                                                            reply.user_role === 'professor' ? 'bg-[#194cbf]' : 'bg-green-600'
                                                                         }`}>
                                                                             {reply.user_name?.charAt(0) || '?'}
                                                                         </div>
@@ -1103,7 +1236,7 @@ export default function CourseDetail() {
                                                     {review.reply && (!review.threaded_replies || review.threaded_replies.length === 0) && (
                                                         <div className="mt-3 pr-4 border-r-4 border-blue-500 bg-blue-50 p-3 rounded-lg">
                                                             <div className="flex items-center gap-2 mb-2">
-                                                                <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                                                <div className="w-6 h-6 bg-[#194cbf] rounded-full flex items-center justify-center text-white text-xs font-bold">
                                                                     {course.created_by_name?.charAt(0) || 'م'}
                                                                 </div>
                                                                 <span className="font-semibold text-blue-900 text-sm">{course.created_by_name}</span>
@@ -1117,7 +1250,7 @@ export default function CourseDetail() {
                                                     <div className="mt-3">
                                                         <button
                                                             onClick={() => setShowReplyForm(review.id)}
-                                                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                                            className="text-[#194cbf] hover:text-blue-800 text-sm font-medium"
                                                         >
                                                             رد على هذا التعليق
                                                         </button>
@@ -1136,7 +1269,7 @@ export default function CourseDetail() {
                                                             <div className="flex gap-2 mt-2">
                                                                 <button
                                                                     onClick={() => handleAddReply(review.id)}
-                                                                    className="px-3 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                                                                    className="px-3 py-1 bg-[#194cbf] text-white rounded-md text-sm hover:bg-blue-700"
                                                                 >
                                                                     إرسال الرد
                                                                 </button>
@@ -1161,38 +1294,7 @@ export default function CourseDetail() {
                     {/* Sidebar */}
                     <div className="lg:col-span-1">
                         {/* Action Card */}
-                        <Card className="mb-6 sticky top-4">
-                            <CardContent className="p-6">
-                                <div className="space-y-4">
-                                    {/* Price Display */}
-                                    {(course.price || course.material_price) && (
-                                        <div className="text-center mb-4">
-                                            <div className="text-3xl font-bold text-green-600">
-                                                {course.material_price || course.price} د.ت
-                                            </div>
-                                            <div className="text-sm text-gray-600">سعر الدرس</div>
-                                        </div>
-                                    )}
-                                    
-                                    <div className="flex items-center pt-4 gap-3">
-                                        {course.sections?.some(section => 
-                                            section.blocks?.some(block => 
-                                                block.type === 'document' && block.files?.length > 0
-                                            )
-                                        ) && (
-                                            <Button className="flex-1 flex justify-center items-center bg-blue-600 text-white font-normal shadow hover:bg-blue-700 transition">
-                                                    <FileText size={18} className="absolute mr-[-1rem]" />
-                                                تحميل الملفات
-                                            </Button>
-                                        )}
-                                        <Button variant="outline" className="flex-1 text-blue-900 hover:bg-gray-50">
-                                            <Play size={18} className="absolute mr-[-8.35rem]" />
-                                            مشاهدة الدرس
-                                            </Button>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        
 
                         {/* Instructor Card */}
                         <Card className="mb-6">
@@ -1201,7 +1303,7 @@ export default function CourseDetail() {
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-center gap-4 mb-4">
-                                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                                    <div className="w-16 h-16 bg-gradient-to-br from-[#194cbf] to-[#61a1ff] rounded-full flex items-center justify-center text-white font-bold text-xl">
                                         {course.created_by_name?.charAt(0) || 'م'}
                                     </div>
                                     <div>
@@ -1294,12 +1396,19 @@ export default function CourseDetail() {
                                 <X size={24} />
                             </button>
                         </div>
-                        <div className="p-4">
+                        <div className="p-4" onContextMenu={handleContextMenu}>
                             <video
                                 controls
+                                controlsList="nodownload noplaybackrate"
                                 src={selectedVideo.url}
-                                className="w-full rounded-lg"
+                                className="w-full rounded-lg select-none"
+                                style={{ userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'auto' }}
                                 autoPlay
+                                onContextMenu={handleContextMenu}
+                                onDragStart={handleDragStart}
+                                onSelectStart={preventDownload}
+                                disablePictureInPicture
+                                playsInline
                             >
                                 <source src={selectedVideo.url} type="video/mp4" />
                                 متصفحك لا يدعم عرض الفيديو.
@@ -1342,7 +1451,7 @@ export default function CourseDetail() {
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => handleDownload(selectedPdf.url, selectedPdf.title)}
-                                    className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                    className="flex items-center gap-1 text-[#194cbf] hover:text-blue-700 text-sm font-medium"
                                 >
                                     <Download size={16} />
                                     تحميل

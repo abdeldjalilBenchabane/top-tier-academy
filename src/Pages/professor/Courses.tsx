@@ -125,40 +125,42 @@ const ProfessorCourses = () => {
         />
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="drafts">
-              Drafts
-              {draftCount > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {draftCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="pending">
-              Pending
-              {pendingCount > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {pendingCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="rejected">
-              Rejected
-              {rejectedCount > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {rejectedCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="approved">
-              Approved
-              {approvedCount > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {approvedCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
+          <div className="mb-4 overflow-x-auto">
+            <TabsList className="inline-flex min-w-full sm:min-w-0">
+              <TabsTrigger value="drafts" className="whitespace-nowrap">
+                Drafts
+                {draftCount > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {draftCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="pending" className="whitespace-nowrap">
+                Pending
+                {pendingCount > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {pendingCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="rejected" className="whitespace-nowrap">
+                Rejected
+                {rejectedCount > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {rejectedCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="approved" className="whitespace-nowrap">
+                Approved
+                {approvedCount > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {approvedCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </div>
           
           <TabsContent value="drafts" className="mt-0">
             {draftCount > 0 ? (

@@ -8,8 +8,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Clock, CheckCircle, XCircle, Video, Calendar, FileText, Plus, Layers, ArrowLeft } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Video, Calendar, FileText, Plus, Layers, ArrowLeft, PlusCircle, Trash2, Edit, Loader2, Image as ImageIcon, BookOpen } from 'lucide-react';
 import { toast as toastLib } from '@/lib/toast';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import LiveSectionForm from '@/components/forms/LiveSectionForm';
 import LiveSectionPathSelector from '@/components/admin/LiveSectionPathSelector';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -40,6 +44,7 @@ const ProfessorLiveSections = () => {
   const [editingSectionData, setEditingSectionData] = useState<any>(null);
   const [showPathSelector, setShowPathSelector] = useState(false);
   const [selectedDraftSection, setSelectedDraftSection] = useState<LiveSection | null>(null);
+
 
   const fetchLiveSections = async () => {
     setIsLoading(true);
@@ -107,6 +112,11 @@ const ProfessorLiveSections = () => {
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  // View Details now works the same as Edit Section
+  const handleViewDetails = async (liveSectionId: string) => {
+    await handleEditSection(liveSectionId);
   };
 
   const handleCreateNew = () => {
@@ -242,12 +252,12 @@ const ProfessorLiveSections = () => {
             className="flex items-center gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Live Sections
+            Back to الدورات
           </Button>
         </div>
         
         <PageHeader 
-          title={editingSectionId ? "Edit Live Section" : "Create Live Section"} 
+          title={editingSectionId ? "Edit الدورة" : "Create الدورة"} 
           description={editingSectionId ? "Edit your live section and its sessions" : "Create a new live section with multiple sessions"}
         />
         
@@ -268,62 +278,64 @@ const ProfessorLiveSections = () => {
   return (
     <div className="space-y-6">
       <PageHeader 
-        title="My Live Sections" 
+        title="My الدورات" 
         description="View and manage your live section submissions"
         action={
           <Button onClick={handleCreateNew}>
             <Plus className="mr-2 h-4 w-4" />
-            Create Live Section
+            Create الدورة
           </Button>
         }
       />
       
       {liveSections.length === 0 ? (
         <EmptyState
-          title="No Live Sections Yet"
+          title="No الدورات Yet"
           description="You haven't created any live sections yet. Get started by creating your first live section."
           icon={<Video className="h-12 w-12 text-gray-400" />}
           action={{
-            label: "Create First Live Section",
+            label: "Create First الدورة",
             onClick: handleCreateNew
           }}
         />
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="drafts">
-              Drafts
-              {draftCount > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {draftCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="pending">
-              Pending
-              {pendingCount > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {pendingCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="rejected">
-              Rejected
-              {rejectedCount > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {rejectedCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="approved">
-              Approved
-              {approvedCount > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {approvedCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
+          <div className="mb-4 overflow-x-auto">
+            <TabsList className="inline-flex min-w-full sm:min-w-0">
+              <TabsTrigger value="drafts" className="whitespace-nowrap">
+                Drafts
+                {draftCount > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {draftCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="pending" className="whitespace-nowrap">
+                Pending
+                {pendingCount > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {pendingCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="rejected" className="whitespace-nowrap">
+                Rejected
+                {rejectedCount > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {rejectedCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="approved" className="whitespace-nowrap">
+                Approved
+                {approvedCount > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {approvedCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </div>
           
           <TabsContent value="drafts" className="mt-0">
             {draftCount > 0 ? (
@@ -336,7 +348,7 @@ const ProfessorLiveSections = () => {
                         {section.cover_image_url && (
                           <img
                             src={section.cover_image_url}
-                            alt="Live Section Cover"
+                            alt="الدورة Cover"
                             className="w-full h-28 object-cover rounded-t-md mb-2 border"
                             style={{ minHeight: '7rem', background: '#f3f4f6' }}
                             onError={e => { (e.target as HTMLImageElement).src = fallbackCover; }}
@@ -345,7 +357,7 @@ const ProfessorLiveSections = () => {
                         {!section.cover_image_url && (
                           <img
                             src={fallbackCover}
-                            alt="Default Live Section Cover"
+                            alt="Default الدورة Cover"
                             className="w-full h-28 object-cover rounded-t-md mb-2 border"
                             style={{ minHeight: '7rem', background: '#f3f4f6' }}
                           />
@@ -394,7 +406,7 @@ const ProfessorLiveSections = () => {
                       </CardContent>
                       <CardFooter className="pt-2 flex flex-col gap-2">
                         <Button variant="outline" size="sm" className="w-full" onClick={(e) => { e.stopPropagation(); handleEditSection(section.id); }}>
-                          Edit Live Section
+                          Edit الدورة
                         </Button>
                         <Button variant="default" size="sm" className="w-full flex items-center justify-center" onClick={(e) => { e.stopPropagation(); setSelectedDraftSection(section); setShowPathSelector(true); }}>
                           <Layers className="h-4 w-4 mr-2" />
@@ -406,7 +418,7 @@ const ProfessorLiveSections = () => {
               </div>
             ) : (
               <EmptyState
-                title="No Draft Live Sections"
+                title="No Draft الدورات"
                 description="You don't have any draft live sections."
                 icon={<FileText className="h-12 w-12 text-gray-400" />}
               />
@@ -424,7 +436,7 @@ const ProfessorLiveSections = () => {
                         {section.cover_image_url && (
                           <img
                             src={section.cover_image_url}
-                            alt="Live Section Cover"
+                            alt="الدورة Cover"
                             className="w-full h-28 object-cover rounded-t-md mb-2 border"
                             style={{ minHeight: '7rem', background: '#f3f4f6' }}
                             onError={e => { (e.target as HTMLImageElement).src = fallbackCover; }}
@@ -433,7 +445,7 @@ const ProfessorLiveSections = () => {
                         {!section.cover_image_url && (
                           <img
                             src={fallbackCover}
-                            alt="Default Live Section Cover"
+                            alt="Default الدورة Cover"
                             className="w-full h-28 object-cover rounded-t-md mb-2 border"
                             style={{ minHeight: '7rem', background: '#f3f4f6' }}
                           />
@@ -494,7 +506,7 @@ const ProfessorLiveSections = () => {
               </div>
             ) : (
               <EmptyState
-                title="No Pending Live Sections"
+                title="لا توجد دورات قيد المراجعة"
                 description="You don't have any pending live sections."
                 icon={<Clock className="h-12 w-12 text-gray-400" />}
               />
@@ -512,7 +524,7 @@ const ProfessorLiveSections = () => {
                         {section.cover_image_url && (
                           <img
                             src={section.cover_image_url}
-                            alt="Live Section Cover"
+                            alt="الدورة Cover"
                             className="w-full h-28 object-cover rounded-t-md mb-2 border"
                             style={{ minHeight: '7rem', background: '#f3f4f6' }}
                             onError={e => { (e.target as HTMLImageElement).src = fallbackCover; }}
@@ -521,7 +533,7 @@ const ProfessorLiveSections = () => {
                         {!section.cover_image_url && (
                           <img
                             src={fallbackCover}
-                            alt="Default Live Section Cover"
+                            alt="Default الدورة Cover"
                             className="w-full h-28 object-cover rounded-t-md mb-2 border"
                             style={{ minHeight: '7rem', background: '#f3f4f6' }}
                           />
@@ -556,7 +568,7 @@ const ProfessorLiveSections = () => {
               </div>
             ) : (
               <EmptyState
-                title="No Rejected Live Sections"
+                title="لا توجد دورات مرفوضة"
                 description="You don't have any rejected live sections."
                 icon={<XCircle className="h-12 w-12 text-gray-400" />}
               />
@@ -574,7 +586,7 @@ const ProfessorLiveSections = () => {
                         {section.cover_image_url && (
                           <img
                             src={section.cover_image_url}
-                            alt="Live Section Cover"
+                            alt="الدورة Cover"
                             className="w-full h-28 object-cover rounded-t-md mb-2 border"
                             style={{ minHeight: '7rem', background: '#f3f4f6' }}
                             onError={e => { (e.target as HTMLImageElement).src = fallbackCover; }}
@@ -583,7 +595,7 @@ const ProfessorLiveSections = () => {
                         {!section.cover_image_url && (
                           <img
                             src={fallbackCover}
-                            alt="Default Live Section Cover"
+                            alt="Default الدورة Cover"
                             className="w-full h-28 object-cover rounded-t-md mb-2 border"
                             style={{ minHeight: '7rem', background: '#f3f4f6' }}
                           />
@@ -609,7 +621,12 @@ const ProfessorLiveSections = () => {
                         </div>
                       </CardContent>
                       <CardFooter className="pt-2">
-                        <Button variant="outline" size="sm" className="w-full">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full"
+                          onClick={() => handleViewDetails(section.id)}
+                        >
                           View Details
                         </Button>
                       </CardFooter>
@@ -618,7 +635,7 @@ const ProfessorLiveSections = () => {
               </div>
             ) : (
               <EmptyState
-                title="No Approved Live Sections"
+                title="No Approved الدورات"
                 description="You don't have any approved live sections."
                 icon={<CheckCircle className="h-12 w-12 text-gray-400" />}
               />
@@ -629,9 +646,9 @@ const ProfessorLiveSections = () => {
       
       {/* PathSelector Dialog for Drafts */}
       <Dialog open={showPathSelector} onOpenChange={setShowPathSelector}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Assign Live Section Path</DialogTitle>
+            <DialogTitle>إسناد الدورة Path</DialogTitle>
             <DialogDescription>
               Select the educational structure or language path for this live section. This helps students find your live section in the right place.
             </DialogDescription>

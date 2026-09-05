@@ -16,14 +16,17 @@ const dbConfig = {
   connectionTimeoutMillis: 10000, // Return an error after 10 seconds if connection could not be established
   statement_timeout: 30000, // Query timeout after 30 seconds
   query_timeout: 30000, // Query timeout after 30 seconds
+    options: '-c timezone=UTC' // Add timezone configuration
 };
 
 // Create a new pool instance
 const pool = new Pool(dbConfig);
 
 // Test the connection
-pool.on('connect', () => {
+pool.on('connect', (client) => {
   console.log('Connected to PostgreSQL database');
+  // Set timezone for this connection
+  client.query('SET timezone = \'UTC\';');
 });
 
 pool.on('error', (err) => {

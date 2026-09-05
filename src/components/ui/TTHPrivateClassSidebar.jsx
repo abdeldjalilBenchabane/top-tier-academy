@@ -36,9 +36,9 @@ const PrivateClassSidebar = ({ onFilterChange, onSearch }) => {
     {
       name: 'ثانوي',
       icon: FaCalendarAlt,
-      color: 'from-purple-500 to-purple-600',
-      bgColor: 'bg-purple-50',
-      textColor: 'text-purple-700',
+      color: 'from-[#194cbf] to-[#61a1ff]',
+      bgColor: 'bg-blue-50',
+      textColor: 'text-[#61a1ff]',
       years: [
         'الأولى ج م علوم ثانوي',
         'الثانية علوم تجريبية ثانوي',
@@ -80,10 +80,10 @@ const PrivateClassSidebar = ({ onFilterChange, onSearch }) => {
       <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-2xl shadow-xl p-4 sm:p-6 backdrop-blur-sm" >
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+          <div className="w-10 h-10 bg-gradient-to-r from-[#194cbf] to-[#61a1ff] rounded-full flex items-center justify-center shadow-lg">
             <FaFilter className="text-white text-lg" />
           </div>
-          <h3 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h3 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-[#194cbf] to-[#61a1ff] bg-clip-text text-transparent">
             السنة الدراسية
           </h3>
         </div>
@@ -160,7 +160,7 @@ const PrivateClassSidebar = ({ onFilterChange, onSearch }) => {
           disabled={!selectedGrade || !selectedYear}
           className={`w-full py-3 sm:py-4 px-6 rounded-xl font-bold text-sm sm:text-base transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 ${
             selectedGrade && selectedYear
-              ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 hover:scale-105'
+              ? 'bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white hover:from-[#1340a0] hover:to-[#4a8de8] hover:scale-105'
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
         >
@@ -170,7 +170,7 @@ const PrivateClassSidebar = ({ onFilterChange, onSearch }) => {
 
         {/* Decorative Elements */}
         <div className="absolute top-4 right-4 w-2 h-2 bg-blue-400 rounded-full opacity-60"></div>
-        <div className="absolute bottom-4 left-4 w-3 h-3 bg-purple-400 rounded-full opacity-40"></div>
+        <div className="absolute bottom-4 left-4 w-3 h-3 bg-blue-400 rounded-full opacity-40"></div>
       </div>
     </div>
   );

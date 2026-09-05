@@ -9,6 +9,43 @@ import { sendPasswordResetEmail, sendSchoolHousePasswordResetEmail } from '../se
 
 const router = express.Router();
 
+// Helper function to generate unique session token
+const generateSessionToken = () => {
+  return crypto.randomBytes(32).toString('hex');
+};
+
+// Helper function to create a new session and invalidate old ones
+const createUserSession = async (userId, req) => {
+  try {
+    // Generate session token
+    const sessionToken = generateSessionToken();
+    
+    // Get device info
+    const userAgent = req.headers['user-agent'] || 'Unknown';
+    const ipAddress = req.ip || req.connection.remoteAddress || 'Unknown';
+    
+    // Session expires in 7 days (same as JWT)
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    
+    // Invalidate all previous sessions for this user
+    await query(
+      'UPDATE user_sessions SET is_active = false WHERE user_id = $1 AND is_active = true',
+      [userId]
+    );
+    
+    // Create new session
+    await query(
+      'INSERT INTO user_sessions (user_id, session_token, device_info, ip_address, user_agent, expires_at) VALUES ($1, $2, $3, $4, $5, $6)',
+      [userId, sessionToken, userAgent, ipAddress, userAgent, expiresAt]
+    );
+    
+    return sessionToken;
+  } catch (error) {
+    console.error('Error creating user session:', error);
+    throw error;
+  }
+};
+
 // Helper function to generate JWT token
 const generateToken = (user) => {
   return jwt.sign(
@@ -72,6 +109,9 @@ router.post('/login', async (req, res) => {
     // Generate JWT token
     const token = generateToken(user);
 
+    // Create new session and invalidate previous ones
+    const sessionToken = await createUserSession(user.id, req);
+
     // Remove password from response
     const { password_hash, ...userWithoutPassword } = user;
     // Ensure id is a string
@@ -84,6 +124,7 @@ router.post('/login', async (req, res) => {
       message: 'Login successful',
       user: userWithoutPassword,
       token,
+      sessionToken,
       agoraUid,
       agoraRtmToken
     });
@@ -150,10 +191,14 @@ router.post('/register', async (req, res) => {
     const token = generateToken(newUser);
     console.log('JWT token generated');
 
+    // Create new session
+    const sessionToken = await createUserSession(newUser.id, req);
+
     res.status(201).json({
       message: 'Registration successful',
       user: newUser,
       token,
+      sessionToken,
       agoraUid,
       agoraRtmToken
     });
@@ -189,9 +234,64 @@ router.get('/me', verifyToken, async (req, res) => {
   }
 });
 
-// Logout endpoint (client-side token removal)
-router.post('/logout', (req, res) => {
-  res.json({ message: 'Logged out successfully' });
+// Logout endpoint (invalidate session)
+router.post('/logout', verifyToken, async (req, res) => {
+  try {
+    const sessionToken = req.header('X-Session-Token');
+    
+    if (sessionToken) {
+      // Invalidate the session
+      await query(
+        'UPDATE user_sessions SET is_active = false WHERE session_token = $1',
+        [sessionToken]
+      );
+    }
+    
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Validate session endpoint
+router.post('/validate-session', verifyToken, async (req, res) => {
+  try {
+    const sessionToken = req.header('X-Session-Token');
+    
+    if (!sessionToken) {
+      return res.status(401).json({ error: 'Session token is required', valid: false });
+    }
+    
+    // Check if session exists and is active
+    const session = await getRow(
+      'SELECT id, user_id, is_active, expires_at FROM user_sessions WHERE session_token = $1',
+      [sessionToken]
+    );
+    
+    if (!session) {
+      return res.status(401).json({ error: 'Invalid session', valid: false });
+    }
+    
+    if (!session.is_active) {
+      return res.status(401).json({ error: 'Session has been invalidated', valid: false });
+    }
+    
+    if (new Date(session.expires_at) < new Date()) {
+      return res.status(401).json({ error: 'Session has expired', valid: false });
+    }
+    
+    // Update last activity
+    await query(
+      'UPDATE user_sessions SET last_activity = CURRENT_TIMESTAMP WHERE id = $1',
+      [session.id]
+    );
+    
+    res.json({ valid: true, message: 'Session is valid' });
+  } catch (error) {
+    console.error('Session validation error:', error);
+    res.status(500).json({ error: 'Internal server error', valid: false });
+  }
 });
 
 // Verify token endpoint
@@ -200,6 +300,49 @@ router.post('/verify', verifyToken, (req, res) => {
     message: 'Token is valid',
     user: req.user
   });
+});
+
+// Refresh token endpoint (for streaming sessions)
+router.post('/refresh-token', verifyToken, async (req, res) => {
+  try {
+    // Get current user from database to ensure they still exist
+    const user = await getRow(
+      'SELECT id, name, email, role, avatar_url FROM users WHERE id = $1',
+      [req.user.id]
+    );
+
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    // Generate new token with extended expiration for streaming
+    const newToken = jwt.sign(
+      {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      },
+      process.env.JWT_SECRET || '***REMOVED***',
+      { expiresIn: '30d' } // Extended expiration for streaming sessions
+    );
+
+    // Generate new Agora tokens
+    const agoraUid = String(user.id).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+    const agoraRtmToken = generateAgoraRtmToken(agoraUid);
+
+    res.json({
+      message: 'Token refreshed successfully',
+      user: { ...user, id: String(user.id) },
+      token: newToken,
+      agoraUid,
+      agoraRtmToken
+    });
+
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Request password reset (forgot password)

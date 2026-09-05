@@ -26,7 +26,8 @@ export const usePrivateClasses = () => {
     title: '',
     sessionsCount: '1',
     description: '',
-    dates: []
+    dates: [],
+    phone: ''
   });
   const [myPendingRequests, setMyPendingRequests] = useState([]);
   const [allOrders, setAllOrders] = useState([]);
@@ -388,7 +389,20 @@ export const usePrivateClasses = () => {
   const handleYearChange = (e) => setSelectedYear(e.target.value);
   const handleSpecialityChange = (e) => setSelectedSpeciality(e.target.value);
   const handleMaterialChange = (e) => setSelectedMaterial(e.target.value);
-  const handleTeacherChange = (e) => setSelectedTeacher(e.target.value);
+  const handleTeacherChange = (e) => {
+    const value = e.target.value;
+    setSelectedTeacher(value);
+
+    // Auto-fill the المرحلة when a teacher with a level is picked
+    if (value) {
+      const teacher = availableTeachers.find(
+        (t) => t.name === value || String(t.id) === String(value)
+      );
+      if (teacher && teacher.level_id) {
+        setSelectedLevel(String(teacher.level_id));
+      }
+    }
+  };
 
   const handleSearch = () => {
     //
@@ -404,7 +418,8 @@ export const usePrivateClasses = () => {
       title: '',
       sessionsCount: '1',
       description: '',
-      dates: []
+      dates: [],
+      phone: ''
     });
   };
 
@@ -422,6 +437,10 @@ export const usePrivateClasses = () => {
     }
     if (!selectedTeacher) {
       alert('يرجى اختيار الأستاذ');
+      return;
+    }
+    if (!requestForm.phone || !requestForm.phone.trim()) {
+      alert('يرجى إدخال رقم الهاتف لكي يتمكن الفريق من التواصل معك');
       return;
     }
     
@@ -472,7 +491,8 @@ export const usePrivateClasses = () => {
             level_id: parseInt(selectedLevel),
             year_id: parseInt(selectedYear),
             speciality_id: parseInt(selectedSpeciality),
-            material_id: parseInt(selectedMaterial)
+            material_id: parseInt(selectedMaterial),
+            phone: requestForm.phone
         })
       });
         

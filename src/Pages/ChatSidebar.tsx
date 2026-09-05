@@ -62,7 +62,7 @@ const ChatSidebar: React.FC<Props> = ({
                     display: none;  /* Safari and Chrome */
                 }
             `}</style>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 h-[600px] flex flex-col">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 h-[400px] lg:h-[600px] flex flex-col">
                 <div className="flex items-center gap-2 mb-4 pb-4 border-b border-white/20">
                     <MessageSquare className="w-5 h-5" />
                     <h3 className="font-semibold">الدردشة المباشرة</h3>

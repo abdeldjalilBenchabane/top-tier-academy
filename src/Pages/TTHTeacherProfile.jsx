@@ -121,7 +121,7 @@ export default function TeacherProfile() {
             </header>
 
             {/* Hero Section */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-700 text-white py-12">
+            <div className="bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white py-12">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center gap-8">
                         <div className="w-32 h-32 bg-white/20 rounded-full flex items-center justify-center text-6xl font-bold">
@@ -154,7 +154,7 @@ export default function TeacherProfile() {
                             <div className="flex gap-4">
                                 <Dialog open={isQuestionDialogOpen} onOpenChange={setIsQuestionDialogOpen}>
                                     <DialogTrigger asChild>
-                                        <Button className="bg-white text-blue-600 hover:bg-gray-100">
+                                        <Button className="bg-white text-[#194cbf] hover:bg-gray-100">
                                             <MessageCircle size={18} className="ml-2" />
                                             اسأل سؤال
                                         </Button>
@@ -235,7 +235,7 @@ export default function TeacherProfile() {
                                             key={tab.id}
                                             onClick={() => setActiveTab(tab.id)}
                                             className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
-                                                ? "border-blue-500 text-blue-600"
+                                                ? "border-blue-500 text-[#194cbf]"
                                                 : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                                                 }`}
                                         >
@@ -258,7 +258,7 @@ export default function TeacherProfile() {
                                             <div className="grid grid-cols-2 gap-3">
                                                 {teacher.specialties.map((specialty, index) => (
                                                     <div key={index} className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                                                        <BookOpen className="text-blue-600" size={20} />
+                                                        <BookOpen className="text-[#194cbf]" size={20} />
                                                         <span>{specialty}</span>
                                                     </div>
                                                 ))}
@@ -280,7 +280,7 @@ export default function TeacherProfile() {
                                         <h3 className="text-xl font-bold text-gray-900 mb-6">المؤهلات التعليمية</h3>
                                         {teacher.education.map((edu, index) => (
                                             <div key={index} className="flex items-start gap-4 p-4 border border-gray-200 rounded-lg">
-                                                <Award className="text-blue-600 mt-1" size={20} />
+                                                <Award className="text-[#194cbf] mt-1" size={20} />
                                                 <span className="text-gray-700">{edu}</span>
                                             </div>
                                         ))}

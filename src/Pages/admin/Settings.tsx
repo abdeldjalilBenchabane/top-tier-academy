@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { toast } from '@/lib/toast';
+import YearResetCard from '@/components/admin/YearResetCard';
 
 const SettingsPage = () => {
   const handleSaveSettings = () => {
@@ -143,24 +144,7 @@ const SettingsPage = () => {
             </CardContent>
           </Card>
           
-          <Card className="border-red-200">
-            <CardHeader>
-              <CardTitle className="text-red-600">Danger Zone</CardTitle>
-              <CardDescription>
-                Destructive actions that cannot be undone
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button 
-                variant="destructive" 
-                onClick={() => {
-                  toast.error('This action is disabled in the demo');
-                }}
-              >
-                Reset Application Data
-              </Button>
-            </CardContent>
-          </Card>
+          <YearResetCard />
         </TabsContent>
       </Tabs>
     </div>

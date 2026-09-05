@@ -361,8 +361,47 @@ export const api = {
   },
 
   getHomeSlides: async (): Promise<HomeSlide[]> => {
-    await delay(500);
-    return mockData.homeSlides.sort((a, b) => a.order - b.order);
+    try {
+      console.log('🔄 Fetching slides from API...');
+      const res = await fetch('/api/slides/active', {
+        credentials: 'include'
+      });
+      console.log('📡 API response status:', res.status);
+      if (!res.ok) throw new Error('Failed to fetch slides');
+      const data = await res.json();
+      console.log('📊 API response data:', data);
+      
+      // Transform snake_case to camelCase for frontend compatibility
+      const transformedSlides = (data.slides || []).map((slide: any) => ({
+        id: slide.id,
+        title: slide.title,
+        description: slide.description,
+        imageUrl: slide.image_url,
+        videoUrl: slide.video_url,
+        mediaType: slide.media_type,
+        order: slide.order,
+        isActive: slide.is_active,
+        duration: slide.duration,
+        startDate: slide.start_date,
+        endDate: slide.end_date,
+        targetAudience: slide.target_audience_roles,
+        ctaText: slide.cta_text,
+        ctaLink: slide.cta_link,
+        overlayColor: slide.overlay_color,
+        overlayOpacity: slide.overlay_opacity,
+        transition: slide.transition,
+        altText: slide.alt_text,
+        views: slide.views,
+        clicks: slide.clicks,
+        createdAt: slide.created_at,
+        updatedAt: slide.updated_at,
+      }));
+      console.log('✅ Transformed slides:', transformedSlides);
+      return transformedSlides;
+    } catch (error) {
+      console.error('❌ Error fetching slides:', error);
+      return [];
+    }
   },
   
   // Generic GET method for any endpoint
@@ -485,6 +524,21 @@ export const api = {
     });
     if (!res.ok) throw new Error('Failed to update session');
     return res.json();
+  },
+  deleteLiveSession: async (sessionId: string): Promise<void> => {
+    const res = await fetch(`${API_BASE_URL}/live-sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` })
+      },
+      credentials: 'include'
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.error || 'Failed to delete live session');
+    }
+    return await res.json();
   },
   updateLiveSessionStatus: async (sessionId: string, status: LiveSession['status']): Promise<LiveSession> => {
     return api.updateLiveSession(sessionId, { status });

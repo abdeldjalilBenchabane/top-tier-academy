@@ -186,7 +186,7 @@ const Register = () => {
               
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white shadow-lg hover:from-[#1340a0] hover:to-[#4a8de8]"
                 disabled={isLoading}
               >
                 {isLoading ? 'Creating account...' : 'Sign up'}

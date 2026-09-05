@@ -335,7 +335,7 @@ const StudentDashboard = () => {
                                 variant={activeTab === tab.id ? "default" : "ghost"}
                                 className={`flex-1 justify-center gap-2 ${activeTab === tab.id
                                     ? 'bg-blue-400 text-white'
-                                    : 'text-blue-600 hover:text-blue-3bg-blue-300'
+                                    : 'text-[#194cbf] hover:text-blue-3bg-blue-300'
                                     }`}
                                 onClick={() => setActiveTab(tab.id)}
                             >
@@ -359,7 +359,7 @@ const StudentDashboard = () => {
                                 variant={activeTab === tab.id ? "default" : "ghost"}
                                 className={`flex flex-col items-center justify-center gap-1 py-3 px-2 text-xs ${activeTab === tab.id
                                     ? 'bg-blue-400 text-white'
-                                    : 'text-blue-600 hover:bg-blue-50'
+                                    : 'text-[#194cbf] hover:bg-blue-50'
                                     }`}
                                 onClick={() => setActiveTab(tab.id)}
                             >
@@ -386,11 +386,11 @@ const StudentDashboard = () => {
                                     </div>
                                 </CardContent>
                             </Card>
-                            <Card className="bg-gradient-to-r from-purple-400 to-purple-700 text-white cursor-pointer hover:shadow-lg transition-all duration-300" onClick={fetchPrivateClassRequests}>
+                            <Card className="bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white cursor-pointer hover:shadow-lg transition-all duration-300" onClick={fetchPrivateClassRequests}>
                                 <CardContent className="p-8">
                                     <div className="flex items-center mt-2 justify-between">
                                         <div>
-                                            <p className="text-purple-100">الحصص الخاصة</p>
+                                            <p className="text-blue-100">الحصص الخاصة</p>
                                             <p className="text-3xl mt-2 font-bold">
                                                 {(() => {
                                                     const count = myPendingRequests?.filter(req => req.status === 'مؤكد').length ?? 0;
@@ -399,7 +399,7 @@ const StudentDashboard = () => {
                                                 })()}
                                             </p>
                                         </div>
-                                        <CheckCircle className="w-8 h-8 text-purple-200" />
+                                        <CheckCircle className="w-8 h-8 text-blue-200" />
                                     </div>
                                 </CardContent>
                             </Card>
@@ -435,7 +435,7 @@ const StudentDashboard = () => {
                             <div className="flex items-center justify-between">
                                 <h2 className="text-2xl font-bold text-gray-900">دوراتي المشتراة</h2>
                                 <Link to="/TTHCourses">
-                                    <Button variant="outline" className="text-blue-600 border-blue-600 hover:bg-blue-50">
+                                    <Button variant="outline" className="text-[#194cbf] border-[#194cbf] hover:bg-blue-50">
                                         عرض جميع الدورات
                                     </Button>
                                 </Link>
@@ -463,7 +463,7 @@ const StudentDashboard = () => {
                                                         }}
                                                     />
                                                 ) : (
-                                                    <div className="w-full h-48 bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center">
+                                                    <div className="w-full h-48 bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
                                                         <BookOpen className="w-12 h-12 text-white" />
                                                     </div>
                                                 )}
@@ -493,7 +493,7 @@ const StudentDashboard = () => {
                                                     </div>
                                                 </div>
                                                 <Button 
-                                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                                    className="w-full bg-[#194cbf] hover:bg-blue-700 text-white"
                                                     onClick={() => navigate(`/coursesList/courses/${course.id}`)}
                                                 >
                                                     عرض الدورة
@@ -509,7 +509,7 @@ const StudentDashboard = () => {
                                     <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد دورات مشتراة</h3>
                                     <p className="text-gray-500 mb-4">ابدأ رحلتك التعليمية بشراء دورات من متجرنا</p>
                                     <Link to="/TTHCourses">
-                                        <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                                        <Button className="bg-[#194cbf] hover:bg-blue-700 text-white">
                                             استكشف الدورات
                                         </Button>
                                     </Link>
@@ -528,7 +528,7 @@ const StudentDashboard = () => {
                       <h2 className="text-2xl font-bold text-gray-900">حصصي المباشرة</h2>
                       <div className="flex gap-2">
                         <Link to="/TTHLiveClasses">
-                          <Button variant="outline" className="text-purple-600 border-purple-600 hover:bg-purple-50">
+                          <Button variant="outline" className="text-[#61a1ff] border-[#61a1ff] hover:bg-blue-50">
                             الجلسات الفردية
                           </Button>
                         </Link>
@@ -555,7 +555,7 @@ const StudentDashboard = () => {
                                                 }}
                                             />
                                         ) : (
-                                            <div className="w-full h-48 bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center">
+                                            <div className="w-full h-48 bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
                                                 <Video className="w-12 h-12 text-white" />
                                             </div>
                                         )}
@@ -603,7 +603,7 @@ const StudentDashboard = () => {
                                                             ? 'text-green-600' 
                                                             : sessionTimers[session.id] === 'منتهي' 
                                                             ? 'text-red-600' 
-                                                            : 'text-blue-600'
+                                                            : 'text-[#194cbf]'
                                                     }`}>
                                                         {sessionTimers[session.id] || new Date(session.start_time).toLocaleTimeString('en-US', {
                                                             hour: '2-digit',
@@ -619,7 +619,7 @@ const StudentDashboard = () => {
                                                     ? 'bg-green-600 hover:bg-green-700 text-white animate-pulse'
                                                     : sessionTimers[session.id] === 'منتهي'
                                                     ? 'bg-gray-400 hover:bg-gray-500 text-white cursor-not-allowed'
-                                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                                    : 'bg-[#194cbf] hover:bg-blue-700 text-white'
                                             }`}
                                             onClick={() => {
                                                 if (sessionTimers[session.id] !== 'منتهي') {
@@ -647,7 +647,7 @@ const StudentDashboard = () => {
                             <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد حصص مباشرة مشتراة</h3>
                             <p className="text-gray-500 mb-4">اشترِ حصص مباشرة من صفحة الجلسات الفردية للانضمام إلى البث المباشر</p>
                             <Link to="/TTHLiveClasses">
-                                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                                <Button className="bg-[#194cbf] hover:bg-blue-700 text-white">
                                     استكشف الجلسات الفردية
                                 </Button>
                             </Link>
