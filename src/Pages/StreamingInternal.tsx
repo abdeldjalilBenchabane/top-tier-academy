@@ -21,6 +21,7 @@ import { api } from '@/lib/api';
 import { authAPI } from '@/services/api';
 
 import ChatSidebar from './ChatSidebar';
+import ChatExpanded from './ChatExpanded';
 
 
 
@@ -72,6 +73,17 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
     const [session, setSession] = useState<any>(null);
 
+    // The states a professor can set by hand. Same wording as TTHLiveCard and
+    // the student dashboard, so the room agrees with the page that led here.
+    const STREAM_STATE: Record<string, { label: string; cls: string }> = {
+        live:             { label: 'مباشر الآن',    cls: 'bg-green-500/20 text-green-300' },
+        starting:         { label: 'على وشك البدء', cls: 'bg-emerald-500/20 text-emerald-300' },
+        paused:           { label: 'متوقفة مؤقتاً', cls: 'bg-amber-500/20 text-amber-300' },
+        technical_issues: { label: 'مشكلة تقنية',   cls: 'bg-orange-500/20 text-orange-300' },
+        cancelled:        { label: 'ملغاة',         cls: 'bg-red-500/20 text-red-300' },
+        ended:            { label: 'انتهى البث',    cls: 'bg-gray-500/20 text-gray-300' },
+    };
+
     const [loadingSession, setLoadingSession] = useState(true);
 
     const [chatEnabled, setChatEnabled] = useState(true);
@@ -99,6 +111,14 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     const [isPaused, setIsPaused] = useState(false);
 
     const [showFullscreenChat, setShowFullscreenChat] = useState(false);
+    // The full-window chat. Unlike showFullscreenChat this does not
+    // require the video to be in fullscreen, so it works for the student
+    // watching in a normal window and for the teacher while presenting.
+    const [chatExpanded, setChatExpanded] = useState(false);
+    // null until the teacher has answered. Some teachers present without
+    // appearing on camera, and that has to be a choice made before the
+    // stream goes out, not something to undo afterwards.
+    const [startWithCamera, setStartWithCamera] = useState<boolean | null>(null);
 
     const [unseenMessages, setUnseenMessages] = useState(0);
 
@@ -732,7 +752,9 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
             avatar_url: user.avatar_url,
 
-            socketId: newSocket.id
+            socketId: newSocket.id,
+
+            agoraUid: stableUid
 
         });
 
@@ -969,6 +991,17 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
             console.log('[DEBUG] Chat toggled by professor:', enabled);
 
             setChatEnabled(enabled);
+
+        });
+
+        // The teacher paused, hit a technical problem, or came back. Sent on
+        // every change and once on arrival, so the badge and the banner never
+        // show a status the room has already left.
+        newSocket.on('session-status', (data: { status?: string }) => {
+
+            if (!data?.status) return;
+
+            setSession((prev: any) => (prev ? { ...prev, status: data.status } : prev));
 
         });
 
@@ -1542,8 +1575,6 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
             setIsLocalMicMuted(agoraVideoRef.current.isLocalMicMuted);
 
-            setIsLocalCameraEnabled(agoraVideoRef.current.isLocalCameraEnabled);
-
             setIsScreenSharing(agoraVideoRef.current.isScreenSharing);
 
             setCameraDevices(agoraVideoRef.current.cameraDevices);
@@ -1825,15 +1856,12 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
     const handleToggleCamera = () => {
 
-        if (agoraVideoRef.current) {
-
-            agoraVideoRef.current.toggleLocalCamera();
-
-            // Update local state for immediate UI feedback
-
-            setIsLocalCameraEnabled(!isLocalCameraEnabled);
-
-        }
+        // No local flip here. This used to invert its own copy of the state,
+        // which started at "on" whatever the camera was doing — so for a
+        // teacher who began without one, every press made the icon more
+        // wrong. The player reports the real state through
+        // onCameraStateChange and the icon follows that.
+        agoraVideoRef.current?.toggleLocalCamera();
 
     };
 
@@ -2051,6 +2079,26 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                             <p className="text-xs sm:text-sm text-gray-300">مشاهدون: {viewerCount}</p>
 
+                            {STREAM_STATE[session.status] && (
+
+                                <span className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${STREAM_STATE[session.status].cls}`}>
+
+                                    {session.status === 'paused' || session.status === 'technical_issues' ? (
+
+                                        <span className="w-1.5 h-1.5 rounded-full bg-current" />
+
+                                    ) : session.status === 'live' ? (
+
+                                        <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+
+                                    ) : null}
+
+                                    {STREAM_STATE[session.status].label}
+
+                                </span>
+
+                            )}
+
                             {!isProfessor && (
 
                                 <div className="flex items-center gap-1 sm:gap-2 mt-1 flex-wrap">
@@ -2201,9 +2249,86 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                 }
                             `}</style>
 
+                            {/* The lesson is interrupted. A small badge in the header
+                                is easy to miss while watching, so a student sees it
+                                over the video itself — and knows the frozen picture
+                                is expected, not their connection. The teacher gets the
+                                same reminder that the students are waiting. */}
+                            {session && (session.status === 'paused' || session.status === 'technical_issues' || session.status === 'starting') && (
+                                <div
+                                    dir="rtl"
+                                    className="pointer-events-none absolute inset-x-0 top-0 z-[10010] flex justify-center p-3"
+                                >
+                                    <div className={`flex max-w-xl items-center gap-3 rounded-2xl px-4 py-3 shadow-2xl backdrop-blur-md ${
+                                        session.status === 'technical_issues'
+                                            ? 'bg-orange-600/90'
+                                            : session.status === 'paused'
+                                            ? 'bg-amber-500/90'
+                                            : 'bg-emerald-600/90'
+                                    }`}>
+                                        {session.status === 'technical_issues' ? (
+                                            <Settings className="h-5 w-5 shrink-0 animate-spin text-white" style={{ animationDuration: '3s' }} />
+                                        ) : session.status === 'paused' ? (
+                                            <Pause className="h-5 w-5 shrink-0 text-white" />
+                                        ) : (
+                                            <PlayIcon className="h-5 w-5 shrink-0 text-white" />
+                                        )}
+                                        <div className="text-white">
+                                            <p className="text-sm font-bold">
+                                                {session.status === 'technical_issues'
+                                                    ? 'مشكلة تقنية'
+                                                    : session.status === 'paused'
+                                                    ? 'الحصة متوقفة مؤقتاً'
+                                                    : 'الحصة على وشك البدء'}
+                                            </p>
+                                            <p className="text-xs text-white/85">
+                                                {session.status === 'technical_issues'
+                                                    ? (isProfessor ? 'الطلاب يرون أنك تعالج مشكلة تقنية.' : 'الأستاذ يعالج مشكلة تقنية — ابقَ في الحصة، ستُستأنف قريباً.')
+                                                    : session.status === 'paused'
+                                                    ? (isProfessor ? 'الطلاب يرون أن الحصة متوقفة.' : 'ابقَ في الحصة، ستُستأنف بعد قليل.')
+                                                    : (isProfessor ? 'الطلاب ينتظرون بدءك.' : 'سيبدأ الأستاذ بعد لحظات.')}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Zone vidéo Agora */}
 
-                            {agoraToken ? (
+                            {/* The teacher answers before anything is published, so a
+                                camera-shy teacher never appears on screen even for a
+                                moment. Students skip this entirely. */}
+                            {isProfessor && startWithCamera === null && (
+                                <div className="absolute inset-0 z-[10020] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+                                    <div dir="rtl" className="w-full max-w-md rounded-2xl border border-white/15 bg-[#121a33] p-6 text-center shadow-2xl">
+                                        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-purple-600/20">
+                                            <Video className="h-7 w-7 text-purple-300" />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-white">كيف تريد أن تبدأ البث؟</h3>
+                                        <p className="mt-2 text-sm text-gray-400">
+                                            يمكنك تشغيل الكاميرا لاحقاً في أي وقت من زر الكاميرا.
+                                        </p>
+                                        <div className="mt-6 space-y-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setStartWithCamera(true)}
+                                                className="w-full rounded-xl bg-purple-600 px-4 py-3 font-semibold text-white transition hover:bg-purple-700"
+                                            >
+                                                البدء بالكاميرا والصوت
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setStartWithCamera(false)}
+                                                className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 font-semibold text-white transition hover:bg-white/10"
+                                            >
+                                                البدء بالصوت فقط
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {agoraToken && (!isProfessor || startWithCamera !== null) ? (
 
                                 <>
 
@@ -2220,6 +2345,10 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                             uid={agoraUid || 0}
 
                                             role={isProfessor ? 'host' : 'audience'}
+
+                                            startWithCamera={isProfessor ? startWithCamera !== false : true}
+
+                                            onCameraStateChange={setIsLocalCameraEnabled}
 
                                             studentsMuted={studentsMuted}
 
@@ -2823,11 +2952,28 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                         isProfessor={isProfessor}
 
+                        onExpand={() => setChatExpanded(true)}
+
                     />
 
                 </div>
 
             </div>
+
+
+
+            {/* The same conversation, given the whole window — for the student
+                reading along and for the teacher following students' questions. */}
+            <ChatExpanded
+                open={chatExpanded}
+                onClose={() => setChatExpanded(false)}
+                messages={messages}
+                input={input}
+                setInput={setInput}
+                handleSend={handleSend}
+                chatEnabled={chatEnabled}
+                isProfessor={isProfessor}
+            />
 
 
 

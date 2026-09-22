@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import LiveSectionCommentsSection from '../components/ui/TTHLiveSectionCommentsSection';
 import { toast } from '@/lib/toast';
 
+import { parseSessionDate } from '@/lib/utils';
 // Telegram icon component
 const TelegramIcon = ({ className }: { className?: string }) => (
   <svg 
@@ -107,11 +108,16 @@ const LiveSessionDetails = () => {
       }
       const sessionEndTime = new Date(sessionTime.getTime() + (session.duration || 60) * 60 * 1000);
       
-      // Check if session is manually ended
+      // Same precedence as the status above: say what the professor set.
       if (session.status === 'ended' || session.is_ended) {
         timers[session.id] = 'منتهي';
         return;
       }
+      if (session.status === 'cancelled')        { timers[session.id] = 'ملغاة';         return; }
+      if (session.status === 'paused')           { timers[session.id] = 'متوقفة مؤقتاً'; return; }
+      if (session.status === 'technical_issues') { timers[session.id] = 'مشكلة تقنية';   return; }
+      if (session.status === 'starting')         { timers[session.id] = 'على وشك البدء'; return; }
+      if (session.status === 'live')             { timers[session.id] = 'مباشر الآن';    return; }
       
       if (currentTime < sessionTime) {
         // Session hasn't started yet
@@ -162,14 +168,22 @@ const LiveSessionDetails = () => {
     
     const sessionEndTime = new Date(sessionTime.getTime() + (session.duration || 60) * 60 * 1000);
     
-    // Check if session is manually ended
-    if (session.status === 'ended' || session.is_ended) {
-      return 'ended';
-    }
-    
+        // What the professor set outranks the clock — it is the more recent and
+    // more deliberate fact about the session.
+    if (session.status === 'cancelled') return 'cancelled';
+    if (session.status === 'ended' || session.is_ended) return 'ended';
+    if (session.status === 'paused') return 'paused';
+    if (session.status === 'technical_issues') return 'technical_issues';
+    if (session.status === 'starting') return 'starting';
+
+    // A stream the professor has actually started stays live however long it
+    // runs. Previously the clock closed it at start + duration, which took the
+    // join button away from students while the lesson was still going.
+    if (session.status === 'live') return 'live';
+
     if (currentTime < sessionTime) {
       return 'upcoming';
-    } else if (currentTime >= sessionTime && currentTime <= sessionEndTime) {
+    } else if (currentTime <= sessionEndTime) {
       return 'live';
     } else {
       return 'ended';
@@ -195,35 +209,12 @@ const LiveSessionDetails = () => {
   };
 
   // Helper function to safely parse dates WITHOUT timezone conversion
-  const parseDate = (dateString: string | null | undefined): Date | null => {
-    console.log('[DEBUG] parseDate called with:', dateString, 'Type:', typeof dateString);
-    
-    if (!dateString) {
-      console.log('[DEBUG] parseDate: dateString is null/undefined');
-      return null;
-    }
-    
-    try {
-      // Parse datetime-local format (YYYY-MM-DDTHH:MM) in LOCAL timezone
-      if (dateString.includes('T')) {
-        const [datePart, timePart] = dateString.split('T');
-        const [year, month, day] = datePart.split('-').map(Number);
-        const [hour, minute] = timePart.split(':').map(Number);
-        // Create date using local timezone (NOT UTC)
-        const parsedDate = new Date(year, month - 1, day, hour, minute);
-        if (!isNaN(parsedDate.getTime())) {
-          console.log('[DEBUG] parseDate: Parsed as LOCAL datetime:', parsedDate);
-          return parsedDate;
-        }
-      }
-      
-      console.warn('[DEBUG] Could not parse date:', dateString);
-      return null;
-    } catch (error) {
-      console.error('[DEBUG] Error parsing date:', dateString, error);
-      return null;
-    }
-  };
+  // Wall-clock parsing lives in lib/utils now: this page used to roll its own,
+  // and it only understood the 'YYYY-MM-DDTHH:MM' shape. The API sends
+  // 'YYYY-MM-DD HH:MM:SS' — a space, not a T — so the private version returned
+  // null for every session and took the countdown and the join button with it.
+  const parseDate = (dateString: string | null | undefined): Date | null =>
+    parseSessionDate(dateString);
 
   // Helper function to format date safely
   const formatDate = (dateString: string | null | undefined): string => {

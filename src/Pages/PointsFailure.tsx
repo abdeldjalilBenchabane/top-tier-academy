@@ -4,6 +4,7 @@ import { XCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { paymentsAPI } from '../services/api';
+import { serverDate } from '@/lib/utils';
 
 const PointsFailure: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -65,7 +66,7 @@ const PointsFailure: React.FC = () => {
                 <div className="text-sm text-gray-600">
                   <p>رقم المعاملة: {transaction.id}</p>
                   <p>الحالة: {transaction.status}</p>
-                  <p>التاريخ: {new Date(transaction.created_at).toLocaleDateString('ar-SA')}</p>
+                  <p>التاريخ: {serverDate(transaction.created_at).toLocaleDateString('ar-SA')}</p>
                 </div>
               </div>
             )}

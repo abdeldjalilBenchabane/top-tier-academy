@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { MessageCircle, BookOpen, Calendar, ArrowLeft } from 'lucide-react';
+import { serverDate } from '@/lib/utils';
 
 interface Course {
   id: number;
@@ -159,7 +160,7 @@ const AdminTeacherCourses = () => {
                   <div className="flex items-center justify-between text-sm text-gray-500">
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
-                      <span>{new Date(course.created_at).toLocaleDateString('ar-SA')}</span>
+                      <span>{serverDate(course.created_at).toLocaleDateString('ar-SA')}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <MessageCircle className="h-4 w-4" />

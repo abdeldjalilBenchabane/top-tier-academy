@@ -1,14 +1,32 @@
 import React, { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 
-import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, IMicrophoneAudioTrack, ILocalVideoTrack, CameraVideoTrackInitConfig } from 'agora-rtc-sdk-ng';
+import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, IMicrophoneAudioTrack, ILocalVideoTrack, ILocalAudioTrack, CameraVideoTrackInitConfig } from 'agora-rtc-sdk-ng';
 
 import { Button } from '@/components/ui/button';
 
-import { Mic, MicOff } from 'lucide-react';
+import { Mic, MicOff, Maximize2, VideoOff } from 'lucide-react';
 
 
+
+// A teacher's screen share goes out on a second Agora connection whose uid is
+// this base + the teacher's own uid. That keeps the camera published at the
+// same time, and lets every viewer (web and mobile) tell the two apart from
+// the uid alone, including students who join late.
+const SCREEN_UID_BASE = 900000000;
+const isScreenUid = (u: any) => Number(u) >= SCREEN_UID_BASE;
 
 interface AgoraVideoPlayerProps {
+
+    // Some teachers present without showing themselves. Starting the stream
+    // does not have to mean starting the camera; they can still turn it on
+    // later from the camera button.
+    startWithCamera?: boolean;
+
+    // The page draws the camera button, but only the player knows whether a
+    // camera is actually running. It used to keep its own guess, starting at
+    // "on" and flipping on every press, so a teacher who began without a
+    // camera saw the button lit and each press made it more wrong.
+    onCameraStateChange?: (enabled: boolean) => void;
 
     appId: string;
 
@@ -70,6 +88,11 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
 
     socket,
 
+    // Default true so every existing caller behaves exactly as before.
+    startWithCamera = true,
+
+    onCameraStateChange,
+
     onError
 
 }, ref) => {
@@ -101,6 +124,63 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
     const [isScreenSharing, setIsScreenSharing] = useState(false);
 
     const screenTrackRef = useRef<ILocalVideoTrack | null>(null);
+    const screenClientRef = useRef<IAgoraRTCClient | null>(null);
+    // Sound of the shared tab/screen (a video playing in it, etc.), when the
+    // teacher ticks "share audio" in the browser's picker.
+    const screenAudioRef = useRef<ILocalAudioTrack | null>(null);
+    // Small corner box for the teacher's camera while a screen is shared.
+    const pipContainerRef = useRef<HTMLDivElement>(null);
+    const remoteCameraRef = useRef<any>(null);
+    const remoteScreenRef = useRef<any>(null);
+    const [showPip, setShowPip] = useState(false);
+    // The camera box can be dragged; on release it snaps to the nearest corner.
+    // Which of the two videos fills the main area during a screen share.
+    const [screenBig, setScreenBig] = useState(true);
+    const [pipCorner, setPipCorner] = useState<'tl' | 'tr' | 'bl' | 'br'>('br');
+    const [pipDrag, setPipDrag] = useState<{ x: number; y: number } | null>(null);
+    const pipGrabRef = useRef<{ dx: number; dy: number } | null>(null);
+    const pipPosRef = useRef<{ x: number; y: number } | null>(null);
+
+    const onPipPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+        const wrap = videoRef.current;
+        const el = pipContainerRef.current;
+        if (!wrap || !el) return;
+        const w = wrap.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        pipGrabRef.current = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+        pipPosRef.current = { x: r.left - w.left, y: r.top - w.top };
+        setPipDrag(pipPosRef.current);
+        try { el.setPointerCapture(e.pointerId); } catch { }
+        e.preventDefault();
+    };
+
+    const onPipPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+        const grab = pipGrabRef.current;
+        const wrap = videoRef.current;
+        const el = pipContainerRef.current;
+        if (!grab || !wrap || !el) return;
+        const w = wrap.getBoundingClientRect();
+        const x = Math.min(Math.max(e.clientX - w.left - grab.dx, 0), w.width - el.offsetWidth);
+        const y = Math.min(Math.max(e.clientY - w.top - grab.dy, 0), w.height - el.offsetHeight);
+        pipPosRef.current = { x, y };
+        setPipDrag({ x, y });
+    };
+
+    const onPipPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+        const wrap = videoRef.current;
+        const el = pipContainerRef.current;
+        const pos = pipPosRef.current;
+        pipGrabRef.current = null;
+        pipPosRef.current = null;
+        if (wrap && el && pos) {
+            const w = wrap.getBoundingClientRect();
+            const vertical = pos.y + el.offsetHeight / 2 < w.height / 2 ? 't' : 'b';
+            const horizontal = pos.x + el.offsetWidth / 2 < w.width / 2 ? 'l' : 'r';
+            setPipCorner(`${vertical}${horizontal}` as 'tl' | 'tr' | 'bl' | 'br');
+            try { el.releasePointerCapture(e.pointerId); } catch { }
+        }
+        setPipDrag(null);
+    };
 
     const [cameraDevices, setCameraDevices] = useState<{ deviceId: string, label: string }[]>([]);
 
@@ -108,7 +188,24 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
 
     const [isLocalMicMuted, setIsLocalMicMuted] = useState(false);
 
-    const [isLocalCameraEnabled, setIsLocalCameraEnabled] = useState(true);
+    // Starts from the teacher's answer, so the very first frame is right.
+    const [isLocalCameraEnabled, setIsLocalCameraEnabled] = useState(startWithCamera);
+
+    useEffect(() => {
+        onCameraStateChange?.(isLocalCameraEnabled);
+    }, [isLocalCameraEnabled, onCameraStateChange]);
+
+    // What a student can see of the teacher. Kept as state, not read off the
+    // refs, because the placeholder has to re-render when these change.
+    //
+    // remoteAudioSeen stands in for "the teacher is here": the Agora uid is a
+    // per-join random number, so the teacher cannot be picked out by id, but
+    // students join muted and only speak once the teacher lets them — so the
+    // first audio in the room is the teacher's. Without it a student who
+    // arrives early would be told "voice only" before anyone had spoken.
+    const [remoteCameraOn, setRemoteCameraOn] = useState(false);
+    const [remoteScreenOn, setRemoteScreenOn] = useState(false);
+    const [remoteAudioSeen, setRemoteAudioSeen] = useState(false);
 
     // Local state for effective role (for dynamic promotion/demotion)
 
@@ -127,6 +224,21 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
         cleanupInProgressRef.current = true;
 
         try {
+            if (screenTrackRef.current) {
+                try { screenTrackRef.current.close(); } catch { }
+                screenTrackRef.current = null;
+            }
+            if (screenAudioRef.current) {
+                try { screenAudioRef.current.close(); } catch { }
+                screenAudioRef.current = null;
+            }
+            if (screenClientRef.current) {
+                try { await screenClientRef.current.leave(); } catch { }
+                screenClientRef.current = null;
+            }
+            remoteCameraRef.current = null;
+            remoteScreenRef.current = null;
+
 
             if (localAudioTrackRef.current) {
 
@@ -235,12 +347,20 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
             client.on('user-published', async (user, mediaType) => {
 
                 if (!mountedRef.current) return;
+                // Our own screen-share connection: already shown locally.
+                if (Number(user.uid) === SCREEN_UID_BASE + (Number(uid) || 0)) return;
 
                 try {
 
                     await client.subscribe(user, mediaType);
-
                     console.log(`[DEBUG] ${role} subscribed to ${mediaType} from user ${user.uid}`);
+                    if (mountedRef.current) {
+                        if (mediaType === 'audio') setRemoteAudioSeen(true);
+                        if (mediaType === 'video') {
+                            if (isScreenUid(user.uid)) setRemoteScreenOn(true);
+                            else { setRemoteCameraOn(true); setRemoteAudioSeen(true); }
+                        }
+                    }
 
                     
 
@@ -264,6 +384,24 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
 
                         if (videoContainerRef.current && user.videoTrack) {
 
+                            if (isScreenUid(user.uid)) {
+                                // Screen share takes the main area; the camera
+                                // moves to the corner box.
+                                remoteScreenRef.current = user;
+                                const cam = remoteCameraRef.current;
+                                if (cam?.videoTrack && pipContainerRef.current) {
+                                    cam.videoTrack.stop();
+                                    cam.videoTrack.play(pipContainerRef.current);
+                                    setShowPip(true);
+                                }
+                            } else {
+                                remoteCameraRef.current = user;
+                                if (remoteScreenRef.current && pipContainerRef.current) {
+                                    user.videoTrack.play(pipContainerRef.current);
+                                    setShowPip(true);
+                                    return;
+                                }
+                            }
                             user.videoTrack.play(videoContainerRef.current);
                             
                             // For students: Always apply screen sharing styling for better display
@@ -339,7 +477,32 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
 
 
 
-            client.on('user-unpublished', (user) => {
+            client.on('user-unpublished', (user, mediaType) => {
+
+                if (Number(user.uid) === SCREEN_UID_BASE + (Number(uid) || 0)) return;
+                if (mediaType === 'video') {
+                    if (isScreenUid(user.uid)) setRemoteScreenOn(false);
+                    else if (remoteCameraRef.current?.uid === user.uid) setRemoteCameraOn(false);
+                    if (isScreenUid(user.uid)) {
+                        remoteScreenRef.current = null;
+                        setShowPip(false);
+                        setScreenBig(true);
+                        const cam = remoteCameraRef.current;
+                        if (cam?.videoTrack && videoContainerRef.current) {
+                            cam.videoTrack.stop();
+                            cam.videoTrack.play(videoContainerRef.current);
+                        }
+                        if (user.videoTrack) {
+                            try { user.videoTrack.stop(); } catch { }
+                        }
+                        setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+                        return;
+                    }
+                    if (remoteCameraRef.current?.uid === user.uid) {
+                        remoteCameraRef.current = null;
+                        setShowPip(false);
+                    }
+                }
 
                 if (mountedRef.current) {
 
@@ -407,6 +570,40 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
 
 
 
+            // If the teacher's browser drops mid-share, the screen connection
+            // just leaves without unpublishing; put the camera back full size.
+            client.on('user-left', (user) => {
+                if (!mountedRef.current) return;
+                if (!isScreenUid(user.uid)) {
+                    // The teacher's main connection went away: their camera
+                    // went with it.
+                    if (remoteCameraRef.current?.uid === user.uid) {
+                        remoteCameraRef.current = null;
+                        setRemoteCameraOn(false);
+                    }
+                    return;
+                }
+                setRemoteScreenOn(false);
+                if (remoteScreenRef.current?.uid !== user.uid) return;
+                remoteScreenRef.current = null;
+                setShowPip(false);
+                setScreenBig(true);
+                const cam = remoteCameraRef.current;
+                if (cam?.videoTrack && videoContainerRef.current) {
+                    cam.videoTrack.stop();
+                    cam.videoTrack.play(videoContainerRef.current);
+                }
+                setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+            });
+
+            // A camera can be muted instead of unpublished (the mobile SDKs do
+            // this); either way the student is no longer seeing a face.
+            client.on('user-info-updated', (infoUid, msg) => {
+                if (!mountedRef.current || isScreenUid(infoUid)) return;
+                if (msg === 'mute-video') setRemoteCameraOn(false);
+                if (msg === 'unmute-video') setRemoteCameraOn(true);
+            });
+
             client.on('connection-state-change', (curState) => {
 
                 if (mountedRef.current) {
@@ -449,21 +646,37 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
 
                     localAudioTrackRef.current = await AgoraRTC.createMicrophoneAudioTrack();
 
-                    let cameraIdToUse = selectedDeviceId;
+                    if (startWithCamera) {
 
-                    if (!cameraIdToUse && cameraDevices.length > 0) cameraIdToUse = cameraDevices[0].deviceId;
+                        let cameraIdToUse = selectedDeviceId;
 
-                    localVideoTrackRef.current = await AgoraRTC.createCameraVideoTrack({ cameraId: cameraIdToUse } as CameraVideoTrackInitConfig);
+                        if (!cameraIdToUse && cameraDevices.length > 0) cameraIdToUse = cameraDevices[0].deviceId;
 
-                    await client.publish([localAudioTrackRef.current, localVideoTrackRef.current]);
+                        localVideoTrackRef.current = await AgoraRTC.createCameraVideoTrack({ cameraId: cameraIdToUse, encoderConfig: '720p_1' } as CameraVideoTrackInitConfig);
 
-                    if (videoContainerRef.current && localVideoTrackRef.current && mountedRef.current) {
+                        await client.publish([localAudioTrackRef.current, localVideoTrackRef.current]);
 
-                        localVideoTrackRef.current.play(videoContainerRef.current);
+                        if (videoContainerRef.current && localVideoTrackRef.current && mountedRef.current) {
+
+                            localVideoTrackRef.current.play(videoContainerRef.current);
+
+                        }
+
+                    } else {
+
+                        // Voice only. The camera button creates the track on
+                        // demand, so this is a starting choice, not a cage.
+                        await client.publish([localAudioTrackRef.current]);
+
+                        setIsLocalCameraEnabled(false);
 
                     }
 
                 } catch (err: any) {
+
+                    // Whatever failed, no camera is running: say so, rather than leaving
+                    // the button lit over a black screen.
+                    setIsLocalCameraEnabled(false);
 
                     if (err.name === 'NotAllowedError') {
 
@@ -567,175 +780,129 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
         }
     }, []);
 
-    async function stopScreenShare(_evt?: any): Promise<void> {
-        if (!clientRef.current) return;
-        
-        console.log('[DEBUG] Stopping screen share, audio track state:', {
-            exists: !!localAudioTrackRef.current,
-            enabled: localAudioTrackRef.current?.enabled,
-            muted: isLocalMicMuted
-        });
-        
-        // Check if audio track is currently published before stopping screen share
-        const localTracksBefore = clientRef.current.localTracks;
-        const isAudioPublishedBefore = localTracksBefore.some(track => track === localAudioTrackRef.current);
-        console.log('[DEBUG] Before stopping screen share - Audio track published?', isAudioPublishedBefore);
-        
-        if (screenTrackRef.current) {
-            await clientRef.current.unpublish([screenTrackRef.current]);
-            screenTrackRef.current.stop();
-            screenTrackRef.current = null;
-        }
-        
-        // Check again after unpublishing screen track
-        const localTracksAfter = clientRef.current.localTracks;
-        const isAudioStillPublished = localTracksAfter.some(track => track === localAudioTrackRef.current);
-        console.log('[DEBUG] After unpublishing screen - Audio track still published?', isAudioStillPublished);
-        
-        // CRITICAL: Always republish audio track together with camera video
-        // This ensures remote users get notified and can subscribe to the audio track
-        const tracksToPublish = [];
-        if (localVideoTrackRef.current) {
-            tracksToPublish.push(localVideoTrackRef.current);
-        }
-        if (localAudioTrackRef.current) {
-            // Unpublish audio first if it's already published, then republish to trigger user-published event
-            if (isAudioStillPublished) {
-                console.log('[DEBUG] Unpublishing audio track to trigger republish event for remote users...');
-                await clientRef.current.unpublish([localAudioTrackRef.current]);
-                // Small delay to ensure unpublish completes
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
-            tracksToPublish.push(localAudioTrackRef.current);
-            console.log('[DEBUG] Publishing camera video and audio track together');
-        }
-        
-        if (tracksToPublish.length > 0) {
-            await clientRef.current.publish(tracksToPublish);
-            if (videoContainerRef.current) {
-                localVideoTrackRef.current.play(videoContainerRef.current);
-                // Apply camera-specific styling
-                ensureVideoFullSize('camera');
-            }
-        }
-        
-        // CRITICAL: Ensure audio track is still enabled and working after screen share stops
-        if (localAudioTrackRef.current) {
-            console.log('[DEBUG] Ensuring audio track is enabled after screen share stop');
-            // Make sure audio track is enabled and volume is set correctly
-            if (isLocalMicMuted) {
-                localAudioTrackRef.current.setVolume(0);
-                localAudioTrackRef.current.setEnabled(false);
-                console.log('[DEBUG] Audio track muted (user preference)');
-            } else {
-                localAudioTrackRef.current.setVolume(100);
-                localAudioTrackRef.current.setEnabled(true);
-                console.log('[DEBUG] Audio track enabled with volume 100');
-            }
-            // Force a small delay to ensure the state is applied
-            setTimeout(() => {
-                if (localAudioTrackRef.current && !isLocalMicMuted) {
-                    localAudioTrackRef.current.setEnabled(true);
-                    localAudioTrackRef.current.setVolume(100);
-                    console.log('[DEBUG] Audio track state verified after delay');
-                }
-            }, 200);
+    // Moves the two tracks between the main area and the corner box.
+    const applyLayout = useCallback((screenInMain: boolean) => {
+        const main = videoContainerRef.current;
+        const pip = pipContainerRef.current;
+        if (!main || !pip) return;
+        const isHost = role === 'host';
+        const screenTrack: any = isHost ? screenTrackRef.current : remoteScreenRef.current?.videoTrack;
+        const cameraTrack: any = isHost ? localVideoTrackRef.current : remoteCameraRef.current?.videoTrack;
+        if (!screenTrack || !cameraTrack) return;
+        try { screenTrack.stop(); } catch { }
+        try { cameraTrack.stop(); } catch { }
+        if (screenInMain) {
+            screenTrack.play(main);
+            cameraTrack.play(pip);
         } else {
-            console.warn('[DEBUG] WARNING: localAudioTrackRef is null during screen share stop!');
+            cameraTrack.play(main);
+            screenTrack.play(pip);
         }
-        
+        setTimeout(() => ensureVideoFullSize(screenInMain ? 'screen' : 'camera'), 100);
+    }, [role, ensureVideoFullSize]);
+
+    const swapViews = useCallback(() => {
+        setScreenBig((current) => {
+            const next = !current;
+            applyLayout(next);
+            return next;
+        });
+    }, [applyLayout]);
+
+    async function stopScreenShare(_evt?: any): Promise<void> {
+        const screenClient = screenClientRef.current;
+        const screenTrack = screenTrackRef.current;
+        const screenAudio = screenAudioRef.current;
+        screenClientRef.current = null;
+        screenTrackRef.current = null;
+        screenAudioRef.current = null;
+        if (screenClient) {
+            try { await screenClient.unpublish(); } catch { }
+        }
+        if (screenTrack) {
+            try { screenTrack.stop(); screenTrack.close(); } catch { }
+        }
+        if (screenAudio) {
+            try { screenAudio.close(); } catch { }
+        }
+        if (screenClient) {
+            try { await screenClient.leave(); } catch { }
+        }
+        // The camera never stopped publishing; just move it back to full size.
+        setShowPip(false);
+        setScreenBig(true);
+        if (localVideoTrackRef.current && videoContainerRef.current) {
+            localVideoTrackRef.current.stop();
+            localVideoTrackRef.current.play(videoContainerRef.current);
+            ensureVideoFullSize('camera');
+        }
         setIsScreenSharing(false);
     }
 
 
 
     const startScreenShare = useCallback(async () => {
-        if (!clientRef.current) return;
+        if (!clientRef.current || screenClientRef.current) return;
+        let screenTrack: ILocalVideoTrack | null = null;
+        let screenAudio: ILocalAudioTrack | null = null;
+        let screenClient: IAgoraRTCClient | null = null;
         try {
-            const screenTrack = await AgoraRTC.createScreenVideoTrack();
-            
-            // IMPORTANT: Check if audio track is currently published
-            const localTracks = clientRef.current.localTracks;
-            const isAudioPublished = localTracks.some(track => track === localAudioTrackRef.current);
-            
-            console.log('[DEBUG] Before screen share - Audio track published?', isAudioPublished);
-            
-            // Unpublish camera video only (audio track should remain published)
-            if (localVideoTrackRef.current) {
-                await clientRef.current.unpublish([localVideoTrackRef.current]);
-                localVideoTrackRef.current.stop();
-            }
-            
-            // Check again after unpublishing video
-            const localTracksAfter = clientRef.current.localTracks;
-            const isAudioStillPublished = localTracksAfter.some(track => track === localAudioTrackRef.current);
-            console.log('[DEBUG] After unpublishing video - Audio track still published?', isAudioStillPublished);
-            
-            // CRITICAL: Always republish audio track together with screen track
-            // This ensures remote users get notified and can subscribe to the audio track
-            const tracksToPublish = [screenTrack];
-            if (localAudioTrackRef.current) {
-                // Unpublish audio first if it's already published, then republish to trigger user-published event
-                if (isAudioStillPublished) {
-                    console.log('[DEBUG] Unpublishing audio track to trigger republish event for remote users...');
-                    await clientRef.current.unpublish([localAudioTrackRef.current]);
-                    // Small delay to ensure unpublish completes
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-                tracksToPublish.push(localAudioTrackRef.current);
-                console.log('[DEBUG] Publishing screen track and audio track together');
-            }
-            
-            // Publish both tracks together
-            await clientRef.current.publish(tracksToPublish);
-            screenTrackRef.current = screenTrack;
-            setIsScreenSharing(true);
-            
-            // CRITICAL: Ensure audio track is still enabled and working after screen share starts
-            if (localAudioTrackRef.current) {
-                console.log('[DEBUG] Ensuring audio track is enabled after screen share start');
-                // Make sure audio track is enabled and volume is set correctly
-                if (isLocalMicMuted) {
-                    localAudioTrackRef.current.setVolume(0);
-                    localAudioTrackRef.current.setEnabled(false);
-                    console.log('[DEBUG] Audio track muted (user preference)');
-                } else {
-                    localAudioTrackRef.current.setVolume(100);
-                    localAudioTrackRef.current.setEnabled(true);
-                    console.log('[DEBUG] Audio track enabled with volume 100');
-                }
-                // Force a small delay to ensure the state is applied
-                setTimeout(() => {
-                    if (localAudioTrackRef.current && !isLocalMicMuted) {
-                        localAudioTrackRef.current.setEnabled(true);
-                        localAudioTrackRef.current.setVolume(100);
-                        console.log('[DEBUG] Audio track state verified after delay');
-                    }
-                }, 200);
+            // 'auto': also capture the tab/system sound if the browser offers
+            // it and the teacher ticks "share audio"; otherwise video only.
+            const created = await AgoraRTC.createScreenVideoTrack({}, 'auto');
+            if (Array.isArray(created)) {
+                [screenTrack, screenAudio] = created;
             } else {
-                console.warn('[DEBUG] WARNING: localAudioTrackRef is null during screen share start!');
+                screenTrack = created;
             }
-            
-            // Play in local container
+
+            // Separate connection for the screen, so the camera (and mic) on
+            // the main connection keep publishing untouched.
+            const screenUid = SCREEN_UID_BASE + (Number(uid) || 0);
+            const res = await fetch(`/api/rtcToken?channel=${encodeURIComponent(channel)}&uid=${screenUid}`, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            });
+            if (!res.ok) throw new Error('screen token request failed: ' + res.status);
+            const { token: screenToken } = await res.json();
+
+            screenClient = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+            await screenClient.setClientRole('host');
+            await screenClient.join(appId, channel, screenToken, screenUid);
+            await screenClient.publish(screenAudio ? [screenTrack, screenAudio] : [screenTrack]);
+
+            screenClientRef.current = screenClient;
+            screenTrackRef.current = screenTrack;
+            screenAudioRef.current = screenAudio;
+            setIsScreenSharing(true);
+
+            // Local view matches what students see: screen big, camera small.
+            if (localVideoTrackRef.current && pipContainerRef.current) {
+                localVideoTrackRef.current.stop();
+                localVideoTrackRef.current.play(pipContainerRef.current);
+                setShowPip(true);
+            }
             if (videoContainerRef.current) {
                 screenTrack.play(videoContainerRef.current);
-                // Apply screen-specific styling with a small delay to ensure video is loaded
-                setTimeout(() => {
-                    if (ensureVideoFullSize) {
-                        ensureVideoFullSize('screen');
-                    }
-                }, 100);
+                setTimeout(() => ensureVideoFullSize('screen'), 100);
             }
-            
-            // Listen for end
-            (screenTrack as any).on('track-ended', async (_evt: any) => { 
-                await stopScreenShare(_evt); 
+
+            (screenTrack as any).on('track-ended', async (_evt: any) => {
+                await stopScreenShare(_evt);
             });
-        } catch (err) {
+        } catch (err: any) {
             console.error('[DEBUG] Screen share error:', err);
-            setError('Erreur lors du partage d\'écran: ' + (err.message || 'inconnue'));
+            try { screenTrack?.close(); } catch { }
+            try { screenAudio?.close(); } catch { }
+            try { await screenClient?.leave(); } catch { }
+            screenClientRef.current = null;
+            screenTrackRef.current = null;
+            // Closing the browser's share picker is not an error.
+            const cancelled = err?.name === 'NotAllowedError' || err?.code === 'PERMISSION_DENIED';
+            if (!cancelled) {
+                setError('Erreur lors du partage d\'écran: ' + (err?.message || 'inconnue'));
+            }
         }
-    }, [clientRef, videoContainerRef, setIsScreenSharing, stopScreenShare, ensureVideoFullSize, isLocalMicMuted]);
+    }, [clientRef, videoContainerRef, setIsScreenSharing, stopScreenShare, ensureVideoFullSize, appId, channel, uid]);
 
 
 
@@ -759,7 +926,7 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
 
         // Créer la nouvelle piste
 
-        const videoTrack = await AgoraRTC.createCameraVideoTrack({ cameraId } as CameraVideoTrackInitConfig);
+        const videoTrack = await AgoraRTC.createCameraVideoTrack({ cameraId, encoderConfig: '720p_1' } as CameraVideoTrackInitConfig);
 
         await clientRef.current.publish([videoTrack]);
 
@@ -767,9 +934,11 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
 
         // Afficher dans le container
 
-        if (videoContainerRef.current && videoTrack) {
+        const target = screenTrackRef.current ? pipContainerRef.current : videoContainerRef.current;
 
-            videoTrack.play(videoContainerRef.current);
+        if (target && videoTrack) {
+
+            videoTrack.play(target);
 
         }
 
@@ -853,21 +1022,50 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
 
     // Fonction pour contrôler la caméra locale du professeur
 
-    const toggleLocalCamera = useCallback(() => {
+    const toggleLocalCamera = useCallback(async () => {
 
-        if (localVideoTrackRef.current) {
-
-            const newCameraState = !isLocalCameraEnabled;
-
-            localVideoTrackRef.current.setEnabled(newCameraState);
-
-            setIsLocalCameraEnabled(newCameraState);
-
-            console.log(`[DEBUG] Professor camera ${newCameraState ? 'enabled' : 'disabled'}`);
-
+        // A teacher who started without a camera has no track to enable, so
+        // the first press has to make one and publish it. Without this the
+        // camera button would be dead for the rest of the lesson.
+        if (!localVideoTrackRef.current) {
+            try {
+                let cameraIdToUse = selectedDeviceId;
+                if (!cameraIdToUse && cameraDevices.length > 0) cameraIdToUse = cameraDevices[0].deviceId;
+                const track = await AgoraRTC.createCameraVideoTrack(
+                    { cameraId: cameraIdToUse, encoderConfig: '720p_1' } as CameraVideoTrackInitConfig);
+                localVideoTrackRef.current = track;
+                if (clientRef.current) await clientRef.current.publish([track]);
+                if (mountedRef.current) {
+                    // While a screen is being shared it owns the big view,
+                    // so a camera turned on now belongs in the small one.
+                    if (screenTrackRef.current && screenBig && pipContainerRef.current) {
+                        track.play(pipContainerRef.current);
+                        setShowPip(true);
+                    } else if (videoContainerRef.current) {
+                        track.play(videoContainerRef.current);
+                    }
+                }
+                setIsLocalCameraEnabled(true);
+                console.log('[DEBUG] Professor camera started mid-stream');
+            } catch (err: any) {
+                console.error('[DEBUG] Could not start the camera:', err);
+                setError(
+                    err?.name === 'NotAllowedError'
+                        ? 'تم رفض الإذن بالكاميرا. اسمح بالوصول ثم حاول مرة أخرى.'
+                        : 'تعذر تشغيل الكاميرا.');
+            }
+            return;
         }
 
-    }, [isLocalCameraEnabled, localVideoTrackRef]);
+        const newCameraState = !isLocalCameraEnabled;
+
+        localVideoTrackRef.current.setEnabled(newCameraState);
+
+        setIsLocalCameraEnabled(newCameraState);
+
+        console.log(`[DEBUG] Professor camera ${newCameraState ? 'enabled' : 'disabled'}`);
+
+    }, [isLocalCameraEnabled, localVideoTrackRef, selectedDeviceId, cameraDevices, screenBig]);
 
     // Patch play() calls to ensure video is always full size
     useEffect(() => {
@@ -1284,13 +1482,114 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
 
                     WebkitTouchCallout: 'none',
 
-                    // Mirror the host's own video (like Zoom/Google Meet) but not screen sharing
+                    // Mirror the host's own camera (like Zoom/Google Meet), wherever it is shown
 
-                    ...(role === 'host' && !isScreenSharing ? { transform: 'scaleX(-1)' } : {})
+                    ...(role === 'host' && (!isScreenSharing || !screenBig) ? { transform: 'scaleX(-1)' } : {})
 
                   }}
 
                 />
+
+                {/* Where the teacher's camera would be, but isn't. A black
+                    rectangle reads as "broken"; this reads as "off". Shown
+                    only when the big view is meant to hold the camera — while a
+                    screen is shared big, the screen is there instead. */}
+                {/* The student's side of the same thing: the teacher is here
+                    and speaking, but has neither a camera nor a shared screen.
+                    Once a screen is shared it fills this area instead. */}
+                {role === 'audience' && remoteAudioSeen && !remoteCameraOn && !remoteScreenOn && (
+                    <div
+                        style={{ position: 'absolute', inset: 0, zIndex: 5 }}
+                        className="flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#141b33] to-[#0b1020] text-center"
+                    >
+                        <div className="relative grid h-20 w-20 place-items-center rounded-full bg-purple-600/20">
+                            <span className="absolute inset-0 animate-ping rounded-full bg-purple-500/20" />
+                            <Mic className="relative h-9 w-9 text-purple-200" />
+                        </div>
+                        <div dir="rtl">
+                            <p className="text-lg font-semibold text-white">الأستاذ يشرح بالصوت فقط</p>
+                            <p className="mt-1 text-sm text-white/60">الكاميرا مغلقة — ستظهر الشاشة هنا إن شاركها الأستاذ.</p>
+                        </div>
+                    </div>
+                )}
+
+                {role === 'host' && !isLocalCameraEnabled && (!isScreenSharing || !screenBig) && (
+                    <div
+                        style={{ position: 'absolute', inset: 0, zIndex: 5 }}
+                        className="flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#141b33] to-[#0b1020] text-center"
+                    >
+                        <div className="grid h-20 w-20 place-items-center rounded-full bg-white/10">
+                            <VideoOff className="h-9 w-9 text-white/70" />
+                        </div>
+                        <div dir="rtl">
+                            <p className="text-lg font-semibold text-white">الكاميرا مغلقة</p>
+                            <p className="mt-1 text-sm text-white/60">الطلاب يسمعون صوتك. شغّل الكاميرا متى شئت.</p>
+                        </div>
+                    </div>
+                )}
+
+                <div
+                  ref={pipContainerRef}
+                  onPointerDown={onPipPointerDown}
+                  onPointerMove={onPipPointerMove}
+                  onPointerUp={onPipPointerUp}
+                  onPointerCancel={onPipPointerUp}
+                  style={{
+                    position: 'absolute',
+                    ...(pipDrag
+                      ? { left: pipDrag.x, top: pipDrag.y }
+                      : {
+                          [pipCorner[0] === 't' ? 'top' : 'bottom']: 16,
+                          [pipCorner[1] === 'l' ? 'left' : 'right']: 16,
+                        }),
+                    cursor: pipDrag ? 'grabbing' : 'grab',
+                    touchAction: 'none',
+                    width: '22%',
+                    minWidth: 150,
+                    maxWidth: 300,
+                    aspectRatio: '16 / 9',
+                    borderRadius: 12,
+                    overflow: 'hidden',
+                    background: '#111',
+                    border: '2px solid rgba(255,255,255,0.25)',
+                    boxShadow: '0 6px 20px rgba(0,0,0,0.45)',
+                    zIndex: 20,
+                    // For the teacher, while the screen is big this tile holds
+                    // the camera — and a camera that is off is just a black
+                    // box. When the views are swapped it holds the screen, and
+                    // that is always worth showing.
+                    display: showPip && (role !== 'host' || !(isScreenSharing && screenBig) || isLocalCameraEnabled) ? 'block' : 'none',
+                    // Mirror the teacher's own camera, like the main view does.
+                    ...(role === 'host' && screenBig ? { transform: 'scaleX(-1)' } : {}),
+                  }}
+                >
+                  <button
+                    type="button"
+                    title="تكبير هذا العرض"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); swapViews(); }}
+                    style={{
+                      position: 'absolute',
+                      top: 6,
+                      left: 6,
+                      zIndex: 5,
+                      width: 30,
+                      height: 30,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 8,
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#fff',
+                      background: 'rgba(0,0,0,0.55)',
+                      // Undo the mirror so the icon isn't reversed.
+                      transform: role === 'host' && screenBig ? 'scaleX(-1)' : 'none',
+                    }}
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </button>
+                </div>
 
                 {role === 'audience' && remoteUsers.length === 0 && (
 

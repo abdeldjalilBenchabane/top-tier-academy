@@ -12,6 +12,7 @@ import {
 import { toast } from '@/lib/toast';
 import { API_BASE_URL } from '@/lib/api';
 import LiveSectionPathCover from '@/components/admin/LiveSectionPathCover';
+import { serverDate } from '@/lib/utils';
 
 const authHeaders = () => {
   const t = localStorage.getItem('token');
@@ -179,7 +180,7 @@ const AdminLiveSectionDetails = () => {
               {section.price != null && <div className="pt-1 font-semibold">{section.price} نقطة</div>}
               <div className="flex items-center gap-2 text-xs text-gray-500">
                 <Calendar className="h-3.5 w-3.5" />
-                {section.created_at ? new Date(section.created_at).toLocaleDateString() : '—'}
+                {section.created_at ? serverDate(section.created_at).toLocaleDateString() : '—'}
               </div>
             </CardContent>
           </Card>

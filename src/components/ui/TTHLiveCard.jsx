@@ -4,6 +4,7 @@ import { FaVideo, FaUser, FaClock, FaUsers, FaPlay, FaStop, FaShoppingCart, FaCh
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
+import { parseSessionDate } from '@/lib/utils';
 const TTHLiveCard = ({ session, onStatusChange }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -77,7 +78,7 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
       if (!session.start_time) return 'none';
       if (session.status === 'ended' || session.is_ended) return 'ended';
       if (session.status === 'live') return 'live';
-      const start = new Date(session.start_time);
+      const start = parseSessionDate(session.start_time) || new Date(0);
       const end = new Date(start.getTime() + (session.duration || 60) * 60 * 1000);
       if (now >= start && now <= end) return 'live';
       if (now > end) return 'ended';
@@ -241,7 +242,7 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
     }
 
     const now = currentTime;
-    const sessionTime = new Date(session.start_time);
+    const sessionTime = parseSessionDate(session.start_time) || new Date(0);
     const sessionEndTime = new Date(sessionTime.getTime() + (session.duration || 60) * 60 * 1000);
     // Students may enter this long before the scheduled start.
     const JOIN_EARLY_MS = 15 * 60 * 1000;

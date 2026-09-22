@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
+import usePageMeta from '@/hooks/usePageMeta';
 
 const Section = ({ title, children }) => (
     <section className="mb-8">
@@ -11,6 +12,17 @@ const Section = ({ title, children }) => (
 );
 
 const TTHPrivacyPolicy = () => {
+
+  usePageMeta({
+
+    title: 'سياسة الخصوصية',
+
+    description: 'كيف تجمع Top Tier Academy بياناتك وتستعملها وتحميها، وما هي حقوقك في الوصول إليها أو حذفها.',
+
+    path: '/privacy-policy',
+
+  });
+
     return (
         <div className="min-h-screen relative overflow-hidden bg-[#f8fafc]" dir="rtl">
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-200/30 blur-[120px]"></div>

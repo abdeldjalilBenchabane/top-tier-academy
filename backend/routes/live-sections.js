@@ -1,4 +1,6 @@
 import express from 'express';
+import { notifyCommentReply } from '../services/commentReplyNotify.js';
+import { notifyLiveSectionContentAdded } from '../services/contentUpdateNotify.js';
 import { verifyToken, requireRole } from '../middleware/auth.js';
 import { getRows, getRow, query } from '../db.js';
 import pool from '../db.js';
@@ -8,6 +10,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { debugLog } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,23 +20,35 @@ const router = express.Router();
 // Configure multer for live section file uploads with R2 storage
 const liveSectionUpload = createR2Multer('live-sections', null, {
   fileFilter: (req, file, cb) => {
-    console.log('Live section file upload attempt:', {
+    debugLog('Live section file upload attempt:', {
       fieldname: file.fieldname,
       originalname: file.originalname,
       mimetype: file.mimetype,
       size: file.size
     });
     
-    // Allow only image files for live section covers
-    const allowedImageTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedImageTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedImageTypes.test(file.mimetype);
-    
-    if (extname && mimetype) {
+        // The cover must be an image. Everything else about this check is about
+    // not rejecting images the professor was allowed to pick: the file input
+    // says accept="image/*", so the server has to honour the same promise.
+
+    // The browser's mimetype is the reliable signal — it covers heic, avif and
+    // anything else a phone produces without needing a list.
+    const looksLikeImage = typeof file.mimetype === 'string'
+      && file.mimetype.toLowerCase().startsWith('image/');
+
+    // Some sources (downloads, cloud pickers) send application/octet-stream
+    // for a perfectly ordinary .png. Fall back to the extension rather than
+    // refusing the file. Requiring BOTH to match is what rejected those.
+    const imageExtensions = /\.(jpe?g|png|gif|webp|bmp|tiff?|heic|heif|avif|jfif|svg)$/i;
+    const hasImageExtension = imageExtensions.test(file.originalname || '');
+
+    if (looksLikeImage || hasImageExtension) {
       return cb(null, true);
-    } else {
-      return cb(new Error('Only image files (jpeg, jpg, png, gif, webp) are allowed for live section covers!'));
     }
+
+    return cb(new Error(
+      `الملف «${file.originalname || 'غير معروف'}» ليس صورة. اختر صورة للغلاف (JPG أو PNG أو WEBP أو HEIC).`
+    ));
   }
 });
 
@@ -101,6 +116,9 @@ router.post('/professors/:professorId/live-sections',
   verifyToken, 
   requireRole('professor'), 
   liveSectionUpload.single('cover_image'),
+  // Without this, a rejected file reaches Express's default handler and the
+  // professor gets an HTML stack trace listing the server's absolute paths.
+  handleMulterError,
   async (req, res, next) => {
   try {
     const { title, description, price, level_id, year_id, speciality_id, material_id, language_id, language_level_id } = req.body;
@@ -118,18 +136,18 @@ router.post('/professors/:professorId/live-sections',
     // Handle R2 upload manually after file is buffered
     if (req.file && req.file.buffer) {
       try {
-        console.log('📤 Processing R2 upload for live section cover...');
+        debugLog('📤 Processing R2 upload for live section cover...');
         
         // Import R2 functions
         const { uploadToR2, generateR2Key } = await import('../services/r2Service.js');
         
         // Generate R2 key
         const r2Key = generateR2Key('live-sections', null, req.file.originalname, 'cover');
-        console.log('🔑 Generated R2 key:', r2Key);
+        debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
         const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
-        console.log('✅ Live section cover uploaded to R2:', publicUrl);
+        debugLog('✅ Live section cover uploaded to R2:', publicUrl);
         
         // Update file object with R2 URL
         req.file.path = publicUrl;
@@ -275,7 +293,7 @@ router.post('/live-sections/:sectionId/assign-path', verifyToken, requireRole('p
           );
         }
         
-        console.log(`✅ Live section creation notifications and emails sent for section ${sectionId}`);
+        debugLog(`✅ Live section creation notifications and emails sent for section ${sectionId}`);
       }
     } catch (error) {
       console.error('Error sending live section creation notifications/emails:', error);
@@ -337,6 +355,9 @@ router.put('/admin/live-sections/:sectionId/path',
   verifyToken,
   requireRole('admin'),
   liveSectionUpload.single('cover_image'),
+  // Without this, a rejected file reaches Express's default handler and the
+  // professor gets an HTML stack trace listing the server's absolute paths.
+  handleMulterError,
   async (req, res) => {
   try {
     const { sectionId } = req.params;
@@ -350,7 +371,7 @@ router.put('/admin/live-sections/:sectionId/path',
         const { uploadToR2, generateR2Key } = await import('../services/r2Service.js');
         const r2Key = generateR2Key('live-sections', null, req.file.originalname, 'cover');
         coverUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
-        console.log('✅ Admin updated live section cover:', coverUrl);
+        debugLog('✅ Admin updated live section cover:', coverUrl);
       } catch (error) {
         console.error('❌ Cover upload failed:', error);
         return res.status(500).json({ error: 'Failed to upload cover: ' + error.message });
@@ -402,7 +423,7 @@ router.put('/admin/live-sections/:sectionId/path',
       values
     );
 
-    console.log(`Live section ${sectionId} path/cover updated by admin ${req.user.id}`);
+    debugLog(`Live section ${sectionId} path/cover updated by admin ${req.user.id}`);
     res.json({ success: true, section: result.rows ? result.rows[0] : result[0] });
   } catch (error) {
     console.error('Error updating live section path:', error);
@@ -483,7 +504,7 @@ router.post('/admin/live-sections/:sectionId/approve', verifyToken, requireRole(
           WHERE section_id = $1 AND is_approved IS NOT TRUE`, [sectionId]);
       approvedSessions = cascade.rowCount || 0;
       if (approvedSessions) {
-        console.log(`Approved ${approvedSessions} live session(s) inside section ${sectionId}`);
+        debugLog(`Approved ${approvedSessions} live session(s) inside section ${sectionId}`);
       }
     } catch (cascadeError) {
       // Never fail the section approval because of the cascade.
@@ -526,7 +547,7 @@ router.post('/admin/live-sections/:sectionId/approve', verifyToken, requireRole(
           admin.name
         );
         
-        console.log(`✅ Live section approval notifications and emails sent for section ${sectionId}`);
+        debugLog(`✅ Live section approval notifications and emails sent for section ${sectionId}`);
       }
     } catch (error) {
       console.error('Error sending live section approval notifications/emails:', error);
@@ -579,7 +600,7 @@ router.post('/admin/live-sections/:sectionId/reject', verifyToken, requireRole('
           WHERE section_id = $1 AND is_rejected IS NOT TRUE`, [sectionId]);
       rejectedSessions = cascade.rowCount || 0;
       if (rejectedSessions) {
-        console.log(`Rejected ${rejectedSessions} live session(s) inside section ${sectionId}`);
+        debugLog(`Rejected ${rejectedSessions} live session(s) inside section ${sectionId}`);
       }
     } catch (cascadeError) {
       // Never fail the section rejection because of the cascade.
@@ -624,7 +645,7 @@ router.post('/admin/live-sections/:sectionId/reject', verifyToken, requireRole('
           reason
         );
         
-        console.log(`✅ Live section rejection notifications and emails sent for section ${sectionId}`);
+        debugLog(`✅ Live section rejection notifications and emails sent for section ${sectionId}`);
       }
     } catch (error) {
       console.error('Error sending live section rejection notifications/emails:', error);
@@ -639,6 +660,23 @@ router.post('/admin/live-sections/:sectionId/reject', verifyToken, requireRole('
 });
 
 // GET /api/live-sections/approved → fetch all approved live sections for public display
+// Professor: which of my دورات already have an open request, so the button can
+// show that instead of offering to ask again.
+router.get('/live-sections/my-deletion-requests',
+  verifyToken, requireRole('professor'), async (req, res) => {
+  try {
+    res.json(await getRows(
+      `SELECT id, live_section_id, section_title, status, reason, admin_note,
+              requested_at, decided_at, refunded
+         FROM live_section_deletion_requests
+        WHERE professor_id = $1
+        ORDER BY requested_at DESC`, [req.user.id]));
+  } catch (error) {
+    console.error('Error listing my deletion requests:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/live-sections/approved', async (req, res) => {
     try {
         const selectApprovedQuery = `
@@ -705,6 +743,9 @@ router.put('/live-sections/:sectionId',
   verifyToken, 
   requireRole('professor'), 
   liveSectionUpload.single('cover_image'),
+  // Without this, a rejected file reaches Express's default handler and the
+  // professor gets an HTML stack trace listing the server's absolute paths.
+  handleMulterError,
   async (req, res, next) => {
   try {
     
@@ -725,18 +766,18 @@ router.put('/live-sections/:sectionId',
     // Handle R2 upload manually after file is buffered
     if (req.file && req.file.buffer) {
       try {
-        console.log('📤 Processing R2 upload for live section cover update...');
+        debugLog('📤 Processing R2 upload for live section cover update...');
         
         // Import R2 functions
         const { uploadToR2, generateR2Key, deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
         
         // Generate R2 key
         const r2Key = generateR2Key('live-sections', null, req.file.originalname, 'cover');
-        console.log('🔑 Generated R2 key:', r2Key);
+        debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
         const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
-        console.log('✅ Live section cover updated to R2:', publicUrl);
+        debugLog('✅ Live section cover updated to R2:', publicUrl);
         
         // Update file object with R2 URL
         req.file.path = publicUrl;
@@ -765,11 +806,11 @@ router.put('/live-sections/:sectionId',
       const oldSection = await getRow('SELECT cover_image_url FROM live_sections WHERE id = $1', [sectionId]);
       if (oldSection && oldSection.cover_image_url) {
         try {
-          console.log('🗑️ Deleting old cover image from R2:', oldSection.cover_image_url);
+          debugLog('🗑️ Deleting old cover image from R2:', oldSection.cover_image_url);
           const oldKey = extractKeyFromUrl(oldSection.cover_image_url);
           if (oldKey && oldKey !== oldSection.cover_image_url) {
             await deleteFromR2(oldKey);
-            console.log('✅ Old cover image deleted from R2:', oldKey);
+            debugLog('✅ Old cover image deleted from R2:', oldKey);
           }
         } catch (err) {
           console.error('⚠️ Error deleting old cover image from R2:', err);
@@ -862,7 +903,9 @@ router.get('/live-sections/:sectionId/sessions', async (req, res) => {
       id: row.id,
       title: row.title,
       description: row.description,
-      scheduledAt: row.start_time ? row.start_time.toISOString() : null,
+      // start_time arrives as a plain wall-clock string now (see db.js), so
+      // it is passed straight through rather than being given a false Z.
+      scheduledAt: row.start_time || null,
       duration: row.duration,
       price: row.price,
       cover_image_url: row.cover_image_url,
@@ -878,32 +921,16 @@ router.get('/live-sections/:sectionId/sessions', async (req, res) => {
   }
 });
 
-// Delete a live section and all related data
-router.delete('/live-sections/:sectionId', verifyToken, requireRole('professor'), async (req, res) => {
-  const client = await pool.connect();
-  let transactionStarted = false;
-  
-  try {
-    const { sectionId } = req.params;
 
-    // Check if the section belongs to the professor
-    const sectionCheck = await getRow('SELECT professor_id, cover_image_url FROM live_sections WHERE id = $1', [sectionId]);
-
-    if (!sectionCheck) {
-      return res.status(404).json({ error: 'Live section not found' });
-    }
-
-    if (sectionCheck.professor_id != req.user.id) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    await client.query('BEGIN');
-    transactionStarted = true;
-
-    console.log(`🗑️ Starting deletion of live section ${sectionId} and all related data...`);
+// Remove a live section and everything hanging off it: R2 files, blocks,
+// content sections, its live sessions and every purchase of either. Shared by
+// the professor route and the admin route so the two can never drift apart.
+// The caller owns the transaction.
+async function purgeLiveSection(client, sectionId, coverImageUrl) {
+    debugLog(`🗑️ Starting deletion of live section ${sectionId} and all related data...`);
 
     // 1. Delete all blocks and their files from R2
-    console.log('Deleting blocks and files...');
+    debugLog('Deleting blocks and files...');
     const blocks = await client.query('SELECT id, type FROM live_section_blocks WHERE live_section_id = $1', [sectionId]);
     
     for (const block of blocks.rows) {
@@ -912,11 +939,11 @@ router.delete('/live-sections/:sectionId', verifyToken, requireRole('professor')
         for (const file of files.rows) {
           try {
             if (file.file_path && (file.file_path.startsWith('http') || file.file_path.startsWith('https'))) {
-              console.log('🗑️ Deleting R2 file:', file.file_path);
+              debugLog('🗑️ Deleting R2 file:', file.file_path);
               const key = extractKeyFromUrl(file.file_path);
               if (key && key !== file.file_path) {
                 await deleteFromR2(key);
-                console.log('✅ R2 file deleted:', key);
+                debugLog('✅ R2 file deleted:', key);
               }
             }
           } catch (err) {
@@ -928,18 +955,18 @@ router.delete('/live-sections/:sectionId', verifyToken, requireRole('professor')
 
     // 2. Delete all files from database
     await client.query('DELETE FROM live_section_files WHERE live_section_id = $1', [sectionId]);
-    console.log('✅ Deleted live_section_files records');
+    debugLog('✅ Deleted live_section_files records');
 
     // 3. Delete all blocks
     await client.query('DELETE FROM live_section_blocks WHERE live_section_id = $1', [sectionId]);
-    console.log('✅ Deleted live_section_blocks records');
+    debugLog('✅ Deleted live_section_blocks records');
 
     // 4. Delete all content sections
     await client.query('DELETE FROM live_section_sections WHERE live_section_id = $1', [sectionId]);
-    console.log('✅ Deleted live_section_sections records');
+    debugLog('✅ Deleted live_section_sections records');
 
     // 5. Delete all live sessions and their related data
-    console.log('Deleting live sessions...');
+    debugLog('Deleting live sessions...');
     const sessions = await client.query('SELECT id FROM live_sessions WHERE section_id = $1', [sectionId]);
     
     for (const session of sessions.rows) {
@@ -954,20 +981,20 @@ router.delete('/live-sections/:sectionId', verifyToken, requireRole('professor')
     }
     
     await client.query('DELETE FROM live_sessions WHERE section_id = $1', [sectionId]);
-    console.log('✅ Deleted live_sessions records');
+    debugLog('✅ Deleted live_sessions records');
 
     // 6. Delete live section purchases
     await client.query('DELETE FROM live_section_purchases WHERE live_section_id = $1', [sectionId]);
-    console.log('✅ Deleted live_section_purchases records');
+    debugLog('✅ Deleted live_section_purchases records');
 
     // 7. Delete cover image from R2 if exists
-    if (sectionCheck.cover_image_url) {
+    if (coverImageUrl) {
       try {
-        console.log('🗑️ Deleting cover image from R2:', sectionCheck.cover_image_url);
-        const coverKey = extractKeyFromUrl(sectionCheck.cover_image_url);
-        if (coverKey && coverKey !== sectionCheck.cover_image_url) {
+        debugLog('🗑️ Deleting cover image from R2:', coverImageUrl);
+        const coverKey = extractKeyFromUrl(coverImageUrl);
+        if (coverKey && coverKey !== coverImageUrl) {
           await deleteFromR2(coverKey);
-          console.log('✅ Cover image deleted from R2:', coverKey);
+          debugLog('✅ Cover image deleted from R2:', coverKey);
         }
       } catch (err) {
         console.error('⚠️ Error deleting cover image from R2:', err);
@@ -975,13 +1002,146 @@ router.delete('/live-sections/:sectionId', verifyToken, requireRole('professor')
     }
 
     // 8. Finally, delete the live section itself
-    console.log('Deleting live section...');
+    debugLog('Deleting live section...');
     await client.query('DELETE FROM live_sections WHERE id = $1', [sectionId]);
-    console.log('✅ Deleted live_sections record');
+    debugLog('✅ Deleted live_sections record');
+}
+
+// Give the students who bought a دورة their points back.
+//
+// Deleting a دورة is not one situation but two, and only a person can tell
+// them apart: a دورة withdrawn while students still expect it owes them a
+// refund, while one retired at the end of the year has already been delivered
+// and owes nothing. So the admin route asks, and passes the answer here.
+//
+// 'refund' matches no branch of trigger_update_user_points_balance, so the row
+// is an audit record only and the balance has to be credited explicitly.
+async function refundLiveSectionBuyers(client, sectionId, actorId) {
+  const buyers = await client.query(
+    'SELECT student_id, points_spent FROM live_section_purchases WHERE live_section_id = $1',
+    [sectionId]);
+
+  let refunded = 0;
+  let points_total = 0;
+
+  for (const buyer of buyers.rows) {
+    const points = parseInt(buyer.points_spent ?? 0, 10);
+    if (!Number.isFinite(points) || points <= 0) continue;
+    try {
+      await client.query(
+        `INSERT INTO point_transactions (user_id, transaction_type, points, amount, status, metadata)
+         VALUES ($1, 'refund', $2, $3, 'completed', $4)`,
+        [buyer.student_id, points, points, JSON.stringify({
+          type: 'live_section_deleted', live_section_id: Number(sectionId), refunded_by: actorId,
+        })]);
+      await client.query(
+        `INSERT INTO user_points (user_id, balance, updated_at)
+         VALUES ($1, $2, CURRENT_TIMESTAMP)
+         ON CONFLICT (user_id) DO UPDATE
+           SET balance = user_points.balance + $2, updated_at = CURRENT_TIMESTAMP`,
+        [buyer.student_id, points]);
+      refunded += 1;
+      points_total += points;
+    } catch (e) {
+      console.error(`[refund] section ${sectionId} student ${buyer.student_id}:`, e.message);
+      throw e; // inside the caller's transaction: a partial refund must not commit
+    }
+  }
+  return { refunded, points_total, buyers: buyers.rows };
+}
+
+// The individual live sessions inside a دورة follow their own rule, the same
+// one that applies when a single session is deleted: a session the student
+// already attended was delivered, so it is not refunded. Only sessions whose
+// day never came hand the points back.
+async function refundUnairedSessionsInSection(client, sectionId, actorId) {
+  const sessions = await client.query(
+    'SELECT id, status, start_time, duration FROM live_sessions WHERE section_id = $1', [sectionId]);
+
+  let refunded = 0;
+  let points_total = 0;
+  let skipped_already_aired = 0;
+
+  for (const session of sessions.rows) {
+    const aired = session.status === 'ended' ||
+      (session.start_time &&
+       Date.now() > new Date(session.start_time).getTime() + (session.duration || 60) * 60 * 1000);
+    if (aired) { skipped_already_aired += 1; continue; }
+
+    const buyers = await client.query(
+      'SELECT student_id, amount_paid FROM purchases WHERE session_id = $1', [session.id]);
+
+    for (const buyer of buyers.rows) {
+      // Prefer what the student was actually charged, recorded on the spend row.
+      const spend = await client.query(
+        `SELECT points FROM point_transactions
+          WHERE user_id = $1 AND transaction_type = 'spend' AND status = 'completed'
+            AND (metadata->>'session_id') = $2::text
+          ORDER BY created_at DESC LIMIT 1`, [buyer.student_id, String(session.id)]);
+      const points = parseInt(spend.rows[0]?.points ?? buyer.amount_paid ?? 0, 10);
+      if (!Number.isFinite(points) || points <= 0) continue;
+
+      await client.query(
+        `INSERT INTO point_transactions (user_id, transaction_type, points, amount, status, metadata)
+         VALUES ($1, 'refund', $2, $3, 'completed', $4)`,
+        [buyer.student_id, points, points, JSON.stringify({
+          type: 'live_session_deleted_with_section',
+          session_id: Number(session.id), live_section_id: Number(sectionId), refunded_by: actorId,
+        })]);
+      await client.query(
+        `INSERT INTO user_points (user_id, balance, updated_at)
+         VALUES ($1, $2, CURRENT_TIMESTAMP)
+         ON CONFLICT (user_id) DO UPDATE
+           SET balance = user_points.balance + $2, updated_at = CURRENT_TIMESTAMP`,
+        [buyer.student_id, points]);
+      refunded += 1;
+      points_total += points;
+    }
+  }
+  return { refunded, points_total, skipped_already_aired };
+}
+
+// Delete a live section and all related data.
+//
+// A professor can no longer do this alone. Deleting a دورة destroys purchases
+// that students paid points for, and whether those points come back is not a
+// decision the person pressing the button should make on their own — so this
+// route now only runs for an admin who has approved a deletion request, and
+// tells a professor where to go instead.
+router.delete('/live-sections/:sectionId', verifyToken, requireRole(['professor', 'admin']), async (req, res) => {
+  const client = await pool.connect();
+  let transactionStarted = false;
+  
+  try {
+    const { sectionId } = req.params;
+
+    // Check if the section belongs to the professor
+    const sectionCheck = await getRow('SELECT professor_id, cover_image_url FROM live_sections WHERE id = $1', [sectionId]);
+
+    if (!sectionCheck) {
+      return res.status(404).json({ error: 'Live section not found' });
+    }
+
+    if (req.user.role === 'professor') {
+      return res.status(403).json({
+        error: 'يجب طلب الحذف من الإدارة',
+        detail: 'حذف الدورة يمس نقاط الطلاب الذين اشتروها، فالإدارة هي من تقرر. أرسل طلب حذف.',
+        use: `POST /api/live-sections/${sectionId}/deletion-request`,
+      });
+    }
+
+    if (sectionCheck.professor_id != req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    await client.query('BEGIN');
+    transactionStarted = true;
+
+    await purgeLiveSection(client, sectionId, sectionCheck.cover_image_url);
 
     await client.query('COMMIT');
     transactionStarted = false;
-    console.log('✅ Live section and all related data deleted successfully!');
+    debugLog('✅ Live section and all related data deleted successfully!');
     
     res.json({ message: 'Live section deleted successfully' });
   } catch (error) {
@@ -999,12 +1159,347 @@ router.delete('/live-sections/:sectionId', verifyToken, requireRole('professor')
   }
 });
 
+
+// ==================== DELETION REQUESTS ====================
+// A professor asks; an admin decides both whether to delete and whether the
+// students who paid get their points back.
+
+// Professor: ask for a دورة to be deleted.
+router.post('/live-sections/:sectionId/deletion-request',
+  verifyToken, requireRole('professor'), async (req, res) => {
+  try {
+    const { sectionId } = req.params;
+    const { reason } = req.body || {};
+
+    const section = await getRow(
+      'SELECT id, title, professor_id FROM live_sections WHERE id = $1', [sectionId]);
+    if (!section) return res.status(404).json({ error: 'Live section not found' });
+    if (section.professor_id != req.user.id) {
+      return res.status(403).json({ error: 'هذه الدورة ليست لك' });
+    }
+
+    const open = await getRow(
+      `SELECT id FROM live_section_deletion_requests
+        WHERE live_section_id = $1 AND status = 'pending'`, [sectionId]);
+    if (open) {
+      return res.status(409).json({ error: 'يوجد طلب حذف قيد المراجعة لهذه الدورة بالفعل' });
+    }
+
+    // Show the admin what the decision actually costs before they take it.
+    const impact = await getRow(
+      `SELECT
+         (SELECT COUNT(*) FROM live_section_purchases WHERE live_section_id = $1)::int  AS section_buyers,
+         (SELECT COALESCE(SUM(points_spent),0) FROM live_section_purchases WHERE live_section_id = $1)::int AS section_points,
+         (SELECT COUNT(*) FROM live_sessions WHERE section_id = $1)::int                AS sessions,
+         (SELECT COUNT(*) FROM purchases p JOIN live_sessions ls ON ls.id = p.session_id
+           WHERE ls.section_id = $1)::int                                               AS session_buyers`,
+      [sectionId]);
+
+    const row = await getRow(
+      `INSERT INTO live_section_deletion_requests
+         (live_section_id, section_title, professor_id, reason)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [sectionId, section.title, req.user.id, (reason || '').trim() || null]);
+
+    try {
+      const NotificationService = (await import('../services/notificationService.js')).default;
+      const admins = await getRows("SELECT id FROM users WHERE role = 'admin'");
+      const who = await getRow('SELECT name FROM users WHERE id = $1', [req.user.id]);
+      for (const a of admins) {
+        await NotificationService.createNotification(
+          a.id, 'live_section_deletion_requested', 'طلب حذف دورة',
+          `طلب ${who?.name || 'أستاذ'} حذف دورة «${section.title}».`,
+          JSON.stringify({ request_id: row.id, live_section_id: Number(sectionId) })
+        ).catch(() => {});
+      }
+    } catch (e) { console.error('deletion-request notify:', e.message); }
+
+    res.status(201).json({ message: 'تم إرسال طلب الحذف إلى الإدارة', request: row, impact });
+  } catch (error) {
+    console.error('Error creating deletion request:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin: the queue, with the impact figures attached so the refund choice is
+// made against real numbers rather than a guess.
+router.get('/admin/live-section-deletion-requests',
+  verifyToken, requireRole('admin'), async (req, res) => {
+  try {
+    const status = req.query.status || 'pending';
+    const rows = await getRows(
+      `SELECT r.*,
+              u.name  AS professor_name,
+              d.name  AS decided_by_name,
+              ls.price, ls.cover_image_url,
+              (SELECT COUNT(*) FROM live_section_purchases WHERE live_section_id = r.live_section_id)::int AS section_buyers,
+              (SELECT COALESCE(SUM(points_spent),0) FROM live_section_purchases WHERE live_section_id = r.live_section_id)::int AS section_points,
+              (SELECT COUNT(*) FROM live_sessions WHERE section_id = r.live_section_id)::int AS sessions_count,
+              (SELECT COUNT(*) FROM purchases p JOIN live_sessions s2 ON s2.id = p.session_id
+                WHERE s2.section_id = r.live_section_id)::int AS session_buyers,
+              (SELECT COUNT(*) FROM live_sessions s3
+                WHERE s3.section_id = r.live_section_id
+                  AND s3.status <> 'ended'
+                  AND s3.start_time > NOW())::int AS sessions_not_yet_aired
+         FROM live_section_deletion_requests r
+         LEFT JOIN users u  ON u.id = r.professor_id
+         LEFT JOIN users d  ON d.id = r.decided_by
+         LEFT JOIN live_sections ls ON ls.id = r.live_section_id
+        WHERE ($1 = 'all' OR r.status = $1)
+        ORDER BY r.requested_at DESC`, [status]);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error listing deletion requests:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin: approve — delete the دورة, refunding or not as chosen.
+//
+//   POST /api/admin/live-section-deletion-requests/:id/approve
+//   body { refund: true | false }
+// refund is required: there is no sensible default when the two outcomes are
+// "students keep their money" and "students lose it".
+router.post('/admin/live-section-deletion-requests/:id/approve',
+  verifyToken, requireRole('admin'), async (req, res) => {
+  const client = await pool.connect();
+  let transactionStarted = false;
+  try {
+    const { id } = req.params;
+    const { refund, note } = req.body || {};
+    if (refund !== true && refund !== false) {
+      return res.status(400).json({ error: 'يجب تحديد ما إذا كانت النقاط تُرجع أم لا (refund: true/false)' });
+    }
+
+    const reqRow = await getRow(
+      'SELECT * FROM live_section_deletion_requests WHERE id = $1', [id]);
+    if (!reqRow) return res.status(404).json({ error: 'الطلب غير موجود' });
+    if (reqRow.status !== 'pending') {
+      return res.status(409).json({ error: `الطلب ${reqRow.status === 'approved' ? 'منفَّذ' : 'مرفوض'} مسبقاً` });
+    }
+    const sectionId = reqRow.live_section_id;
+    const section = sectionId
+      ? await getRow('SELECT id, title, cover_image_url FROM live_sections WHERE id = $1', [sectionId])
+      : null;
+    if (!section) {
+      // The دورة went away by another route; close the request honestly rather
+      // than pretending a deletion happened.
+      await query(
+        `UPDATE live_section_deletion_requests
+            SET status='approved', decided_by=$2, decided_at=NOW(),
+                admin_note=COALESCE($3,'الدورة كانت محذوفة مسبقاً'), refunded=false
+          WHERE id=$1`, [id, req.user.id, note || null]);
+      return res.json({ message: 'الدورة كانت محذوفة مسبقاً — أُغلق الطلب', deleted: false });
+    }
+
+    await client.query('BEGIN');
+    transactionStarted = true;
+
+    let sectionRefund = { refunded: 0, points_total: 0 };
+    let sessionRefund = { refunded: 0, points_total: 0, skipped_already_aired: 0 };
+    if (refund === true) {
+      sectionRefund = await refundLiveSectionBuyers(client, sectionId, req.user.id);
+      sessionRefund = await refundUnairedSessionsInSection(client, sectionId, req.user.id);
+    }
+
+    const affected = await client.query(
+      `SELECT DISTINCT student_id FROM live_section_purchases WHERE live_section_id = $1
+       UNION
+       SELECT DISTINCT p.student_id FROM purchases p
+         JOIN live_sessions ls ON ls.id = p.session_id
+        WHERE ls.section_id = $1`, [sectionId]);
+
+    // Record the decision BEFORE the delete: the FK sets live_section_id to
+    // NULL, and these numbers are the only thing left explaining what happened.
+    await client.query(
+      `UPDATE live_section_deletion_requests
+          SET status='approved', decided_by=$2, decided_at=NOW(), admin_note=$3,
+              refunded=$4, points_returned=$5, students_refunded=$6
+        WHERE id=$1`,
+      [id, req.user.id, note || null, refund === true,
+       sectionRefund.points_total + sessionRefund.points_total,
+       sectionRefund.refunded + sessionRefund.refunded]);
+
+    await purgeLiveSection(client, sectionId, section.cover_image_url);
+
+    await client.query('COMMIT');
+    transactionStarted = false;
+
+    try {
+      const NotificationService = (await import('../services/notificationService.js')).default;
+      for (const row of affected.rows) {
+        await NotificationService.createNotification(
+          row.student_id, 'live_section_deleted',
+          refund ? 'تم إلغاء الدورة وإعادة نقاطك' : 'تم إلغاء الدورة',
+          refund ? `تم إلغاء دورة «${section.title}» وأعيدت النقاط إلى رصيدك.`
+                 : `تم إلغاء دورة «${section.title}».`,
+          JSON.stringify({ live_section_id: Number(sectionId), refunded: !!refund })
+        ).catch(() => {});
+      }
+      if (reqRow.professor_id) {
+        await NotificationService.createNotification(
+          reqRow.professor_id, 'live_section_deletion_approved', 'تمت الموافقة على حذف الدورة',
+          refund ? `حُذفت دورة «${section.title}» وأُعيدت نقاط الطلاب.`
+                 : `حُذفت دورة «${section.title}» دون إرجاع النقاط.`,
+          JSON.stringify({ request_id: Number(id), refunded: !!refund })
+        ).catch(() => {});
+      }
+    } catch (e) { console.error('approve-deletion notify:', e.message); }
+
+    res.json({
+      message: 'تم حذف الدورة',
+      deleted: true,
+      refunded: refund === true,
+      section_buyers_refunded: sectionRefund.refunded,
+      session_buyers_refunded: sessionRefund.refunded,
+      sessions_already_aired: sessionRefund.skipped_already_aired,
+      points_returned: sectionRefund.points_total + sessionRefund.points_total,
+      students_notified: affected.rows.length,
+    });
+  } catch (error) {
+    if (transactionStarted) {
+      try { await client.query('ROLLBACK'); } catch (e) { console.error('Rollback failed:', e); }
+    }
+    console.error('❌ Error approving deletion request:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// Admin: reject — the دورة stays exactly as it is.
+router.post('/admin/live-section-deletion-requests/:id/reject',
+  verifyToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { note } = req.body || {};
+    const reqRow = await getRow('SELECT * FROM live_section_deletion_requests WHERE id = $1', [id]);
+    if (!reqRow) return res.status(404).json({ error: 'الطلب غير موجود' });
+    if (reqRow.status !== 'pending') {
+      return res.status(409).json({ error: 'تم البت في هذا الطلب مسبقاً' });
+    }
+
+    await query(
+      `UPDATE live_section_deletion_requests
+          SET status='rejected', decided_by=$2, decided_at=NOW(), admin_note=$3, refunded=NULL
+        WHERE id=$1`, [id, req.user.id, (note || '').trim() || null]);
+
+    try {
+      const NotificationService = (await import('../services/notificationService.js')).default;
+      if (reqRow.professor_id) {
+        await NotificationService.createNotification(
+          reqRow.professor_id, 'live_section_deletion_rejected', 'رُفض طلب حذف الدورة',
+          `لم تتم الموافقة على حذف دورة «${reqRow.section_title}».` +
+            (note ? ` السبب: ${note}` : ''),
+          JSON.stringify({ request_id: Number(id) })
+        ).catch(() => {});
+      }
+    } catch (e) { console.error('reject-deletion notify:', e.message); }
+
+    res.json({ message: 'تم رفض طلب الحذف' });
+  } catch (error) {
+    console.error('Error rejecting deletion request:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin: delete a دورة, choosing whether its students are refunded.
+//
+// Until now no interface could delete a دورة at all, and the professor route
+// deleted the purchase rows outright, so students silently lost their points.
+// The refund is not something code can decide on its own — a دورة cancelled in
+// October and one retired the following June are the same operation with
+// opposite fairness — so the admin says which this is and the answer is
+// recorded on every transaction row.
+//
+//   DELETE /api/admin/live-sections/:sectionId        -> no refund (default)
+//   DELETE /api/admin/live-sections/:sectionId?refund=true
+router.delete('/admin/live-sections/:sectionId', verifyToken, requireRole('admin'), async (req, res) => {
+  const client = await pool.connect();
+  let transactionStarted = false;
+
+  try {
+    const { sectionId } = req.params;
+    // Refunding is the irreversible half, so it only happens when asked for
+    // explicitly. Anything else means no refund.
+    const shouldRefund = String(req.query.refund ?? req.body?.refund ?? 'false') === 'true';
+
+    const section = await getRow(
+      'SELECT id, title, professor_id, cover_image_url FROM live_sections WHERE id = $1', [sectionId]);
+    if (!section) return res.status(404).json({ error: 'Live section not found' });
+
+    await client.query('BEGIN');
+    transactionStarted = true;
+
+    let sectionRefund = { refunded: 0, points_total: 0, buyers: [] };
+    let sessionRefund = { refunded: 0, points_total: 0, skipped_already_aired: 0 };
+
+    if (shouldRefund) {
+      sectionRefund = await refundLiveSectionBuyers(client, sectionId, req.user.id);
+      sessionRefund = await refundUnairedSessionsInSection(client, sectionId, req.user.id);
+    }
+
+    // Who to tell, gathered before the rows are deleted.
+    const affected = await client.query(
+      `SELECT DISTINCT student_id FROM live_section_purchases WHERE live_section_id = $1
+       UNION
+       SELECT DISTINCT p.student_id FROM purchases p
+         JOIN live_sessions ls ON ls.id = p.session_id
+        WHERE ls.section_id = $1`, [sectionId]);
+
+    await purgeLiveSection(client, sectionId, section.cover_image_url);
+
+    await client.query('COMMIT');
+    transactionStarted = false;
+
+    // Notifications are not part of the transaction: a failure to notify must
+    // not undo a completed deletion.
+    try {
+      const NotificationService = (await import('../services/notificationService.js')).default;
+      const totalPoints = sectionRefund.points_total + sessionRefund.points_total;
+      for (const row of affected.rows) {
+        await NotificationService.createNotification(
+          row.student_id,
+          'live_section_deleted',
+          shouldRefund ? 'تم إلغاء الدورة وإعادة نقاطك' : 'تم إلغاء الدورة',
+          shouldRefund
+            ? `تم إلغاء دورة «${section.title}» وأعيدت النقاط إلى رصيدك.`
+            : `تم إلغاء دورة «${section.title}».`,
+          JSON.stringify({ live_section_id: Number(sectionId), refunded: shouldRefund })
+        ).catch(() => {});
+      }
+      if (totalPoints) debugLog(`Refunded ${totalPoints} points for deleted section ${sectionId}`);
+    } catch (e) {
+      console.error('Notification after section delete failed:', e.message);
+    }
+
+    res.json({
+      message: 'Live section deleted successfully',
+      refunded: shouldRefund,
+      section_buyers_refunded: sectionRefund.refunded,
+      session_buyers_refunded: sessionRefund.refunded,
+      sessions_already_aired: sessionRefund.skipped_already_aired,
+      points_returned: sectionRefund.points_total + sessionRefund.points_total,
+      students_notified: affected.rows.length,
+    });
+  } catch (error) {
+    if (transactionStarted) {
+      try { await client.query('ROLLBACK'); } catch (e) { console.error('Rollback failed:', e); }
+    }
+    console.error('❌ Error deleting live section (admin):', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+});
+
+
 // ==================== CONTENT SECTIONS AND BLOCKS ROUTES ====================
 
 // Configure multer for live section content files (video, pdf, images, etc.)
 const liveSectionContentUpload = createR2Multer('live-sections', null, {
   fileFilter: (req, file, cb) => {
-    console.log('Live section content file upload attempt:', {
+    debugLog('Live section content file upload attempt:', {
       fieldname: file.fieldname,
       originalname: file.originalname,
       mimetype: file.mimetype,
@@ -1041,7 +1536,7 @@ router.get('/live-sections/:liveSectionId/content', async (req, res) => {
       SELECT id, title, "order"
       FROM live_section_sections
       WHERE live_section_id = $1
-      ORDER BY "order"
+      ORDER BY "order", id
     `, [liveSectionId]);
 
     // Get blocks for each section
@@ -1050,7 +1545,7 @@ router.get('/live-sections/:liveSectionId/content', async (req, res) => {
         SELECT id, type, title, content, "order"
         FROM live_section_blocks
         WHERE section_id = $1
-        ORDER BY "order"
+        ORDER BY "order", id
       `, [section.id]);
 
       // Get files for each block
@@ -1097,6 +1592,68 @@ router.get('/live-sections/:liveSectionId/content', async (req, res) => {
 });
 
 // Create a new content section in a live section
+// ---------------------------------------------------------------------------
+// PUT /api/live-sections/:liveSectionId/order
+//   { sections: [ { id, blocks: [blockId, ...] }, ... ] }
+//
+// The teacher's order, set in one go. Array position is the order: the first
+// section is 1, and within each section the first block is 1.
+//
+// Done as one call, after the form has saved everything, rather than by
+// sending an order with each section: new sections only get an id once they
+// are created, and a half-applied order (some rows moved, some not) is exactly
+// the shuffled list this exists to prevent — so it is a transaction.
+// ---------------------------------------------------------------------------
+router.put('/live-sections/:liveSectionId/order', verifyToken, requireRole('professor'), async (req, res) => {
+  const liveSectionId = Number(req.params.liveSectionId);
+  const sections = Array.isArray(req.body?.sections) ? req.body.sections : null;
+  if (!liveSectionId || !sections) {
+    return res.status(400).json({ error: 'sections array is required' });
+  }
+
+  const owner = await getRow('SELECT professor_id FROM live_sections WHERE id = $1', [liveSectionId]);
+  if (!owner) return res.status(404).json({ error: 'Live section not found' });
+  if (String(owner.professor_id) !== String(req.user.id)) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    let moved = 0;
+    for (let i = 0; i < sections.length; i++) {
+      const sectionId = Number(sections[i]?.id);
+      if (!sectionId) continue;
+      // The live_section_id condition is the ownership check for the rows: an
+      // id from someone else's دورة simply matches nothing.
+      const r = await client.query(
+        `UPDATE live_section_sections SET "order" = $1
+          WHERE id = $2 AND live_section_id = $3`,
+        [i + 1, sectionId, liveSectionId]);
+      moved += r.rowCount;
+
+      const blocks = Array.isArray(sections[i].blocks) ? sections[i].blocks : [];
+      for (let j = 0; j < blocks.length; j++) {
+        const blockId = Number(blocks[j]);
+        if (!blockId) continue;
+        await client.query(
+          `UPDATE live_section_blocks SET "order" = $1
+            WHERE id = $2 AND section_id = $3`,
+          [j + 1, blockId, sectionId]);
+      }
+    }
+    await client.query('COMMIT');
+    debugLog(`[order] دورة ${liveSectionId}: ${moved} sections reordered`);
+    res.json({ message: 'تم حفظ الترتيب', sections: moved });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Error saving section order:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+});
+
 router.post('/live-sections/sections', verifyToken, requireRole('professor'), async (req, res) => {
   try {
     const { live_section_id, title, order } = req.body;
@@ -1119,12 +1676,22 @@ router.post('/live-sections/sections', verifyToken, requireRole('professor'), as
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
+    // No explicit order means "put it last" — see course_sections for why.
     const result = await query(
-      'INSERT INTO live_section_sections (live_section_id, title, "order") VALUES ($1, $2, $3) RETURNING *',
-      [live_section_id, title, order || 1]
+      `INSERT INTO live_section_sections (live_section_id, title, "order")
+       VALUES ($1, $2, COALESCE($3::int,
+         (SELECT COALESCE(MAX("order"), 0) + 1
+            FROM live_section_sections WHERE live_section_id = $1)))
+       RETURNING *`,
+      [live_section_id, title, order ?? null]
     );
 
     res.status(201).json(result.rows[0]);
+
+    // Buyers of this دورة hear about it, once per 30 minutes however many
+    // files the upload turns out to contain.
+    notifyLiveSectionContentAdded(live_section_id).catch((e) =>
+      console.error('[content-added] live section notify failed:', e.message));
   } catch (error) {
     console.error('Error creating live section content section:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -1201,11 +1768,11 @@ router.delete('/live-sections/sections/:sectionId', verifyToken, requireRole('pr
           try {
             // Check if it's an R2 URL
             if (file.file_path && (file.file_path.startsWith('http') || file.file_path.startsWith('https'))) {
-              console.log('🗑️ Deleting R2 file:', file.file_path);
+              debugLog('🗑️ Deleting R2 file:', file.file_path);
               const key = extractKeyFromUrl(file.file_path);
               if (key && key !== file.file_path) {
                 await deleteFromR2(key);
-                console.log('✅ R2 file deleted:', key);
+                debugLog('✅ R2 file deleted:', key);
               }
             }
           } catch (err) {
@@ -1239,18 +1806,18 @@ router.post('/live-sections/blocks',
     // Handle R2 upload manually after file is buffered
     if (req.file && req.file.buffer) {
       try {
-        console.log('📤 Processing R2 upload for live section block file...');
+        debugLog('📤 Processing R2 upload for live section block file...');
         
         // Import R2 functions
         const { uploadToR2, generateR2Key } = await import('../services/r2Service.js');
         
         // Generate R2 key
         const r2Key = generateR2Key('live-sections', null, req.file.originalname, 'content');
-        console.log('🔑 Generated R2 key:', r2Key);
+        debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
         const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
-        console.log('✅ Live section block file uploaded to R2:', publicUrl);
+        debugLog('✅ Live section block file uploaded to R2:', publicUrl);
         
         // Update file object with R2 URL
         req.file.path = publicUrl;
@@ -1288,23 +1855,27 @@ router.post('/live-sections/blocks',
         return res.status(403).json({ error: 'Unauthorized' });
       }
 
-      console.log('📝 Creating live section block with data:', { section_id, live_section_id, type, title, content });
+      debugLog('📝 Creating live section block with data:', { section_id, live_section_id, type, title, content });
 
       // Insert block
       const blockResult = await query(
-        'INSERT INTO live_section_blocks (section_id, live_section_id, type, title, content, "order") VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [section_id, live_section_id, type, title || null, type === 'text' ? content : '', 1]
+        `INSERT INTO live_section_blocks (section_id, live_section_id, type, title, content, "order")
+         VALUES ($1, $2, $3, $4, $5,
+           (SELECT COALESCE(MAX("order"), 0) + 1
+              FROM live_section_blocks WHERE section_id = $1))
+         RETURNING *`,
+        [section_id, live_section_id, type, title || null, type === 'text' ? content : '']
       );
       const block = blockResult.rows[0];
-      console.log('✅ Block created:', block.id);
+      debugLog('✅ Block created:', block.id);
 
       let fileInfo = null;
       if (type !== 'text' && req.file) {
-        console.log('📁 Processing file for block:', req.file.originalname);
+        debugLog('📁 Processing file for block:', req.file.originalname);
         
         // Use R2 URL instead of local path
         const fileUrl = req.file.path; // R2 public URL
-        console.log('🔗 File URL:', fileUrl);
+        debugLog('🔗 File URL:', fileUrl);
         
         await query(
           'INSERT INTO live_section_files (live_section_id, section_id, block_id, file_name, file_path, file_type, file_size, original_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
@@ -1319,11 +1890,15 @@ router.post('/live-sections/blocks',
           original_name: req.file.originalname
         };
         
-        console.log('✅ File info saved to database');
+        debugLog('✅ File info saved to database');
       }
 
-      console.log('✅ Block creation completed successfully');
+      debugLog('✅ Block creation completed successfully');
       res.status(201).json({ ...block, files: fileInfo ? [fileInfo] : [] });
+
+      // A new video or PDF in an existing section is news for the buyers.
+      notifyLiveSectionContentAdded(live_section_id).catch((e) =>
+        console.error('[content-added] live block notify failed:', e.message));
     } catch (error) {
       console.error('❌ Error creating live section block:', error);
       console.error('Stack trace:', error.stack);
@@ -1341,18 +1916,18 @@ router.put('/live-sections/blocks/:blockId',
     // Handle R2 upload manually after file is buffered
     if (req.file && req.file.buffer) {
       try {
-        console.log('📤 Processing R2 upload for live section block file update...');
+        debugLog('📤 Processing R2 upload for live section block file update...');
         
         // Import R2 functions
         const { uploadToR2, generateR2Key } = await import('../services/r2Service.js');
         
         // Generate R2 key
         const r2Key = generateR2Key('live-sections', null, req.file.originalname, 'content');
-        console.log('🔑 Generated R2 key:', r2Key);
+        debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
         const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
-        console.log('✅ Live section block file updated to R2:', publicUrl);
+        debugLog('✅ Live section block file updated to R2:', publicUrl);
         
         // Update file object with R2 URL
         req.file.path = publicUrl;
@@ -1444,11 +2019,11 @@ router.delete('/live-sections/:sectionId/cover', verifyToken, requireRole('profe
     // Delete cover image from R2 if it exists
     if (sectionCheck.cover_image_url) {
       try {
-        console.log('🗑️ Deleting cover image from R2:', sectionCheck.cover_image_url);
+        debugLog('🗑️ Deleting cover image from R2:', sectionCheck.cover_image_url);
         const key = extractKeyFromUrl(sectionCheck.cover_image_url);
         if (key && key !== sectionCheck.cover_image_url) {
           await deleteFromR2(key);
-          console.log('✅ Cover image deleted from R2:', key);
+          debugLog('✅ Cover image deleted from R2:', key);
         }
       } catch (err) {
         console.error('⚠️ Error deleting cover image from R2:', err);
@@ -1493,11 +2068,11 @@ router.delete('/live-sections/blocks/:blockId', verifyToken, requireRole('profes
         try {
           // Check if it's an R2 URL
           if (file.file_path && (file.file_path.startsWith('http') || file.file_path.startsWith('https'))) {
-            console.log('🗑️ Deleting R2 file:', file.file_path);
+            debugLog('🗑️ Deleting R2 file:', file.file_path);
             const key = extractKeyFromUrl(file.file_path);
             if (key && key !== file.file_path) {
               await deleteFromR2(key);
-              console.log('✅ R2 file deleted:', key);
+              debugLog('✅ R2 file deleted:', key);
             }
           }
         } catch (err) {
@@ -1528,7 +2103,7 @@ router.get('/live-sections/:id/comments', async (req, res) => {
   try {
     const result = await query(
       `SELECT c.id, c.user_id, COALESCE(u.name, c.name) as name, c.comment,
-              c.live_section_id, c.created_at, c.reply, c.tab, c.rating
+              c.live_section_id, c.created_at AT TIME ZONE 'UTC' AS created_at, c.reply, c.tab, c.rating
        FROM live_section_comments c
        LEFT JOIN users u ON c.user_id = u.id
        WHERE c.live_section_id = $1
@@ -1538,7 +2113,7 @@ router.get('/live-sections/:id/comments', async (req, res) => {
     const commentsWithReplies = await Promise.all(
       result.rows.map(async (comment) => {
         const repliesResult = await query(
-          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at AT TIME ZONE 'UTC' AS created_at
            FROM live_section_comment_replies r
            WHERE r.comment_id = $1
            ORDER BY r.created_at ASC`,
@@ -1611,6 +2186,8 @@ router.post('/live-sections/comments/:commentId/replies', verifyToken, async (re
       [commentId, userId, user.name, reply_text, userRole]
     );
     res.json({ success: true, reply: replyResult.rows[0] });
+    notifyCommentReply('live_section', commentId, userId, user.name, reply_text).catch((e) =>
+      console.error('[comment-reply] notify failed:', e.message));
   } catch (err) {
     console.error('Error adding live section reply:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -1622,7 +2199,7 @@ router.get('/live-sections/comments/:commentId/replies', async (req, res) => {
   try {
     const { commentId } = req.params;
     const repliesResult = await query(
-      `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+      `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at AT TIME ZONE 'UTC' AS created_at
        FROM live_section_comment_replies r
        WHERE r.comment_id = $1
        ORDER BY r.created_at ASC`,
@@ -1675,7 +2252,7 @@ router.get('/professor/live-section-comments/:sectionId', verifyToken, requireRo
       return res.status(403).json({ error: 'Not authorized to view comments for this live section' });
     }
     const result = await query(
-      `SELECT c.id, c.live_section_id, c.name, c.comment, c.tab, c.rating, c.created_at, c.reply,
+      `SELECT c.id, c.live_section_id, c.name, c.comment, c.tab, c.rating, c.created_at AT TIME ZONE 'UTC' AS created_at, c.reply,
               COALESCE(u.name, c.name) as student_name
        FROM live_section_comments c
        LEFT JOIN users u ON c.user_id = u.id
@@ -1686,7 +2263,7 @@ router.get('/professor/live-section-comments/:sectionId', verifyToken, requireRo
     const commentsWithReplies = await Promise.all(
       result.rows.map(async (comment) => {
         const repliesResult = await query(
-          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at AT TIME ZONE 'UTC' AS created_at
            FROM live_section_comment_replies r
            WHERE r.comment_id = $1
            ORDER BY r.created_at ASC`,
@@ -1763,7 +2340,7 @@ router.get('/admin/live-section-comments/:sectionId', verifyToken, requireRole('
   try {
     const { sectionId } = req.params;
     const result = await query(
-      `SELECT c.id, c.live_section_id, c.name, c.comment, c.tab, c.rating, c.created_at, c.reply,
+      `SELECT c.id, c.live_section_id, c.name, c.comment, c.tab, c.rating, c.created_at AT TIME ZONE 'UTC' AS created_at, c.reply,
               COALESCE(u.name, c.name) as student_name,
               u.id as user_id
        FROM live_section_comments c
@@ -1775,7 +2352,7 @@ router.get('/admin/live-section-comments/:sectionId', verifyToken, requireRole('
     const commentsWithReplies = await Promise.all(
       result.rows.map(async (comment) => {
         const repliesResult = await query(
-          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at AT TIME ZONE 'UTC' AS created_at
            FROM live_section_comment_replies r
            WHERE r.comment_id = $1
            ORDER BY r.created_at ASC`,
@@ -1820,6 +2397,8 @@ router.post('/admin/live-section-comments/:commentId/reply', verifyToken, requir
       [commentId, adminId, adminName, reply]
     );
     res.json({ success: true, reply: result.rows[0] });
+    notifyCommentReply('live_section', commentId, adminId, adminName, reply).catch((e) =>
+      console.error('[comment-reply] notify failed:', e.message));
   } catch (err) {
     console.error('Error adding admin live section reply:', err);
     res.status(500).json({ error: 'Internal server error' });

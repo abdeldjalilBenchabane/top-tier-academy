@@ -1,5 +1,19 @@
 import pkg from 'pg';
-const { Pool } = pkg;
+const { Pool, types } = pkg;
+
+// TIMESTAMP WITHOUT TIME ZONE (oid 1114) -> plain string, not a JS Date.
+//
+// These columns hold wall-clock time: the hour a professor picked, with no
+// zone attached. Converting them to a Date made the API serialise them with a
+// trailing "Z", claiming UTC, and every client then shifted them by its own
+// offset — the mobile app showed a 2 PM session at 3 PM, and the web did too
+// until each call site was taught to ignore the Z.
+//
+// Returning the raw text means the wire format makes no claim the database
+// cannot back up, and a client that simply reads the digits is correct.
+// Backend code that wraps these in `new Date(...)` is unaffected: it parses
+// the string in the server's timezone and gets the same instant as before.
+types.setTypeParser(1114, (value) => value);
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -19,12 +33,23 @@ const dbConfig = {
     options: '-c timezone=UTC' // Add timezone configuration
 };
 
+// Query logging. Off by default: logging every statement is what produced a
+// 2.1 GB log file. DB_SLOW_QUERY_MS still surfaces genuinely slow queries.
+const DB_DEBUG = process.env.DB_DEBUG === 'true';
+const SLOW_QUERY_MS = Number(process.env.DB_SLOW_QUERY_MS) || 1000;
+
 // Create a new pool instance
 const pool = new Pool(dbConfig);
 
 // Test the connection
+let announcedConnection = false;
 pool.on('connect', (client) => {
-  console.log('Connected to PostgreSQL database');
+  // One line on first connect, not one per pooled client: with max:20 and a
+  // 30s idle timeout this handler fires constantly.
+  if (!announcedConnection) {
+    console.log('Connected to PostgreSQL database');
+    announcedConnection = true;
+  }
   // Set timezone for this connection
   client.query('SET timezone = \'UTC\';');
 });
@@ -40,7 +65,16 @@ export const query = async (text, params) => {
   try {
     const res = await pool.query(text, params);
     const duration = Date.now() - start;
-    console.log('Executed query', { text, duration, rows: res.rowCount });
+    // This used to log every query unconditionally and grew pm2's out.log to
+    // 2.1 GB. Keep the signal — queries slow enough to matter — and drop the
+    // noise. Set DB_DEBUG=true in backend/.env to get the old behaviour back
+    // while debugging.
+    if (DB_DEBUG) {
+      console.log('Executed query', { text, duration, rows: res.rowCount });
+    } else if (duration >= SLOW_QUERY_MS) {
+      console.warn(`Slow query (${duration}ms, ${res.rowCount} rows):`,
+                   String(text).replace(/\s+/g, ' ').slice(0, 300));
+    }
     return res;
   } catch (error) {
     console.error('Database query error:', error);

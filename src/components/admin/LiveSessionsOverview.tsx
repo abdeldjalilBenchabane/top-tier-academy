@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api';
 import { LiveSession, User } from '@/types';
 import { toast } from '@/lib/toast';
-import { formatTimeForDisplay, formatDateForDisplay } from '@/lib/utils';
+import { formatTimeForDisplay, formatDateForDisplay, parseSessionDate, serverDate } from '@/lib/utils';
 import { useLiveSessionsCount } from '@/contexts/LiveSessionsCountContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { API_BASE_URL } from '@/lib/api';
@@ -198,8 +198,8 @@ const LiveSessionsOverview = () => {
 
   const getUpcomingSessions = () => {
     return sessions
-      .filter(s => s.status === 'scheduled' && new Date(s.scheduledAt) > new Date())
-      .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+      .filter(s => s.status === 'scheduled' && (parseSessionDate(s.scheduledAt) || new Date(0)) > new Date())
+      .sort((a, b) => (parseSessionDate(a.scheduledAt)?.getTime() ?? 0) - (parseSessionDate(b.scheduledAt)?.getTime() ?? 0))
       .slice(0, 5);
   };
 
@@ -301,7 +301,8 @@ const LiveSessionsOverview = () => {
   const formatDate = (dateString: string) => {
     if (!dateString) return 'Not scheduled';
     try {
-      const date = new Date(dateString);
+      const date = parseSessionDate(dateString);
+      if (!date) return '—';
       if (isNaN(date.getTime())) return 'Invalid Date';
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -316,7 +317,8 @@ const LiveSessionsOverview = () => {
   const formatTime = (dateString: string) => {
     if (!dateString) return '';
     try {
-      const date = new Date(dateString);
+      const date = parseSessionDate(dateString);
+      if (!date) return '—';
       if (isNaN(date.getTime())) return '';
       return date.toLocaleTimeString('en-US', {
         hour: '2-digit',
@@ -543,11 +545,11 @@ const LiveSessionsOverview = () => {
                         <p className="text-xs text-gray-600">{getProfessorName(session.professorId)}</p>
                       </div>
                       <Badge variant="outline" className="text-xs">
-                        {new Date(session.scheduledAt).toLocaleDateString()}
+                        {parseSessionDate(session.scheduledAt)?.toLocaleDateString() ?? '—'}
                       </Badge>
                     </div>
                     <div className="text-xs text-gray-500">
-                      {new Date(session.scheduledAt).toLocaleTimeString()} • {session.duration}m
+                      {parseSessionDate(session.scheduledAt)?.toLocaleTimeString() ?? '—'} • {session.duration}m
                     </div>
                   </div>
                 ))
@@ -835,7 +837,7 @@ const LiveSessionsOverview = () => {
                           </div>
                           <div className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
-                            {new Date(session.scheduledAt).toLocaleDateString()}
+                            {parseSessionDate(session.scheduledAt)?.toLocaleDateString() ?? '—'}
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
@@ -889,7 +891,7 @@ const LiveSessionsOverview = () => {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium">{notification.message}</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    {new Date(notification.createdAt).toLocaleString()}
+                    {serverDate(notification.createdAt).toLocaleString()}
                   </p>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Star, Send, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { serverDate } from '@/lib/utils';
 
 export default function LiveSectionCommentsSection({ sectionId }) {
   const { user } = useAuth();
@@ -192,7 +193,7 @@ export default function LiveSectionCommentsSection({ sectionId }) {
                   </div>
                 </div>
                 <span className="text-xs text-gray-400">
-                  {review.created_at ? new Date(review.created_at).toLocaleDateString() : ''}
+                  {review.created_at ? serverDate(review.created_at).toLocaleDateString() : ''}
                 </span>
               </div>
               <p className="text-gray-700">{review.comment}</p>
@@ -234,7 +235,7 @@ export default function LiveSectionCommentsSection({ sectionId }) {
                           )
                         </span>
                         <span className="text-xs text-gray-400">
-                          {new Date(reply.created_at).toLocaleString()}
+                          {serverDate(reply.created_at).toLocaleString()}
                         </span>
                       </div>
                       <p className="text-sm">{reply.reply_text}</p>

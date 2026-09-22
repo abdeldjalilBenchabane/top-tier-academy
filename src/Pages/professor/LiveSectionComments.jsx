@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { ArrowLeft, MessageCircle, Calendar } from 'lucide-react';
+import { serverDate } from '@/lib/utils';
 
 const LiveSectionComments = () => {
   const { sectionId } = useParams();
@@ -135,7 +136,7 @@ const LiveSectionComments = () => {
                   {section.created_at && (
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
-                      <span>أنشئت في {new Date(section.created_at).toLocaleDateString('ar-SA')}</span>
+                      <span>أنشئت في {serverDate(section.created_at).toLocaleDateString('ar-SA')}</span>
                     </div>
                   )}
                 </div>
@@ -164,7 +165,7 @@ const LiveSectionComments = () => {
                     {comment.student_name || comment.name}
                   </span>
                   <span className="text-gray-400 text-xs">
-                    {new Date(comment.created_at).toLocaleString()}
+                    {serverDate(comment.created_at).toLocaleString()}
                   </span>
                   {comment.tab && <span className="ml-2 text-purple-600 text-xs">({comment.tab})</span>}
                 </div>
@@ -215,7 +216,7 @@ const LiveSectionComments = () => {
                           )
                         </span>
                         <span className="text-xs text-gray-400">
-                          {new Date(reply.created_at).toLocaleString()}
+                          {serverDate(reply.created_at).toLocaleString()}
                         </span>
                       </div>
                       <p className="text-sm">{reply.reply_text}</p>

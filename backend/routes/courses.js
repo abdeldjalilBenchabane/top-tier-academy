@@ -1,4 +1,6 @@
 import express from 'express';
+import { notifyCommentReply } from '../services/commentReplyNotify.js';
+import { notifyCourseContentAdded, courseIdOfSection } from '../services/contentUpdateNotify.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -8,13 +10,14 @@ import pool from '../db.js';
 import { createR2Multer } from '../middleware/r2MulterStorage.js';
 import { deleteFromR2, extractKeyFromUrl, uploadToR2, generateR2Key } from '../services/r2Service.js';
 import { uploadProgressService } from '../services/uploadProgressService.js';
+import { debugLog } from '../utils/logger.js';
 
 const router = express.Router();
 
 // Configure multer for course file uploads with R2 storage
 const courseUpload = createR2Multer('courses', null, {
   fileFilter: (req, file, cb) => {
-    console.log('Course file upload attempt:', {
+    debugLog('Course file upload attempt:', {
       fieldname: file.fieldname,
       originalname: file.originalname,
       mimetype: file.mimetype,
@@ -140,9 +143,9 @@ router.get('/', async (req, res) => {
 // Get all language course prices
 router.get('/language-course-prices', async (req, res) => {
   try {
-    console.log('Fetching language course prices...');
+    debugLog('Fetching language course prices...');
     const result = await query('SELECT * FROM language_course_prices', []);
-    console.log('Language course prices fetched:', result.rows.length, 'records');
+    debugLog('Language course prices fetched:', result.rows.length, 'records');
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching language course prices:', error);
@@ -192,7 +195,7 @@ router.get('/:id', async (req, res) => {
       SELECT id, title, "order"
       FROM course_sections
       WHERE course_id = $1
-      ORDER BY "order"
+      ORDER BY "order", id
     `, [courseId]);
     // Get blocks for each section
     for (let section of sections) {
@@ -200,7 +203,7 @@ router.get('/:id', async (req, res) => {
         SELECT id, type, title, content, "order"
         FROM section_blocks
         WHERE section_id = $1
-        ORDER BY "order"
+        ORDER BY "order", id
       `, [section.id]);
       // Get files for each block
       for (let block of blocks) {
@@ -230,7 +233,7 @@ router.get('/:id', async (req, res) => {
 
 // Create new course with file uploads
 router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
-  console.log('📝 Course creation request received');
+  debugLog('📝 Course creation request received');
   
   // Use multer.any() to accept all files (cover and content blocks)
   courseUpload.any()(req, res, async (err) => {
@@ -238,25 +241,25 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
       console.error('❌ Multer error in course creation:', err);
       return handleUploadError(err, req, res, next);
     }
-    console.log('✅ Multer processing completed');
-    console.log('📦 Request body after multer:', req.body);
-    console.log('📦 Request body keys:', req.body ? Object.keys(req.body) : 'No body');
-    console.log('📦 Processed files:', req.files ? req.files.length : 'No files');
+    debugLog('✅ Multer processing completed');
+    debugLog('📦 Request body after multer:', req.body);
+    debugLog('📦 Request body keys:', req.body ? Object.keys(req.body) : 'No body');
+    debugLog('📦 Processed files:', req.files ? req.files.length : 'No files');
     
     // Upload files to R2 if they exist
     if (req.files && req.files.length > 0) {
-      console.log('📤 Uploading files to R2...');
+      debugLog('📤 Uploading files to R2...');
       for (const file of req.files) {
-        console.log(`📁 Processing file: ${file.originalname}`);
-        console.log(`📊 File size: ${file.size}`);
-        console.log(`📦 Buffer available: ${!!file.buffer}`);
+        debugLog(`📁 Processing file: ${file.originalname}`);
+        debugLog(`📊 File size: ${file.size}`);
+        debugLog(`📦 Buffer available: ${!!file.buffer}`);
         
         if (file.buffer) {
           try {
             // Check file size and warn for large files
             const fileSizeMB = file.size / (1024 * 1024);
             if (fileSizeMB > 50) {
-              console.log(`⚠️ Large file detected: ${file.originalname} (${fileSizeMB.toFixed(1)}MB)`);
+              debugLog(`⚠️ Large file detected: ${file.originalname} (${fileSizeMB.toFixed(1)}MB)`);
             }
             
             // Generate upload ID for progress tracking
@@ -264,20 +267,20 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
             
             // Start progress tracking
             uploadProgressService.startUpload(uploadId, file.size, file.originalname);
-            console.log('📊 Started progress tracking for:', uploadId);
+            debugLog('📊 Started progress tracking for:', uploadId);
             
             // Generate R2 key
             const r2Key = generateR2Key('courses', null, file.originalname, file.fieldname);
-            console.log('🔑 Generated R2 key:', r2Key);
+            debugLog('🔑 Generated R2 key:', r2Key);
             
             // Upload to R2
-            console.log(`📤 Starting upload for ${file.originalname} (${fileSizeMB.toFixed(1)}MB)...`);
+            debugLog(`📤 Starting upload for ${file.originalname} (${fileSizeMB.toFixed(1)}MB)...`);
             const publicUrl = await uploadToR2(file.buffer, r2Key, file.mimetype);
-            console.log('✅ File uploaded to R2:', publicUrl);
+            debugLog('✅ File uploaded to R2:', publicUrl);
             
             // Mark upload as completed
             uploadProgressService.completeUpload(uploadId, true);
-            console.log('✅ Progress tracking completed for:', uploadId);
+            debugLog('✅ Progress tracking completed for:', uploadId);
             
             // Update file object with R2 URL
             file.path = publicUrl;
@@ -292,12 +295,12 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
             }
             
             if (error.message.includes('timeout')) {
-              console.log(`⚠️ File ${file.originalname} upload timed out, skipping...`);
+              debugLog(`⚠️ File ${file.originalname} upload timed out, skipping...`);
               // Continue with course creation but mark this file as failed
               file.uploadFailed = true;
               file.error = 'Upload timed out';
             } else {
-              console.log(`⚠️ File ${file.originalname} upload failed, skipping...`);
+              debugLog(`⚠️ File ${file.originalname} upload failed, skipping...`);
               file.uploadFailed = true;
               file.error = error.message;
             }
@@ -313,20 +316,20 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
   });
 }, async (req, res) => {
   try {
-    console.log('🎯 Starting course creation process...');
-    console.log('📋 Request body:', req.body || 'No body');
-    console.log('📁 Files received:', req.files ? req.files.length : 0);
+    debugLog('🎯 Starting course creation process...');
+    debugLog('📋 Request body:', req.body || 'No body');
+    debugLog('📁 Files received:', req.files ? req.files.length : 0);
     
     const { title, description, material_id, price, sections } = req.body;
     const created_by = req.user.id;
     
-    console.log('👤 User ID:', created_by);
-    console.log('📝 Course title:', title);
-    console.log('📝 Course description:', description);
+    debugLog('👤 User ID:', created_by);
+    debugLog('📝 Course title:', title);
+    debugLog('📝 Course description:', description);
     
     // Set status: 'draft' if no material_id, else 'pending'
     const status = material_id ? 'pending' : 'draft';
-    console.log('📊 Course status:', status);
+    debugLog('📊 Course status:', status);
     
     // Validate required fields
     if (!title || !description) {
@@ -334,50 +337,50 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
       return res.status(400).json({ error: 'Title and description are required' });
     }
     
-    console.log('✅ Validation passed, starting database transaction...');
+    debugLog('✅ Validation passed, starting database transaction...');
     
     // Start transaction
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      console.log('✅ Database transaction started');
+      debugLog('✅ Database transaction started');
       
       // Insert new course - set price to null if empty or '0' to use material price
       const coursePrice = (!price || price === '0' || price === 0) ? null : price;
-      console.log('💰 Course price:', coursePrice);
+      debugLog('💰 Course price:', coursePrice);
       
       const courseResult = await client.query(
         'INSERT INTO courses (title, description, material_id, created_by, price, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
         [title, description, material_id || null, created_by, coursePrice, status]
       );
       const courseId = courseResult.rows[0].id;
-      console.log('✅ Course created with ID:', courseId);
+      debugLog('✅ Course created with ID:', courseId);
       
       // Handle cover upload
       if (req.files && req.files.length > 0) {
         const coverFile = req.files.find(f => f.fieldname === 'cover');
         if (coverFile && !coverFile.uploadFailed) {
-          console.log('🖼️ Processing cover file:', coverFile.originalname);
+          debugLog('🖼️ Processing cover file:', coverFile.originalname);
           // Use R2 URL instead of local path
           const coverUrl = coverFile.path; // R2 public URL
           await client.query(
             'INSERT INTO course_covers (course_id, cover) VALUES ($1, $2)',
             [courseId, coverUrl]
           );
-          console.log('✅ Cover uploaded to R2:', coverUrl);
+          debugLog('✅ Cover uploaded to R2:', coverUrl);
         } else if (coverFile && coverFile.uploadFailed) {
-          console.log('⚠️ Cover file upload failed, skipping cover...');
+          debugLog('⚠️ Cover file upload failed, skipping cover...');
         }
       }
       
       // Handle sections and content files
       if (sections && Array.isArray(JSON.parse(sections))) {
         const sectionsData = JSON.parse(sections);
-        console.log('📚 Processing sections:', sectionsData.length);
+        debugLog('📚 Processing sections:', sectionsData.length);
         
         for (let i = 0; i < sectionsData.length; i++) {
           const section = sectionsData[i];
-          console.log(`📖 Processing section ${i + 1}:`, section.title);
+          debugLog(`📖 Processing section ${i + 1}:`, section.title);
           
           // Insert section
           const sectionResult = await client.query(
@@ -385,15 +388,15 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
             [courseId, section.title, i + 1]
           );
           const sectionId = sectionResult.rows[0].id;
-          console.log('✅ Section created with ID:', sectionId);
+          debugLog('✅ Section created with ID:', sectionId);
           
           // Insert blocks
           if (section.blocks && Array.isArray(section.blocks)) {
-            console.log(`📝 Processing ${section.blocks.length} blocks for section ${sectionId}`);
+            debugLog(`📝 Processing ${section.blocks.length} blocks for section ${sectionId}`);
             
             for (let j = 0; j < section.blocks.length; j++) {
               const block = section.blocks[j];
-              console.log(`📄 Processing block ${j + 1}:`, block.type);
+              debugLog(`📄 Processing block ${j + 1}:`, block.type);
               
               let contentValue = block.type === 'text' ? block.content || '' : '';
               const blockResult = await client.query(
@@ -401,7 +404,7 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
                 [sectionId, block.type, block.title || null, contentValue, j + 1]
               );
               const blockId = blockResult.rows[0].id;
-              console.log('✅ Block created with ID:', blockId);
+              debugLog('✅ Block created with ID:', blockId);
               
               // Handle content files for this block (image, pdf, video)
               if (block.type !== 'text' && req.files && req.files.length > 0) {
@@ -409,18 +412,18 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
                 const fileField = `content_${block.id}`;
                 const file = req.files.find(f => f.fieldname === fileField);
                 if (file && !file.uploadFailed) {
-                  console.log(`📁 Processing file for block ${blockId}:`, file.originalname);
+                  debugLog(`📁 Processing file for block ${blockId}:`, file.originalname);
                   // Use R2 URL instead of local path
                   const fileUrl = file.path; // R2 public URL
                   await client.query(
                     'INSERT INTO course_files (course_id, section_id, block_id, file_name, file_path, file_type, file_size, original_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
                     [courseId, sectionId, blockId, file.filename, fileUrl, file.mimetype, file.size, file.originalname]
                   );
-                  console.log('✅ File uploaded to R2:', fileUrl);
+                  debugLog('✅ File uploaded to R2:', fileUrl);
                 } else if (file && file.uploadFailed) {
-                  console.log(`⚠️ File upload failed for block ${blockId}: ${file.originalname}`);
+                  debugLog(`⚠️ File upload failed for block ${blockId}: ${file.originalname}`);
                 } else {
-                  console.log(`⚠️ No file found for block ${blockId} with field ${fileField}`);
+                  debugLog(`⚠️ No file found for block ${blockId} with field ${fileField}`);
                 }
               }
             }
@@ -429,7 +432,7 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
       }
       
       await client.query('COMMIT');
-      console.log('✅ Database transaction committed');
+      debugLog('✅ Database transaction committed');
       
       // Get the created course with all details
       const createdCourse = await getRow(`
@@ -447,7 +450,7 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
         WHERE c.id = $1
       `, [courseId]);
       
-      console.log('✅ Course creation completed successfully');
+      debugLog('✅ Course creation completed successfully');
       
       // Collect upload IDs from processed files
       const uploadIds = {};
@@ -799,7 +802,7 @@ router.put('/:id/assign-material', verifyToken, requireRole(['professor']), asyn
         );
       }
 
-      console.log(`✅ Course path assignment notifications and emails sent for course ${courseId}`);
+      debugLog(`✅ Course path assignment notifications and emails sent for course ${courseId}`);
     } catch (error) {
       console.error('Error sending course path assignment notifications/emails:', error);
       // Don't fail the path assignment if notifications fail
@@ -907,7 +910,7 @@ router.put('/:id/create-material', verifyToken, requireRole(['professor']), asyn
           );
         }
 
-        console.log(`✅ Course path assignment notifications and emails sent for course ${courseId}`);
+        debugLog(`✅ Course path assignment notifications and emails sent for course ${courseId}`);
       } catch (error) {
         console.error('Error sending course path assignment notifications/emails:', error);
         // Don't fail the path assignment if notifications fail
@@ -999,7 +1002,7 @@ router.put('/:id/approve', verifyToken, requireRole(['admin']), async (req, res)
         admin.name
       );
 
-      console.log(`✅ Course approval notifications and emails sent for course ${courseId}`);
+      debugLog(`✅ Course approval notifications and emails sent for course ${courseId}`);
     } catch (error) {
       console.error('Error sending course approval notifications/emails:', error);
       // Don't fail the approval if notifications fail
@@ -1079,7 +1082,7 @@ router.put('/:id/reject', verifyToken, requireRole(['admin']), async (req, res) 
         reason
       );
 
-      console.log(`✅ Course rejection notifications and emails sent for course ${courseId}`);
+      debugLog(`✅ Course rejection notifications and emails sent for course ${courseId}`);
     } catch (error) {
       console.error('Error sending course rejection notifications/emails:', error);
       // Don't fail the rejection if notifications fail
@@ -1146,7 +1149,7 @@ router.put('/:id/language-path', verifyToken, requireRole(['professor']), async 
         );
       }
 
-      console.log(`✅ Course path assignment notifications and emails sent for course ${courseId}`);
+      debugLog(`✅ Course path assignment notifications and emails sent for course ${courseId}`);
     } catch (error) {
       console.error('Error sending course path assignment notifications/emails:', error);
       // Don't fail the path assignment if notifications fail
@@ -1161,36 +1164,36 @@ router.put('/:id/language-path', verifyToken, requireRole(['professor']), async 
 
 // Add endpoint to update course cover (admin or professor who owns the course)
 router.put('/:id/cover', (req, res, next) => {
-  console.log('🔄 Cover upload request received');
-  console.log('📋 Request headers:', req.headers);
-  console.log('📋 Request method:', req.method);
-  console.log('📋 Request URL:', req.url);
-  console.log('📋 Request body type:', typeof req.body);
+  debugLog('🔄 Cover upload request received');
+  debugLog('📋 Request headers:', req.headers);
+  debugLog('📋 Request method:', req.method);
+  debugLog('📋 Request URL:', req.url);
+  debugLog('📋 Request body type:', typeof req.body);
   next();
 }, (req, res, next) => {
-  console.log('🔐 Verifying token...');
+  debugLog('🔐 Verifying token...');
   next();
 }, verifyToken, (req, res, next) => {
-  console.log('✅ Token verified, user:', req.user);
+  debugLog('✅ Token verified, user:', req.user);
   next();
 }, requireRole(['admin', 'professor']), (req, res, next) => {
-  console.log('✅ Role verified, processing upload...');
+  debugLog('✅ Role verified, processing upload...');
   next();
 }, courseUpload.single('cover'), async (req, res, next) => {
-  console.log('📁 File upload processed:', req.file);
+  debugLog('📁 File upload processed:', req.file);
   
   // Handle R2 upload manually after file is buffered
   if (req.file && req.file.buffer) {
     try {
-      console.log('📤 Processing R2 upload for cover...');
+      debugLog('📤 Processing R2 upload for cover...');
       
       // Generate R2 key
       const r2Key = generateR2Key('courses', null, req.file.originalname, 'cover');
-      console.log('🔑 Generated R2 key:', r2Key);
+      debugLog('🔑 Generated R2 key:', r2Key);
       
       // Upload to R2
       const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
-      console.log('✅ Cover uploaded to R2:', publicUrl);
+      debugLog('✅ Cover uploaded to R2:', publicUrl);
       
       // Update file object with R2 URL
       req.file.path = publicUrl;
@@ -1207,7 +1210,7 @@ router.put('/:id/cover', (req, res, next) => {
   next();
 }, async (req, res) => {
   try {
-    console.log('🔄 Cover upload started for course:', req.params.id);
+    debugLog('🔄 Cover upload started for course:', req.params.id);
   } catch (error) {
     console.error('❌ Error in cover upload middleware:', error);
     console.error('Stack trace:', error.stack);
@@ -1224,42 +1227,42 @@ router.put('/:id/cover', (req, res, next) => {
     // Check if course exists
     const course = await getRow('SELECT * FROM courses WHERE id = $1', [courseId]);
     if (!course) {
-      console.log('❌ Course not found:', courseId);
+      debugLog('❌ Course not found:', courseId);
       return res.status(404).json({ error: 'Course not found' });
     }
     
     // If professor, check ownership
     if (req.user.role === 'professor' && course.created_by !== req.user.id) {
-      console.log('❌ Permission denied for course:', courseId);
+      debugLog('❌ Permission denied for course:', courseId);
       return res.status(403).json({ error: 'You can only update your own courses' });
     }
     
     // Handle new cover upload
     if (!req.file) {
-      console.log('❌ No file uploaded');
+      debugLog('❌ No file uploaded');
       return res.status(400).json({ error: 'No cover file uploaded' });
     }
     
-    console.log('📁 File uploaded:', req.file.originalname, 'Size:', req.file.size);
+    debugLog('📁 File uploaded:', req.file.originalname, 'Size:', req.file.size);
     
     // Use R2 URL instead of local path
     const coverUrl = req.file.path; // R2 public URL
-    console.log('🔗 New cover URL:', coverUrl);
+    debugLog('🔗 New cover URL:', coverUrl);
     
     // Get old cover if exists
     const oldCover = await getRow('SELECT cover FROM course_covers WHERE course_id = $1', [courseId]);
-    console.log('📷 Old cover:', oldCover?.cover);
+    debugLog('📷 Old cover:', oldCover?.cover);
     
     // Delete old cover file from R2 if exists
     if (oldCover && oldCover.cover) {
       try {
-        console.log('🗑️ Deleting old cover from R2...');
+        debugLog('🗑️ Deleting old cover from R2...');
         const oldKey = extractKeyFromUrl(oldCover.cover);
-        console.log('🔑 Old key extracted:', oldKey);
+        debugLog('🔑 Old key extracted:', oldKey);
         
         if (oldKey && oldKey !== oldCover.cover) {
           await deleteFromR2(oldKey);
-          console.log('✅ Old cover deleted from R2');
+          debugLog('✅ Old cover deleted from R2');
         }
       } catch (err) {
         console.error('⚠️ Error deleting old cover from R2:', err);
@@ -1269,14 +1272,14 @@ router.put('/:id/cover', (req, res, next) => {
     
     // Update or insert cover row
     if (oldCover) {
-      console.log('📝 Updating existing cover row...');
+      debugLog('📝 Updating existing cover row...');
       await query('UPDATE course_covers SET cover = $1 WHERE course_id = $2', [coverUrl, courseId]);
     } else {
-      console.log('📝 Inserting new cover row...');
+      debugLog('📝 Inserting new cover row...');
       await query('INSERT INTO course_covers (course_id, cover) VALUES ($1, $2) ON CONFLICT (course_id) DO UPDATE SET cover = EXCLUDED.cover', [courseId, coverUrl]);
     }
     
-    console.log('✅ Cover upload completed successfully');
+    debugLog('✅ Cover upload completed successfully');
     res.json({ cover_url: coverUrl });
     
   } catch (error) {
@@ -1344,7 +1347,7 @@ router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (r
       return res.status(403).json({ error: 'You can only delete your own courses' });
     }
     
-    console.log(`🗑️ Starting deletion of course ${courseId} and all related data...`);
+    debugLog(`🗑️ Starting deletion of course ${courseId} and all related data...`);
     
     // Helper function to execute query with savepoint for non-critical operations
     const executeWithSavepoint = async (queryFn, operationName) => {
@@ -1355,12 +1358,12 @@ router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (r
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
       } catch (err) {
         await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`).catch(() => {});
-        console.log(`⚠️ Error in ${operationName}, continuing...`, err.message);
+        debugLog(`⚠️ Error in ${operationName}, continuing...`, err.message);
       }
     };
     
     // 1. Delete quiz-related data
-    console.log('Deleting quiz data...');
+    debugLog('Deleting quiz data...');
     await executeWithSavepoint(async () => {
       await client.query(`
         DELETE FROM quiz_attempt_answers 
@@ -1392,7 +1395,7 @@ router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (r
     }, 'quiz data deletion');
     
     // 2. Delete comment-related data
-    console.log('Deleting comment data...');
+    debugLog('Deleting comment data...');
     await executeWithSavepoint(async () => {
       await client.query(`
         DELETE FROM comment_replies 
@@ -1403,7 +1406,7 @@ router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (r
     }, 'comment data deletion');
     
     // 3. Delete course files from R2 and database
-    console.log('Deleting course files...');
+    debugLog('Deleting course files...');
     await executeWithSavepoint(async () => {
       const courseFilesResult = await client.query('SELECT file_path FROM course_files WHERE course_id = $1', [courseId]);
       for (const file of courseFilesResult.rows) {
@@ -1412,7 +1415,7 @@ router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (r
             const fileKey = extractKeyFromUrl(file.file_path);
             if (fileKey && fileKey !== file.file_path) {
               await deleteFromR2(fileKey);
-              console.log('✅ Deleted file from R2:', fileKey);
+              debugLog('✅ Deleted file from R2:', fileKey);
             }
           } catch (err) {
             console.error('⚠️ Error deleting file from R2:', err);
@@ -1423,7 +1426,7 @@ router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (r
     }, 'course files deletion');
     
     // 4. Delete section blocks and their files
-    console.log('Deleting section blocks...');
+    debugLog('Deleting section blocks...');
     await executeWithSavepoint(async () => {
       const sectionsResult = await client.query('SELECT id FROM course_sections WHERE course_id = $1', [courseId]);
       for (const section of sectionsResult.rows) {
@@ -1455,7 +1458,7 @@ router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (r
     }, 'course sections deletion');
     
     // 6. Delete student course enrollments and purchases
-    console.log('Deleting student enrollments and purchases...');
+    debugLog('Deleting student enrollments and purchases...');
     // Try to delete from course_purchases if table exists
     await executeWithSavepoint(async () => {
       await client.query('DELETE FROM course_purchases WHERE course_id = $1', [courseId]);
@@ -1464,17 +1467,17 @@ router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (r
     // Delete from course_enrollments if table exists (do this first as it might have CASCADE)
     await executeWithSavepoint(async () => {
       await client.query('DELETE FROM course_enrollments WHERE course_id = $1', [courseId]);
-      console.log('✅ Deleted course_enrollments records');
+      debugLog('✅ Deleted course_enrollments records');
     }, 'course_enrollments deletion');
     
     // Delete from student_courses (this is where purchases are actually stored)
     // This MUST succeed - it's critical for purchased courses
     // Don't use savepoint here - if this fails, we need to know about it
     const deleteResult = await client.query('DELETE FROM student_courses WHERE course_id = $1', [courseId]);
-    console.log(`✅ Deleted ${deleteResult.rowCount} student_courses records`);
+    debugLog(`✅ Deleted ${deleteResult.rowCount} student_courses records`);
     
     // 7. Delete activities related to this course
-    console.log('Deleting activities...');
+    debugLog('Deleting activities...');
     await executeWithSavepoint(async () => {
       await client.query(`
         DELETE FROM activities 
@@ -1487,11 +1490,11 @@ router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (r
       const courseCoverResult = await client.query('SELECT cover FROM course_covers WHERE course_id = $1', [courseId]);
       if (courseCoverResult.rows.length > 0 && courseCoverResult.rows[0].cover) {
         try {
-          console.log('🗑️ Deleting course cover from R2:', courseCoverResult.rows[0].cover);
+          debugLog('🗑️ Deleting course cover from R2:', courseCoverResult.rows[0].cover);
           const coverKey = extractKeyFromUrl(courseCoverResult.rows[0].cover);
           if (coverKey && coverKey !== courseCoverResult.rows[0].cover) {
             await deleteFromR2(coverKey);
-            console.log('✅ Course cover deleted from R2:', coverKey);
+            debugLog('✅ Course cover deleted from R2:', coverKey);
           }
         } catch (err) {
           console.error('⚠️ Error deleting course cover from R2:', err);
@@ -1505,7 +1508,7 @@ router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (r
     }, 'course cover database deletion');
     
     // 10. Delete point transactions related to this course (in metadata)
-    console.log('Deleting point transactions related to course...');
+    debugLog('Deleting point transactions related to course...');
     await executeWithSavepoint(async () => {
       await client.query(`
         DELETE FROM point_transactions 
@@ -1514,7 +1517,7 @@ router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (r
     }, 'point transactions deletion');
     
     // 11. Delete video views and security logs
-    console.log('Deleting video views and security logs...');
+    debugLog('Deleting video views and security logs...');
     await executeWithSavepoint(async () => {
       await client.query('DELETE FROM video_views WHERE course_id = $1', [courseId]);
     }, 'video_views deletion');
@@ -1543,18 +1546,18 @@ router.delete('/:id', verifyToken, requireRole(['professor', 'admin']), async (r
         `, [courseId]);
         // Delete live sessions
         await client.query('DELETE FROM live_sessions WHERE course_id = $1', [courseId]);
-        console.log('✅ Deleted live_sessions related to course');
+        debugLog('✅ Deleted live_sessions related to course');
       }
     }, 'live_sessions deletion');
     
     // 15. Finally, delete the course itself
     // If there are still foreign key constraints, this will fail and we'll catch it
-    console.log('Deleting course...');
+    debugLog('Deleting course...');
     await client.query('DELETE FROM courses WHERE id = $1', [courseId]);
     
     await client.query('COMMIT');
     transactionStarted = false;
-    console.log('✅ Course and all related data deleted successfully!');
+    debugLog('✅ Course and all related data deleted successfully!');
     res.json({ message: 'Course deleted successfully' });
   } catch (error) {
     // Only rollback if transaction is still active
@@ -1606,18 +1609,18 @@ router.delete('/blocks/:blockId', verifyToken, requireRole(['professor', 'admin'
         try {
           // Check if it's an R2 URL
           if (file.file_path && (file.file_path.startsWith('http') || file.file_path.startsWith('https'))) {
-            console.log('🗑️ Deleting R2 file:', file.file_path);
+            debugLog('🗑️ Deleting R2 file:', file.file_path);
             const key = extractKeyFromUrl(file.file_path);
             if (key && key !== file.file_path) {
               await deleteFromR2(key);
-              console.log('✅ R2 file deleted:', key);
+              debugLog('✅ R2 file deleted:', key);
             }
           } else {
             // Local file deletion (fallback)
             const filePath = path.join(__dirname, '..', '..', 'public', file.file_path);
             if (fs.existsSync(filePath)) {
               fs.unlinkSync(filePath);
-              console.log('✅ Local file deleted:', filePath);
+              debugLog('✅ Local file deleted:', filePath);
             }
           }
         } catch (err) {
@@ -1644,18 +1647,18 @@ async function deleteBlockFiles(blockId) {
     try {
       // Check if it's an R2 URL
       if (file.file_path && (file.file_path.startsWith('http') || file.file_path.startsWith('https'))) {
-        console.log('🗑️ Deleting R2 file:', file.file_path);
+        debugLog('🗑️ Deleting R2 file:', file.file_path);
         const key = extractKeyFromUrl(file.file_path);
         if (key && key !== file.file_path) {
           await deleteFromR2(key);
-          console.log('✅ R2 file deleted:', key);
+          debugLog('✅ R2 file deleted:', key);
         }
       } else {
         // Local file deletion (fallback)
         const filePath = path.join(__dirname, '..', '..', 'public', file.file_path);
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
-          console.log('✅ Local file deleted:', filePath);
+          debugLog('✅ Local file deleted:', filePath);
         }
       }
     } catch (err) {
@@ -1671,11 +1674,22 @@ router.post('/sections', verifyToken, requireRole(['professor', 'admin']), async
   try {
     const { course_id, title, order } = req.body;
     if (!course_id || !title) return res.status(400).json({ error: 'course_id and title are required' });
+    // No explicit order means "put it last". It used to mean 1, so every
+    // section a professor added landed with the same order and the list came
+    // back in whatever order the planner chose — the random order bug.
     const result = await query(
-      'INSERT INTO course_sections (course_id, title, "order") VALUES ($1, $2, $3) RETURNING *',
-      [course_id, title, order || 1]
+      `INSERT INTO course_sections (course_id, title, "order")
+       VALUES ($1, $2, COALESCE($3::int,
+         (SELECT COALESCE(MAX("order"), 0) + 1 FROM course_sections WHERE course_id = $1)))
+       RETURNING *`,
+      [course_id, title, order ?? null]
     );
     res.status(201).json(result.rows[0]);
+
+    // Students who bought this course hear about it. Fire and forget: the
+    // teacher's upload must not wait on a fan-out.
+    notifyCourseContentAdded(course_id).catch((e) =>
+      console.error('[content-added] course section notify failed:', e.message));
   } catch (error) {
     console.error('Error creating section:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -1729,20 +1743,20 @@ router.put('/blocks/:blockId', verifyToken, requireRole(['professor', 'admin']),
 
 // Create a new block in a section
 router.post('/blocks', verifyToken, requireRole(['professor', 'admin']), courseUpload.single('file'), async (req, res, next) => {
-  console.log('📁 Block creation request received');
+  debugLog('📁 Block creation request received');
   
   // Handle R2 upload manually after file is buffered
   if (req.file && req.file.buffer) {
     try {
-      console.log('📤 Processing R2 upload for block file...');
+      debugLog('📤 Processing R2 upload for block file...');
       
       // Generate R2 key
       const r2Key = generateR2Key('courses', null, req.file.originalname, 'content');
-      console.log('🔑 Generated R2 key:', r2Key);
+      debugLog('🔑 Generated R2 key:', r2Key);
       
       // Upload to R2
       const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
-      console.log('✅ Block file uploaded to R2:', publicUrl);
+      debugLog('✅ Block file uploaded to R2:', publicUrl);
       
       // Update file object with R2 URL
       req.file.path = publicUrl;
@@ -1762,23 +1776,28 @@ router.post('/blocks', verifyToken, requireRole(['professor', 'admin']), courseU
     const { section_id, type, title, content } = req.body;
     if (!section_id || !type) return res.status(400).json({ error: 'section_id and type are required' });
     
-    console.log('📝 Creating block with data:', { section_id, type, title, content });
+    debugLog('📝 Creating block with data:', { section_id, type, title, content });
     
     // Insert block
+    // Same as sections: a new block belongs at the end of its section, not
+    // tied with every other block at order 1.
     const blockResult = await query(
-      'INSERT INTO section_blocks (section_id, type, title, content, "order") VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [section_id, type, title || null, type === 'text' ? content : '', 1]
+      `INSERT INTO section_blocks (section_id, type, title, content, "order")
+       VALUES ($1, $2, $3, $4,
+         (SELECT COALESCE(MAX("order"), 0) + 1 FROM section_blocks WHERE section_id = $1))
+       RETURNING *`,
+      [section_id, type, title || null, type === 'text' ? content : '']
     );
     const block = blockResult.rows[0];
-    console.log('✅ Block created:', block.id);
+    debugLog('✅ Block created:', block.id);
     
     let fileInfo = null;
     if (type !== 'text' && req.file) {
-      console.log('📁 Processing file for block:', req.file.originalname);
+      debugLog('📁 Processing file for block:', req.file.originalname);
       
       // Use R2 URL instead of local path
       const fileUrl = req.file.path; // R2 public URL
-      console.log('🔗 File URL:', fileUrl);
+      debugLog('🔗 File URL:', fileUrl);
       
       await query(
         'INSERT INTO course_files (section_id, block_id, file_name, file_path, file_type, file_size, original_name) VALUES ($1, $2, $3, $4, $5, $6, $7)',
@@ -1793,11 +1812,17 @@ router.post('/blocks', verifyToken, requireRole(['professor', 'admin']), courseU
         original_name: req.file.originalname
       };
       
-      console.log('✅ File info saved to database');
+      debugLog('✅ File info saved to database');
     }
     
-    console.log('✅ Block creation completed successfully');
+    debugLog('✅ Block creation completed successfully');
     res.status(201).json({ ...block, files: fileInfo ? [fileInfo] : [] });
+
+    // Adding a video or a PDF to an existing section is news too. The block
+    // only knows its section, so resolve the course it belongs to.
+    courseIdOfSection(section_id)
+      .then((courseId) => notifyCourseContentAdded(courseId))
+      .catch((e) => console.error('[content-added] course block notify failed:', e.message));
   } catch (error) {
     console.error('❌ Error creating block:', error);
     console.error('Stack trace:', error.stack);
@@ -1934,7 +1959,7 @@ router.get('/professor/comments/:courseId', verifyToken, requireRole(['professor
     
     const result = await query(
       `SELECT 
-         c.id, c.course_id, c.name, c.comment, c.tab, c.rating, c.created_at, c.reply,
+         c.id, c.course_id, c.name, c.comment, c.tab, c.rating, c.created_at AT TIME ZONE 'UTC' AS created_at, c.reply,
          COALESCE(u.name, c.name) as student_name
        FROM course_comments c
        LEFT JOIN users u ON c.user_id = u.id
@@ -1947,7 +1972,7 @@ router.get('/professor/comments/:courseId', verifyToken, requireRole(['professor
     const commentsWithReplies = await Promise.all(
       result.rows.map(async (comment) => {
         const repliesResult = await query(
-          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at AT TIME ZONE 'UTC' AS created_at
            FROM comment_replies r
            WHERE r.comment_id = $1
            ORDER BY r.created_at ASC`,
@@ -2001,7 +2026,7 @@ router.get('/professor/comments', verifyToken, requireRole(['professor']), async
     const professorId = req.user.id;
     const result = await query(
       `SELECT 
-         c.id, c.course_id, c.name, c.comment, c.tab, c.rating, c.created_at, c.reply,
+         c.id, c.course_id, c.name, c.comment, c.tab, c.rating, c.created_at AT TIME ZONE 'UTC' AS created_at, c.reply,
          COALESCE(u.name, c.name) as student_name,
          crs.title as course_title
        FROM course_comments c
@@ -2016,7 +2041,7 @@ router.get('/professor/comments', verifyToken, requireRole(['professor']), async
     const commentsWithReplies = await Promise.all(
       result.rows.map(async (comment) => {
         const repliesResult = await query(
-          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at AT TIME ZONE 'UTC' AS created_at
            FROM comment_replies r
            WHERE r.comment_id = $1
            ORDER BY r.created_at ASC`,
@@ -2048,7 +2073,7 @@ router.get('/:id/comments', async (req, res) => {
     // If id is 'user', get all comments by a specific user
     if (id === 'user' && userId) {
       result = await query(
-        `SELECT c.id, c.user_id, u.name, c.comment, c.course_id, c.section_id, c.created_at, c.reply, c.tab, c.rating,
+        `SELECT c.id, c.user_id, u.name, c.comment, c.course_id, c.section_id, c.created_at AT TIME ZONE 'UTC' AS created_at, c.reply, c.tab, c.rating,
                 crs.title as course_title
          FROM course_comments c
          LEFT JOIN users u ON c.user_id = u.id
@@ -2060,7 +2085,7 @@ router.get('/:id/comments', async (req, res) => {
     } else {
       // Get comments for a specific course
       result = await query(
-        `SELECT c.id, c.user_id, u.name, c.comment, c.course_id, c.section_id, c.created_at, c.reply, c.tab, c.rating
+        `SELECT c.id, c.user_id, u.name, c.comment, c.course_id, c.section_id, c.created_at AT TIME ZONE 'UTC' AS created_at, c.reply, c.tab, c.rating
          FROM course_comments c
          LEFT JOIN users u ON c.user_id = u.id
          WHERE c.course_id = $1
@@ -2073,7 +2098,7 @@ router.get('/:id/comments', async (req, res) => {
     const commentsWithReplies = await Promise.all(
       result.rows.map(async (comment) => {
         const repliesResult = await query(
-          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at AT TIME ZONE 'UTC' AS created_at
            FROM comment_replies r
            WHERE r.comment_id = $1
            ORDER BY r.created_at ASC`,
@@ -2155,6 +2180,8 @@ router.post('/comments/:commentId/replies', verifyToken, async (req, res) => {
     );
     
     res.json({ success: true, reply: replyResult.rows[0] });
+    notifyCommentReply('course', commentId, userId, user.name, reply_text).catch((e) =>
+      console.error('[comment-reply] notify failed:', e.message));
   } catch (err) {
     console.error('Error adding threaded reply:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -2167,7 +2194,7 @@ router.get('/comments/:commentId/replies', async (req, res) => {
     const { commentId } = req.params;
     
     const repliesResult = await query(
-      `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+      `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at AT TIME ZONE 'UTC' AS created_at
        FROM comment_replies r
        WHERE r.comment_id = $1
        ORDER BY r.created_at ASC`,
@@ -2193,7 +2220,7 @@ router.get('/all-comments-by-user/:userId', verifyToken, async (req, res) => {
     
     const result = await query(
       `SELECT 
-         c.id, c.course_id, c.user_id, c.name, c.comment, c.tab, c.rating, c.created_at, c.reply,
+         c.id, c.course_id, c.user_id, c.name, c.comment, c.tab, c.rating, c.created_at AT TIME ZONE 'UTC' AS created_at, c.reply,
          COALESCE(u.name, c.name) as student_name,
          crs.title as course_title
        FROM course_comments c
@@ -2208,7 +2235,7 @@ router.get('/all-comments-by-user/:userId', verifyToken, async (req, res) => {
     const commentsWithReplies = await Promise.all(
       result.rows.map(async (comment) => {
         const repliesResult = await query(
-          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at AT TIME ZONE 'UTC' AS created_at
            FROM comment_replies r
            WHERE r.comment_id = $1
            ORDER BY r.created_at ASC`,
@@ -2221,7 +2248,7 @@ router.get('/all-comments-by-user/:userId', verifyToken, async (req, res) => {
       })
     );
     
-    console.log(`Found ${commentsWithReplies.length} comments for user ${userId}`);
+    debugLog(`Found ${commentsWithReplies.length} comments for user ${userId}`);
     res.json({ comments: commentsWithReplies });
   } catch (err) {
     console.error('Error fetching user comments:', err);
@@ -2249,6 +2276,8 @@ router.post('/professor/comments/:commentId/reply', verifyToken, requireRole(['p
       [reply, commentId]
     );
     res.json({ success: true });
+    notifyCommentReply('course', commentId, professorId, req.user.name, reply).catch((e) =>
+      console.error('[comment-reply] notify failed:', e.message));
   } catch (err) {
     console.error('Error replying to comment:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -2324,7 +2353,7 @@ router.get('/admin/comments/:courseId', verifyToken, requireRole(['admin']), asy
     
     const result = await query(
       `SELECT 
-         c.id, c.course_id, c.name, c.comment, c.tab, c.rating, c.created_at, c.reply,
+         c.id, c.course_id, c.name, c.comment, c.tab, c.rating, c.created_at AT TIME ZONE 'UTC' AS created_at, c.reply,
          COALESCE(u.name, c.name) as student_name,
          u.id as user_id
        FROM course_comments c
@@ -2338,7 +2367,7 @@ router.get('/admin/comments/:courseId', verifyToken, requireRole(['admin']), asy
     const commentsWithReplies = await Promise.all(
       result.rows.map(async (comment) => {
         const repliesResult = await query(
-          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at
+          `SELECT r.id, r.user_id, r.user_name, r.reply_text, r.user_role, r.created_at AT TIME ZONE 'UTC' AS created_at
            FROM comment_replies r
            WHERE r.comment_id = $1
            ORDER BY r.created_at ASC`,
@@ -2400,6 +2429,8 @@ router.post('/admin/comments/:commentId/reply', verifyToken, requireRole(['admin
     );
     
     res.json({ success: true, reply: result.rows[0] });
+    notifyCommentReply('course', commentId, adminId, adminName, reply).catch((e) =>
+      console.error('[comment-reply] notify failed:', e.message));
   } catch (err) {
     console.error('Error adding admin reply:', err);
     res.status(500).json({ error: 'Internal server error' });

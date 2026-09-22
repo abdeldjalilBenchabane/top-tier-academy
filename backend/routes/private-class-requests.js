@@ -4,6 +4,7 @@ import pool from '../db.js';
 import { verifyToken } from '../middleware/auth.js';
 import NotificationService from '../services/notificationService.js';
 import { sendPrivateClassRequestEmail, sendPrivateClassApprovalEmail, sendPrivateClassRejectionEmail, sendPrivateClassPaymentEmail, sendPrivateClassTimeUpdateEmail } from '../services/emailService.js';
+import { debugLog } from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -33,7 +34,7 @@ const getHierarchyPath = async (levelId, yearId, specialityId, materialId) => {
     }
     
     const fullPath = path.join(' - ');
-    console.log('Generated hierarchy path:', { levelId, yearId, specialityId, materialId, path, fullPath });
+    debugLog('Generated hierarchy path:', { levelId, yearId, specialityId, materialId, path, fullPath });
     return fullPath;
   } catch (error) {
     console.error('Error getting hierarchy path:', error);
@@ -219,7 +220,7 @@ router.post('/', verifyToken, async (req, res) => {
           }
         );
         
-        console.log('Notification and email sent to teacher:', teacher.name);
+        debugLog('Notification and email sent to teacher:', teacher.name);
       } catch (error) {
         console.error('Failed to send notification/email to teacher:', error);
         // Don't fail the request if notification/email fails
@@ -353,7 +354,7 @@ router.patch('/:requestId/status', verifyToken, async (req, res) => {
           }
         );
         
-        console.log('Approval notification and email sent to student:', student.name);
+        debugLog('Approval notification and email sent to student:', student.name);
       } catch (error) {
         console.error('Failed to send approval notification/email:', error);
       }
@@ -387,7 +388,7 @@ router.patch('/:requestId/status', verifyToken, async (req, res) => {
           updatedRequest.rejection_reason
         );
         
-        console.log('Rejection notification and email sent to student:', student.name);
+        debugLog('Rejection notification and email sent to student:', student.name);
       } catch (error) {
         console.error('Failed to send rejection notification/email:', error);
       }
@@ -423,7 +424,7 @@ router.patch('/:requestId/status', verifyToken, async (req, res) => {
           time
         );
         
-        console.log('Time update notification and email sent to student:', student.name);
+        debugLog('Time update notification and email sent to student:', student.name);
       } catch (error) {
         console.error('Failed to send time update notification/email:', error);
       }
@@ -537,7 +538,7 @@ router.post('/:requestId/purchase', verifyToken, async (req, res) => {
           pointsNeeded
         );
         
-        console.log('Purchase notification sent to student');
+        debugLog('Purchase notification sent to student');
       } catch (error) {
         console.error('Failed to send purchase notification:', error);
         // Don't fail the purchase if notification fails
@@ -579,7 +580,7 @@ router.post('/:requestId/purchase', verifyToken, async (req, res) => {
             pointsNeeded
           );
           
-          console.log('Payment notification and email sent to teacher:', teacher.name);
+          debugLog('Payment notification and email sent to teacher:', teacher.name);
         }
       } catch (error) {
         console.error('Failed to send payment notification/email to teacher:', error);

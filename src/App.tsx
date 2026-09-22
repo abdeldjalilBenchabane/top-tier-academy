@@ -52,6 +52,7 @@ const AdminCourses = lazy(() => import('./Pages/admin/Courses'));
 const AdminCourseDetails = lazy(() => import('./Pages/admin/CourseDetails'));
 const AdminSettings = lazy(() => import('./Pages/admin/Settings'));
 const AdminLiveSections = lazy(() => import('./Pages/admin/LiveSections'));
+const SendNotification = lazy(() => import('./Pages/admin/SendNotification'));
 const AdminPurchases = lazy(() => import('./Pages/admin/Purchases'));
 const AdminLiveSectionDetails = lazy(() => import('./Pages/admin/LiveSectionDetails'));
 const AdminMobileApp = lazy(() => import('./Pages/admin/MobileApp'));
@@ -191,6 +192,7 @@ const App: React.FC = () => {
                             <Route path="live-sessions" element={<LiveSessionsOverview />} />
                             <Route path="live-sessions/:sessionId/edit" element={<EditLiveSessionPage asAdmin />} />
                             <Route path="live-sections" element={<AdminLiveSections />} />
+                            <Route path="send-notification" element={<SendNotification />} />
                             <Route path="live-sections/:sectionId" element={<AdminLiveSectionDetails />} />
                             <Route path="purchases" element={<AdminPurchases />} />
                             <Route path="mobile" element={<AdminMobileApp />} />

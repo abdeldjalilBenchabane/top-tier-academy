@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Textarea } from '../../components/ui/textarea';
 import { ArrowLeft, MessageCircle, Calendar, User } from 'lucide-react';
+import { serverDate } from '@/lib/utils';
 
 const CourseComments = () => {
   const { courseId } = useParams();
@@ -150,7 +151,7 @@ const CourseComments = () => {
                   </div>
                   <div className="flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
-                    <span>أنشئت في {new Date(course.created_at).toLocaleDateString('ar-SA')}</span>
+                    <span>أنشئت في {serverDate(course.created_at).toLocaleDateString('ar-SA')}</span>
                   </div>
                 </div>
               </div>
@@ -176,7 +177,7 @@ const CourseComments = () => {
                     {(comment.student_name || comment.name)?.charAt(0) || '?'}
                   </div>
                   <span className="font-bold text-blue-700">{comment.student_name || comment.name}</span>
-                  <span className="text-gray-400 text-xs">{new Date(comment.created_at).toLocaleString()}</span>
+                  <span className="text-gray-400 text-xs">{serverDate(comment.created_at).toLocaleString()}</span>
                   <span className="ml-2 text-purple-600 text-xs">({comment.tab})</span>
                 </div>
                 {comment.rating && (
@@ -217,7 +218,7 @@ const CourseComments = () => {
                           ({reply.user_role === 'professor' ? 'المدرس' : 'الطالب'})
                         </span>
                         <span className="text-xs text-gray-400">
-                          {new Date(reply.created_at).toLocaleString()}
+                          {serverDate(reply.created_at).toLocaleString()}
                         </span>
                       </div>
                       <p className={`text-sm ${

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaEnvelope, FaLock } from 'react-icons/fa';
+import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/lib/toast';
@@ -8,6 +8,7 @@ import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 
 const Login = () => {
+    const [showPassword, setShowPassword] = useState(false);
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -156,16 +157,24 @@ const Login = () => {
                                     </div>
                                     <div className="relative group">
                                         <input
-                                            type="password"
+                                            type={showPassword ? "text" : "password"}
                                             id="password"
                                             name="password"
                                             value={formData.password}
                                             onChange={handleChange}
-                                            className="premium-input group-hover:border-blue-300 transition-colors"
+                                            className="premium-input pr-12 group-hover:border-blue-300 transition-colors"
                                             placeholder="أدخل كلمة المرور"
                                             required
                                             disabled={Loading}
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                                            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                        >
+                                            {showPassword ? <FaEyeSlash /> : <FaEye />}
+                                        </button>
                                     </div>
                                     {errors.password && (
                                         <p className="text-red-500 text-xs mt-1 mr-1 flex items-center animate-bounce">

@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/button';
 import { Textarea } from '../../components/ui/textarea';
 import { ArrowLeft, MessageCircle, Calendar, User, Trash2, Send } from 'lucide-react';
 import { useToast } from '../../hooks/use-toast';
+import { serverDate } from '@/lib/utils';
 
 interface Reply {
   id: number;
@@ -161,7 +162,7 @@ const AdminLiveSectionComments = () => {
                   <span className="font-bold text-blue-700">{comment.student_name || comment.name}</span>
                   <span className="text-gray-400 text-xs">
                     <Calendar className="h-3 w-3 inline mr-1" />
-                    {new Date(comment.created_at).toLocaleString('ar-SA')}
+                    {serverDate(comment.created_at).toLocaleString('ar-SA')}
                   </span>
                   {comment.tab && (
                     <span className="ml-2 text-purple-600 text-xs px-2 py-1 bg-purple-50 rounded">
@@ -193,7 +194,7 @@ const AdminLiveSectionComments = () => {
                           {getRoleBadge(reply.user_role)}
                         </span>
                         <span className="text-xs text-gray-500">
-                          {new Date(reply.created_at).toLocaleString('ar-SA')}
+                          {serverDate(reply.created_at).toLocaleString('ar-SA')}
                         </span>
                       </div>
                       <div className="text-gray-700 text-sm">{reply.reply_text}</div>

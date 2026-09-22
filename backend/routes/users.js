@@ -2,30 +2,33 @@ import express from 'express';
 import { verifyToken, requireRole } from '../middleware/auth.js';
 import { getRows, getRow, query } from '../db.js';
 import { createR2Multer } from '../middleware/r2MulterStorage.js';
-import { deleteFromR2, extractKeyFromUrl } from '../services/r2Service.js';
+import { deleteFromR2, extractKeyFromUrl, uploadToR2, generateR2Key } from '../services/r2Service.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import bcrypt from 'bcrypt';
+import { debugLog } from '../utils/logger.js';
 
 const router = express.Router();
 
 // Configure multer for avatar uploads with R2 storage
 const avatarUpload = createR2Multer('avatars', null, {
   fileFilter: (req, file, cb) => {
-    console.log('Avatar upload attempt:', {
+    debugLog('Avatar upload attempt:', {
       fieldname: file.fieldname,
       originalname: file.originalname,
       mimetype: file.mimetype,
       size: file.size
     });
     
-    // Allow only image files for avatars
+    // Allow only image files for avatars. The mobile app uploads without a
+    // content type (application/octet-stream), so the file extension alone is
+    // enough — the route below checks the type again before saving.
     const allowedImageTypes = /jpeg|jpg|png|gif|webp/;
     const extname = allowedImageTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedImageTypes.test(file.mimetype);
-    
-    if (extname && mimetype) {
+
+    if (extname || mimetype) {
       return cb(null, true);
     } else {
       return cb(new Error('Only image files (jpeg, jpg, png, gif, webp) are allowed for avatars!'));
@@ -262,18 +265,18 @@ router.post('/:id/avatar', verifyToken, requireRole(['admin']), avatarUpload.sin
     // Handle R2 upload manually after file is buffered
     if (req.file && req.file.buffer) {
       try {
-        console.log('📤 Processing R2 upload for avatar...');
+        debugLog('📤 Processing R2 upload for avatar...');
         
         // Import R2 functions
         const { uploadToR2, generateR2Key, deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
         
         // Generate R2 key
         const r2Key = generateR2Key('avatars', null, req.file.originalname, 'avatar');
-        console.log('🔑 Generated R2 key:', r2Key);
+        debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
         const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
-        console.log('✅ Avatar uploaded to R2:', publicUrl);
+        debugLog('✅ Avatar uploaded to R2:', publicUrl);
         
         // Update file object with R2 URL
         req.file.path = publicUrl;
@@ -290,12 +293,12 @@ router.post('/:id/avatar', verifyToken, requireRole(['admin']), avatarUpload.sin
     // Delete old avatar from R2 if it exists
     if (existingUser.avatar_url) {
       try {
-        console.log('🗑️ Deleting old avatar from R2:', existingUser.avatar_url);
+        debugLog('🗑️ Deleting old avatar from R2:', existingUser.avatar_url);
         const { deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
         const oldKey = extractKeyFromUrl(existingUser.avatar_url);
         if (oldKey && oldKey !== existingUser.avatar_url) {
           await deleteFromR2(oldKey);
-          console.log('✅ Old avatar deleted from R2:', oldKey);
+          debugLog('✅ Old avatar deleted from R2:', oldKey);
         }
       } catch (fileError) {
         console.error('⚠️ Error deleting old avatar from R2:', fileError);
@@ -304,7 +307,15 @@ router.post('/:id/avatar', verifyToken, requireRole(['admin']), avatarUpload.sin
     }
 
     // Save new avatar URL (R2)
-    const avatarUrl = req.file.path; // R2 public URL
+    // The upload middleware keeps the file in memory (multer.memoryStorage),
+    // so it has a buffer and no path — send it to R2 here, the way course
+    // files are handled. Reading req.file.path saved an empty avatar_url.
+    const r2Key = generateR2Key('avatars', null, req.file.originalname, 'avatar');
+    const avatarUrl = await uploadToR2(
+      req.file.buffer, r2Key, req.file.mimetype || 'image/jpeg');
+    if (!avatarUrl) {
+      return res.status(500).json({ error: 'تعذر حفظ الصورة. حاول مرة أخرى.' });
+    }
     await query(
       'UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, name, email, role, avatar_url, created_at',
       [avatarUrl, userId]
@@ -323,41 +334,41 @@ router.post('/:id/avatar', verifyToken, requireRole(['admin']), avatarUpload.sin
 // Upload avatar for students (own profile only)
 router.post('/student/avatar', verifyToken, requireRole(['student']), avatarUpload.single('avatar'), async (req, res, next) => {
   try {
-    console.log('Avatar upload request received');
-    console.log('User:', req.user);
-    console.log('File:', req.file);
+    debugLog('Avatar upload request received');
+    debugLog('User:', req.user);
+    debugLog('File:', req.file);
 
     const studentId = req.user.id;
 
     // Check if user exists
     const existingUser = await getRow('SELECT id, avatar_url, role FROM users WHERE id = $1', [studentId]);
-    console.log('Existing user:', existingUser);
+    debugLog('Existing user:', existingUser);
 
     if (!existingUser) {
-      console.log('User not found');
+      debugLog('User not found');
       return res.status(404).json({ error: 'User not found' });
     }
 
     if (!req.file) {
-      console.log('No file uploaded');
+      debugLog('No file uploaded');
       return res.status(400).json({ error: 'No avatar file uploaded' });
     }
 
     // Handle R2 upload manually after file is buffered
     if (req.file && req.file.buffer) {
       try {
-        console.log('📤 Processing R2 upload for student avatar...');
+        debugLog('📤 Processing R2 upload for student avatar...');
         
         // Import R2 functions
         const { uploadToR2, generateR2Key, deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
         
         // Generate R2 key
         const r2Key = generateR2Key('avatars', null, req.file.originalname, 'avatar');
-        console.log('🔑 Generated R2 key:', r2Key);
+        debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
         const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
-        console.log('✅ Student avatar uploaded to R2:', publicUrl);
+        debugLog('✅ Student avatar uploaded to R2:', publicUrl);
         
         // Update file object with R2 URL
         req.file.path = publicUrl;
@@ -374,12 +385,12 @@ router.post('/student/avatar', verifyToken, requireRole(['student']), avatarUplo
     // Delete old avatar from R2 if it exists
     if (existingUser.avatar_url) {
       try {
-        console.log('🗑️ Deleting old student avatar from R2:', existingUser.avatar_url);
+        debugLog('🗑️ Deleting old student avatar from R2:', existingUser.avatar_url);
         const { deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
         const oldKey = extractKeyFromUrl(existingUser.avatar_url);
         if (oldKey && oldKey !== existingUser.avatar_url) {
           await deleteFromR2(oldKey);
-          console.log('✅ Old student avatar deleted from R2:', oldKey);
+          debugLog('✅ Old student avatar deleted from R2:', oldKey);
         }
       } catch (fileError) {
         console.error('⚠️ Error deleting old student avatar from R2:', fileError);
@@ -388,13 +399,21 @@ router.post('/student/avatar', verifyToken, requireRole(['student']), avatarUplo
     }
 
     // Save new avatar URL (R2)
-    const avatarUrl = req.file.path; // R2 public URL
+    // The upload middleware keeps the file in memory (multer.memoryStorage),
+    // so it has a buffer and no path — send it to R2 here, the way course
+    // files are handled. Reading req.file.path saved an empty avatar_url.
+    const r2Key = generateR2Key('avatars', null, req.file.originalname, 'avatar');
+    const avatarUrl = await uploadToR2(
+      req.file.buffer, r2Key, req.file.mimetype || 'image/jpeg');
+    if (!avatarUrl) {
+      return res.status(500).json({ error: 'تعذر حفظ الصورة. حاول مرة أخرى.' });
+    }
     await query(
       'UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, name, email, role, avatar_url, created_at',
       [avatarUrl, studentId]
     );
 
-    console.log('Avatar uploaded successfully:', avatarUrl);
+    debugLog('Avatar uploaded successfully:', avatarUrl);
     res.json({
       message: 'Avatar uploaded successfully',
       avatar_url: avatarUrl
@@ -408,9 +427,9 @@ router.post('/student/avatar', verifyToken, requireRole(['student']), avatarUplo
 // Upload avatar for current user (any role)
 router.post('/me/avatar', verifyToken, avatarUpload.single('avatar'), async (req, res, next) => {
   try {
-    console.log('Avatar upload (me) request received');
-    console.log('User:', req.user);
-    console.log('File:', req.file);
+    debugLog('Avatar upload (me) request received');
+    debugLog('User:', req.user);
+    debugLog('File:', req.file);
     const userId = req.user.id;
     
     // Check if user exists
@@ -426,18 +445,18 @@ router.post('/me/avatar', verifyToken, avatarUpload.single('avatar'), async (req
     // Handle R2 upload manually after file is buffered
     if (req.file && req.file.buffer) {
       try {
-        console.log('📤 Processing R2 upload for user avatar...');
+        debugLog('📤 Processing R2 upload for user avatar...');
         
         // Import R2 functions
         const { uploadToR2, generateR2Key, deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
         
         // Generate R2 key
         const r2Key = generateR2Key('avatars', null, req.file.originalname, 'avatar');
-        console.log('🔑 Generated R2 key:', r2Key);
+        debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
         const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
-        console.log('✅ User avatar uploaded to R2:', publicUrl);
+        debugLog('✅ User avatar uploaded to R2:', publicUrl);
         
         // Update file object with R2 URL
         req.file.path = publicUrl;
@@ -454,12 +473,12 @@ router.post('/me/avatar', verifyToken, avatarUpload.single('avatar'), async (req
     // Delete old avatar from R2 if it exists
     if (existingUser.avatar_url) {
       try {
-        console.log('🗑️ Deleting old user avatar from R2:', existingUser.avatar_url);
+        debugLog('🗑️ Deleting old user avatar from R2:', existingUser.avatar_url);
         const { deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
         const oldKey = extractKeyFromUrl(existingUser.avatar_url);
         if (oldKey && oldKey !== existingUser.avatar_url) {
           await deleteFromR2(oldKey);
-          console.log('✅ Old user avatar deleted from R2:', oldKey);
+          debugLog('✅ Old user avatar deleted from R2:', oldKey);
         }
       } catch (fileError) {
         console.error('⚠️ Error deleting old user avatar from R2:', fileError);
@@ -468,12 +487,20 @@ router.post('/me/avatar', verifyToken, avatarUpload.single('avatar'), async (req
     }
 
     // Save new avatar URL (R2)
-    const avatarUrl = req.file.path; // R2 public URL
+    // The upload middleware keeps the file in memory (multer.memoryStorage),
+    // so it has a buffer and no path — send it to R2 here, the way course
+    // files are handled. Reading req.file.path saved an empty avatar_url.
+    const r2Key = generateR2Key('avatars', null, req.file.originalname, 'avatar');
+    const avatarUrl = await uploadToR2(
+      req.file.buffer, r2Key, req.file.mimetype || 'image/jpeg');
+    if (!avatarUrl) {
+      return res.status(500).json({ error: 'تعذر حفظ الصورة. حاول مرة أخرى.' });
+    }
     await query(
       'UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, name, email, role, avatar_url, created_at',
       [avatarUrl, userId]
     );
-    console.log('Avatar uploaded successfully (me):', avatarUrl);
+    debugLog('Avatar uploaded successfully (me):', avatarUrl);
     res.json({
       message: 'Avatar uploaded successfully',
       avatar_url: avatarUrl
@@ -485,31 +512,40 @@ router.post('/me/avatar', verifyToken, avatarUpload.single('avatar'), async (req
 });
 
 // Universal avatar upload endpoint (works for all roles)
-router.post('/avatar-profile', verifyToken, avatarUpload.single('avatar'), async (req, res) => {
+router.post('/avatar-profile', verifyToken, (req, res, next) => {
+  // Without this wrapper a rejected upload falls through to Express's
+  // default handler, which answers with an HTML error page — the mobile app
+  // then fails parsing it ("Unexpected character … <!DOCTYPE html").
+  avatarUpload.single('avatar')(req, res, (error) =>
+    error ? handleMulterError(error, req, res, next) : next());
+}, async (req, res) => {
   try {
-    console.log('Universal avatar upload request received');
-    console.log('User:', req.user);
-    console.log('File:', req.file);
+    debugLog('Universal avatar upload request received');
+    debugLog('User:', req.user);
+    debugLog('File:', req.file);
 
     const userId = req.user.id;
 
     // Check if user exists
     const existingUser = await getRow('SELECT id, avatar_url, role FROM users WHERE id = $1', [userId]);
-    console.log('Existing user:', existingUser);
+    debugLog('Existing user:', existingUser);
 
     if (!existingUser) {
-      console.log('User not found');
+      debugLog('User not found');
       return res.status(404).json({ error: 'User not found' });
     }
 
     if (!req.file) {
-      console.log('No file uploaded');
+      debugLog('No file uploaded');
       return res.status(400).json({ error: 'No avatar file uploaded' });
     }
 
-    // Validate file type
+    // Validate file type: by content type, or by extension when the client
+    // didn't send one (the mobile app sends application/octet-stream).
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(req.file.mimetype)) {
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+    const extension = path.extname(req.file.originalname || '').toLowerCase();
+    if (!allowedTypes.includes(req.file.mimetype) && !allowedExtensions.includes(extension)) {
       return res.status(400).json({ error: 'Invalid file type. Only JPG, PNG, and WebP are allowed.' });
     }
 
@@ -524,7 +560,7 @@ router.post('/avatar-profile', verifyToken, avatarUpload.single('avatar'), async
       try {
         if (fs.existsSync(oldAvatarPath)) {
           fs.unlinkSync(oldAvatarPath);
-          console.log(`Old avatar deleted: ${oldAvatarPath}`);
+          debugLog(`Old avatar deleted: ${oldAvatarPath}`);
         }
       } catch (fileError) {
         console.error('Error deleting old avatar:', fileError);
@@ -532,13 +568,21 @@ router.post('/avatar-profile', verifyToken, avatarUpload.single('avatar'), async
     }
 
     // Save new avatar URL (R2)
-    const avatarUrl = req.file.path; // R2 public URL
+    // The upload middleware keeps the file in memory (multer.memoryStorage),
+    // so it has a buffer and no path — send it to R2 here, the way course
+    // files are handled. Reading req.file.path saved an empty avatar_url.
+    const r2Key = generateR2Key('avatars', null, req.file.originalname, 'avatar');
+    const avatarUrl = await uploadToR2(
+      req.file.buffer, r2Key, req.file.mimetype || 'image/jpeg');
+    if (!avatarUrl) {
+      return res.status(500).json({ error: 'تعذر حفظ الصورة. حاول مرة أخرى.' });
+    }
     await query(
       'UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, name, email, role, avatar_url, created_at',
       [avatarUrl, userId]
     );
 
-    console.log('Avatar uploaded successfully (universal):', avatarUrl);
+    debugLog('Avatar uploaded successfully (universal):', avatarUrl);
     res.json({
       message: 'Avatar uploaded successfully',
       avatar_url: avatarUrl,
@@ -575,7 +619,7 @@ router.delete('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
       try {
         if (fs.existsSync(avatarPath)) {
           fs.unlinkSync(avatarPath);
-          console.log(`Avatar deleted: ${avatarPath}`);
+          debugLog(`Avatar deleted: ${avatarPath}`);
         }
       } catch (fileError) {
         console.error('Error deleting avatar:', fileError);
@@ -638,10 +682,10 @@ router.get('/student/activities', verifyToken, requireRole(['student']), async (
 router.get('/student/profile', verifyToken, requireRole(['student']), async (req, res) => {
   try {
     const studentId = req.user.id;
-    console.log('Student profile request for user:', studentId);
+    debugLog('Student profile request for user:', studentId);
     const user = await getRow('SELECT id, name, email, role, avatar_url, created_at FROM users WHERE id = $1', [studentId]);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    console.log('User profile:', user);
+    debugLog('User profile:', user);
     res.json(user);
   } catch (error) {
     console.error('Student profile error:', error);
@@ -652,7 +696,7 @@ router.get('/student/profile', verifyToken, requireRole(['student']), async (req
 // Test endpoint to check user role
 router.get('/test-role', verifyToken, async (req, res) => {
   try {
-    console.log('Test role request - User:', req.user);
+    debugLog('Test role request - User:', req.user);
     res.json({
       user: req.user,
       message: 'Role check successful'
@@ -666,7 +710,7 @@ router.get('/test-role', verifyToken, async (req, res) => {
 // Test endpoint to check if /me/profile route is accessible
 router.get('/test-me-profile', verifyToken, async (req, res) => {
   try {
-    console.log('Test me/profile route - User:', req.user);
+    debugLog('Test me/profile route - User:', req.user);
     res.json({
       message: '/me/profile route is accessible',
       user: req.user
@@ -680,14 +724,14 @@ router.get('/test-me-profile', verifyToken, async (req, res) => {
 // Get current user profile (works for all roles)
 router.get('/me', verifyToken, async (req, res) => {
   try {
-    console.log('Get current user request - User:', req.user);
+    debugLog('Get current user request - User:', req.user);
     const userId = req.user.id;
     const user = await getRow('SELECT id, name, email, role, avatar_url, created_at FROM users WHERE id = $1', [userId]);
     if (!user) {
-      console.log('User not found');
+      debugLog('User not found');
       return res.status(404).json({ error: 'User not found' });
     }
-    console.log('Current user profile:', user);
+    debugLog('Current user profile:', user);
     res.json(user);
   } catch (error) {
     console.error('Get current user error:', error);

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { pointsAPI } from '@/services/api';
+import { serverDate } from '@/lib/utils';
 
 const PointsHistory: React.FC = () => {
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -49,7 +50,7 @@ const PointsHistory: React.FC = () => {
                   <td className="p-2">{tx.transaction_type}</td>
                   <td className="p-2">{tx.points}</td>
                   <td className="p-2">{tx.status}</td>
-                  <td className="p-2">{new Date(tx.created_at).toLocaleString('ar-EG')}</td>
+                  <td className="p-2">{serverDate(tx.created_at).toLocaleString('ar-EG')}</td>
                   <td className="p-2">{tx.metadata && tx.metadata.packageName ? tx.metadata.packageName : ''}</td>
                 </tr>
               ))}

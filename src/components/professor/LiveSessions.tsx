@@ -11,7 +11,7 @@ import StatusControl from '../live-sessions/StatusControl';
 import { LiveSession } from '@/types';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { formatTimeForDisplay, formatDateForDisplay } from '@/lib/utils';
+import { formatTimeForDisplay, formatDateForDisplay, parseSessionDate } from '@/lib/utils';
 
 interface LiveSessionsProps {
   professorId: string;
@@ -46,19 +46,21 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
   // Automatic status management
   const checkAndUpdateSessionStatus = async (session: LiveSession) => {
     const now = new Date();
-    const sessionStartTime = new Date(session.start_time || session.scheduledAt);
+    const sessionStartTime = parseSessionDate(session.start_time || session.scheduledAt) || new Date(0);
     const sessionEndTime = new Date(sessionStartTime.getTime() + (session.duration || 60) * 60 * 1000);
     
     let newStatus = session.status;
     
-    // Check if session should be live
+    // The clock may OPEN a session — that is a convenience, and the professor
+    // can still end it whenever they like.
     if (session.status === 'scheduled' && now >= sessionStartTime && now <= sessionEndTime) {
       newStatus = 'live';
     }
-    // Check if session should be ended
-    else if (session.status === 'live' && now > sessionEndTime) {
-      newStatus = 'ended';
-    }
+    // It may NOT close one. This used to force 'ended' the moment a session
+    // ran past its scheduled duration, which cut off any lesson that overran
+    // and left the professor locked out of their own stream with no way back.
+    // Ending a session is the professor's decision, through the status control
+    // beside each session.
     
     // Update status if it changed
     if (newStatus !== session.status) {
@@ -156,7 +158,9 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
 
   const toLocalInput = (value: string) => {
     if (!value) return '';
-    const d = new Date(value);
+    // Wall clock: the stored digits are the time that was chosen, not UTC.
+    const d = parseSessionDate(value);
+    if (!d) return '';
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
@@ -180,7 +184,9 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
       const fd = new FormData();
       fd.append('title', editForm.title);
       fd.append('description', editForm.description);
-      fd.append('start_time', new Date(editForm.start_time).toISOString());
+      // Send the field's own 'YYYY-MM-DDTHH:mm' — the column keeps those
+      // digits verbatim, and converting first would shift the session.
+      fd.append('start_time', editForm.start_time);
       fd.append('duration', String(parseInt(editForm.duration, 10) || 60));
       fd.append('price', String(parseInt(editForm.price, 10) || 0));
 
@@ -251,10 +257,18 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
     return session.status || 'scheduled';
   };
 
-  const canStartSession = (session: LiveSession) => {
-    // Add logic to determine if session can be started
-    // For now, allow starting if status is 'scheduled'
-    return session.status === 'scheduled';
+  // A professor may start their own session at any time. Being late is not a
+  // reason to be locked out, and a session that was ended — by the old
+  // auto-updater, or by a misclick — can be opened again.
+  const canStartSession = (session: LiveSession) =>
+    ['scheduled', 'ended', 'cancelled', 'paused', 'technical_issues', 'starting']
+      .includes(session.status || 'scheduled');
+
+  // Was this session supposed to have happened already?
+  const isOverdue = (session: LiveSession) => {
+    const start = parseSessionDate(session.start_time || session.scheduledAt);
+    if (!start) return false;
+    return new Date() > new Date(start.getTime() + (session.duration || 60) * 60 * 1000);
   };
 
   // Helper to get status badge
@@ -276,12 +290,10 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
     <>
     <div className="space-y-6">
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Live Sessions</h2>
-          <p className="text-gray-600">Schedule and manage your live teaching sessions</p>
-        </div>
-
+      {/* The page above already renders the title and description through
+          PageHeader; repeating them here printed both twice. Only the button
+          belongs to this component. */}
+      <div className="flex justify-end">
         <Button onClick={() => navigate('/professor/create-live-session')} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Schedule Session
@@ -339,14 +351,18 @@ const LiveSessions = ({ professorId }: LiveSessionsProps) => {
                         انضم للبث المباشر
                       </Button>
                     )}
-                    {getSessionStatus(session) === 'upcoming' && canStartSession(session) && (
+                    {getSessionStatus(session) !== 'live' && canStartSession(session) && (
                       <Button
                         onClick={() => handleStartSession(session.id)}
                         variant="default"
                         className="bg-green-600 hover:bg-green-700 whitespace-nowrap"
                       >
                         <Play className="h-4 w-4 mr-2" />
-                        Start Live Session
+                        {session.status === 'ended' || session.status === 'cancelled'
+                          ? 'إعادة فتح البث'
+                          : isOverdue(session)
+                          ? 'بدء البث (تأخر عن موعده)'
+                          : 'بدء البث المباشر'}
                       </Button>
                     )}
                     <StatusControl

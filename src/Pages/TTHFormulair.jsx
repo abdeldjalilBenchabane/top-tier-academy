@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { FaUser, FaEnvelope, FaLock, FaPhone, FaIdCard } from 'react-icons/fa';
+import { FaUser, FaEnvelope, FaLock, FaPhone, FaIdCard, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 
 const Formulair = () => {
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -185,17 +187,32 @@ const Formulair = () => {
                                         <label className="block text-gray-800 font-bold text-sm mr-1" htmlFor="password">
                                             <FaLock className="inline ml-2 text-[#194cbf]" /> كلمة المرور
                                         </label>
-                                        <input
-                                            type="password"
-                                            id="password"
-                                            name="password"
-                                            value={formData.password}
-                                            onChange={handleChange}
-                                            className="premium-input"
-                                            placeholder="********"
-                                            required
-                                            disabled={Loading}
-                                        />
+                                        {/* The wrapper is what makes the button land inside the field:
+                                            an absolute element needs a positioned ancestor, and without
+                                            this it anchored to the card and sat outside the input. */}
+                                        <div className="relative">
+                                            <input
+                                                type={showPassword ? "text" : "password"}
+                                                id="password"
+                                                name="password"
+                                                value={formData.password}
+                                                onChange={handleChange}
+                                                className="premium-input pr-12"
+                                                placeholder="********"
+                                                required
+                                                disabled={Loading}
+                                            
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                                                className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                            >
+                                                {showPassword ? <FaEyeSlash /> : <FaEye />}
+                                            
+                                            </button>
+                                        </div>
                                         {errors.password && <p className="text-red-500 text-xs mt-1 mr-1">{errors.password}</p>}
                                     </div>
 
@@ -204,17 +221,32 @@ const Formulair = () => {
                                         <label className="block text-gray-800 font-bold text-sm mr-1" htmlFor="confirmPassword">
                                             <FaLock className="inline ml-2 text-[#194cbf]" /> تأكيد كلمة المرور
                                         </label>
-                                        <input
-                                            type="password"
-                                            id="confirmPassword"
-                                            name="confirmPassword"
-                                            value={formData.confirmPassword}
-                                            onChange={handleChange}
-                                            className="premium-input"
-                                            placeholder="********"
-                                            required
-                                            disabled={Loading}
-                                        />
+                                        {/* The wrapper is what makes the button land inside the field:
+                                            an absolute element needs a positioned ancestor, and without
+                                            this it anchored to the card and sat outside the input. */}
+                                        <div className="relative">
+                                            <input
+                                                type={showConfirmPassword ? "text" : "password"}
+                                                id="confirmPassword"
+                                                name="confirmPassword"
+                                                value={formData.confirmPassword}
+                                                onChange={handleChange}
+                                                className="premium-input pr-12"
+                                                placeholder="********"
+                                                required
+                                                disabled={Loading}
+                                            
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                aria-label={showConfirmPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                                                className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                            >
+                                                {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                                            
+                                            </button>
+                                        </div>
                                         {errors.confirmPassword && <p className="text-red-500 text-xs mt-1 mr-1">{errors.confirmPassword}</p>}
                                     </div>
                                 </div>

@@ -1,0 +1,1101 @@
+// Prisma schema for top-tier.academy.
+//
+// GENERATED FROM THE LIVE DATABASE. This database already had its tables long
+// before Prisma existed here, so the DATABASE is the source of truth and this
+// file is a mirror of it — not the other way round.
+//
+// NOTE: `prisma db pull` overwrites this file and drops this header. If you
+// run it, paste this block back at the top.
+//
+//   npm run db:pull      re-read the database into this file after a SQL change
+//   npm run db:generate  rebuild the typed client from this file
+//   npm run db:studio    browse the data in a local UI (via an SSH tunnel)
+//
+// DANGER — never run these against production:
+//   prisma migrate dev / prisma migrate reset / prisma db push
+// They drop and recreate tables. The app manages its own schema in SQL (see
+// backend/migrations/applied/); Prisma here is for reading and typed queries.
+//
+// Credentials: prisma/.env is a symlink to ../backend/.env, so there is one
+// set of credentials. It is deliberately NOT at the project root — vite loads
+// the root .env and would bake any VITE_* secret into the public browser bundle.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model activities {
+  id         Int       @id @default(autoincrement())
+  student_id Int?
+  type       String?   @db.VarChar(50)
+  title      String?   @db.VarChar(255)
+  time       DateTime? @default(now()) @db.Timestamp(6)
+  related_id Int?
+  extra      Json?     @db.Json
+  users      users?    @relation(fields: [student_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model chat_messages {
+  id           Int       @id @default(autoincrement())
+  session_id   String    @db.VarChar(255)
+  user_id      Int
+  user_name    String    @db.VarChar(255)
+  user_role    String    @db.VarChar(50)
+  message_text String
+  timestamp    DateTime? @default(now()) @db.Timestamp(6)
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([session_id], map: "idx_chat_messages_session_id")
+  @@index([timestamp], map: "idx_chat_messages_timestamp")
+}
+
+model chat_notifications {
+  id                   Int       @id @default(autoincrement())
+  user_id              Int
+  session_id           String    @db.VarChar(255)
+  last_seen_message_id String?   @default("0") @db.VarChar(255)
+  unseen_count         Int?      @default(0)
+  created_at           DateTime? @default(now()) @db.Timestamp(6)
+  updated_at           DateTime? @default(now()) @db.Timestamp(6)
+
+  @@unique([user_id, session_id])
+}
+
+model comment_replies {
+  id              Int             @id @default(autoincrement())
+  comment_id      Int
+  user_id         Int?
+  user_name       String?         @db.VarChar(100)
+  user_role       String?         @db.VarChar(32)
+  reply_text      String
+  created_at      DateTime?       @default(now()) @db.Timestamp(6)
+  course_comments course_comments @relation(fields: [comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users           users?          @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+}
+
+model comments {
+  id              Int              @id @default(autoincrement())
+  user_id         Int?
+  course_id       Int?
+  section_id      Int?
+  content         String
+  created_at      DateTime?        @default(now()) @db.Timestamp(6)
+  courses         courses?         @relation(fields: [course_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  course_sections course_sections? @relation(fields: [section_id], references: [id], onUpdate: NoAction)
+  users           users?           @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+}
+
+model course_comments {
+  id              Int               @id @default(autoincrement())
+  course_id       Int
+  user_id         Int?
+  section_id      Int?
+  name            String            @db.VarChar(100)
+  comment         String
+  tab             String            @db.VarChar(32)
+  rating          Int?
+  reply           String?
+  created_at      DateTime?         @default(now()) @db.Timestamp(6)
+  comment_replies comment_replies[]
+  courses         courses           @relation(fields: [course_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  course_sections course_sections?  @relation(fields: [section_id], references: [id], onUpdate: NoAction)
+  users           users?            @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+}
+
+model course_covers {
+  id         Int       @id @default(autoincrement())
+  course_id  Int?      @unique
+  cover      String    @db.VarChar(255)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  courses    courses?  @relation(fields: [course_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([course_id], map: "idx_course_covers_course_id")
+}
+
+model course_enrollments {
+  id           Int       @id @default(autoincrement())
+  user_id      Int?
+  course_id    Int?
+  points_spent Int?      @default(0)
+  enrolled_at  DateTime? @default(now()) @db.Timestamp(6)
+  courses      courses?  @relation(fields: [course_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users        users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, course_id])
+}
+
+model course_files {
+  id              Int              @id @default(autoincrement())
+  course_id       Int?
+  section_id      Int?
+  block_id        Int?
+  file_name       String           @db.VarChar(255)
+  file_path       String           @db.VarChar(500)
+  file_type       String           @db.VarChar(100)
+  file_size       Int?
+  original_name   String           @db.VarChar(255)
+  created_at      DateTime?        @default(now()) @db.Timestamp(6)
+  section_blocks  section_blocks?  @relation(fields: [block_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  courses         courses?         @relation(fields: [course_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  course_sections course_sections? @relation(fields: [section_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([block_id], map: "idx_course_files_block_id")
+  @@index([course_id], map: "idx_course_files_course_id")
+  @@index([section_id], map: "idx_course_files_section_id")
+}
+
+model course_sections {
+  id              Int               @id @default(autoincrement())
+  course_id       Int?
+  title           String            @db.VarChar(255)
+  order           Int?
+  comments        comments[]
+  course_comments course_comments[]
+  course_files    course_files[]
+  courses         courses?          @relation(fields: [course_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  section_blocks  section_blocks[]
+}
+
+model courses {
+  id                     Int                      @id @default(autoincrement())
+  title                  String                   @db.VarChar(255)
+  description            String?
+  material_id            Int?
+  created_by             Int?
+  created_at             DateTime?                @default(now()) @db.Timestamp(6)
+  approved_at            DateTime?                @db.Timestamp(6)
+  price                  Decimal?                 @db.Decimal(10, 2)
+  is_published           Boolean?                 @default(false)
+  status                 String                   @default("draft") @db.VarChar(50)
+  language_level_id      Int?
+  comments               comments[]
+  course_comments        course_comments[]
+  course_covers          course_covers?
+  course_enrollments     course_enrollments[]
+  course_files           course_files[]
+  course_sections        course_sections[]
+  users                  users?                   @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  materials              materials?               @relation(fields: [material_id], references: [id], onUpdate: NoAction)
+  language_levels        language_levels?         @relation(fields: [language_level_id], references: [id], onUpdate: NoAction, map: "fk_language_level_id")
+  language_course_prices language_course_prices[]
+  quizzes                quizzes[]
+  student_courses        student_courses[]
+  video_security_logs    video_security_logs[]
+  video_views            video_views[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model enhanced_slides {
+  id                    Int                     @id @default(autoincrement())
+  title                 String                  @db.VarChar(255)
+  description           String?
+  image_url             String?                 @db.VarChar(500)
+  video_url             String?                 @db.VarChar(500)
+  media_type            String                  @default("image") @db.VarChar(20)
+  order                 Int                     @default(0)
+  is_active             Boolean?                @default(true)
+  duration              Int?
+  start_date            DateTime?               @db.Timestamp(6)
+  end_date              DateTime?               @db.Timestamp(6)
+  target_audience       String[]
+  cta_text              String?                 @db.VarChar(100)
+  cta_link              String?                 @db.VarChar(500)
+  overlay_color         String?                 @default("#000000") @db.VarChar(7)
+  overlay_opacity       Decimal?                @default(0.3) @db.Decimal(3, 2)
+  transition            String?                 @default("fade") @db.VarChar(20)
+  alt_text              String?                 @db.VarChar(255)
+  views                 Int?                    @default(0)
+  clicks                Int?                    @default(0)
+  created_by            Int?
+  created_at            DateTime?               @default(now()) @db.Timestamp(6)
+  updated_at            DateTime?               @default(now()) @db.Timestamp(6)
+  users                 users?                  @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  slide_analytics       slide_analytics[]
+  slide_target_audience slide_target_audience[]
+
+  @@index([is_active], map: "idx_enhanced_slides_active")
+  @@index([created_at], map: "idx_enhanced_slides_created_at")
+  @@index([order], map: "idx_enhanced_slides_order")
+}
+
+model file_uploads {
+  id          Int       @id @default(autoincrement())
+  user_id     Int?
+  file_url    String    @db.VarChar(255)
+  file_type   String?   @db.VarChar(50)
+  uploaded_at DateTime? @default(now()) @db.Timestamp(6)
+  users       users?    @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+}
+
+model footer_content {
+  id            Int       @id @default(autoincrement())
+  section_name  String    @db.VarChar(100)
+  content_key   String    @db.VarChar(100)
+  content_value String
+  content_type  String?   @default("text") @db.VarChar(50)
+  display_order Int?      @default(0)
+  is_active     Boolean?  @default(true)
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
+  updated_at    DateTime? @default(now()) @db.Timestamp(6)
+
+  @@unique([section_name, content_key])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model homepage_materials {
+  id            Int       @id @default(autoincrement())
+  name          String    @db.VarChar(255)
+  section_type  String    @db.VarChar(50)
+  level_type    String    @db.VarChar(50)
+  level_name_ar String    @db.VarChar(255)
+  level_name_en String?   @db.VarChar(255)
+  display_order Int?      @default(0)
+  is_active     Boolean?  @default(true)
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
+  updated_at    DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([section_type, level_type, display_order], map: "idx_homepage_materials_section_type")
+}
+
+model language_course_prices {
+  id                Int              @id @default(autoincrement())
+  course_id         Int?
+  language_level_id Int?
+  price             Decimal          @db.Decimal(10, 2)
+  courses           courses?         @relation(fields: [course_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  language_levels   language_levels? @relation(fields: [language_level_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([course_id, language_level_id])
+}
+
+model language_levels {
+  id                     Int                      @id @default(autoincrement())
+  name                   String                   @db.VarChar(50)
+  description            String
+  language_id            Int?
+  order                  Int?                     @default(1)
+  is_active              Boolean?                 @default(true)
+  created_at             DateTime?                @default(now()) @db.Timestamp(6)
+  courses                courses[]
+  language_course_prices language_course_prices[]
+  languages              languages?               @relation(fields: [language_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  live_sections          live_sections[]
+  live_sessions          live_sessions[]
+
+  @@index([is_active], map: "idx_language_levels_active")
+  @@index([language_id], map: "idx_language_levels_language_id")
+  @@index([order], map: "idx_language_levels_order")
+}
+
+model languages {
+  id              Int               @id @default(autoincrement())
+  name            String            @db.VarChar(100)
+  code            String            @unique @db.VarChar(10)
+  flag            String?           @db.VarChar(255)
+  is_active       Boolean?          @default(true)
+  created_at      DateTime?         @default(now()) @db.Timestamp(6)
+  language_levels language_levels[]
+  live_sections   live_sections[]
+  live_sessions   live_sessions[]
+
+  @@index([is_active], map: "idx_languages_active")
+  @@index([code], map: "idx_languages_code")
+}
+
+model levels {
+  id                     Int                      @id @default(autoincrement())
+  name                   String                   @db.VarChar(100)
+  live_sections          live_sections[]
+  private_class_requests private_class_requests[]
+  users                  users[]
+  years                  years[]
+}
+
+model live_private {
+  id                                     Int                         @id @default(autoincrement())
+  title                                  String                      @db.VarChar(255)
+  description                            String?
+  scheduled_at                           DateTime                    @db.Timestamp(6)
+  professor_id                           Int?
+  created_by                             Int?
+  status                                 String                      @default("scheduled") @db.VarChar(50)
+  created_at                             DateTime?                   @default(now()) @db.Timestamp(6)
+  users_live_private_created_byTousers   users?                      @relation("live_private_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction)
+  users_live_private_professor_idTousers users?                      @relation("live_private_professor_idTousers", fields: [professor_id], references: [id], onUpdate: NoAction)
+  live_private_participants              live_private_participants[]
+
+  @@index([professor_id], map: "idx_live_private_professor_id")
+  @@index([scheduled_at], map: "idx_live_private_scheduled_at")
+}
+
+model live_private_participants {
+  id              Int           @id @default(autoincrement())
+  live_private_id Int?
+  user_id         Int?
+  joined_at       DateTime?     @default(now()) @db.Timestamp(6)
+  live_private    live_private? @relation(fields: [live_private_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users           users?        @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([live_private_id], map: "idx_live_private_participants_live_private_id")
+  @@index([user_id], map: "idx_live_private_participants_user_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model live_section_blocks {
+  id                    Int                   @id @default(autoincrement())
+  section_id            Int
+  live_section_id       Int
+  type                  String                @db.VarChar(50)
+  title                 String?               @db.VarChar(255)
+  content               String?
+  order                 Int?                  @default(1)
+  created_at            DateTime?             @default(now()) @db.Timestamp(6)
+  updated_at            DateTime?             @default(now()) @db.Timestamp(6)
+  live_sections         live_sections         @relation(fields: [live_section_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  live_section_sections live_section_sections @relation(fields: [section_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  live_section_files    live_section_files[]
+
+  @@index([live_section_id], map: "idx_live_section_blocks_live_section_id")
+  @@index([order], map: "idx_live_section_blocks_order")
+  @@index([section_id], map: "idx_live_section_blocks_section_id")
+}
+
+model live_section_comment_replies {
+  id                    Int                   @id @default(autoincrement())
+  comment_id            Int
+  user_id               Int?
+  user_name             String?               @db.VarChar(100)
+  user_role             String?               @db.VarChar(32)
+  reply_text            String
+  created_at            DateTime?             @default(now()) @db.Timestamp(6)
+  live_section_comments live_section_comments @relation(fields: [comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                 users?                @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@index([comment_id], map: "idx_lscr_comment")
+}
+
+model live_section_comments {
+  id                           Int                            @id @default(autoincrement())
+  live_section_id              Int
+  user_id                      Int?
+  name                         String                         @db.VarChar(100)
+  comment                      String
+  tab                          String                         @db.VarChar(32)
+  rating                       Int?
+  reply                        String?
+  created_at                   DateTime?                      @default(now()) @db.Timestamp(6)
+  live_section_comment_replies live_section_comment_replies[]
+  live_sections                live_sections                  @relation(fields: [live_section_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                        users?                         @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@index([live_section_id], map: "idx_lsc_section")
+}
+
+model live_section_files {
+  id                    Int                    @id @default(autoincrement())
+  live_section_id       Int
+  section_id            Int?
+  block_id              Int?
+  file_name             String                 @db.VarChar(255)
+  file_path             String                 @db.VarChar(500)
+  file_type             String?                @db.VarChar(100)
+  file_size             BigInt?
+  original_name         String?                @db.VarChar(255)
+  created_at            DateTime?              @default(now()) @db.Timestamp(6)
+  live_section_blocks   live_section_blocks?   @relation(fields: [block_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  live_sections         live_sections          @relation(fields: [live_section_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  live_section_sections live_section_sections? @relation(fields: [section_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([block_id], map: "idx_live_section_files_block_id")
+  @@index([live_section_id], map: "idx_live_section_files_live_section_id")
+  @@index([section_id], map: "idx_live_section_files_section_id")
+}
+
+model live_section_purchases {
+  id              Int           @id @default(autoincrement())
+  student_id      Int
+  live_section_id Int
+  purchase_date   DateTime?     @default(now()) @db.Timestamp(6)
+  points_spent    Int
+  live_sections   live_sections @relation(fields: [live_section_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users           users         @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([student_id, live_section_id])
+  @@index([live_section_id], map: "idx_live_section_purchases_section")
+  @@index([student_id], map: "idx_live_section_purchases_student")
+}
+
+model live_section_sections {
+  id                  Int                   @id @default(autoincrement())
+  live_section_id     Int
+  title               String                @db.VarChar(255)
+  order               Int?                  @default(1)
+  created_at          DateTime?             @default(now()) @db.Timestamp(6)
+  updated_at          DateTime?             @default(now()) @db.Timestamp(6)
+  live_section_blocks live_section_blocks[]
+  live_section_files  live_section_files[]
+  live_sections       live_sections         @relation(fields: [live_section_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([live_section_id], map: "idx_live_section_sections_live_section_id")
+  @@index([order], map: "idx_live_section_sections_order")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model live_sections {
+  id                                      Int                              @id @default(autoincrement())
+  professor_id                            Int
+  title                                   String                           @db.VarChar(255)
+  description                             String?
+  price                                   Decimal                          @db.Decimal(10, 2)
+  cover_image_url                         String?                          @db.VarChar(500)
+  status                                  String?                          @default("draft") @db.VarChar(50)
+  level_id                                Int?
+  year_id                                 Int?
+  speciality_id                           Int?
+  material_id                             Int?
+  language_id                             Int?
+  language_level_id                       Int?
+  root_type                               String?                          @db.VarChar(20)
+  approved_by                             Int?
+  approved_at                             DateTime?                        @db.Timestamp(6)
+  rejected_reason                         String?
+  scheduled_date                          DateTime?                        @db.Date
+  scheduled_time                          DateTime?                        @db.Time(6)
+  duration_minutes                        Int?                             @default(90)
+  telegram_channel                        String?                          @db.VarChar(255)
+  created_at                              DateTime?                        @default(now()) @db.Timestamp(6)
+  updated_at                              DateTime?                        @default(now()) @db.Timestamp(6)
+  live_section_blocks                     live_section_blocks[]
+  live_section_comments                   live_section_comments[]
+  live_section_deletion_requests          live_section_deletion_requests[]
+  live_section_files                      live_section_files[]
+  live_section_purchases                  live_section_purchases[]
+  live_section_sections                   live_section_sections[]
+  users_live_sections_approved_byTousers  users?                           @relation("live_sections_approved_byTousers", fields: [approved_by], references: [id], onUpdate: NoAction)
+  languages                               languages?                       @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+  language_levels                         language_levels?                 @relation(fields: [language_level_id], references: [id], onUpdate: NoAction)
+  levels                                  levels?                          @relation(fields: [level_id], references: [id], onUpdate: NoAction)
+  materials                               materials?                       @relation(fields: [material_id], references: [id], onUpdate: NoAction)
+  users_live_sections_professor_idTousers users                            @relation("live_sections_professor_idTousers", fields: [professor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  specialities                            specialities?                    @relation(fields: [speciality_id], references: [id], onUpdate: NoAction)
+  years                                   years?                           @relation(fields: [year_id], references: [id], onUpdate: NoAction)
+  live_sessions                           live_sessions[]
+
+  @@index([created_at], map: "idx_live_sections_created_at")
+  @@index([language_id], map: "idx_live_sections_language_id")
+  @@index([material_id], map: "idx_live_sections_material_id")
+  @@index([professor_id], map: "idx_live_sections_professor_id")
+  @@index([root_type], map: "idx_live_sections_root_type")
+  @@index([scheduled_date], map: "idx_live_sections_scheduled_date")
+  @@index([status], map: "idx_live_sections_status")
+}
+
+model live_session_participants {
+  id         Int       @id @default(autoincrement())
+  session_id Int?
+  user_id    Int?
+  joined_at  DateTime? @default(now()) @db.Timestamp(6)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model live_sessions {
+  id                                      Int              @id @default(autoincrement())
+  professor_id                            Int
+  professor_name                          String?          @db.VarChar(255)
+  title                                   String           @db.VarChar(255)
+  description                             String?
+  start_time                              DateTime         @db.Timestamp(6)
+  duration                                Int
+  price                                   Decimal          @db.Decimal(10, 2)
+  material_id                             Int?
+  cover_image_url                         String?          @db.VarChar(500)
+  section_id                              Int?
+  is_published                            Boolean?         @default(false)
+  is_approved                             Boolean?         @default(false)
+  is_rejected                             Boolean?         @default(false)
+  status                                  String?          @default("scheduled") @db.VarChar(50)
+  approved_by                             Int?
+  approved_at                             DateTime?        @db.Timestamp(6)
+  meeting_url                             String?          @db.VarChar(500)
+  agora_channel                           String?          @db.VarChar(100)
+  agora_token                             String?
+  attendees_count                         Int?             @default(0)
+  max_attendees                           Int?             @default(100)
+  recording_url                           String?          @db.VarChar(500)
+  is_recorded                             Boolean?         @default(false)
+  tags                                    String[]
+  created_at                              DateTime?        @default(now()) @db.Timestamp(6)
+  updated_at                              DateTime?        @default(now()) @db.Timestamp(6)
+  telegram_channel                        String?
+  language_id                             Int?
+  language_level_id                       Int?
+  root_type                               String?          @db.VarChar(20)
+  users_live_sessions_approved_byTousers  users?           @relation("live_sessions_approved_byTousers", fields: [approved_by], references: [id], onUpdate: NoAction)
+  languages                               languages?       @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+  language_levels                         language_levels? @relation(fields: [language_level_id], references: [id], onUpdate: NoAction)
+  materials                               materials?       @relation(fields: [material_id], references: [id], onUpdate: NoAction)
+  users_live_sessions_professor_idTousers users            @relation("live_sessions_professor_idTousers", fields: [professor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  live_sections                           live_sections?   @relation(fields: [section_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  purchases                               purchases[]
+
+  @@index([is_approved], map: "idx_live_sessions_is_approved")
+  @@index([material_id], map: "idx_live_sessions_material_id")
+  @@index([professor_id], map: "idx_live_sessions_professor_id")
+  @@index([section_id], map: "idx_live_sessions_section_id")
+  @@index([start_time], map: "idx_live_sessions_start_time")
+  @@index([status], map: "idx_live_sessions_status")
+}
+
+model materials {
+  id                     Int                      @id @default(autoincrement())
+  name                   String                   @db.VarChar(100)
+  speciality_id          Int?
+  price                  Decimal?                 @db.Decimal(10, 2)
+  year_id                Int?
+  courses                courses[]
+  live_sections          live_sections[]
+  live_sessions          live_sessions[]
+  specialities           specialities?            @relation(fields: [speciality_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  years                  years?                   @relation(fields: [year_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  pending_courses        pending_courses[]
+  private_class_requests private_class_requests[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model mobile_app_settings {
+  id         Int      @id @default(1)
+  config     Json
+  updated_by Int?
+  updated_at DateTime @default(now()) @db.Timestamp(6)
+  users      users?   @relation(fields: [updated_by], references: [id], onUpdate: NoAction)
+}
+
+model notifications {
+  id         Int       @id @default(autoincrement())
+  user_id    Int?
+  message    String
+  is_read    Boolean?  @default(false)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  type       String?   @db.VarChar(50)
+  title      String?   @db.VarChar(255)
+  metadata   Json?
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model password_reset_tokens {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  token      String    @unique @db.VarChar(255)
+  expires_at DateTime  @db.Timestamp(6)
+  used_at    DateTime? @db.Timestamp(6)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([expires_at], map: "idx_password_reset_tokens_expires_at")
+  @@index([token], map: "idx_password_reset_tokens_token")
+  @@index([user_id], map: "idx_password_reset_tokens_user_id")
+}
+
+model pending_course_sections {
+  id                     Int                      @id @default(autoincrement())
+  pending_course_id      Int?
+  title                  String                   @db.VarChar(255)
+  order                  Int?
+  pending_courses        pending_courses?         @relation(fields: [pending_course_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  pending_section_blocks pending_section_blocks[]
+}
+
+model pending_courses {
+  id                      Int                       @id @default(autoincrement())
+  title                   String                    @db.VarChar(255)
+  description             String?
+  material_id             Int?
+  created_by              Int?
+  created_at              DateTime?                 @default(now()) @db.Timestamp(6)
+  status                  String                    @default("pending") @db.VarChar(50)
+  rejection_reason        String?
+  rejected_at             DateTime?                 @db.Timestamp(6)
+  pending_course_sections pending_course_sections[]
+  users                   users?                    @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  materials               materials?                @relation(fields: [material_id], references: [id], onUpdate: NoAction)
+}
+
+model pending_section_blocks {
+  id                      Int                      @id @default(autoincrement())
+  pending_section_id      Int?
+  type                    String                   @db.VarChar(50)
+  title                   String?                  @db.VarChar(255)
+  content                 String?
+  order                   Int?
+  pending_course_sections pending_course_sections? @relation(fields: [pending_section_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model point_codes {
+  id             Int             @id @default(autoincrement())
+  code           String          @unique @db.VarChar(16)
+  package_id     Int?
+  is_used        Boolean?        @default(false)
+  used_by        Int?
+  used_at        DateTime?       @db.Timestamp(6)
+  created_at     DateTime?       @default(now()) @db.Timestamp(6)
+  points         Int?
+  point_packages point_packages? @relation(fields: [package_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users          users?          @relation(fields: [used_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([code], map: "idx_point_codes_code")
+  @@index([package_id], map: "idx_point_codes_package_id")
+  @@index([used_by], map: "idx_point_codes_used_by")
+}
+
+model point_package_features {
+  id             Int            @id @default(autoincrement())
+  package_id     Int
+  name           String         @db.VarChar(255)
+  points         Int            @default(0)
+  price          Decimal        @default(0) @db.Decimal(10, 2)
+  currency       String         @default("DZD") @db.VarChar(10)
+  display_order  Int            @default(0)
+  is_active      Boolean        @default(true)
+  created_at     DateTime       @default(now()) @db.Timestamp(6)
+  updated_at     DateTime       @default(now()) @db.Timestamp(6)
+  point_packages point_packages @relation(fields: [package_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([package_id], map: "idx_ppf_package")
+}
+
+model point_packages {
+  id                     Int                      @id @default(autoincrement())
+  name                   String                   @db.VarChar(100)
+  points                 Int
+  price                  Decimal                  @db.Decimal(10, 2)
+  currency               String?                  @default("DZD") @db.VarChar(3)
+  is_active              Boolean?                 @default(true)
+  created_at             DateTime?                @default(now()) @db.Timestamp(6)
+  point_codes            point_codes[]
+  point_package_features point_package_features[]
+  point_transactions     point_transactions[]
+
+  @@index([is_active], map: "idx_point_packages_active")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model point_transactions {
+  id                Int             @id @default(autoincrement())
+  user_id           Int
+  package_id        Int?
+  transaction_type  String          @db.VarChar(50)
+  points            Int
+  amount            Decimal?        @db.Decimal(10, 2)
+  currency          String?         @default("DZD") @db.VarChar(3)
+  status            String          @default("pending") @db.VarChar(50)
+  payment_reference String?         @db.VarChar(255)
+  metadata          Json?
+  created_at        DateTime?       @default(now()) @db.Timestamp(6)
+  updated_at        DateTime?       @default(now()) @db.Timestamp(6)
+  point_packages    point_packages? @relation(fields: [package_id], references: [id], onUpdate: NoAction)
+  users             users           @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_point_transactions_created_at")
+  @@index([status], map: "idx_point_transactions_status")
+  @@index([user_id], map: "idx_point_transactions_user_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model private_class_requests {
+  id                Int           @id @default(autoincrement())
+  student_id        Int?
+  teacher_name      String        @db.VarChar(100)
+  subject           String?       @db.VarChar(100)
+  grade             String?       @db.VarChar(100)
+  date              String?       @db.VarChar(50)
+  time              String?       @db.VarChar(50)
+  sessions_count    Int?
+  title             String?       @db.VarChar(255)
+  description       String?
+  status            String?       @default("في الانتظار") @db.VarChar(50)
+  created_at        DateTime?     @default(now()) @db.Timestamp(6)
+  updated_at        DateTime?     @default(now()) @db.Timestamp(6)
+  scheduled_at      DateTime?     @db.Timestamp(6)
+  agora_channel     String?       @db.VarChar(100)
+  level_id          Int?
+  year_id           Int?
+  speciality_id     Int?
+  material_id       Int?
+  price_per_session Decimal?      @default(0) @db.Decimal(10, 2)
+  session_duration  Int?          @default(60)
+  points_used       Int?          @default(0)
+  payment_date      DateTime?     @db.Timestamp(6)
+  payment_status    String?       @default("pending") @db.VarChar(50)
+  rejection_reason  String?
+  phone             String?       @db.VarChar(50)
+  levels            levels?       @relation(fields: [level_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  materials         materials?    @relation(fields: [material_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  specialities      specialities? @relation(fields: [speciality_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users             users?        @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  years             years?        @relation(fields: [year_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([payment_date], map: "idx_private_class_requests_payment_date")
+  @@index([payment_status], map: "idx_private_class_requests_payment_status")
+}
+
+model private_class_settings {
+  id                   Int       @id @default(autoincrement())
+  price_per_session    Decimal   @default(0) @db.Decimal(10, 2)
+  session_duration     Int       @default(60)
+  available_start_time DateTime? @default(dbgenerated("'08:00:00'::time without time zone")) @db.Time(6)
+  available_end_time   DateTime? @default(dbgenerated("'23:00:00'::time without time zone")) @db.Time(6)
+  created_at           DateTime? @default(now()) @db.Timestamp(6)
+  updated_at           DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model purchases {
+  id            Int           @id @default(autoincrement())
+  session_id    Int
+  student_id    Int
+  amount_paid   Decimal       @db.Decimal(10, 2)
+  purchased_at  DateTime?     @default(now()) @db.Timestamp(6)
+  live_sessions live_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users         users         @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([session_id, student_id])
+  @@index([session_id], map: "idx_purchases_session_id")
+  @@index([student_id], map: "idx_purchases_student_id")
+}
+
+model quiz_answers {
+  id                   Int                    @id @default(autoincrement())
+  question_id          Int?
+  answer_text          String
+  is_correct           Boolean?               @default(false)
+  order                Int?                   @default(0)
+  quiz_questions       quiz_questions?        @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  quiz_attempt_answers quiz_attempt_answers[]
+
+  @@index([question_id], map: "idx_quiz_answers_question_id")
+}
+
+model quiz_attempt_answers {
+  id             Int             @id @default(autoincrement())
+  attempt_id     Int?
+  question_id    Int?
+  answer_id      Int?
+  student_answer String?
+  is_correct     Boolean?        @default(false)
+  points_earned  Int?            @default(0)
+  quiz_answers   quiz_answers?   @relation(fields: [answer_id], references: [id], onUpdate: NoAction)
+  quiz_attempts  quiz_attempts?  @relation(fields: [attempt_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  quiz_questions quiz_questions? @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([attempt_id], map: "idx_quiz_attempt_answers_attempt_id")
+}
+
+model quiz_attempts {
+  id                   Int                    @id @default(autoincrement())
+  quiz_id              Int?
+  user_id              Int?
+  started_at           DateTime?              @default(now()) @db.Timestamp(6)
+  completed_at         DateTime?              @db.Timestamp(6)
+  score                Decimal?               @default(0) @db.Decimal(5, 2)
+  total_points         Int?                   @default(0)
+  passed               Boolean?               @default(false)
+  time_spent           Int?                   @default(0)
+  quiz_attempt_answers quiz_attempt_answers[]
+  quizzes              quizzes?               @relation(fields: [quiz_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                users?                 @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([quiz_id], map: "idx_quiz_attempts_quiz_id")
+  @@index([user_id], map: "idx_quiz_attempts_user_id")
+}
+
+model quiz_questions {
+  id                   Int                    @id @default(autoincrement())
+  quiz_id              Int?
+  question_text        String
+  question_type        String                 @db.VarChar(50)
+  order                Int?
+  points               Int?                   @default(1)
+  explanation          String?
+  quiz_answers         quiz_answers[]
+  quiz_attempt_answers quiz_attempt_answers[]
+  quizzes              quizzes?               @relation(fields: [quiz_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([quiz_id], map: "idx_quiz_questions_quiz_id")
+}
+
+model quizzes {
+  id                               Int              @id @default(autoincrement())
+  title                            String           @db.VarChar(255)
+  course_id                        Int?
+  created_by                       Int?
+  status                           String           @default("pending") @db.VarChar(50)
+  created_at                       DateTime?        @default(now()) @db.Timestamp(6)
+  approved_at                      DateTime?        @db.Timestamp(6)
+  rejection_reason                 String?
+  rejected_at                      DateTime?        @db.Timestamp(6)
+  description                      String?
+  time_limit                       Int?
+  passing_score                    Int?             @default(70)
+  max_attempts                     Int?
+  approved_by                      Int?
+  is_active                        Boolean?         @default(true)
+  quiz_attempts                    quiz_attempts[]
+  quiz_questions                   quiz_questions[]
+  users_quizzes_approved_byTousers users?           @relation("quizzes_approved_byTousers", fields: [approved_by], references: [id], onUpdate: NoAction)
+  courses                          courses?         @relation(fields: [course_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_quizzes_created_byTousers  users?           @relation("quizzes_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction)
+
+  @@index([course_id], map: "idx_quizzes_course_id")
+  @@index([created_by], map: "idx_quizzes_created_by")
+  @@index([status], map: "idx_quizzes_status")
+}
+
+model section_blocks {
+  id              Int              @id @default(autoincrement())
+  section_id      Int?
+  type            String           @db.VarChar(50)
+  title           String?          @db.VarChar(255)
+  content         String?
+  order           Int?
+  course_files    course_files[]
+  course_sections course_sections? @relation(fields: [section_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model slide_analytics {
+  id              Int              @id @default(autoincrement())
+  slide_id        Int?
+  user_id         Int?
+  action_type     String           @db.VarChar(20)
+  ip_address      String?          @db.Inet
+  user_agent      String?
+  created_at      DateTime?        @default(now()) @db.Timestamp(6)
+  enhanced_slides enhanced_slides? @relation(fields: [slide_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users           users?           @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_slide_analytics_created_at")
+  @@index([slide_id], map: "idx_slide_analytics_slide_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model slide_target_audience {
+  slide_id        Int
+  audience_role   String          @db.VarChar(20)
+  enhanced_slides enhanced_slides @relation(fields: [slide_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([slide_id, audience_role])
+  @@index([slide_id], map: "idx_slide_target_audience_slide_id")
+}
+
+model slides {
+  id          Int      @id @default(autoincrement())
+  title       String   @db.VarChar(255)
+  image_url   String?  @db.VarChar(255)
+  description String?
+  is_enhanced Boolean? @default(false)
+  order       Int?
+}
+
+model specialities {
+  id                     Int                      @id @default(autoincrement())
+  name                   String                   @db.VarChar(100)
+  year_id                Int?
+  live_sections          live_sections[]
+  materials              materials[]
+  private_class_requests private_class_requests[]
+  years                  years?                   @relation(fields: [year_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model student_courses {
+  id            Int       @id @default(autoincrement())
+  student_id    Int?
+  course_id     Int?
+  completed     Boolean?  @default(false)
+  progress      Int?      @default(0)
+  hours_spent   Int?      @default(0)
+  last_accessed DateTime? @default(now()) @db.Timestamp(6)
+  buy_at        DateTime? @default(now()) @db.Timestamp(6)
+  points_spent  Int?
+  courses       courses?  @relation(fields: [course_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users         users?    @relation(fields: [student_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model user_points {
+  id         Int       @id @default(autoincrement())
+  user_id    Int       @unique
+  balance    Int       @default(0)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  updated_at DateTime? @default(now()) @db.Timestamp(6)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id], map: "idx_user_points_user_id")
+}
+
+model user_sessions {
+  id            Int       @id @default(autoincrement())
+  user_id       Int
+  session_token String    @unique @db.VarChar(255)
+  device_info   String?
+  ip_address    String?   @db.VarChar(45)
+  user_agent    String?
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
+  expires_at    DateTime  @db.Timestamp(6)
+  last_activity DateTime? @default(now()) @db.Timestamp(6)
+  is_active     Boolean?  @default(true)
+  users         users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([is_active], map: "idx_user_sessions_active")
+  @@index([session_token], map: "idx_user_sessions_token")
+  @@index([user_id], map: "idx_user_sessions_user_id")
+}
+
+model user_settings {
+  id            Int    @id @default(autoincrement())
+  user_id       Int?
+  settings_json Json?
+  users         users? @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  id                                                                                Int                              @id @default(autoincrement())
+  name                                                                              String                           @db.VarChar(100)
+  email                                                                             String                           @unique @db.VarChar(255)
+  password_hash                                                                     String                           @db.VarChar(255)
+  role                                                                              String                           @db.VarChar(50)
+  avatar_url                                                                        String?                          @db.VarChar(255)
+  created_at                                                                        DateTime?                        @default(now()) @db.Timestamp(6)
+  level_id                                                                          Int?
+  activities                                                                        activities[]
+  comment_replies                                                                   comment_replies[]
+  comments                                                                          comments[]
+  course_comments                                                                   course_comments[]
+  course_enrollments                                                                course_enrollments[]
+  courses                                                                           courses[]
+  enhanced_slides                                                                   enhanced_slides[]
+  file_uploads                                                                      file_uploads[]
+  live_private_live_private_created_byTousers                                       live_private[]                   @relation("live_private_created_byTousers")
+  live_private_live_private_professor_idTousers                                     live_private[]                   @relation("live_private_professor_idTousers")
+  live_private_participants                                                         live_private_participants[]
+  live_section_comment_replies                                                      live_section_comment_replies[]
+  live_section_comments                                                             live_section_comments[]
+  live_section_deletion_requests_live_section_deletion_requests_decided_byTousers   live_section_deletion_requests[] @relation("live_section_deletion_requests_decided_byTousers")
+  live_section_deletion_requests_live_section_deletion_requests_professor_idTousers live_section_deletion_requests[] @relation("live_section_deletion_requests_professor_idTousers")
+  live_section_purchases                                                            live_section_purchases[]
+  live_sections_live_sections_approved_byTousers                                    live_sections[]                  @relation("live_sections_approved_byTousers")
+  live_sections_live_sections_professor_idTousers                                   live_sections[]                  @relation("live_sections_professor_idTousers")
+  live_session_participants                                                         live_session_participants[]
+  live_sessions_live_sessions_approved_byTousers                                    live_sessions[]                  @relation("live_sessions_approved_byTousers")
+  live_sessions_live_sessions_professor_idTousers                                   live_sessions[]                  @relation("live_sessions_professor_idTousers")
+  mobile_app_settings                                                               mobile_app_settings[]
+  notifications                                                                     notifications[]
+  password_reset_tokens                                                             password_reset_tokens[]
+  pending_courses                                                                   pending_courses[]
+  point_codes                                                                       point_codes[]
+  point_transactions                                                                point_transactions[]
+  private_class_requests                                                            private_class_requests[]
+  purchases                                                                         purchases[]
+  quiz_attempts                                                                     quiz_attempts[]
+  quizzes_quizzes_approved_byTousers                                                quizzes[]                        @relation("quizzes_approved_byTousers")
+  quizzes_quizzes_created_byTousers                                                 quizzes[]                        @relation("quizzes_created_byTousers")
+  slide_analytics                                                                   slide_analytics[]
+  student_courses                                                                   student_courses[]
+  user_points                                                                       user_points?
+  user_sessions                                                                     user_sessions[]
+  user_settings                                                                     user_settings[]
+  levels                                                                            levels?                          @relation(fields: [level_id], references: [id], onUpdate: NoAction)
+  video_security_logs                                                               video_security_logs[]
+  video_views                                                                       video_views[]
+
+  @@index([level_id], map: "idx_users_level_id")
+}
+
+model video_security_logs {
+  id         Int       @id @default(autoincrement())
+  user_id    Int?
+  course_id  Int?
+  video_path String?   @db.VarChar(500)
+  event_type String    @db.VarChar(50)
+  details    Json?
+  ip_address String?   @db.VarChar(45)
+  user_agent String?
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  courses    courses?  @relation(fields: [course_id], references: [id], onUpdate: NoAction)
+  users      users?    @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_video_security_logs_created_at")
+  @@index([event_type], map: "idx_video_security_logs_event_type")
+  @@index([user_id], map: "idx_video_security_logs_user_id")
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model video_views {
+  id             Int       @id @default(autoincrement())
+  user_id        Int
+  course_id      Int
+  video_path     String    @db.VarChar(500)
+  viewed_at      DateTime? @default(now()) @db.Timestamp(6)
+  watch_time     Int?      @default(0)
+  video_duration Int?      @default(0)
+  ip_address     String?   @db.VarChar(45)
+  user_agent     String?
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  courses        courses   @relation(fields: [course_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users          users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([course_id], map: "idx_video_views_course_id")
+  @@index([user_id], map: "idx_video_views_user_id")
+  @@index([video_path], map: "idx_video_views_video_path")
+  @@index([viewed_at], map: "idx_video_views_viewed_at")
+}
+
+model years {
+  id                     Int                      @id @default(autoincrement())
+  name                   String                   @db.VarChar(100)
+  level_id               Int?
+  live_sections          live_sections[]
+  materials              materials[]
+  private_class_requests private_class_requests[]
+  specialities           specialities[]
+  levels                 levels?                  @relation(fields: [level_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model purchases_orphaned_archive {
+  id           Int       @id
+  session_id   Int
+  student_id   Int
+  amount_paid  Decimal   @db.Decimal(10, 2)
+  purchased_at DateTime? @db.Timestamp(6)
+  archived_at  DateTime  @default(now()) @db.Timestamp(6)
+  reason       String?
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model live_section_deletion_requests {
+  id                                                       Int            @id @default(autoincrement())
+  live_section_id                                          Int?
+  section_title                                            String
+  professor_id                                             Int?
+  reason                                                   String?
+  status                                                   String         @default("pending") @db.VarChar(20)
+  requested_at                                             DateTime       @default(now()) @db.Timestamp(6)
+  decided_by                                               Int?
+  decided_at                                               DateTime?      @db.Timestamp(6)
+  admin_note                                               String?
+  refunded                                                 Boolean?
+  points_returned                                          Int            @default(0)
+  students_refunded                                        Int            @default(0)
+  users_live_section_deletion_requests_decided_byTousers   users?         @relation("live_section_deletion_requests_decided_byTousers", fields: [decided_by], references: [id], onUpdate: NoAction)
+  live_sections                                            live_sections? @relation(fields: [live_section_id], references: [id], onUpdate: NoAction)
+  users_live_section_deletion_requests_professor_idTousers users?         @relation("live_section_deletion_requests_professor_idTousers", fields: [professor_id], references: [id], onUpdate: NoAction)
+
+  @@index([status, requested_at(sort: Desc)], map: "idx_deletion_requests_status")
+}

@@ -2,6 +2,7 @@ import express from 'express';
 import { verifyToken } from '../middleware/auth.js';
 import { getRow, getRows } from '../db.js';
 import pool from '../db.js';
+import { debugLog } from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -78,7 +79,7 @@ router.post('/', verifyToken, requireAdmin, async (req, res) => {
     const b = await client.query('DELETE FROM live_section_purchases');
     await client.query('COMMIT');
 
-    console.log(`✅ Student access cleared by admin ${req.user.id}: ` +
+    debugLog(`✅ Student access cleared by admin ${req.user.id}: ` +
       `${a.rowCount} course enrollments, ${b.rowCount} live section purchases. ` +
       `No courses, content or files were deleted.`);
 
@@ -157,7 +158,7 @@ router.post('/revoke', verifyToken, requireAdmin, async (req, res) => {
       ? await pool.query('DELETE FROM student_courses WHERE course_id = $1 AND student_id = ANY($2)', [id, studentIds])
       : await pool.query('DELETE FROM live_section_purchases WHERE live_section_id = $1 AND student_id = ANY($2)', [id, studentIds]);
 
-    console.log(`Access revoked by admin ${req.user.id}: ${result.rowCount} student(s) on ${type} ${id}`);
+    debugLog(`Access revoked by admin ${req.user.id}: ${result.rowCount} student(s) on ${type} ${id}`);
     res.json({ success: true, revoked: result.rowCount });
   } catch (error) {
     console.error('Error revoking access:', error);

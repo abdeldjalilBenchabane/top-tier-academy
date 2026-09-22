@@ -21,6 +21,7 @@ import { toast } from '@/lib/toast';
 import { coursesAPI } from '@/services/api';
 import UploadProgressBar from '@/components/UploadProgressBar';
 
+import { measureUploadSpeedMbps, estimateSeconds, formatDuration } from '@/lib/uploadEstimate';
 interface CourseFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -57,146 +58,41 @@ const CourseForm = ({ onSuccess, onCancel }: CourseFormProps) => {
   const coverInputRef = useRef<HTMLInputElement | null>(null);
 
   // Simple internet upload speed test using Blob constructor
+  // The old test uploaded 1 KB, 5 KB and 10 KB and then divided the result by
+  // ten "to fix a decimal point error". Payloads that small measure round-trip
+  // latency rather than bandwidth, and the divisor multiplied every estimate by
+  // ten on top of that. Both live in src/lib/uploadEstimate.ts now, corrected
+  // and shared with the دورة form.
   const testInternetSpeed = async () => {
     setIsSpeedTesting(true);
+    setSpeedTestProgress('');
     try {
-      const speeds = [];
-      const testSizes = [0.001, 0.005, 0.01]; // Very small test sizes (1KB, 5KB, 10KB)
-      
-      for (let i = 0; i < testSizes.length; i++) {
-        const testSizeMB = testSizes[i];
-        setSpeedTestProgress(`Testing ${testSizeMB}MB upload... (${i + 1}/${testSizes.length})`);
-        
-        const startTime = Date.now();
-        
-        try {
-          // Create test data using Blob constructor with size parameter
-          const testBlob = new Blob(['A'.repeat(testSizeMB * 1024 * 1024)], { type: 'text/plain' });
-          const testFile = new File([testBlob], `speed-test-${testSizeMB}mb.txt`, { type: 'text/plain' });
-          
-          // Create FormData and upload
-          const formData = new FormData();
-          formData.append('file', testFile);
-          
-          const response = await fetch('/api/upload-test', {
-            method: 'POST',
-            body: formData,
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Upload test failed for ${testSizeMB}MB`);
-          }
-          
-          const endTime = Date.now();
-          const duration = (endTime - startTime) / 1000; // Convert to seconds
-          const speedMBps = testSizeMB / duration; // MB/s
-          const speedMbps = speedMBps * 8; // Convert to Mbps
-          
-          // Fix decimal point error - divide by 10 to get correct speed
-          const correctedSpeedMbps = speedMbps / 10;
-          
-          // Store the corrected measured speed
-          speeds.push(correctedSpeedMbps);
-          
-          // Update speed in real-time as tests complete
-          if (speeds.length > 0) {
-            const currentAvg = speeds.reduce((a, b) => a + b, 0) / speeds.length;
-            setRealTimeSpeed(currentAvg);
-            setInternetSpeed({ 
-              upload: currentAvg, 
-              download: currentAvg * 2
-            });
-          }
-          
-          // Short delay between tests
-          if (i < testSizes.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 300));
-          }
-        } catch (testError) {
-          console.warn(`Speed test ${i + 1} failed:`, testError);
-          // Continue with other tests
-        }
-      }
-      
-      if (speeds.length === 0) {
-        throw new Error('All speed tests failed');
-      }
-      
-      // Calculate final average speed
-      const finalSpeed = speeds.reduce((a, b) => a + b, 0) / speeds.length;
-      
-      setInternetSpeed({ 
-        upload: finalSpeed, 
-        download: finalSpeed * 2 
-      });
-      
-      toast.success(`Upload speed: ${finalSpeed.toFixed(2)} Mbps`);
+      const { mbps } = await measureUploadSpeedMbps(setSpeedTestProgress);
+      setRealTimeSpeed(mbps);
+      setInternetSpeed({ upload: mbps, download: mbps });
+      toast.success(`سرعة الرفع: ${mbps.toFixed(1)} ميغابت/ثانية`);
     } catch (error) {
       console.error('Speed test failed:', error);
-      toast.error('Speed test failed. Please try again.');
+      toast.error('تعذّر قياس سرعة الرفع. حاول مرة أخرى.');
     } finally {
       setIsSpeedTesting(false);
       setSpeedTestProgress('');
     }
   };
 
-  // Calculate estimated upload time
+  // Estimated upload time for everything currently picked.
   const calculateEstimatedTime = () => {
     if (!internetSpeed) return;
-    
-    const totalSize = Object.values(uploadedFiles).reduce((sum, file) => sum + file.size, 0) + 
+    const totalSize = Object.values(uploadedFiles).reduce((sum, file) => sum + file.size, 0) +
                      (coverFile ? coverFile.size : 0);
-    
-    if (totalSize === 0) {
-      setEstimatedTime('');
-      return;
-    }
-    
-    const totalSizeMB = totalSize / (1024 * 1024);
-    const uploadSpeedMBps = internetSpeed.upload / 8; // Convert Mbps to MB/s
-    const estimatedSeconds = totalSizeMB / uploadSpeedMBps;
-    
-    let timeString = '';
-    if (estimatedSeconds < 60) {
-      timeString = `${Math.ceil(estimatedSeconds)} seconds`;
-    } else if (estimatedSeconds < 3600) {
-      const minutes = Math.ceil(estimatedSeconds / 60);
-      timeString = `${minutes} minute${minutes > 1 ? 's' : ''}`;
-    } else {
-      const hours = Math.ceil(estimatedSeconds / 3600);
-      timeString = `${hours} hour${hours > 1 ? 's' : ''}`;
-    }
-    
-    setEstimatedTime(timeString);
+    setEstimatedTime(formatDuration(estimateSeconds(totalSize, internetSpeed.upload)));
   };
 
-  // Calculate estimated time when files change - DYNAMIC UPDATES
+  // One source of truth for the estimate: the effect calls the same
+  // function the rest of the form does, instead of repeating the maths
+  // with a different wording for the same number.
   useEffect(() => {
-    if (internetSpeed) {
-      const totalSize = Object.values(uploadedFiles).reduce((sum, file) => sum + file.size, 0) + 
-                       (coverFile ? coverFile.size : 0);
-      
-      if (totalSize > 0) {
-        const totalSizeMB = totalSize / (1024 * 1024);
-        const uploadSpeedMBps = internetSpeed.upload / 8; // Convert Mbps to MB/s
-        const estimatedSeconds = totalSizeMB / uploadSpeedMBps;
-        
-        let timeString = '';
-        if (estimatedSeconds < 60) {
-          timeString = `${Math.ceil(estimatedSeconds)}s`;
-        } else if (estimatedSeconds < 3600) {
-          const minutes = Math.ceil(estimatedSeconds / 60);
-          timeString = `${minutes}m`;
-        } else {
-          const hours = Math.ceil(estimatedSeconds / 3600);
-          timeString = `${hours}h`;
-        }
-        
-        setEstimatedTime(timeString);
-      } else {
-        setEstimatedTime('');
-      }
-    }
+    calculateEstimatedTime();
   }, [uploadedFiles, coverFile, internetSpeed]);
 
   // Test speed on component mount

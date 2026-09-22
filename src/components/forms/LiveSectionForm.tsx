@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { PlusCircle, Trash2, FileUp, Video, FileText, Calendar, Clock, DollarSign, Image as ImageIcon, BookOpen } from 'lucide-react';
+import { measureUploadSpeedMbps, estimateSeconds, formatDuration, totalBytes, formatSize } from '@/lib/uploadEstimate';
+import { PlusCircle, Trash2, FileUp, Video, FileText, Calendar, Clock, DollarSign, Image as ImageIcon, BookOpen, Gauge, Loader2, ChevronUp, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/lib/toast';
 import { FaGraduationCap, FaBook, FaLayerGroup } from 'react-icons/fa';
 
+import { parseSessionDate } from '@/lib/utils';
 interface LiveSessionBlock {
   id: string;
   title: string;
@@ -105,7 +107,7 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
               formattedScheduledAt = session.scheduledAt.substring(0, 16);
             } else {
               // Fallback: try parsing as date
-              const date = new Date(session.scheduledAt);
+              const date = parseSessionDate(session.scheduledAt) || new Date(0);
               if (!isNaN(date.getTime())) {
                 const year = date.getFullYear();
                 const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -154,6 +156,29 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
     }
   ]);
   const [uploadedFiles, setUploadedFiles] = useState<{[key: string]: File}>({});
+
+  // Upload time estimate. A professor picking a 600 MB lecture should learn
+  // that before they start, not by watching a bar for twenty minutes. The
+  // speed is measured once per session and reused for every file.
+  const [uploadMbps, setUploadMbps] = useState<number | null>(null);
+  const [measuringSpeed, setMeasuringSpeed] = useState(false);
+  const [speedStatus, setSpeedStatus] = useState('');
+
+  const measureSpeed = async () => {
+    setMeasuringSpeed(true);
+    setSpeedStatus('');
+    try {
+      const { mbps } = await measureUploadSpeedMbps(setSpeedStatus);
+      setUploadMbps(mbps);
+      setSpeedStatus('');
+    } catch {
+      setSpeedStatus('تعذّر قياس السرعة — حاول مرة أخرى');
+    } finally {
+      setMeasuringSpeed(false);
+    }
+  };
+
+  const pendingBytes = totalBytes([...Object.values(uploadedFiles), coverFile]);
   const fileInputRefs = useRef<{[key: string]: HTMLInputElement | null}>({});
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -240,6 +265,30 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
         blocks: []
       }
     ]);
+  };
+
+  // The order on screen is the order students get. These only rearrange the
+  // list; saving writes it to the server in one step (see the /order call in
+  // handleSubmit), so moving things around and then cancelling changes nothing.
+  const moveContentSection = (index: number, direction: -1 | 1) => {
+    setContentSections((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const moveContentBlock = (sectionId: string, index: number, direction: -1 | 1) => {
+    setContentSections((prev) => prev.map((section) => {
+      if (section.id !== sectionId) return section;
+      const target = index + direction;
+      if (target < 0 || target >= section.blocks.length) return section;
+      const blocks = [...section.blocks];
+      [blocks[index], blocks[target]] = [blocks[target], blocks[index]];
+      return { ...section, blocks };
+    }));
   };
 
   const removeSection = (sectionId: string) => {
@@ -738,11 +787,16 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
                     <div className="flex-1">
                       <p className="text-sm font-medium">{uploadedFiles[block.id].name}</p>
                       <p className="text-xs text-gray-500">
-                        {(uploadedFiles[block.id].size / (1024 * 1024)).toFixed(1)} MB
+                        {formatSize(uploadedFiles[block.id].size)}
                         {(uploadedFiles[block.id].size / (1024 * 1024)) > 50 && (
-                          <span className="ml-2 text-orange-600 font-medium">⚠️ Large file</span>
+                          <span className="ml-2 text-orange-600 font-medium">⚠️ ملف كبير</span>
                         )}
                       </p>
+                      {uploadMbps && (
+                        <p className="text-xs text-blue-600 mt-0.5">
+                          ⏱️ وقت الرفع المتوقع: {formatDuration(estimateSeconds(uploadedFiles[block.id].size, uploadMbps))}
+                        </p>
+                      )}
                     </div>
                     
                     <Button
@@ -972,6 +1026,10 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
       
       // Save content sections
       console.log('[DEBUG] Saving content sections:', contentSections);
+      // Real ids, in the order on screen. New sections and blocks only have an
+      // id after they are created, so this is filled as the loop saves them.
+      const finalOrder: { id: number; blocks: number[] }[] = [];
+
       for (const section of contentSections) {
         // Skip empty sections (no title and no blocks)
         if (!section.title && section.blocks.length === 0) {
@@ -1027,6 +1085,9 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
           }
         }
         
+        const orderEntry = { id: Number(sectionId), blocks: [] as number[] };
+        finalOrder.push(orderEntry);
+
         // Save blocks for this section
         for (const block of section.blocks) {
           const isExistingBlock = !isNaN(Number(block.id));
@@ -1054,6 +1115,7 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
             if (!blockResponse.ok) {
               console.error('[DEBUG] Failed to update block');
             }
+            orderEntry.blocks.push(Number(block.id));
           } else {
             // Create new block
             console.log('[DEBUG] Creating new block:', block.type, block.title);
@@ -1080,6 +1142,7 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
             if (blockResponse.ok) {
               const newBlock = await blockResponse.json();
               console.log('[DEBUG] Block created:', newBlock);
+              if (newBlock?.id) orderEntry.blocks.push(Number(newBlock.id));
             } else {
               console.error('[DEBUG] Failed to create block');
             }
@@ -1087,6 +1150,24 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
         }
       }
       
+      // Everything exists now, so the order can be set in one transaction —
+      // exactly as it appears on screen, whatever order things were created in.
+      if (finalOrder.length > 0) {
+        const orderResponse = await fetch(`/api/live-sections/${sectionData.id}/order`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ sections: finalOrder })
+        });
+        if (!orderResponse.ok) {
+          // The content is saved; only the arrangement is not. Say so rather
+          // than report a full success the student will not see.
+          toast.error('تم الحفظ، لكن تعذّر حفظ ترتيب الأقسام. أعد المحاولة من التعديل.');
+        }
+      }
+
       toast.success(editingSection ? 'تم تحديث القسم المباشر بنجاح!' : 'تم إنشاء القسم المباشر بنجاح!');
       onSuccess?.(sectionData);
       
@@ -1417,6 +1498,31 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
                     />
                   </div>
                   
+                  <div className="flex flex-col" title="تغيير ترتيب القسم">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      disabled={index === 0}
+                      onClick={() => moveContentSection(index, -1)}
+                      aria-label="نقل القسم للأعلى"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      disabled={index === contentSections.length - 1}
+                      onClick={() => moveContentSection(index, 1)}
+                      aria-label="نقل القسم للأسفل"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </div>
+
                   <Button
                     type="button"
                     variant="ghost"
@@ -1430,12 +1536,36 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
                 </div>
                 
                 <div className="space-y-4">
-                  {section.blocks.map((block) => (
+                  {section.blocks.map((block, blockIndex) => (
                     <div key={block.id} className="rounded-md border p-4">
                       <div className="flex items-center justify-between mb-2">
-                        <Label className="text-sm font-medium capitalize">
-                          {block.type} Content
-                        </Label>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            disabled={blockIndex === 0}
+                            onClick={() => moveContentBlock(section.id, blockIndex, -1)}
+                            aria-label="نقل للأعلى"
+                          >
+                            <ChevronUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            disabled={blockIndex === section.blocks.length - 1}
+                            onClick={() => moveContentBlock(section.id, blockIndex, 1)}
+                            aria-label="نقل للأسفل"
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                          <Label className="text-sm font-medium capitalize">
+                            {block.type} Content
+                          </Label>
+                        </div>
                         <Button
                           type="button"
                           variant="ghost"
@@ -1507,6 +1637,56 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
         </TabsContent>
       </Tabs>
 
+      {/* Upload time, before the upload starts rather than after.
+          Same panel whether the دورة is being created or edited: the files
+          added during an edit cost exactly as much to upload as the first
+          batch did. */}
+      {pendingBytes > 0 && (
+        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50/60 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm">
+              <span className="font-medium text-gray-800">
+                {formatSize(pendingBytes)} جاهزة للرفع
+              </span>
+              {uploadMbps ? (
+                <span className="mr-2 text-blue-700">
+                  — الوقت المتوقع:{' '}
+                  <strong>{formatDuration(estimateSeconds(pendingBytes, uploadMbps))}</strong>
+                </span>
+              ) : (
+                <span className="mr-2 text-gray-600">
+                  — اقس سرعة اتصالك لمعرفة المدة المتوقعة
+                </span>
+              )}
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={measureSpeed}
+              disabled={measuringSpeed || isSubmitting}
+              className="flex items-center gap-2"
+            >
+              {measuringSpeed
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <Gauge className="h-4 w-4" />}
+              {measuringSpeed ? 'جاري القياس…' : uploadMbps ? 'إعادة القياس' : 'قياس سرعة الرفع'}
+            </Button>
+          </div>
+
+          {speedStatus && (
+            <p className="mt-2 text-xs text-gray-600">{speedStatus}</p>
+          )}
+          {uploadMbps && !measuringSpeed && (
+            <p className="mt-2 text-xs text-gray-500">
+              سرعة الرفع المقاسة: {uploadMbps.toFixed(1)} ميغابت/ثانية.
+              التقدير تقريبي ويتغير مع تغير الشبكة — لا تغلق الصفحة أثناء الرفع.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="flex justify-between items-center pt-4">
         {editingSection && (
           <Button
@@ -1532,7 +1712,7 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
             </Button>
           )}
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Submitting...' : (editingSection ? 'Add New Sessions' : 'Submit الدورات')}
+            {isSubmitting ? 'Submitting...' : (editingSection ? 'Submit' : 'Submit الدورات')}
           </Button>
         </div>
       </div>

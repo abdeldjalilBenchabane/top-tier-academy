@@ -30,7 +30,7 @@ import {
   X,
   Tag,
   LayoutDashboard
-, RotateCcw, Smartphone} from 'lucide-react';
+, RotateCcw, Smartphone, Bell} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SidebarLink {
@@ -84,6 +84,7 @@ const Sidebar = () => {
     { name: 'Point Transactions', path: '/admin/point-transactions', icon: <TrendingUp className="h-5 w-5" /> },
     { name: 'المشتريات', path: '/admin/purchases', icon: <RotateCcw className="h-5 w-5" /> },
     { name: 'تطبيق الجوال', path: '/admin/mobile', icon: <Smartphone className="h-5 w-5" /> },
+    { name: 'Notification', path: '/admin/send-notification', icon: <Bell className="h-5 w-5" /> },
     { name: 'Private Classes', path: '/admin/private-classes', icon: <Shield className="h-5 w-5" /> },
     { name: 'Private Class Settings', path: '/admin/private-class-settings', icon: <Settings className="h-5 w-5" /> },
     { name: 'تعليقات الدورات', path: '/admin/comments', icon: <MessageCircle className="h-5 w-5" /> },

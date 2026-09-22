@@ -22,6 +22,7 @@ import ProfileSection from '../components/TTHProfileSection';
 import { pointsAPI } from '@/services/api';
 import { useAuth } from '../contexts/AuthContext';
 
+import { parseSessionDate } from '@/lib/utils';
 // Fonction utilitaire pour calculer le nombre total d'heures passées sur la plateforme
 function calculateTotalHours(activities) {
     if (!activities || !Array.isArray(activities)) return 0;
@@ -50,6 +51,29 @@ const StudentDashboard = () => {
     const [editMode, setEditMode] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [sessionTimers, setSessionTimers] = useState({});
+
+    // What each label means, in one place, so the badge colour, the button
+    // colour, the button text and whether it is clickable can never disagree.
+    const LIVE_STATES = {
+        'مباشر الآن':    { tone: 'live',     joinable: true,  cta: 'انضم الآن - مباشر' },
+        'على وشك البدء': { tone: 'imminent', joinable: true,  cta: 'ادخل الآن - على وشك البدء' },
+        'متوقفة مؤقتاً': { tone: 'paused',   joinable: true,  cta: 'متوقفة مؤقتاً - يمكنك الدخول' },
+        'مشكلة تقنية':   { tone: 'trouble',  joinable: true,  cta: 'مشكلة تقنية - يمكنك الدخول' },
+        'ملغاة':         { tone: 'dead',     joinable: false, cta: 'تم إلغاء البث' },
+        'منتهي':         { tone: 'dead',     joinable: false, cta: 'انتهى البث' },
+    };
+    const stateOf = (id) => LIVE_STATES[sessionTimers[id]] || null;
+    const TEXT_TONE = {
+        live: 'text-green-600', imminent: 'text-emerald-600', paused: 'text-amber-600',
+        trouble: 'text-orange-600', dead: 'text-red-600',
+    };
+    const BTN_TONE = {
+        live: 'bg-green-600 hover:bg-green-700 text-white animate-pulse',
+        imminent: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+        paused: 'bg-amber-500 hover:bg-amber-600 text-white',
+        trouble: 'bg-orange-500 hover:bg-orange-600 text-white',
+        dead: 'bg-gray-400 text-white cursor-not-allowed',
+    };
 
     // Function to refresh student stats
     const refreshStudentStats = async () => {
@@ -82,13 +106,22 @@ const StudentDashboard = () => {
                 return;
             }
 
-            const sessionTime = new Date(session.start_time);
+            const sessionTime = parseSessionDate(session.start_time) || new Date(0);
             const sessionEndTime = new Date(sessionTime.getTime() + (session.duration || 60) * 60 * 1000);
 
             if (session.status === 'ended' || session.is_ended) {
                 timers[session.id] = 'منتهي';
                 return;
             }
+
+            // A state the professor set by hand outranks the clock: it is the
+            // more recent and more deliberate piece of information. Same
+            // wording as TTHLiveCard, so the student sees one story sitewide.
+            if (session.status === 'cancelled')        { timers[session.id] = 'ملغاة';         return; }
+            if (session.status === 'paused')           { timers[session.id] = 'متوقفة مؤقتاً'; return; }
+            if (session.status === 'technical_issues') { timers[session.id] = 'مشكلة تقنية';   return; }
+            if (session.status === 'starting')         { timers[session.id] = 'على وشك البدء'; return; }
+            if (session.status === 'live')             { timers[session.id] = 'مباشر الآن';    return; }
 
             if (currentTime < sessionTime) {
                 // Session hasn't started yet
@@ -587,7 +620,7 @@ const StudentDashboard = () => {
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-sm font-medium text-gray-700">التاريخ:</span>
                                                     <span className="text-sm text-gray-600">
-                                                        {new Date(session.start_time).toLocaleDateString('en-US', {
+                                                        {(parseSessionDate(session.start_time) || new Date()).toLocaleDateString('en-US', {
                                                             year: 'numeric',
                                                             month: 'long',
                                                             day: 'numeric'
@@ -599,13 +632,9 @@ const StudentDashboard = () => {
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-sm font-medium text-gray-700">الوقت:</span>
                                                     <span className={`text-sm font-semibold ${
-                                                        sessionTimers[session.id] === 'مباشر الآن' 
-                                                            ? 'text-green-600' 
-                                                            : sessionTimers[session.id] === 'منتهي' 
-                                                            ? 'text-red-600' 
-                                                            : 'text-[#194cbf]'
+                                                        TEXT_TONE[stateOf(session.id)?.tone] || 'text-[#194cbf]'
                                                     }`}>
-                                                        {sessionTimers[session.id] || new Date(session.start_time).toLocaleTimeString('en-US', {
+                                                        {sessionTimers[session.id] || (parseSessionDate(session.start_time) || new Date()).toLocaleTimeString('en-US', {
                                                             hour: '2-digit',
                                                             minute: '2-digit'
                                                         })}
@@ -615,23 +644,18 @@ const StudentDashboard = () => {
                                         </div>
                                         <Button 
                                             className={`w-full font-semibold ${
-                                                sessionTimers[session.id] === 'مباشر الآن'
-                                                    ? 'bg-green-600 hover:bg-green-700 text-white animate-pulse'
-                                                    : sessionTimers[session.id] === 'منتهي'
-                                                    ? 'bg-gray-400 hover:bg-gray-500 text-white cursor-not-allowed'
-                                                    : 'bg-[#194cbf] hover:bg-blue-700 text-white'
+                                                BTN_TONE[stateOf(session.id)?.tone] || 'bg-[#194cbf] hover:bg-blue-700 text-white'
                                             }`}
                                             onClick={() => {
-                                                if (sessionTimers[session.id] !== 'منتهي') {
+                                                // A cancelled or finished session leads nowhere.
+                                                if (stateOf(session.id)?.joinable !== false) {
                                                     navigate(`/streaming/${session.id}`);
                                                 }
                                             }}
-                                            disabled={sessionTimers[session.id] === 'منتهي'}
+                                            disabled={stateOf(session.id)?.joinable === false}
                                         >
-                                            {sessionTimers[session.id] === 'مباشر الآن' 
-                                                ? 'انضم الآن - مباشر' 
-                                                : sessionTimers[session.id] === 'منتهي'
-                                                ? 'انتهى البث'
+                                            {stateOf(session.id)
+                                                ? stateOf(session.id).cta
                                                 : sessionTimers[session.id] && sessionTimers[session.id] !== ''
                                                 ? `انتظار البداية - ${sessionTimers[session.id]}`
                                                 : 'انضم الآن'

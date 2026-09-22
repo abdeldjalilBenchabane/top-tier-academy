@@ -2,6 +2,7 @@ import express from 'express';
 import { verifyToken } from '../middleware/auth.js';
 import { getRow, getRows } from '../db.js';
 import pool from '../db.js';
+import { debugLog } from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -118,7 +119,7 @@ router.put('/admin/mobile-config', verifyToken, requireAdmin, async (req, res) =
        RETURNING config`,
       [JSON.stringify(config), req.user.id]);
 
-    console.log(`Mobile app settings updated by admin ${req.user.id}`);
+    debugLog(`Mobile app settings updated by admin ${req.user.id}`);
     res.json({ success: true, config: normalize(result.rows[0].config) });
   } catch (error) {
     console.error('Error saving mobile config:', error);

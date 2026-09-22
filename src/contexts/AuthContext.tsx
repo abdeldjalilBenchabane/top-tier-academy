@@ -49,7 +49,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.location.href = '/login';
   };
 
-  // Function to validate session periodically
+  // Counts consecutive network/server failures of the session poll, so a
+  // hiccup can be told apart from a session that is genuinely gone.
+  const transientSessionFailures = useRef(0);
+
+  // Function to validate session periodically.
+  //
+  // This poll runs every 30 seconds. It used to sign the user out on ANY
+  // failure, so a dropped request, a slow network or one 500 from the server
+  // threw them back to the login page mid-lesson — indistinguishable from a
+  // real session eviction. Only an explicit rejection from the server means
+  // the session is actually gone; everything else is noise and is retried on
+  // the next tick.
   const validateSession = async () => {
     const token = getAuthToken();
     const sessionToken = getSessionToken();
@@ -60,9 +71,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     try {
       await authAPI.validateSession();
+      transientSessionFailures.current = 0;
     } catch (error: any) {
-      console.error('Session validation failed:', error);
-      handleSessionInvalidation();
+      const message = String(error?.message || '');
+      // These are the only replies /auth/validate-session gives when the
+      // session itself is no longer usable.
+      const sessionReallyGone =
+        /Invalid session|Session has been invalidated|Session has expired|Session token is required|Invalid token/i
+          .test(message);
+
+      if (sessionReallyGone) {
+        console.warn('Session invalidated by the server:', message);
+        handleSessionInvalidation();
+        return;
+      }
+
+      transientSessionFailures.current += 1;
+      console.warn(
+        `Session check failed (attempt ${transientSessionFailures.current}), staying signed in:`,
+        message
+      );
     }
   };
 

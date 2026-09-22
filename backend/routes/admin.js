@@ -1,6 +1,7 @@
 import express from 'express';
 import { verifyToken } from '../middleware/auth.js';
 import { getRow, getRows, query } from '../db.js';
+import { debugLog } from '../utils/logger.js';
 import pool from '../db.js'; // Fixed pool import
 
 const router = express.Router();
@@ -38,7 +39,7 @@ const safeGetSum = async (query, fallback = 0) => {
 // GET /api/admin/test-tables - Test endpoint to check what tables exist
 router.get('/test-tables', verifyToken, requireAdmin, async (req, res) => {
   try {
-    console.log('Testing database tables...');
+    debugLog('Testing database tables...');
     
     // Get all tables in the database
     const tables = await getRows(`
@@ -79,7 +80,7 @@ router.get('/test-tables', verifyToken, requireAdmin, async (req, res) => {
 // GET /api/admin/dashboard/stats - Get admin dashboard statistics
 router.get('/dashboard/stats', verifyToken, requireAdmin, async (req, res) => {
   try {
-    console.log('Fetching admin dashboard stats...');
+    debugLog('Fetching admin dashboard stats...');
     
     // Get total users count (without is_active filter)
     const totalUsers = await safeGetCount('SELECT COUNT(*) as count FROM users');
@@ -143,12 +144,13 @@ router.get('/dashboard/stats', verifyToken, requireAdmin, async (req, res) => {
     // Get total quizzes count
     const totalQuizzes = await safeGetCount('SELECT COUNT(*) as count FROM quizzes');
     
-    // Get pending quizzes count (with fallback since is_approved column might not exist)
+    // Pending quizzes. This used to read is_approved, which quizzes has never
+    // had — the query threw on every dashboard load and the tile showed 0.
     let pendingQuizzes = 0;
     try {
-      pendingQuizzes = await safeGetCount('SELECT COUNT(*) as count FROM quizzes WHERE is_approved = false');
+      pendingQuizzes = await safeGetCount("SELECT COUNT(*) as count FROM quizzes WHERE status = 'pending'");
     } catch (error) {
-      console.log('is_approved column not found in quizzes table, using 0 as pending');
+      debugLog('is_approved column not found in quizzes table, using 0 as pending');
       pendingQuizzes = 0;
     }
     
@@ -214,7 +216,7 @@ router.get('/dashboard/stats', verifyToken, requireAdmin, async (req, res) => {
     const previousPending = parseInt(lastMonthPending || 0);
     const pendingGrowth = previousPending > 0 ? ((currentPending - previousPending) / previousPending) * 100 : 0;
     
-    console.log('Admin dashboard stats calculated successfully');
+    debugLog('Admin dashboard stats calculated successfully');
     
     res.json({
       stats: {
@@ -260,7 +262,7 @@ router.get('/dashboard/stats', verifyToken, requireAdmin, async (req, res) => {
 // GET /api/admin/dashboard/analytics - Get analytics data for charts
 router.get('/dashboard/analytics', verifyToken, requireAdmin, async (req, res) => {
   try {
-    console.log('Fetching analytics data for charts...');
+    debugLog('Fetching analytics data for charts...');
     
     // Get user growth data for the last 6 months
     const userGrowthData = await getRows(`
@@ -329,7 +331,7 @@ router.get('/dashboard/analytics', verifyToken, requireAdmin, async (req, res) =
         LIMIT 10
       `);
     } catch (error) {
-      console.log('Student spending query failed, using basic data');
+      debugLog('Student spending query failed, using basic data');
       studentSpendingData = await getRows(`
         SELECT 
           u.name,
@@ -379,7 +381,7 @@ router.get('/dashboard/analytics', verifyToken, requireAdmin, async (req, res) =
         ORDER BY month
       `);
     } catch (error) {
-      console.log('Live session participants query failed, using basic data');
+      debugLog('Live session participants query failed, using basic data');
       liveSessionData = await getRows(`
         SELECT 
           DATE_TRUNC('month', created_at) as month,
@@ -463,7 +465,7 @@ router.get('/dashboard/analytics', verifyToken, requireAdmin, async (req, res) =
         LIMIT 10
       `);
     } catch (error) {
-      console.log('Live session popularity query failed, using basic data');
+      debugLog('Live session popularity query failed, using basic data');
       liveSessionPopularity = await getRows(`
         SELECT 
           title,
@@ -489,14 +491,14 @@ router.get('/dashboard/analytics', verifyToken, requireAdmin, async (req, res) =
         ORDER BY month
       `);
     } catch (error) {
-      console.log('Course enrollment trends query failed, using mock data');
+      debugLog('Course enrollment trends query failed, using mock data');
       courseEnrollmentTrends = [
         { month: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), enrollments: 5 },
         { month: new Date(), enrollments: 8 }
       ];
     }
     
-    console.log('Analytics data fetched successfully');
+    debugLog('Analytics data fetched successfully');
     
     res.json({
       userGrowth: userGrowthData.map(item => ({
@@ -583,7 +585,7 @@ router.get('/dashboard/analytics', verifyToken, requireAdmin, async (req, res) =
 // GET /api/admin/dashboard/recent-activity - Get recent activity for admin dashboard
 router.get('/dashboard/recent-activity', verifyToken, requireAdmin, async (req, res) => {
   try {
-    console.log('Fetching recent activity...');
+    debugLog('Fetching recent activity...');
     const { limit = 10 } = req.query;
     
     const activities = [];
@@ -675,7 +677,7 @@ router.get('/dashboard/recent-activity', verifyToken, requireAdmin, async (req, 
       .sort((a, b) => new Date(b.time) - new Date(a.time))
       .slice(0, parseInt(limit));
     
-    console.log(`Returning ${sortedActivities.length} recent activities`);
+    debugLog(`Returning ${sortedActivities.length} recent activities`);
     
     res.json({ activities: sortedActivities });
   } catch (error) {
@@ -690,7 +692,7 @@ router.get('/dashboard/recent-activity', verifyToken, requireAdmin, async (req, 
 // GET /api/admin/dashboard/system-health - Get system health metrics
 router.get('/dashboard/system-health', verifyToken, requireAdmin, async (req, res) => {
   try {
-    console.log('Fetching system health...');
+    debugLog('Fetching system health...');
     
     // Get database connection status
     let dbStatus = 'disconnected';
@@ -726,7 +728,7 @@ router.get('/dashboard/system-health', verifyToken, requireAdmin, async (req, re
     // Get success rate (mock for now)
     const successRate = 99.1; // percentage
     
-    console.log('System health data calculated successfully');
+    debugLog('System health data calculated successfully');
     
     res.json({
       database: {

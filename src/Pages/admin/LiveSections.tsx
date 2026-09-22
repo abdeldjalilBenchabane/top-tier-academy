@@ -4,15 +4,24 @@ import PageHeader from '@/components/common/PageHeader';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Loader2, Eye, Check, X, FileText, Video, Image as ImageIcon, Search, User, Layers, Calendar } from 'lucide-react';
+import { Loader2, Eye, Check, X, FileText, Video, Image as ImageIcon, Search, User, Layers, Calendar, Trash2, Coins, Ban } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/lib/toast';
 import { API_BASE_URL } from '@/lib/api';
+import { serverDate } from '@/lib/utils';
 
 // The UI says الدورات; the API, URLs and database still say live sections.
 const LABEL = 'الدورات';
 
-type Status = 'all' | 'pending' | 'approved' | 'rejected';
+type Status = 'all' | 'pending' | 'approved' | 'rejected' | 'deletion';
+
+interface DeletionRequest {
+  id: number; live_section_id: number | null; section_title: string;
+  professor_name?: string; reason?: string; status: string;
+  requested_at: string; admin_note?: string;
+  section_buyers: number; section_points: number;
+  sessions_count: number; session_buyers: number; sessions_not_yet_aired: number;
+}
 
 interface Section {
   id: number; title: string; description?: string; status: string;
@@ -75,13 +84,40 @@ const AdminLiveSections = () => {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // Deleting a دورة asks a question the code cannot answer for itself: were
+  // the students who paid for it served or not? So the dialog offers the two
+  // answers and refuses to act until one is picked — no default, because a
+  // default here is a guess about someone else's money.
+  const [deleting, setDeleting] = useState<Section | null>(null);
+  const [refundChoice, setRefundChoice] = useState<'refund' | 'keep' | null>(null);
+
+  // Deletion requests raised by professors, decided here.
+  const [requests, setRequests] = useState<DeletionRequest[]>([]);
+  const [deciding, setDeciding] = useState<DeletionRequest | null>(null);
+  const [rejectingReq, setRejectingReq] = useState<DeletionRequest | null>(null);
+  const [note, setNote] = useState('');
+
   const load = async (status: Status) => {
     setLoading(true);
-    try { setRows(await api(`/admin/live-sections/all?status=${status}`)); }
-    catch (e: any) { toast.error(e.message); setRows([]); }
+    try {
+      if (status === 'deletion') {
+        setRequests(await api('/admin/live-section-deletion-requests?status=pending'));
+      } else {
+        setRows(await api(`/admin/live-sections/all?status=${status}`));
+      }
+    }
+    catch (e: any) { toast.error(e.message); if (status === 'deletion') setRequests([]); else setRows([]); }
     finally { setLoading(false); }
   };
   useEffect(() => { load(tab); }, [tab]);
+
+  // Keep the tab badge honest even while another tab is open.
+  const [pendingRequests, setPendingRequests] = useState(0);
+  useEffect(() => {
+    api('/admin/live-section-deletion-requests?status=pending')
+      .then((r: DeletionRequest[]) => setPendingRequests(r.length))
+      .catch(() => {});
+  }, [tab]);
 
   const openContent = async (s: Section) => {
     setViewing(s); setContent([]); setLoadingContent(true);
@@ -115,6 +151,57 @@ const AdminLiveSections = () => {
     finally { setBusy(false); }
   };
 
+  const remove = async () => {
+    if (!deleting || !refundChoice) return;
+    setBusy(true);
+    try {
+      const r = await api(
+        `/admin/live-sections/${deleting.id}?refund=${refundChoice === 'refund'}`,
+        { method: 'DELETE' });
+      const title = deleting.title;
+      if (refundChoice === 'refund') {
+        const parts: string[] = [];
+        if (r.points_returned) parts.push(`أُعيدت ${r.points_returned} نقطة`);
+        if (r.sessions_already_aired) parts.push(`${r.sessions_already_aired} بثاً مرّ موعده لم يُسترجع`);
+        toast.success(`تم حذف «${title}». ${parts.join(' — ') || 'لا مشتريات لإرجاعها.'}`);
+      } else {
+        toast.success(`تم حذف «${title}» دون إرجاع النقاط.`);
+      }
+      setDeleting(null); setRefundChoice(null); load(tab);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const decideRequest = async () => {
+    if (!deciding || !refundChoice) return;
+    setBusy(true);
+    try {
+      const r = await api(`/admin/live-section-deletion-requests/${deciding.id}/approve`, {
+        method: 'POST',
+        body: JSON.stringify({ refund: refundChoice === 'refund', note: note.trim() || undefined }),
+      });
+      const bits: string[] = [];
+      if (r.points_returned) bits.push(`أُعيدت ${r.points_returned} نقطة`);
+      if (r.sessions_already_aired) bits.push(`${r.sessions_already_aired} بثاً مرّ موعده لم يُسترجع`);
+      toast.success(`تم حذف «${deciding.section_title}». ${bits.join(' — ') || (refundChoice === 'refund' ? 'لا مشتريات لإرجاعها.' : 'دون إرجاع النقاط.')}`);
+      setDeciding(null); setRefundChoice(null); setNote(''); load(tab);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const rejectRequest = async () => {
+    if (!rejectingReq) return;
+    setBusy(true);
+    try {
+      await api(`/admin/live-section-deletion-requests/${rejectingReq.id}/reject`, {
+        method: 'POST', body: JSON.stringify({ note: note.trim() || undefined }),
+      });
+      toast.success(`رُفض طلب حذف «${rejectingReq.section_title}» وأُبلغ الأستاذ.`);
+      setRejectingReq(null); setNote(''); load(tab);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  };
+
   const uniq = (key: keyof Section) =>
     [...new Set(rows.map(r => (r[key] as string) || '').filter(Boolean))].sort();
 
@@ -136,6 +223,7 @@ const AdminLiveSections = () => {
 
   const TABS: Array<[Status, string]> = [
     ['all', 'الكل'], ['pending', 'قيد المراجعة'], ['approved', 'مقبولة'], ['rejected', 'مرفوضة'],
+    ['deletion', 'طلبات الحذف'],
   ];
 
   return (
@@ -146,7 +234,13 @@ const AdminLiveSections = () => {
         <CardContent className="pt-6">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             {TABS.map(([k, label]) => (
-              <Button key={k} size="sm" variant={tab === k ? 'default' : 'outline'} onClick={() => setTab(k)}>
+              <Button key={k} size="sm" variant={tab === k ? 'default' : 'outline'} onClick={() => setTab(k)}
+                className={k === 'deletion' && pendingRequests > 0 && tab !== k ? 'border-red-400 text-red-600' : ''}>
+                {k === 'deletion' && pendingRequests > 0 && (
+                  <span className="ml-1 rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
+                    {pendingRequests}
+                  </span>
+                )}
                 {label}
               </Button>
             ))}
@@ -186,6 +280,65 @@ const AdminLiveSections = () => {
             <div className="flex items-center gap-2 py-8 text-sm text-gray-500">
               <Loader2 className="h-4 w-4 animate-spin" /> جاري التحميل…
             </div>
+          ) : tab === 'deletion' ? (
+            requests.length === 0 ? (
+              <p className="py-8 text-sm text-gray-500">لا توجد طلبات حذف قيد المراجعة.</p>
+            ) : (
+              <div className="space-y-3">
+                {requests.map(r => (
+                  <div key={r.id} className="rounded-lg border border-orange-200 bg-orange-50/40 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-[220px] flex-1">
+                        <div className="flex items-center gap-2 font-semibold">
+                          <Trash2 className="h-4 w-4 text-red-600" />
+                          {r.section_title}
+                        </div>
+                        <div className="mt-1 text-xs text-gray-600">
+                          طلب الحذف: {r.professor_name || 'أستاذ'} — {serverDate(r.requested_at).toLocaleString()}
+                        </div>
+                        {r.reason && (
+                          <div className="mt-2 rounded bg-white p-2 text-xs text-gray-700">
+                            <span className="font-medium">السبب: </span>{r.reason}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* What the decision costs, in front of the person taking it. */}
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded bg-white p-3 text-xs">
+                        <span className="text-gray-500">اشتروا الدورة</span>
+                        <span className="font-semibold">{r.section_buyers} طالب ({r.section_points} نقطة)</span>
+                        <span className="text-gray-500">عدد البثوث</span>
+                        <span className="font-semibold">{r.sessions_count}</span>
+                        <span className="text-gray-500">اشتروا بثوثاً</span>
+                        <span className="font-semibold">{r.session_buyers} طالب</span>
+                        <span className="text-gray-500">بثوث لم يأتِ موعدها</span>
+                        <span className={`font-semibold ${r.sessions_not_yet_aired > 0 ? 'text-orange-600' : ''}`}>
+                          {r.sessions_not_yet_aired}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {r.live_section_id && (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/admin/live-sections/${r.live_section_id}`}>
+                            <Eye className="mr-1 h-4 w-4" /> مراجعة الدورة
+                          </Link>
+                        </Button>
+                      )}
+                      <Button size="sm" variant="destructive" disabled={busy}
+                        onClick={() => { setDeciding(r); setRefundChoice(null); setNote(''); }}>
+                        <Trash2 className="mr-1 h-4 w-4" /> موافقة وحذف…
+                      </Button>
+                      <Button size="sm" variant="outline" disabled={busy}
+                        onClick={() => { setRejectingReq(r); setNote(''); }}>
+                        <X className="mr-1 h-4 w-4" /> رفض الطلب
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           ) : shown.length === 0 ? (
             <p className="py-8 text-sm text-gray-500">لا توجد نتائج.</p>
           ) : (
@@ -226,7 +379,7 @@ const AdminLiveSections = () => {
 
                     <div className="flex items-center text-xs text-gray-500 mt-1">
                       <Calendar className="h-3.5 w-3.5 mr-1" />
-                      <span>{s.created_at ? new Date(s.created_at).toLocaleDateString() : '—'}</span>
+                      <span>{s.created_at ? serverDate(s.created_at).toLocaleDateString() : '—'}</span>
                     </div>
                   </CardContent>
 
@@ -252,6 +405,11 @@ const AdminLiveSections = () => {
                         </Button>
                       )}
                     </div>
+                    <Button size="sm" variant="ghost" disabled={busy}
+                      className="w-full text-red-600 hover:bg-red-50 hover:text-red-700"
+                      onClick={() => { setDeleting(s); setRefundChoice(null); }}>
+                      <Trash2 className="mr-1 h-4 w-4" /> حذف الدورة نهائياً
+                    </Button>
                   </CardFooter>
                 </Card>
               ))}
@@ -259,6 +417,163 @@ const AdminLiveSections = () => {
           )}
         </CardContent>
       </Card>
+
+
+
+      {/* Approving a request is the same decision as deleting a دورة directly,
+          so it asks the same question and offers no default answer. */}
+      <Dialog open={!!deciding} onOpenChange={(v) => { if (!busy && !v) { setDeciding(null); setRefundChoice(null); setNote(''); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">حذف «{deciding?.section_title}»</DialogTitle>
+            <DialogDescription className="text-right">
+              طلب الأستاذ {deciding?.professor_name || ''} حذف هذه الدورة.
+              الحذف نهائي — اختر ما يحدث لنقاط الطلاب:
+            </DialogDescription>
+          </DialogHeader>
+
+          {deciding && (deciding.section_buyers > 0 || deciding.session_buyers > 0) && (
+            <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
+              يتأثر <strong>{deciding.section_buyers + deciding.session_buyers}</strong> طالباً.
+              {deciding.sessions_not_yet_aired > 0 && (
+                <> ومنها <strong>{deciding.sessions_not_yet_aired}</strong> بثاً لم يأتِ موعده بعد.</>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <button type="button" onClick={() => setRefundChoice('refund')}
+              className={`w-full rounded-lg border-2 p-4 text-right transition ${
+                refundChoice === 'refund' ? 'border-green-500 bg-green-50'
+                  : 'border-gray-200 hover:border-green-300 hover:bg-green-50/40'}`}>
+              <div className="flex items-center gap-2 font-semibold text-green-700">
+                <Coins className="h-4 w-4" /> إرجاع النقاط للطلاب
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-gray-600">
+                تُعاد نقاط من اشترى الدورة، ونقاط من اشترى بثاً <strong>لم يأتِ موعده بعد</strong>.
+                البثوث التي جرت فعلاً لا تُسترجع لأن الطالب حضرها.
+                <br />استعملها عند إلغاء دورة قبل اكتمالها.
+              </p>
+            </button>
+
+            <button type="button" onClick={() => setRefundChoice('keep')}
+              className={`w-full rounded-lg border-2 p-4 text-right transition ${
+                refundChoice === 'keep' ? 'border-gray-500 bg-gray-50'
+                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
+              <div className="flex items-center gap-2 font-semibold text-gray-700">
+                <Ban className="h-4 w-4" /> بدون إرجاع النقاط
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-gray-600">
+                تُحذف الدورة ويحتفظ النظام بالنقاط المدفوعة.
+                <br />استعملها عند حذف دورة اكتملت في نهاية السنة — الطلاب حصلوا على محتواها.
+              </p>
+            </button>
+
+            <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
+              placeholder="ملاحظة للأستاذ (اختيارية)"
+              className="w-full rounded-md border border-gray-300 p-2 text-sm" />
+            <p className="text-xs text-gray-500">سيصل إشعار للطلاب وللأستاذ في الحالتين.</p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" disabled={busy}
+              onClick={() => { setDeciding(null); setRefundChoice(null); setNote(''); }}>إلغاء</Button>
+            <Button variant="destructive" disabled={busy || !refundChoice} onClick={decideRequest}>
+              {busy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              {refundChoice === 'refund' ? 'حذف وإرجاع النقاط'
+                : refundChoice === 'keep' ? 'حذف بدون إرجاع'
+                : 'اختر أحد الخيارين'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rejecting leaves the دورة untouched. */}
+      <Dialog open={!!rejectingReq} onOpenChange={(v) => { if (!busy && !v) { setRejectingReq(null); setNote(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>رفض طلب حذف «{rejectingReq?.section_title}»</DialogTitle>
+            <DialogDescription className="text-right">
+              تبقى الدورة كما هي ولا يتغير شيء. سيصل السبب إلى الأستاذ.
+            </DialogDescription>
+          </DialogHeader>
+          <textarea value={note} onChange={e => setNote(e.target.value)} rows={3}
+            placeholder="سبب الرفض (اختياري)"
+            className="w-full rounded-md border border-gray-300 p-2 text-sm" />
+          <DialogFooter className="gap-2">
+            <Button variant="outline" disabled={busy}
+              onClick={() => { setRejectingReq(null); setNote(''); }}>إلغاء</Button>
+            <Button disabled={busy} onClick={rejectRequest}>
+              {busy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />} رفض الطلب
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deleting a دورة: the admin picks what happens to the students' points.
+          There is no pre-selected option — the two outcomes are not
+          interchangeable and the safe-looking one is not always the fair one. */}
+      <Dialog open={!!deleting} onOpenChange={(v) => { if (!busy && !v) { setDeleting(null); setRefundChoice(null); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">حذف «{deleting?.title}» نهائياً</DialogTitle>
+            <DialogDescription className="text-right">
+              سيُحذف كل محتوى الدورة وبثوثها وملفاتها ولا يمكن التراجع.
+              اختر ما يحدث لنقاط الطلاب الذين اشتروها:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setRefundChoice('refund')}
+              className={`w-full rounded-lg border-2 p-4 text-right transition ${
+                refundChoice === 'refund'
+                  ? 'border-green-500 bg-green-50'
+                  : 'border-gray-200 hover:border-green-300 hover:bg-green-50/40'}`}>
+              <div className="flex items-center gap-2 font-semibold text-green-700">
+                <Coins className="h-4 w-4" /> إرجاع النقاط للطلاب
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-gray-600">
+                تُعاد نقاط من اشترى الدورة، ونقاط من اشترى بثاً <strong>لم يأتِ موعده بعد</strong>.
+                البثوث التي جرت فعلاً لا تُسترجع لأن الطالب حضرها.
+                <br />استعملها عند إلغاء دورة قبل اكتمالها.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setRefundChoice('keep')}
+              className={`w-full rounded-lg border-2 p-4 text-right transition ${
+                refundChoice === 'keep'
+                  ? 'border-gray-500 bg-gray-50'
+                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
+              <div className="flex items-center gap-2 font-semibold text-gray-700">
+                <Ban className="h-4 w-4" /> بدون إرجاع النقاط
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-gray-600">
+                تُحذف الدورة ويحتفظ النظام بالنقاط المدفوعة.
+                <br />استعملها عند حذف دورة اكتملت في نهاية السنة — الطلاب حصلوا على محتواها.
+              </p>
+            </button>
+
+            <p className="text-xs text-gray-500">
+              سيصل إشعار للطلاب في الحالتين.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" disabled={busy}
+              onClick={() => { setDeleting(null); setRefundChoice(null); }}>إلغاء</Button>
+            <Button variant="destructive" disabled={busy || !refundChoice} onClick={remove}>
+              {busy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              {refundChoice === 'refund' ? 'حذف وإرجاع النقاط'
+                : refundChoice === 'keep' ? 'حذف بدون إرجاع'
+                : 'اختر أحد الخيارين'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Content preview — decide with the material in front of you */}
       <Dialog open={!!viewing} onOpenChange={(v) => { if (!busy && !v) setViewing(null); }}>

@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, UserPlus, Edit, Upload, User as UserIcon, Loader2, Search, Filter } from 'lucide-react';
+import { Trash2, UserPlus, Edit, Upload, User as UserIcon, Loader2, Search, Filter, Eye, EyeOff } from 'lucide-react';
 import { toast } from '@/lib/toast';
 
 interface LevelOption {
@@ -18,6 +18,10 @@ interface LevelOption {
 
 const UserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [showPwd, setShowPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
+  const [showEditPwd, setShowEditPwd] = useState(false);
+  const [showEditConfirmPwd, setShowEditConfirmPwd] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -323,25 +327,47 @@ const UserManagement = () => {
               </div>
               <div>
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPwd ? "text" : "password"}
+                    className="pr-10"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
                   minLength={6}
-                />
+                    />
+                  <button
+                    type="button"
+                    onClick={() => setShowPwd(!showPwd)}
+                    aria-label={showPwd ? "Hide password" : "Show password"}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPwd ? "text" : "password"}
+                    className="pr-10"
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   required
                   minLength={6}
-                />
+                    />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPwd(!showConfirmPwd)}
+                    aria-label={showConfirmPwd ? "Hide password" : "Show password"}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirmPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <Label htmlFor="role">Role</Label>
@@ -584,23 +610,45 @@ const UserManagement = () => {
               </div>
               <div>
                 <Label htmlFor="edit-password">New Password (leave blank to keep current)</Label>
-                <Input
-                  id="edit-password"
-                  type="password"
+                <div className="relative">
+                  <Input
+                    id="edit-password"
+                    type={showEditPwd ? "text" : "password"}
+                    className="pr-10"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   minLength={6}
-                />
+                    />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPwd(!showEditPwd)}
+                    aria-label={showEditPwd ? "Hide password" : "Show password"}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showEditPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <Label htmlFor="edit-confirmPassword">Confirm New Password</Label>
-                <Input
-                  id="edit-confirmPassword"
-                  type="password"
+                <div className="relative">
+                  <Input
+                    id="edit-confirmPassword"
+                    type={showEditConfirmPwd ? "text" : "password"}
+                    className="pr-10"
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   minLength={6}
-                />
+                    />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditConfirmPwd(!showEditConfirmPwd)}
+                    aria-label={showEditConfirmPwd ? "Hide password" : "Show password"}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showEditConfirmPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <Label htmlFor="edit-role">Role</Label>

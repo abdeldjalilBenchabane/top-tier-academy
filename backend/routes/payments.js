@@ -3,6 +3,7 @@ import pool from '../db.js';
 import { verifyToken as auth } from '../middleware/auth.js';
 import NotificationService from '../services/notificationService.js';
 import crypto from 'crypto';
+import { debugLog } from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -53,19 +54,35 @@ router.post('/create-checkout', auth, async (req, res) => {
       }
     };
 
-    console.log('Creating Chargily checkout with data:', checkoutData);
+    debugLog('Creating Chargily checkout with data:', checkoutData);
 
     // Get Chargily API key from environment variables
-    const chargilyApiKey = process.env.VITE_CHARGILY_API_KEY || process.env.CHARGILY_API_KEY;
+    const chargilyApiKey = process.env.CHARGILY_SECRET_KEY
+      || process.env.VITE_CHARGILY_API_KEY
+      || process.env.CHARGILY_API_KEY;
     
     if (!chargilyApiKey) {
       console.error('Chargily API key not found in environment variables');
       return res.status(500).json({ error: 'Payment gateway configuration error' });
     }
 
-    console.log('Using Chargily API key:', chargilyApiKey.substring(0, 10) + '...');
+    // Live and test keys are not interchangeable: each only works against its
+    // own endpoint. Drive the URL from CHARGILY_MODE so the two can never drift.
+    const chargilyLive = (process.env.CHARGILY_MODE || 'test').toLowerCase() === 'live';
+    const chargilyUrl = chargilyLive
+      ? 'https://pay.chargily.net/api/v2/checkouts'
+      : 'https://pay.chargily.net/test/api/v2/checkouts';
 
-    const response = await fetch('https://pay.chargily.net/test/api/v2/checkouts', {
+    // Guard against a live key pointed at test (or the reverse) — it fails with
+    // an unhelpful 401 otherwise.
+    if (chargilyLive !== chargilyApiKey.startsWith('live_')) {
+      console.error(`Chargily key/mode mismatch: mode=${chargilyLive ? 'live' : 'test'}, key=${chargilyApiKey.slice(0, 5)}...`);
+      return res.status(500).json({ error: 'Payment gateway configuration error' });
+    }
+
+    debugLog(`Chargily ${chargilyLive ? 'LIVE' : 'test'} checkout, key ${chargilyApiKey.substring(0, 10)}...`);
+
+    const response = await fetch(chargilyUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${chargilyApiKey}`,
@@ -111,8 +128,8 @@ router.post('/create-checkout', auth, async (req, res) => {
 // Webhook to handle Chargily payment status updates with signature verification
 router.post('/webhook', async (req, res) => {
   try {
-    console.log('--- WEBHOOK DEBUG ---');
-    console.log('Webhook received:', {
+    debugLog('--- WEBHOOK DEBUG ---');
+    debugLog('Webhook received:', {
       headers: req.headers,
       body: req.body
     });
@@ -146,23 +163,23 @@ router.post('/webhook', async (req, res) => {
     }
     */
     
-    console.log('Signature verification temporarily disabled for testing');
-    console.log('Received signature:', signature);
-    console.log('Computed signature:', computedSignature);
+    debugLog('Signature verification temporarily disabled for testing');
+    debugLog('Received signature:', signature);
+    debugLog('Computed signature:', computedSignature);
 
     // Parse the webhook event
     const event = req.body;
     const { type, data } = event;
 
-    console.log('Webhook event type:', type);
-    console.log('Webhook event data:', data);
+    debugLog('Webhook event type:', type);
+    debugLog('Webhook event data:', data);
 
     // Handle different event types
     if (type === 'checkout.paid') {
       const checkout = data;
       const checkoutId = checkout.id;
       
-      console.log('Processing paid checkout:', checkoutId);
+      debugLog('Processing paid checkout:', checkoutId);
 
       // Find transaction by checkout ID
       const transactionResult = await pool.query(
@@ -184,7 +201,7 @@ router.post('/webhook', async (req, res) => {
           ['completed', transaction.id]
         );
         
-        console.log('Transaction marked as completed:', transaction.id);
+        debugLog('Transaction marked as completed:', transaction.id);
         
         // Manually update user points balance
         try {
@@ -199,7 +216,7 @@ router.post('/webhook', async (req, res) => {
                 updated_at = CURRENT_TIMESTAMP
           `, [transaction.user_id, transaction.points]);
           
-          console.log('User points balance updated:', {
+          debugLog('User points balance updated:', {
             user_id: transaction.user_id,
             points_added: transaction.points
           });
@@ -215,7 +232,7 @@ router.post('/webhook', async (req, res) => {
             transaction.points, 
             transaction.amount
           );
-          console.log('Notification sent for points purchase:', {
+          debugLog('Notification sent for points purchase:', {
             user_id: transaction.user_id,
             points: transaction.points,
             amount: transaction.amount
@@ -225,14 +242,14 @@ router.post('/webhook', async (req, res) => {
           // Don't fail the webhook if notification fails
         }
       } else {
-        console.log('Transaction already completed:', transaction.id);
+        debugLog('Transaction already completed:', transaction.id);
       }
       
     } else if (type === 'checkout.failed') {
       const checkout = data;
       const checkoutId = checkout.id;
       
-      console.log('Processing failed checkout:', checkoutId);
+      debugLog('Processing failed checkout:', checkoutId);
 
       // Find transaction by checkout ID
       const transactionResult = await pool.query(
@@ -248,13 +265,13 @@ router.post('/webhook', async (req, res) => {
           ['failed', transaction.id]
         );
         
-        console.log('Transaction marked as failed:', transaction.id);
+        debugLog('Transaction marked as failed:', transaction.id);
       }
     } else {
-      console.log('Unhandled webhook event type:', type);
+      debugLog('Unhandled webhook event type:', type);
     }
 
-    console.log('--- WEBHOOK DEBUG END (success) ---');
+    debugLog('--- WEBHOOK DEBUG END (success) ---');
     res.status(200).json({ success: true });
 
   } catch (error) {
@@ -276,7 +293,7 @@ router.get('/debug/transactions', async (req, res) => {
 // Fallback endpoint: Mark transaction as completed if user lands on success_url with a valid token
 router.post('/mark-completed', async (req, res) => {
   const { checkout_id, transaction_id } = req.body;
-  console.log('--- /mark-completed endpoint called ---', req.body);
+  debugLog('--- /mark-completed endpoint called ---', req.body);
   if (!checkout_id && !transaction_id) return res.status(400).json({ error: 'Missing checkout_id or transaction_id' });
 
   try {
@@ -287,7 +304,7 @@ router.post('/mark-completed', async (req, res) => {
         ['completed', checkout_id]
       );
       if (result.rows.length > 0) {
-        console.log({
+        debugLog({
           message: 'Transaction marked as completed via success_url fallback (by checkout_id)',
           transaction_id: result.rows[0].id
         });
@@ -300,14 +317,14 @@ router.post('/mark-completed', async (req, res) => {
         ['completed', transaction_id]
       );
       if (result.rows.length > 0) {
-        console.log({
+        debugLog({
           message: 'Transaction marked as completed via success_url fallback (by transaction_id)',
           transaction_id: result.rows[0].id
         });
       }
     }
     if (!result || result.rows.length === 0) {
-      console.log('No transaction found or already completed for:', { checkout_id, transaction_id });
+      debugLog('No transaction found or already completed for:', { checkout_id, transaction_id });
       return res.status(404).json({ error: 'Transaction not found or already completed', checkout_id, transaction_id });
     }
     res.json({ success: true, transaction: result.rows[0] });

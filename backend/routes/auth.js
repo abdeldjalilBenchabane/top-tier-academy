@@ -2,20 +2,41 @@ import express from 'express';
 import { query, getRow } from '../db.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { verifyToken } from '../middleware/auth.js';
+import { verifyToken, forgetUserSessions } from '../middleware/auth.js';
 import AgoraToken from 'agora-access-token';
 import crypto from 'crypto';
 import { sendPasswordResetEmail, sendSchoolHousePasswordResetEmail } from '../services/emailService.js';
+import { debugLog } from '../utils/logger.js';
 
 const router = express.Router();
+
+// How long a login lasts. Three months: long enough that a student or a
+// professor is not asked to sign in again mid-term, short enough that a token
+// picked up from a shared computer or a lost phone stops working.
+// Override with AUTH_LIFETIME_DAYS in backend/.env.
+const AUTH_LIFETIME_DAYS = Number(process.env.AUTH_LIFETIME_DAYS) || 90;
+const AUTH_LIFETIME = `${AUTH_LIFETIME_DAYS}d`;
 
 // Helper function to generate unique session token
 const generateSessionToken = () => {
   return crypto.randomBytes(32).toString('hex');
 };
 
-// Helper function to create a new session and invalidate old ones
-const createUserSession = async (userId, req) => {
+// How many devices one account may be signed in on at once.
+//
+// This used to be 1 for everyone: every login switched off every other session
+// of that account, and the client polls /validate-session every 30 seconds, so
+// the other device was thrown out within half a minute. For a professor with a
+// laptop in class and a phone in hand — or two people sharing a staff account —
+// that reads as "we get logged out at random".
+//
+// Students stay at 1 on purpose. Their account is what they paid with, and
+// letting one login run on unlimited devices is how a single purchase becomes
+// a shared one.
+const MAX_CONCURRENT_SESSIONS = { admin: 5, professor: 5, student: 1 };
+
+// Helper function to create a new session, retiring older ones past the limit
+const createUserSession = async (userId, req, role) => {
   try {
     // Generate session token
     const sessionToken = generateSessionToken();
@@ -24,21 +45,44 @@ const createUserSession = async (userId, req) => {
     const userAgent = req.headers['user-agent'] || 'Unknown';
     const ipAddress = req.ip || req.connection.remoteAddress || 'Unknown';
     
-    // Session expires in 7 days (same as JWT)
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    // Same lifetime as the JWT — if these two disagree, the shorter one wins
+    // and the longer one is decoration.
+    const expiresAt = new Date(Date.now() + AUTH_LIFETIME_DAYS * 24 * 60 * 60 * 1000);
     
-    // Invalidate all previous sessions for this user
-    await query(
-      'UPDATE user_sessions SET is_active = false WHERE user_id = $1 AND is_active = true',
-      [userId]
-    );
+    const limit = MAX_CONCURRENT_SESSIONS[role] ?? 1;
+
+    if (limit <= 1) {
+      // One device only: retire every other session.
+      await query(
+        'UPDATE user_sessions SET is_active = false WHERE user_id = $1 AND is_active = true',
+        [userId]
+      );
+    } else {
+      // Keep the (limit - 1) most recently used sessions alive next to the one
+      // about to be created, so the total never exceeds the limit and the
+      // session that gets dropped is always the stalest.
+      await query(
+        `UPDATE user_sessions SET is_active = false
+          WHERE user_id = $1 AND is_active = true
+            AND id NOT IN (
+              SELECT id FROM user_sessions
+               WHERE user_id = $1 AND is_active = true
+               ORDER BY last_activity DESC NULLS LAST, created_at DESC
+               LIMIT $2)`,
+        [userId, limit - 1]
+      );
+    }
     
     // Create new session
     await query(
       'INSERT INTO user_sessions (user_id, session_token, device_info, ip_address, user_agent, expires_at) VALUES ($1, $2, $3, $4, $5, $6)',
       [userId, sessionToken, userAgent, ipAddress, userAgent, expiresAt]
     );
-    
+
+    // Drop this user's cached session verdicts so the device that just lost
+    // its session is refused on its very next request, not up to 30s later.
+    forgetUserSessions(userId);
+
     return sessionToken;
   } catch (error) {
     console.error('Error creating user session:', error);
@@ -47,16 +91,19 @@ const createUserSession = async (userId, req) => {
 };
 
 // Helper function to generate JWT token
-const generateToken = (user) => {
+const generateToken = (user, sessionToken) => {
   return jwt.sign(
     {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role
+      role: user.role,
+      // The session this token belongs to. verifyToken refuses the token once
+      // that session is retired — that is what makes "one device" real.
+      sid: sessionToken
     },
     process.env.JWT_SECRET || '***REMOVED***',
-    { expiresIn: '7d' }
+    { expiresIn: AUTH_LIFETIME }
   );
 };
 
@@ -106,11 +153,9 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Generate JWT token
-    const token = generateToken(user);
-
-    // Create new session and invalidate previous ones
-    const sessionToken = await createUserSession(user.id, req);
+    // The session has to exist before the token can name it.
+    const sessionToken = await createUserSession(user.id, req, user.role);
+    const token = generateToken(user, sessionToken);
 
     // Remove password from response
     const { password_hash, ...userWithoutPassword } = user;
@@ -137,48 +182,48 @@ router.post('/login', async (req, res) => {
 
 // Register endpoint
 router.post('/register', async (req, res) => {
-  console.log('--- /register endpoint hit ---');
+  debugLog('--- /register endpoint hit ---');
   try {
-    console.log('Received registration request:', req.body);
+    debugLog('Received registration request:', req.body);
     const { name, email, password, role = 'student', phoneNumber, nationalId } = req.body;
 
     // Validate required fields
     if (!name || !email || !password) {
-      console.log('Validation failed: missing fields');
+      debugLog('Validation failed: missing fields');
       return res.status(400).json({ error: 'Name, email, and password are required' });
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      console.log('Validation failed: invalid email format');
+      debugLog('Validation failed: invalid email format');
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
     // Validate password length
     if (password.length < 8) {
-      console.log('Validation failed: password too short');
+      debugLog('Validation failed: password too short');
       return res.status(400).json({ error: 'Password must be at least 8 characters long' });
     }
 
     // Check if user already exists
     const existingUser = await getRow('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser) {
-      console.log('Validation failed: user already exists');
+      debugLog('Validation failed: user already exists');
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
     // Hash password
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
-    console.log('Password hashed successfully');
+    debugLog('Password hashed successfully');
 
     // Insert new user
     const result = await query(
       'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role, avatar_url, created_at',
       [name, email, passwordHash, role]
     );
-    console.log('User inserted into database:', result.rows[0]);
+    debugLog('User inserted into database:', result.rows[0]);
 
     const newUser = result.rows[0];
     // Ensure id is a string
@@ -189,10 +234,10 @@ router.post('/register', async (req, res) => {
 
     // Generate JWT token
     const token = generateToken(newUser);
-    console.log('JWT token generated');
+    debugLog('JWT token generated');
 
     // Create new session
-    const sessionToken = await createUserSession(newUser.id, req);
+    const sessionToken = await createUserSession(newUser.id, req, newUser.role);
 
     res.status(201).json({
       message: 'Registration successful',
@@ -245,6 +290,7 @@ router.post('/logout', verifyToken, async (req, res) => {
         'UPDATE user_sessions SET is_active = false WHERE session_token = $1',
         [sessionToken]
       );
+    forgetUserSessions(req.user.id);
     }
     
     res.json({ message: 'Logged out successfully' });
@@ -321,10 +367,15 @@ router.post('/refresh-token', verifyToken, async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        // Carry the session across the refresh, or refreshing would hand back
+        // a token that outlives the logout that retired it.
+        sid: req.user.sid
       },
       process.env.JWT_SECRET || '***REMOVED***',
-      { expiresIn: '30d' } // Extended expiration for streaming sessions
+      // Was 30 days, which would have capped the session at a month however
+      // long the login token said it had.
+      { expiresIn: AUTH_LIFETIME }
     );
 
     // Generate new Agora tokens

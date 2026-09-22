@@ -8,8 +8,20 @@ import Footer from "../components/TTHFooter";
 import FanCard from '../components/TTHFanCard';
 import Avis from "../components/TTHAvis";
 import { paymentsAPI } from '../services/api';
+import usePageMeta from '@/hooks/usePageMeta';
 
 const Home = () => {
+
+  usePageMeta({
+
+    title: 'Top Tier Academy - منصة تعليمية | دروس خصوصية أونلاين | تعلم من المنزل',
+
+    description: 'منصة تعليمية شاملة تقدم دروس خصوصية أونلاين في الرياضيات واللغات لجميع المراحل: ابتدائي، متوسط، ثانوي. تعلم من المنزل مع أفضل الأساتذة الخصوصيين.',
+
+    path: '/',
+
+  });
+
     const [searchParams] = useSearchParams();
 
     useEffect(() => {

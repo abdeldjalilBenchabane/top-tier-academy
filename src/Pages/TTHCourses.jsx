@@ -6,8 +6,20 @@ import CourseCard from "../components/ui/TTHCourseCard";
 import { pointsAPI } from '@/services/api';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import usePageMeta from '@/hooks/usePageMeta';
 
 export default function Courses() {
+
+  usePageMeta({
+
+    title: 'الدورات التعليمية',
+
+    description: 'تصفح دورات Top Tier Academy في الرياضيات والفيزياء والعلوم لكل المراحل: ابتدائي ومتوسط وثانوي. دروس مسجلة مع أساتذة معتمدين، تتابعها متى شئت.',
+
+    path: '/TTHCourses',
+
+  });
+
   const [coursesByPath, setCoursesByPath] = useState({});
   const [allCourses, setAllCourses] = useState([]);
   const [availableLevels, setAvailableLevels] = useState([]);

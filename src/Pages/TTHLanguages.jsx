@@ -7,8 +7,20 @@ import LiveSectionCard from "../components/ui/TTHLiveSectionCard";
 import LanguageFilter from "../components/ui/TTHLanguageFilter";
 import { languageCourses } from "../data";
 import { pointsAPI } from '@/services/api';
+import usePageMeta from '@/hooks/usePageMeta';
 
 export default function Languages() {
+
+  usePageMeta({
+
+    title: 'دورات اللغات',
+
+    description: 'تعلم الإنجليزية والفرنسية والإسبانية أونلاين مع أساتذة Top Tier Academy. مستويات من المبتدئ إلى المتقدم، ودروس مباشرة ومسجلة.',
+
+    path: '/TTHLanguages',
+
+  });
+
   const [courses, setCourses] = useState([]);
   const [liveSections, setLiveSections] = useState([]);
   const [filteredCourses, setFilteredCourses] = useState([]);

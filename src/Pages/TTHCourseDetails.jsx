@@ -8,6 +8,7 @@ import Footer from "../components/TTHFooter";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
+import { serverDate } from '@/lib/utils';
 
 const levelLabels = {
     "primaire": "ابتدائي",
@@ -1094,7 +1095,7 @@ export default function CourseDetail() {
                                                                     {quiz.maxAttempts && (
                                                                         <span>المحاولات: {quiz.maxAttempts}</span>
                                                                     )}
-                                                                    <span>تم الإنشاء: {new Date(quiz.createdAt).toLocaleDateString('ar-SA')}</span>
+                                                                    <span>تم الإنشاء: {serverDate(quiz.createdAt).toLocaleDateString('ar-SA')}</span>
                                                                 </div>
                                                                                           <Button 
                             className="bg-gradient-to-r from-[#194cbf] to-[#61a1ff] hover:from-[#1340a0] hover:to-[#4a8de8] text-white"
@@ -1219,7 +1220,7 @@ export default function CourseDetail() {
                                                                             ({reply.user_role === 'professor' ? 'المدرس' : 'الطالب'})
                                                                         </span>
                                                                         <span className="text-xs text-gray-400">
-                                                                            {new Date(reply.created_at).toLocaleString()}
+                                                                            {serverDate(reply.created_at).toLocaleString()}
                                                                         </span>
                                                                     </div>
                                                                     <p className={`text-sm ${

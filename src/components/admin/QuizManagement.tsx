@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { PendingQuiz, User } from '@/types';
 import { toast } from '@/lib/toast';
 import { usePendingQuizzesCount } from '@/contexts/PendingQuizzesCountContext';
+import { serverDate } from '@/lib/utils';
 
 
 const QuizManagement = () => {
@@ -183,7 +184,7 @@ const QuizManagement = () => {
                   <TableCell>{quiz.questions?.length || 0}</TableCell>
                   <TableCell>{quiz.timeLimit ? `${quiz.timeLimit} min` : 'No limit'}</TableCell>
                   <TableCell>{getStatusBadge(quiz.status)}</TableCell>
-                  <TableCell>{new Date(quiz.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell>{serverDate(quiz.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Dialog>
@@ -208,7 +209,7 @@ const QuizManagement = () => {
                               <div className="grid grid-cols-1 gap-2 text-sm">
                                 <div><strong>Course:</strong> {quiz.courseTitle || 'Unknown Course'}</div>
                                 <div><strong>Professor:</strong> {quiz.professorName || getProfessorName(quiz.createdBy)}</div>
-                                <div><strong>Created:</strong> {new Date(quiz.createdAt).toLocaleDateString('en-US', { 
+                                <div><strong>Created:</strong> {serverDate(quiz.createdAt).toLocaleDateString('en-US', { 
                                   year: 'numeric', 
                                   month: 'long', 
                                   day: 'numeric',

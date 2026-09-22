@@ -31,7 +31,8 @@ const PointsPurchase: React.FC = () => {
   const [chosenFeature, setChosenFeature] = useState<Record<string, string>>({});
   const [codeQuantity, setCodeQuantity] = useState<number>(1);
   const [pointsBalance, setPointsBalance] = useState<number>(user?.pointsBalance || 0);
-  const cardsEnabled = false; // Cards are permanently disabled
+  // Card payment via Chargily, now running in live mode.
+  const cardsEnabled = true;
 
   useEffect(() => {
     fetchPackages();

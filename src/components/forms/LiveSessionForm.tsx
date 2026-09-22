@@ -16,6 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/lib/toast';
 import { FaGraduationCap, FaBook, FaLayerGroup, FaVideo, FaClock, FaMoneyBill } from 'react-icons/fa';
 
+import { parseSessionDate } from '@/lib/utils';
 interface LiveSessionFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -87,7 +88,12 @@ const LiveSessionForm = ({ onSuccess, onCancel, editingSession, asAdmin, initial
     setPrice(Number(editingSession.price) || 0);
     setTelegramChannel(editingSession.telegram_channel || '');
     const start = editingSession.start_time || editingSession.startTime;
-    if (start) setScheduledAt(formatDateTimeForInput(new Date(start)));
+    // Wall clock, not UTC: the stored digits are the time the professor
+    // picked, and `new Date` would add the viewer's offset to them.
+    if (start) {
+      const parsed = parseSessionDate(start);
+      if (parsed) setScheduledAt(formatDateTimeForInput(parsed));
+    }
     if (editingSession.cover_image_url) setImagePreview(editingSession.cover_image_url);
 
     // Pre-select the whole educational path. Ask by session id rather than
@@ -437,11 +443,12 @@ const LiveSessionForm = ({ onSuccess, onCancel, editingSession, asAdmin, initial
       const formData = new FormData();
       formData.append('title', title);
       formData.append('description', description);
-      // Send the datetime as-is to preserve local time
-      // Convert local time to UTC before sending
-      const localDate = new Date(scheduledAt);
-      const utcTime = localDate.toISOString();
-      formData.append('start_time', utcTime);
+      // Send exactly what the field holds: 'YYYY-MM-DDTHH:mm', the wall clock
+      // the professor chose. The column is `timestamp without time zone` and
+      // stores these digits verbatim. Converting to UTC first only worked
+      // before because the value had already been shifted an hour on the way
+      // in — two errors cancelling, and the field displaying the wrong time.
+      formData.append('start_time', scheduledAt);
       formData.append('duration', duration.toString());
       formData.append('price', price.toString());
       // Only send the path when one is actually chosen. When editing, leaving

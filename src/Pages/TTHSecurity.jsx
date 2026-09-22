@@ -1,6 +1,7 @@
 import React from 'react';
 import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
+import usePageMeta from '@/hooks/usePageMeta';
 
 const Section = ({ title, children }) => (
     <section className="mb-8">
@@ -10,6 +11,17 @@ const Section = ({ title, children }) => (
 );
 
 const TTHSecurity = () => {
+
+  usePageMeta({
+
+    title: 'الأمان وحماية البيانات',
+
+    description: 'إجراءات Top Tier Academy لحماية حساب الطالب وبياناته ومدفوعاته على المنصة.',
+
+    path: '/security',
+
+  });
+
     return (
         <div className="min-h-screen relative overflow-hidden bg-[#f8fafc]" dir="rtl">
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-200/30 blur-[120px]"></div>

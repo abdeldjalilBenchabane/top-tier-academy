@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Loader2, Coins, TrendingUp, CheckCircle, XCircle, DollarSign, Download } from 'lucide-react';
 import { toast } from '@/lib/toast';
+import { serverDate } from '@/lib/utils';
 
 interface PointCode {
   id: number;
@@ -178,7 +179,7 @@ const AdminPointCodes: React.FC = () => {
         code.code,
         code.points,
         code.package_name || '',
-        new Date(code.created_at).toLocaleString()
+        serverDate(code.created_at).toLocaleString()
       ])
     ].map(row => 
       row.map(cell => {
@@ -219,7 +220,7 @@ const AdminPointCodes: React.FC = () => {
       code: code.code,
       points: code.points,
       package: code.package_name || '',
-      generatedAt: new Date(code.created_at).toISOString(),
+      generatedAt: serverDate(code.created_at).toISOString(),
       status: 'unused'
     }));
     
@@ -428,7 +429,7 @@ const AdminPointCodes: React.FC = () => {
                         : '-'}
                     </TableCell>
                     <TableCell>{code.used_at ? new Date(code.used_at).toLocaleString() : '-'}</TableCell>
-                    <TableCell>{new Date(code.created_at).toLocaleString()}</TableCell>
+                    <TableCell>{serverDate(code.created_at).toLocaleString()}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

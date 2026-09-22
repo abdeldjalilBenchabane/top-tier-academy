@@ -3,6 +3,7 @@ import pool from '../db.js';
 import { verifyToken, requireRole } from '../middleware/auth.js';
 import NotificationService from '../services/notificationService.js';
 import { sendQuizCreatedEmailToAdmin, sendQuizApprovedEmailToProfessor, sendQuizApprovedEmailToStudent } from '../services/emailService.js';
+import { debugLog } from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -287,14 +288,14 @@ router.patch('/admin/quizzes/:id/reject', verifyToken, requireRole(['admin']), a
 router.get('/courses/:id/quizzes', verifyToken, async (req, res) => {
   try {
     const courseId = req.params.id;
-    console.log('Fetching quizzes for course ID:', courseId);
+    debugLog('Fetching quizzes for course ID:', courseId);
     
     const result = await pool.query(
       `SELECT * FROM quizzes WHERE course_id = $1 AND status = 'approved'`,
       [courseId]
     );
     
-    console.log(`Found ${result.rows.length} approved quizzes for course ${courseId}:`, result.rows.map(q => ({ id: q.id, title: q.title, status: q.status })));
+    debugLog(`Found ${result.rows.length} approved quizzes for course ${courseId}:`, result.rows.map(q => ({ id: q.id, title: q.title, status: q.status })));
     
     // Fetch questions for each quiz (without answers for students)
     const quizzesWithQuestions = await Promise.all(
@@ -345,11 +346,11 @@ router.get('/courses/:id/quizzes', verifyToken, async (req, res) => {
 // Student: start a quiz attempt
 router.post('/attempts/start', verifyToken, requireRole(['student']), async (req, res) => {
   try {
-    console.log('Starting quiz attempt with body:', req.body);
+    debugLog('Starting quiz attempt with body:', req.body);
     const { quizId } = req.body;
     const studentId = parseInt(req.user.id);
     
-    console.log('Quiz ID:', quizId, 'Student ID:', studentId);
+    debugLog('Quiz ID:', quizId, 'Student ID:', studentId);
     
     if (!quizId) {
       return res.status(400).json({ error: 'Quiz ID is required' });
@@ -399,7 +400,7 @@ router.post('/attempts/start', verifyToken, requireRole(['student']), async (req
       );
       
       attemptId = existingId;
-      console.log('Updated existing quiz attempt with ID:', attemptId);
+      debugLog('Updated existing quiz attempt with ID:', attemptId);
     } else {
       // Create new attempt
       const attemptResult = await pool.query(
@@ -407,7 +408,7 @@ router.post('/attempts/start', verifyToken, requireRole(['student']), async (req
         [quizId, studentId]
       );
       attemptId = attemptResult.rows[0].id;
-      console.log('Created new quiz attempt with ID:', attemptId);
+      debugLog('Created new quiz attempt with ID:', attemptId);
     }
     
     res.json({ attemptId: attemptId });
@@ -463,19 +464,19 @@ router.post('/attempts/:attemptId/submit', verifyToken, requireRole(['student'])
         
         if (correctAnswerResult.rows.length > 0) {
           const correctAnswer = correctAnswerResult.rows[0].answer_text;
-          console.log(`Question ${answer.questionId}: Student answered "${answer.answer}", Correct answer is "${correctAnswer}", Match: ${answer.answer === correctAnswer}`);
+          debugLog(`Question ${answer.questionId}: Student answered "${answer.answer}", Correct answer is "${correctAnswer}", Match: ${answer.answer === correctAnswer}`);
           
           // Handle type conversion for true/false questions
           if (question.question_type === 'true-false') {
             const studentAnswerBool = answer.answer === 'true';
             const correctAnswerBool = correctAnswer === 'True';
             isCorrect = studentAnswerBool === correctAnswerBool;
-            console.log(`True/False conversion: Student=${studentAnswerBool}, Correct=${correctAnswerBool}, Match=${isCorrect}`);
+            debugLog(`True/False conversion: Student=${studentAnswerBool}, Correct=${correctAnswerBool}, Match=${isCorrect}`);
           } else {
             isCorrect = answer.answer === correctAnswer;
           }
         } else {
-          console.log(`Question ${answer.questionId}: No correct answer found in database`);
+          debugLog(`Question ${answer.questionId}: No correct answer found in database`);
         }
       } else {
         // For short-answer, we'll need manual grading
@@ -630,7 +631,7 @@ router.get('/professor/results', verifyToken, requireRole(['professor']), async 
       })
     );
     
-    console.log('Professor results being sent:', quizzesWithResults.map(q => ({
+    debugLog('Professor results being sent:', quizzesWithResults.map(q => ({
       id: q.id,
       title: q.title,
       totalAttempts: q.total_attempts,
@@ -673,7 +674,7 @@ router.get('/my-quizzes', verifyToken, requireRole(['professor']), async (req, r
           `SELECT qq.* FROM quiz_questions qq WHERE qq.quiz_id = $1 ORDER BY qq."order"`,
           [quiz.id]
         );
-        console.log(`Quiz ${quiz.id} - Found ${questionsResult.rows.length} questions:`, questionsResult.rows.map(q => ({ id: q.id, question: q.question_text, type: q.question_type })));
+        debugLog(`Quiz ${quiz.id} - Found ${questionsResult.rows.length} questions:`, questionsResult.rows.map(q => ({ id: q.id, question: q.question_text, type: q.question_type })));
 
         const questions = await Promise.all(questionsResult.rows.map(async (q) => {
           let options = undefined;
@@ -757,7 +758,7 @@ router.put('/:id', verifyToken, requireRole(['professor']), async (req, res) => 
     }
     
     // Update quiz basic info
-    console.log('Update quiz parameters:', { title, description, course_id, timeLimit, passingScore, maxAttempts, id });
+    debugLog('Update quiz parameters:', { title, description, course_id, timeLimit, passingScore, maxAttempts, id });
     
     // Handle null/undefined values
     const updateParams = [
@@ -770,7 +771,7 @@ router.put('/:id', verifyToken, requireRole(['professor']), async (req, res) => 
       id
     ];
     
-    console.log('Processed parameters:', updateParams);
+    debugLog('Processed parameters:', updateParams);
     
     // Use a fresh query to avoid parameter count issues
     const updateQuery = `
@@ -784,12 +785,12 @@ router.put('/:id', verifyToken, requireRole(['professor']), async (req, res) => 
       WHERE id = $7
     `;
     
-    console.log('Update query:', updateQuery);
-    console.log('Parameters count:', updateParams.length);
+    debugLog('Update query:', updateQuery);
+    debugLog('Parameters count:', updateParams.length);
     
     try {
       await pool.query(updateQuery, updateParams);
-      console.log('✅ Quiz basic info updated successfully');
+      debugLog('✅ Quiz basic info updated successfully');
     } catch (error) {
       console.error('❌ Error updating quiz basic info:', error);
       throw error;
@@ -798,28 +799,28 @@ router.put('/:id', verifyToken, requireRole(['professor']), async (req, res) => 
     // Delete existing questions and answers
     try {
       await pool.query('DELETE FROM quiz_questions WHERE quiz_id = $1', [id]);
-      console.log('✅ Existing questions deleted successfully');
+      debugLog('✅ Existing questions deleted successfully');
     } catch (error) {
       console.error('❌ Error deleting existing questions:', error);
       throw error;
     }
     
     // Insert new questions and answers
-    console.log('Inserting questions:', questions.length);
+    debugLog('Inserting questions:', questions.length);
     for (const question of questions) {
-      console.log('Inserting question:', question);
+      debugLog('Inserting question:', question);
       try {
         const questionResult = await pool.query(
           `INSERT INTO quiz_questions (quiz_id, question_text, question_type, points, explanation, "order") 
            VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
           [id, question.question, question.type, question.points, question.explanation || '', 1]
         );
-        console.log('✅ Question inserted successfully, ID:', questionResult.rows[0].id);
+        debugLog('✅ Question inserted successfully, ID:', questionResult.rows[0].id);
         
         const questionId = questionResult.rows[0].id;
         
         if (question.type === 'multiple-choice' && question.options) {
-          console.log('Inserting multiple-choice answers for question:', questionId);
+          debugLog('Inserting multiple-choice answers for question:', questionId);
           for (let i = 0; i < question.options.length; i++) {
             const isCorrect = question.correctAnswer === i;
             try {
@@ -828,14 +829,14 @@ router.put('/:id', verifyToken, requireRole(['professor']), async (req, res) => 
                  VALUES ($1, $2, $3, $4)`,
                 [questionId, question.options[i], isCorrect, i + 1]
               );
-              console.log(`✅ Answer ${i + 1} inserted:`, question.options[i], 'Correct:', isCorrect);
+              debugLog(`✅ Answer ${i + 1} inserted:`, question.options[i], 'Correct:', isCorrect);
             } catch (error) {
               console.error(`❌ Error inserting answer ${i + 1}:`, error);
               throw error;
             }
           }
         } else if (question.type === 'true-false') {
-          console.log('Inserting true-false answers for question:', questionId);
+          debugLog('Inserting true-false answers for question:', questionId);
           try {
             // Insert True answer
             await pool.query(
@@ -851,20 +852,20 @@ router.put('/:id', verifyToken, requireRole(['professor']), async (req, res) => 
               [questionId, 'False', question.correctAnswer === false, 2]
             );
             
-            console.log('✅ True-false answers inserted successfully');
+            debugLog('✅ True-false answers inserted successfully');
           } catch (error) {
             console.error('❌ Error inserting true-false answers:', error);
             throw error;
           }
         } else if (question.type === 'short-answer') {
-          console.log('Inserting short-answer for question:', questionId);
+          debugLog('Inserting short-answer for question:', questionId);
           try {
             await pool.query(
               `INSERT INTO quiz_answers (question_id, answer_text, is_correct, "order") 
                VALUES ($1, $2, $3, $4)`,
               [questionId, question.correctAnswer, true, 1]
             );
-            console.log('✅ Short-answer inserted successfully');
+            debugLog('✅ Short-answer inserted successfully');
           } catch (error) {
             console.error('❌ Error inserting short-answer:', error);
             throw error;

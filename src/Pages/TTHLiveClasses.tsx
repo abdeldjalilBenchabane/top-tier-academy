@@ -5,8 +5,20 @@ import TTHLiveClassesSearchFilter from "../components/ui/TTHLiveClassesSearchFil
 import TTHLiveCard from "../components/ui/TTHLiveCard";
 import { Video } from "lucide-react";
 import { useLiveClasses } from "../hooks/TTHUseLiveClasses";
+import usePageMeta from '@/hooks/usePageMeta';
 
 const TTHLiveClasses = () => {
+
+  usePageMeta({
+
+    title: 'البثوث المباشرة',
+
+    description: 'احضر دروساً مباشرة مع أساتذة Top Tier Academy، اسأل أثناء الحصة واحصل على الإجابة فوراً. جدول البثوث القادمة والتسجيل فيها.',
+
+    path: '/TTHLiveClasses',
+
+  });
+
   const {
     selectedLevel,
     selectedYear,

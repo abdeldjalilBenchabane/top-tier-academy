@@ -8,6 +8,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { debugLog } from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -18,7 +19,7 @@ const __dirname = path.dirname(__filename);
 // Configure multer for file uploads with R2 storage
 const upload = createR2Multer('slides', null, {
   fileFilter: (req, file, cb) => {
-    console.log('File upload attempt:', {
+    debugLog('File upload attempt:', {
       originalname: file.originalname,
       mimetype: file.mimetype,
       size: file.size
@@ -35,7 +36,7 @@ const upload = createR2Multer('slides', null, {
     if (isVideo || isImage) {
       return cb(null, true);
     } else {
-      console.log('File rejected:', file.originalname, file.mimetype);
+      debugLog('File rejected:', file.originalname, file.mimetype);
       cb(new Error('Only image and video files are allowed!'));
     }
   }
@@ -143,18 +144,18 @@ router.post('/', verifyToken, requireRole(['admin']), (req, res, next) => {
     // Handle R2 upload manually after file is buffered
     if (req.file && req.file.buffer) {
       try {
-        console.log('📤 Processing R2 upload for slide media...');
+        debugLog('📤 Processing R2 upload for slide media...');
         
         // Import R2 functions
         const { uploadToR2, generateR2Key } = await import('../services/r2Service.js');
         
         // Generate R2 key
         const r2Key = generateR2Key('slides', null, req.file.originalname, 'media');
-        console.log('🔑 Generated R2 key:', r2Key);
+        debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
         const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
-        console.log('✅ Slide media uploaded to R2:', publicUrl);
+        debugLog('✅ Slide media uploaded to R2:', publicUrl);
         
         // Update file object with R2 URL
         req.file.path = publicUrl;
@@ -172,8 +173,8 @@ router.post('/', verifyToken, requireRole(['admin']), (req, res, next) => {
   });
 }, async (req, res) => {
   try {
-    console.log('Received slide data:', req.body); // Debug log
-    console.log('Received file:', req.file); // Debug log
+    debugLog('Received slide data:', req.body); // Debug log
+    debugLog('Received file:', req.file); // Debug log
     
     const {
       title,
@@ -270,18 +271,18 @@ router.put('/:id', verifyToken, requireRole(['admin']), (req, res, next) => {
     // Handle R2 upload manually after file is buffered
     if (req.file && req.file.buffer) {
       try {
-        console.log('📤 Processing R2 upload for slide media update...');
+        debugLog('📤 Processing R2 upload for slide media update...');
         
         // Import R2 functions
         const { uploadToR2, generateR2Key, deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
         
         // Generate R2 key
         const r2Key = generateR2Key('slides', null, req.file.originalname, 'media');
-        console.log('🔑 Generated R2 key:', r2Key);
+        debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
         const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
-        console.log('✅ Slide media uploaded to R2:', publicUrl);
+        debugLog('✅ Slide media uploaded to R2:', publicUrl);
         
         // Update file object with R2 URL
         req.file.path = publicUrl;
@@ -333,11 +334,11 @@ router.put('/:id', verifyToken, requireRole(['admin']), (req, res, next) => {
       const oldFilePath = existingSlide.image_url || existingSlide.video_url;
       if (oldFilePath) {
         try {
-          console.log('🗑️ Deleting old slide media from R2:', oldFilePath);
+          debugLog('🗑️ Deleting old slide media from R2:', oldFilePath);
           const oldKey = extractKeyFromUrl(oldFilePath);
           if (oldKey && oldKey !== oldFilePath) {
             await deleteFromR2(oldKey);
-            console.log('✅ Old slide media deleted from R2:', oldKey);
+            debugLog('✅ Old slide media deleted from R2:', oldKey);
           }
         } catch (fileError) {
           console.error('⚠️ Error deleting old slide media from R2:', fileError);
@@ -436,12 +437,12 @@ router.delete('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
       const filePath = slide.image_url || slide.video_url;
       
       try {
-        console.log('🗑️ Deleting slide media from R2:', filePath);
+        debugLog('🗑️ Deleting slide media from R2:', filePath);
         const { deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
         const key = extractKeyFromUrl(filePath);
         if (key && key !== filePath) {
           await deleteFromR2(key);
-          console.log('✅ Slide media deleted from R2:', key);
+          debugLog('✅ Slide media deleted from R2:', key);
         }
       } catch (fileError) {
         console.error('⚠️ Error deleting slide media from R2:', fileError);

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
+import { serverDate } from '@/lib/utils';
 
 const ProfessorComments = () => {
   const [comments, setComments] = useState([]);
@@ -114,7 +115,7 @@ const ProfessorComments = () => {
             <div key={comment.id} className="border rounded-lg p-4 bg-white shadow">
               <div className="mb-2">
                 <span className="font-bold text-blue-700">{comment.student_name || comment.name}</span>
-                <span className="mx-2 text-gray-400 text-xs">{new Date(comment.created_at).toLocaleString()}</span>
+                <span className="mx-2 text-gray-400 text-xs">{serverDate(comment.created_at).toLocaleString()}</span>
                 <span className="ml-2 text-purple-600 text-xs">({comment.tab})</span>
               </div>
               <div className="mb-1 text-sm text-gray-500">الدورة: {comment.course_title}</div>
@@ -147,7 +148,7 @@ const ProfessorComments = () => {
                           ({reply.user_role === 'professor' ? 'المدرس' : 'الطالب'})
                         </span>
                         <span className="text-xs text-gray-400">
-                          {new Date(reply.created_at).toLocaleString()}
+                          {serverDate(reply.created_at).toLocaleString()}
                         </span>
                       </div>
                       <p className={`text-sm ${

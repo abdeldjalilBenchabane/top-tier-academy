@@ -2,6 +2,7 @@ import express from 'express';
 import pool from '../db.js';
 import { verifyToken as auth } from '../middleware/auth.js';
 import NotificationService from '../services/notificationService.js';
+import { debugLog } from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -501,25 +502,25 @@ router.post('/buy-course', auth, async (req, res) => {
 
     // Allow free courses (price = 0) - remove the price validation
     // if (!price || price <= 0) {
-    //   console.log(`[BUY-COURSE] Invalid price for courseId=${courseId}, resolved price=`, price, 'course:', course);
+    //   debugLog(`[BUY-COURSE] Invalid price for courseId=${courseId}, resolved price=`, price, 'course:', course);
     //   return res.status(400).json({ error: 'Invalid course price' });
     // }
 
     // Check if already purchased
     const purchasedRes = await pool.query('SELECT id FROM student_courses WHERE student_id = $1 AND course_id = $2', [userId, courseId]);
     if (purchasedRes.rows.length > 0) {
-      console.log(`[BUY-COURSE] User ${userId} already purchased course ${courseId}`);
+      debugLog(`[BUY-COURSE] User ${userId} already purchased course ${courseId}`);
       return res.status(409).json({ error: 'You have already purchased this course.' });
     }
 
     // Get user points
     const pointsRes = await pool.query('SELECT balance FROM user_points WHERE user_id = $1', [userId]);
     const balance = pointsRes.rows[0]?.balance || 0;
-    console.log(`[BUY-COURSE] User ${userId} balance before purchase:`, balance, 'Course price:', price);
+    debugLog(`[BUY-COURSE] User ${userId} balance before purchase:`, balance, 'Course price:', price);
     
     // Only check balance if course is not free
     if (price > 0 && balance < price) {
-      console.log(`[BUY-COURSE] Not enough points: balance=${balance}, price=${price}`);
+      debugLog(`[BUY-COURSE] Not enough points: balance=${balance}, price=${price}`);
       return res.status(400).json({ error: 'Not enough points' });
     }
 
@@ -616,7 +617,7 @@ router.post('/buy-course', auth, async (req, res) => {
         );
       }
 
-      console.log(`✅ Course purchase notifications and emails sent for course ${courseId}`);
+      debugLog(`✅ Course purchase notifications and emails sent for course ${courseId}`);
     } catch (error) {
       console.error('Error sending course purchase notifications/emails:', error);
       // Don't fail the purchase if notifications fail
@@ -625,7 +626,7 @@ router.post('/buy-course', auth, async (req, res) => {
     // Get new balance
     const newPointsRes = await pool.query('SELECT balance FROM user_points WHERE user_id = $1', [userId]);
     const newBalance = newPointsRes.rows[0]?.balance || 0;
-    console.log(`[BUY-COURSE] User ${userId} balance after purchase:`, newBalance);
+    debugLog(`[BUY-COURSE] User ${userId} balance after purchase:`, newBalance);
     res.json({ success: true, newBalance, message: 'Course purchased successfully' });
   } catch (error) {
     console.error('Error buying course with points:', error);
@@ -926,13 +927,13 @@ router.post('/admin/buy-for-student', auth, requireAdmin, async (req, res) => {
   try {
     const { userId, points, amount, currency, packageName, paymentReference, requestId } = req.body;
     
-    console.log(`=== ADMIN BUY POINTS REQUEST ===`);
-    console.log(`Request ID: ${requestId}`);
-    console.log(`Admin: ${req.user.name} (${req.user.id})`);
-    console.log(`User: ${userId}`);
-    console.log(`Points to add: ${points}`);
-    console.log(`Amount: ${amount}`);
-    console.log(`Package: ${packageName}`);
+    debugLog(`=== ADMIN BUY POINTS REQUEST ===`);
+    debugLog(`Request ID: ${requestId}`);
+    debugLog(`Admin: ${req.user.name} (${req.user.id})`);
+    debugLog(`User: ${userId}`);
+    debugLog(`Points to add: ${points}`);
+    debugLog(`Amount: ${amount}`);
+    debugLog(`Package: ${packageName}`);
     
     if (!userId || !points || !amount) {
       return res.status(400).json({ error: 'userId, points, and amount are required' });
@@ -952,7 +953,7 @@ router.post('/admin/buy-for-student', auth, requireAdmin, async (req, res) => {
        LIMIT 10`,
       [userId]
     );
-    console.log(`Recent transactions for user ${userId}:`, recentTransactionsResult.rows);
+    debugLog(`Recent transactions for user ${userId}:`, recentTransactionsResult.rows);
 
     // Check for recent duplicate transactions (within last 5 seconds)
     const recentTransaction = await pool.query(
@@ -967,7 +968,7 @@ router.post('/admin/buy-for-student', auth, requireAdmin, async (req, res) => {
     );
 
     if (recentTransaction.rows.length > 0) {
-      console.log(`Preventing duplicate transaction for user ${userId} by admin ${req.user.id}`);
+      debugLog(`Preventing duplicate transaction for user ${userId} by admin ${req.user.id}`);
       return res.status(409).json({ error: 'Duplicate transaction detected. Please wait a moment and try again.' });
     }
 
@@ -977,19 +978,19 @@ router.post('/admin/buy-for-student', auth, requireAdmin, async (req, res) => {
       const packageResult = await pool.query('SELECT id FROM point_packages WHERE name = $1', [packageName]);
       if (packageResult.rows.length > 0) {
         packageId = packageResult.rows[0].id;
-        console.log(`Found package ID: ${packageId} for package: ${packageName}`);
+        debugLog(`Found package ID: ${packageId} for package: ${packageName}`);
       }
     }
 
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      console.log(`Transaction started for request ID: ${requestId}`);
+      debugLog(`Transaction started for request ID: ${requestId}`);
       
       // Get current balance INSIDE the transaction to prevent race conditions
       const currentBalanceResult = await client.query('SELECT balance FROM user_points WHERE user_id = $1', [userId]);
       const currentBalance = currentBalanceResult.rows[0]?.balance || 0;
-      console.log(`Current balance inside transaction: ${currentBalance}`);
+      debugLog(`Current balance inside transaction: ${currentBalance}`);
       
       // Create transaction record with completed status
       const transactionResult = await client.query(
@@ -1016,26 +1017,26 @@ router.post('/admin/buy-for-student', auth, requireAdmin, async (req, res) => {
         ]
       );
       
-      console.log(`Transaction record created with ID: ${transactionResult.rows[0].id} for request ID: ${requestId}`);
+      debugLog(`Transaction record created with ID: ${transactionResult.rows[0].id} for request ID: ${requestId}`);
       
       // The database trigger will automatically add points when the transaction is created
       // No need to manually add points here
-      console.log(`Database trigger will automatically add ${points} points to user ${userId}`);
+      debugLog(`Database trigger will automatically add ${points} points to user ${userId}`);
       
       // Get the new balance after the trigger has run
       const newBalanceResult = await client.query('SELECT balance FROM user_points WHERE user_id = $1', [userId]);
       const newBalance = newBalanceResult.rows[0]?.balance || 0;
-      console.log(`Points added for request ID ${requestId}. New balance: ${newBalance} (was: ${currentBalance}, added: ${points})`);
-      console.log(`Balance change verification: ${newBalance} - ${currentBalance} = ${newBalance - currentBalance}`);
-      console.log(`Expected balance: ${currentBalance + points}, Actual balance: ${newBalance}`);
+      debugLog(`Points added for request ID ${requestId}. New balance: ${newBalance} (was: ${currentBalance}, added: ${points})`);
+      debugLog(`Balance change verification: ${newBalance} - ${currentBalance} = ${newBalance - currentBalance}`);
+      debugLog(`Expected balance: ${currentBalance + points}, Actual balance: ${newBalance}`);
       
       await client.query('COMMIT');
-      console.log(`Transaction committed successfully for request ID: ${requestId}`);
+      debugLog(`Transaction committed successfully for request ID: ${requestId}`);
       
       // Send notification to user about points purchase
       try {
         await NotificationService.notifyPointsPurchased(userId, points, amount);
-        console.log('Notification sent for admin points purchase:', {
+        debugLog('Notification sent for admin points purchase:', {
           user_id: userId,
           points: points,
           amount: amount
@@ -1045,8 +1046,8 @@ router.post('/admin/buy-for-student', auth, requireAdmin, async (req, res) => {
         // Don't fail the transaction if notification fails
       }
       
-      console.log(`Admin ${req.user.name} added ${points} points to user ${userId} (package: ${packageName}) - Request ID: ${requestId}`);
-      console.log(`=== ADMIN BUY POINTS COMPLETED for request ID: ${requestId} ===`);
+      debugLog(`Admin ${req.user.name} added ${points} points to user ${userId} (package: ${packageName}) - Request ID: ${requestId}`);
+      debugLog(`=== ADMIN BUY POINTS COMPLETED for request ID: ${requestId} ===`);
       
       res.json({ 
         success: true, 

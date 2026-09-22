@@ -8,8 +8,20 @@ import PrivateClassCard from "../components/ui/TTHPrivateClassCard";
 import PrivateClassModal from "../components/ui/TTHPrivateClassModal";
 import { usePrivateClasses } from "../hooks/TTHUsePrivateClasses";
 import { useNavigate } from 'react-router-dom';
+import usePageMeta from '@/hooks/usePageMeta';
 
 const PrivateClasses = () => {
+
+  usePageMeta({
+
+    title: 'الحصص الخاصة',
+
+    description: 'احجز حصة خاصة فردية مع أستاذ من Top Tier Academy في الوقت الذي يناسبك. شرح مخصص لمستواك واحتياجك، ومتابعة فردية.',
+
+    path: '/TTHPrivateClasses',
+
+  });
+
   const {
     selectedGrade,
     selectedYear,

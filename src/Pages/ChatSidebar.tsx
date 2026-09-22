@@ -1,7 +1,7 @@
 // src/components/ChatSidebar.tsx
 import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, Maximize2 } from 'lucide-react';
 
 interface Message {
     sender: string;
@@ -17,6 +17,9 @@ interface Props {
     chatEnabled: boolean;
     studentsMuted: boolean;
     isProfessor: boolean;
+    // Opens the same conversation in a full-window view. Optional so the
+    // component still works anywhere that has no room to expand into.
+    onExpand?: () => void;
 }
 
 const ChatSidebar: React.FC<Props> = ({
@@ -26,7 +29,8 @@ const ChatSidebar: React.FC<Props> = ({
     handleSend,
     chatEnabled,
     studentsMuted,
-    isProfessor
+    isProfessor,
+    onExpand
 }) => {
     const chatEndRef = useRef<HTMLDivElement>(null);
     const [participants, setParticipants] = useState<any[]>([]);
@@ -63,10 +67,24 @@ const ChatSidebar: React.FC<Props> = ({
                 }
             `}</style>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 h-[400px] lg:h-[600px] flex flex-col">
-                <div className="flex items-center gap-2 mb-4 pb-4 border-b border-white/20">
+                <div
+                    className={`flex items-center gap-2 mb-4 pb-4 border-b border-white/20 ${onExpand ? 'cursor-pointer' : ''}`}
+                    onClick={onExpand}
+                >
                     <MessageSquare className="w-5 h-5" />
                     <h3 className="font-semibold">الدردشة المباشرة</h3>
                     {!chatEnabled && <span className="ml-2 text-xs text-red-400">الدردشة مغلقة من قبل الأستاذ</span>}
+                    {onExpand && (
+                        <button
+                            type="button"
+                            onClick={onExpand}
+                            title="توسيع الدردشة"
+                            aria-label="توسيع الدردشة"
+                            className="ml-auto rounded-lg p-1.5 text-gray-300 transition hover:bg-white/10 hover:text-white"
+                        >
+                            <Maximize2 className="w-4 h-4" />
+                        </button>
+                    )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-3 mb-4 scrollbar-hide">

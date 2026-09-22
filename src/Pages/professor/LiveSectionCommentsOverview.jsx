@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { MessageCircle, Video, Calendar } from 'lucide-react';
+import { serverDate } from '@/lib/utils';
 
 const LiveSectionCommentsOverview = () => {
   const [sections, setSections] = useState([]);
@@ -115,7 +116,7 @@ const LiveSectionCommentsOverview = () => {
                   <div className="flex items-center justify-between text-sm text-gray-500">
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
-                      <span>{new Date(section.created_at).toLocaleDateString('ar-SA')}</span>
+                      <span>{serverDate(section.created_at).toLocaleDateString('ar-SA')}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <MessageCircle className="h-4 w-4" />

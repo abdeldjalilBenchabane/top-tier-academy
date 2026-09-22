@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Clock, DollarSign, Save, Loader2, History, Settings } from 'lucide-react';
 import { toast } from '@/lib/toast';
+import { serverDate } from '@/lib/utils';
 
 interface PrivateClassSettings {
   id: number;
@@ -293,10 +294,10 @@ const AdminPrivateClassSettings: React.FC = () => {
                 {history.map((setting) => (
                   <TableRow key={setting.id}>
                     <TableCell>
-                      {new Date(setting.created_at).toLocaleDateString()}
+                      {serverDate(setting.created_at).toLocaleDateString()}
                       <br />
                       <span className="text-sm text-gray-500">
-                        {new Date(setting.created_at).toLocaleTimeString()}
+                        {serverDate(setting.created_at).toLocaleTimeString()}
                       </span>
                     </TableCell>
                     <TableCell>{setting.price_per_session.toLocaleString()}</TableCell>

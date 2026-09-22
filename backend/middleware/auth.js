@@ -1,21 +1,82 @@
 import jwt from 'jsonwebtoken';
 import { getRow } from '../db.js';
 
+// ---------------------------------------------------------------------------
+// Session enforcement.
+//
+// A signed JWT cannot be taken back; a session row can. So every token issued
+// at login carries `sid`, the session it belongs to, and this middleware
+// refuses tokens whose session has been retired. Without it "one device per
+// student" was a promise the server never kept: logging in elsewhere marked
+// the old session inactive and nothing ever read that flag, so the first
+// device kept working until the token expired months later.
+//
+// The lookup is cached so this does not become a database round trip on every
+// request. A login that retires other sessions drops them from the cache
+// immediately (see forgetUserSessions), so the old device is locked out at
+// once rather than after the TTL.
+// ---------------------------------------------------------------------------
+const SESSION_CACHE_TTL_MS = 30_000;
+const sessionCache = new Map(); // sid -> { userId, active, checkedAt }
+
+export function forgetUserSessions(userId) {
+  for (const [sid, entry] of sessionCache) {
+    if (String(entry.userId) === String(userId)) sessionCache.delete(sid);
+  }
+}
+
+async function sessionIsActive(sid, userId) {
+  const hit = sessionCache.get(sid);
+  if (hit && Date.now() - hit.checkedAt < SESSION_CACHE_TTL_MS) return hit.active;
+
+  const row = await getRow(
+    'SELECT is_active, expires_at FROM user_sessions WHERE session_token = $1',
+    [sid]);
+
+  // A token whose session row is gone stays valid: rows are pruned, and
+  // logging every one of those users out would be a worse failure than the
+  // one this check exists to prevent.
+  const active = !row
+    || (row.is_active === true && new Date(row.expires_at) > new Date());
+
+  sessionCache.set(sid, { userId, active, checkedAt: Date.now() });
+  return active;
+}
+
 // Middleware to verify JWT token
-export const verifyToken = (req, res, next) => {
+export const verifyToken = async (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
-  
+
   if (!token) {
     return res.status(401).json({ error: 'Access denied. No token provided.' });
   }
 
+  let decoded;
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || '***REMOVED***');
-    req.user = decoded;
-    next();
+    decoded = jwt.verify(token, process.env.JWT_SECRET || '***REMOVED***');
   } catch (error) {
-    res.status(400).json({ error: 'Invalid token.' });
+    return res.status(400).json({ error: 'Invalid token.' });
   }
+
+  // Tokens issued before sessions were enforced have no `sid`. They keep
+  // working until they expire, because logging every existing user out to
+  // turn this on would cost more than it buys.
+  if (decoded.sid) {
+    try {
+      if (!await sessionIsActive(decoded.sid, decoded.id)) {
+        return res.status(401).json({
+          error: 'تم تسجيل الدخول من جهاز آخر',
+          sessionInvalid: true,
+        });
+      }
+    } catch (error) {
+      // The database being unreachable must not lock everyone out.
+      console.error('Session check failed, allowing request:', error.message);
+    }
+  }
+
+  req.user = decoded;
+  next();
 };
 
 // Middleware to verify JWT token AND session

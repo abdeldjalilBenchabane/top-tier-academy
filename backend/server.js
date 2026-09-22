@@ -15,6 +15,7 @@ import privateClassRequestsRoutes from './routes/private-class-requests.js';
 import privateClassSettingsRoutes from './routes/private-class-settings.js';
 import liveSectionsRoutes from './routes/live-sections.js';
 import AgoraToken from 'agora-access-token';
+import NotificationService from './services/notificationService.js';
 import hierarchyRoutes from './routes/hierarchy.routes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -28,6 +29,8 @@ import yearResetRoutes from './routes/year-reset.js';
 import purchasesAdminRoutes from './routes/purchases-admin.js';
 import mobileConfigRoutes from './routes/mobile-config.js';
 import professorRoutes from './routes/professor.js';
+import studentPathRoutes from './routes/student-path.js';
+import pushRoutes from './routes/push.js';
 import chatNotificationsRouter from './routes/chat-notifications.js';
 import chatMessagesRouter from './routes/chat-messages.js';
 import sessionReminderScheduler from './session-reminder-scheduler.js';
@@ -41,11 +44,51 @@ const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 const roomUsers = {};
 // Persistent mute state for each room
 const roomMuteState = {}; // { [roomId]: true/false }
+const roomChatState = {}; // { [roomId]: true/false } — chat open/closed, sent to late joiners
+
+// Sessions already announced as ended, so a double click doesn't notify twice.
+const endedAnnounced = new Set();
+
+async function announceStreamEnded(roomId) {
+  const sessionId = Number(roomId);
+  if (!Number.isInteger(sessionId) || sessionId <= 0) return;
+  if (endedAnnounced.has(sessionId)) return;
+  endedAnnounced.add(sessionId);
+  setTimeout(() => endedAnnounced.delete(sessionId), 60 * 60 * 1000);
+
+  const session = await pool.query(
+    "UPDATE live_sessions SET status = 'ended' WHERE id = $1 RETURNING title",
+    [sessionId]);
+  const title = session.rows[0]?.title || 'الحصة المباشرة';
+
+  // Only the students who actually attended.
+  const attendees = await pool.query(
+    'SELECT DISTINCT user_id FROM live_session_participants WHERE session_id = $1',
+    [sessionId]);
+  for (const { user_id } of attendees.rows) {
+    try {
+      await NotificationService.createNotification(
+        user_id, 'live_session_ended', 'انتهى البث المباشر',
+        `انتهت «${title}». شكراً لحضورك!`,
+        JSON.stringify({ session_id: sessionId }), { route: null });
+    } catch { /* one failure must not stop the rest */ }
+  }
+  console.log(`[stream-ended] session ${sessionId} ended, ${attendees.rows.length} attendee(s) notified`);
+}
 
 // app.use('/api', hierarchyRoutes);
 dotenv.config();
 
 const app = express();
+
+// Every request arrives through nginx on this same machine, so without this
+// Express reports req.ip as 127.0.0.1 for everyone. All 371 rows in
+// user_sessions were recorded that way: no way to tell where a login came
+// from, for support or for security. The 1 means trust exactly one proxy hop
+// — nginx — and read the client address from the last entry it appends to
+// X-Forwarded-For. A larger number, or `true`, would let a caller forge the
+// header by sending their own X-Forwarded-For.
+app.set('trust proxy', 1);
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
@@ -53,6 +96,9 @@ const io = new Server(server, {
     methods: ["GET", "POST"]
   }
 });
+// Routes need to reach live rooms (a status change has to reach the students
+// already inside), and this is the one place the server exists.
+app.set('io', io);
 const PORT = process.env.PORT || 5001;
 
 // Get current directory
@@ -107,6 +153,10 @@ app.use('/api/payments', paymentsRoutes);
 app.use('/api/private-class-requests', privateClassRequestsRoutes);
 app.use('/api/private-class-settings', privateClassSettingsRoutes);
 app.use('/api', liveSectionsRoutes);
+// A student's educational path, and the content that matches it (mobile).
+app.use('/api', studentPathRoutes);
+// Device registration and admin announcements (push).
+app.use('/api', pushRoutes);
 app.use('/api', liveSessionRoutes);
 app.use('/api', hierarchyRoutes);
 app.use('/api/structure', hierarchyRoutes); // <-- Add this line to alias structure endpoints
@@ -145,6 +195,19 @@ io.on('connection', (socket) => {
     // Send current mute state to the new user
     const isMuted = roomMuteState[roomId] ?? false; // default to unmuted
     socket.emit('students-muted-state', isMuted);
+    socket.emit('chat-toggled', roomChatState[roomId] ?? true);
+
+    // A student who arrives while the lesson is paused, or while the teacher
+    // is dealing with a technical problem, has to be told on arrival — the
+    // broadcast that announced it went out before they were here. Private
+    // classes use a prefixed room id and have no such status.
+    if (/^\d+$/.test(String(roomId))) {
+      pool.query('SELECT status FROM live_sessions WHERE id = $1', [Number(roomId)])
+        .then((r) => {
+          if (r.rows[0]) socket.emit('session-status', { status: r.rows[0].status });
+        })
+        .catch((e) => console.error('[session-status] lookup failed:', e.message));
+    }
 
     console.log(`User ${userData.name} (${userData.role}) joined room ${roomId}`);
 
@@ -193,7 +256,8 @@ io.on('connection', (socket) => {
       userId: userData.id,
       name: userData.name,
       role: userData.role,
-      avatar_url: userData.avatar_url
+      avatar_url: userData.avatar_url,
+      agoraUid: userData.agoraUid ?? null
     });
 
     // Get all users in this room and send the list to the new user
@@ -207,7 +271,8 @@ io.on('connection', (socket) => {
             userId: userSocket.userData.id,
             name: userSocket.userData.name,
             role: userSocket.userData.role,
-            avatar_url: userSocket.userData.avatar_url
+            avatar_url: userSocket.userData.avatar_url,
+              agoraUid: userSocket.userData.agoraUid ?? null
           };
         }
         return null;
@@ -285,6 +350,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('toggle-chat', (roomId, enabled) => {
+    roomChatState[roomId] = enabled;
     io.to(roomId).emit('chat-toggled', enabled);
   });
 
@@ -331,8 +397,11 @@ io.on('connection', (socket) => {
     
     // Emit specific event to the professor who ended the stream
     socket.emit('stream-ended-professor', { roomId }); // [LIVE STREAM MODIF]
-    
-    // (Optionnel) : la mise à jour du statut du live se fait via l'API REST
+
+    // Mark the session ended and tell the students who attended. Ending is
+    // announced once: pressing the button twice must not notify twice.
+    announceStreamEnded(roomId).catch((e) =>
+      console.error('[stream-ended] failed:', e.message));
   });
 
   socket.on('disconnect', () => {
@@ -358,7 +427,8 @@ io.on('connection', (socket) => {
               userId: userSocket.userData.id,
               name: userSocket.userData.name,
               role: userSocket.userData.role,
-              avatar_url: userSocket.userData.avatar_url
+              avatar_url: userSocket.userData.avatar_url,
+              agoraUid: userSocket.userData.agoraUid ?? null
             };
           }
           return null;
@@ -380,7 +450,15 @@ pool.query('SELECT NOW()', (err, result) => {
   }
 });
 
-server.listen(PORT, '0.0.0.0', () => {
+// Loopback only. nginx runs on this same machine and is the single way in;
+// it terminates TLS, adds the security headers and is the only thing that
+// should ever answer from outside. Binding 0.0.0.0 left the API one firewall
+// rule away from being reachable directly on port 5001 — no TLS, no headers,
+// nothing in front of it. Set HOST=0.0.0.0 in backend/.env only if something
+// genuinely has to reach the API without going through nginx.
+const HOST = process.env.HOST || '127.0.0.1';
+
+server.listen(PORT, HOST, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`DB → ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
   

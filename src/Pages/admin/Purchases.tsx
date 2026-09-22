@@ -10,6 +10,7 @@ import {
 import { Loader2, Search, RotateCcw, AlertTriangle, BookOpen, Video, Languages, Radio, UserRound } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { API_BASE_URL } from '@/lib/api';
+import { serverDate } from '@/lib/utils';
 
 type Kind = 'course' | 'language_course' | 'live' | 'live_session' | 'private_class';
 
@@ -121,7 +122,7 @@ const AdminPurchases = () => {
                     </div>
                     <div className="mt-0.5 truncate text-xs text-gray-500">
                       {p.student_name} · {p.student_email}
-                      {p.purchased_at ? ` · ${new Date(p.purchased_at).toLocaleDateString()}` : ''}
+                      {p.purchased_at ? ` · ${serverDate(p.purchased_at).toLocaleDateString()}` : ''}
                     </div>
                   </div>
                   <Badge className="shrink-0">{p.points} نقطة</Badge>

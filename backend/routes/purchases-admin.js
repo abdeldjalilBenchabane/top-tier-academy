@@ -2,6 +2,7 @@ import express from 'express';
 import { verifyToken } from '../middleware/auth.js';
 import { getRows } from '../db.js';
 import pool from '../db.js';
+import { debugLog } from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -180,7 +181,7 @@ router.post('/cancel', verifyToken, requireAdmin, async (req, res) => {
     const balance = await client.query('SELECT balance FROM user_points WHERE user_id = $1', [studentId]);
     await client.query('COMMIT');
 
-    console.log(`Purchase cancelled by admin ${req.user.id}: ${kind} row ${rowId}, student ${studentId}, refunded ${points}`);
+    debugLog(`Purchase cancelled by admin ${req.user.id}: ${kind} row ${rowId}, student ${studentId}, refunded ${points}`);
     res.json({ success: true, refunded: points, newBalance: parseInt(balance.rows[0]?.balance ?? 0, 10) });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});

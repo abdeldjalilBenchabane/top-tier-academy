@@ -11,7 +11,11 @@
     "preview": "vite preview",
     "server": "node backend/server.js",
     "server:dev": "nodemon backend/server.js",
-    "db:init": "node backend/initDb.js"
+    "db:init": "node backend/initDb.js",
+    "db:pull": "prisma db pull",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio",
+    "db:validate": "prisma validate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.859.0",
@@ -20,6 +24,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^3.9.0",
+    "@prisma/client": "^6.19.3",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
     "@radix-ui/react-aspect-ratio": "^1.1.0",
@@ -106,6 +111,7 @@
     "lovable-tagger": "^1.1.7",
     "nodemon": "^3.1.10",
     "postcss": "^8.4.47",
+    "prisma": "^6.19.3",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",

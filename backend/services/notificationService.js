@@ -1,17 +1,109 @@
 import pool from '../db.js';
+import { pushToUser } from './pushService.js';
 import { formatTimeForDisplay, formatDateForDisplay } from '../utils/timezone.js';
+
+// Where tapping a notification should land, worked out from its type and the
+// ids already carried in its metadata. Kept on the server so the destination
+// travels with the notification: the app follows `route` and never has to hold
+// a matching table of its own, which would drift the moment either side moved.
+const ROUTE_FOR = {
+  // courses
+  course_purchased:        (m) => m.course_id        && `/course/${m.course_id}`,
+  course_created:          (m) => m.course_id        && `/course/${m.course_id}`,
+  course_approved:         (m) => m.course_id        && `/course/${m.course_id}`,
+  course_rejected:         (m) => m.course_id        && `/professor/courses`,
+  course_updated:          (m) => m.course_id        && `/course/${m.course_id}`,
+  course_content_added:    (m) => m.course_id        && `/course/${m.course_id}`,
+
+  // دورات
+  live_section_created:    (m) => m.live_section_id  && `/live-section/${m.live_section_id}`,
+  live_section_approved:   (m) => m.live_section_id  && `/live-section/${m.live_section_id}`,
+  live_section_rejected:   (m) => `/professor/live-sections`,
+  live_section_purchased:  (m) => m.live_section_id  && `/live-section/${m.live_section_id}`,
+  live_section_deleted:    () => `/notifications`,
+  live_section_content_added: (m) => m.live_section_id && `/live-section/${m.live_section_id}`,
+  live_section_deletion_requested: (m) => `/admin/live-sections`,
+  live_section_deletion_approved:  () => `/professor/live-sections`,
+  live_section_deletion_rejected:  () => `/professor/live-sections`,
+
+  // live sessions
+  live_session_created:    (m) => m.session_id       && `/live-session/${m.session_id}`,
+  live_session_approved:   (m) => m.session_id       && `/live-session/${m.session_id}`,
+  live_session_rejected:   () => `/professor/live-sessions`,
+  live_session_purchased:  (m) => m.session_id       && `/live-session/${m.session_id}`,
+  live_session_starting:   (m) => m.session_id       && `/live-session/${m.session_id}`,
+  live_session_reminder:   (m) => m.session_id       && `/live-session/${m.session_id}`,
+  live_session_time_updated: (m) => m.session_id     && `/live-session/${m.session_id}`,
+  live_session_postponed:  (m) => m.session_id       && `/live-session/${m.session_id}`,
+  live_session_cancelled:  (m) => m.session_id       && `/live-session/${m.session_id}`,
+  live_session_technical_issue: (m) => m.session_id  && `/live-session/${m.session_id}`,
+  live_session_rescheduled:(m) => m.session_id       && `/live-session/${m.session_id}`,
+  live_session_deleted:    () => `/notifications`,
+
+  // private classes
+  private_class_request:   () => `/professor/private-classes`,
+  private_class_approved:  (m) => m.request_id       && `/private-class/${m.request_id}`,
+  private_class_rejected:  () => `/TTHPrivateClasses`,
+  private_class_starting:  (m) => m.request_id       && `/private-class/${m.request_id}`,
+  private_class_reminder:  (m) => m.request_id       && `/private-class/${m.request_id}`,
+
+  // discussion
+  comment_reply:           (m) => m.live_section_id
+                                    ? `/live-section/${m.live_section_id}#comments`
+                                    : m.course_id ? `/course/${m.course_id}#comments` : null,
+
+  // points and admin
+  points_purchased:        () => `/points/history`,
+  point_code_used:         () => `/points/history`,
+  admin_announcement:      (m) => m.route || `/notifications`,
+  teacher_announcement:    (m) => m.live_section_id
+                                    ? `/live-section/${m.live_section_id}`
+                                    : m.course_id ? `/course/${m.course_id}` : `/notifications`,
+};
+
+function routeFor(type, metadata) {
+  try {
+    const m = typeof metadata === 'string' ? JSON.parse(metadata) : (metadata || {});
+    // An explicit route in the metadata always wins — that is how the admin
+    // panel points an announcement wherever it likes.
+    if (m.route) return String(m.route);
+    const fn = ROUTE_FOR[type];
+    return (fn && fn(m)) || null;
+  } catch {
+    return null;
+  }
+}
 
 class NotificationService {
   // Create a new notification
-  static async createNotification(userId, type, title, message, metadata = null) {
+  static async createNotification(userId, type, title, message, metadata = null, options = {}) {
     try {
+      const route = options.route ?? routeFor(type, metadata);
+      const imageUrl = options.imageUrl ?? null;
+
       const result = await pool.query(`
-        INSERT INTO notifications (user_id, type, title, message, metadata)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO notifications (user_id, type, title, message, metadata, route, image_url)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
-      `, [userId, type, title, message, metadata]);
-      
-      return result.rows[0];
+      `, [userId, type, title, message, metadata, route, imageUrl]);
+
+      const saved = result.rows[0];
+
+      // Push afterwards, and never let it affect the caller: the notification
+      // is already saved and visible in the app's notification centre. An
+      // unreachable phone, an expired token or a missing Firebase key must not
+      // turn into a failed request for whoever triggered this.
+      if (options.push !== false) {
+        pushToUser(userId, {
+          title,
+          body: message,
+          route,
+          imageUrl,
+          data: { notification_id: saved.id, type },
+        }).catch((e) => console.error('[push] send failed:', e.message));
+      }
+
+      return saved;
     } catch (error) {
       console.error('Error creating notification:', error);
       throw error;

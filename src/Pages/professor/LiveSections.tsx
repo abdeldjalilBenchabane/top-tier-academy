@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import LiveSectionForm from '@/components/forms/LiveSectionForm';
 import LiveSectionPathSelector from '@/components/admin/LiveSectionPathSelector';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 interface LiveSection {
   id: string;
@@ -44,6 +44,13 @@ const ProfessorLiveSections = () => {
   const [editingSectionData, setEditingSectionData] = useState<any>(null);
   const [showPathSelector, setShowPathSelector] = useState(false);
   const [selectedDraftSection, setSelectedDraftSection] = useState<LiveSection | null>(null);
+
+  // Deletion is a request, not an action. Track what has already been asked so
+  // the button shows the state instead of offering to ask twice.
+  const [deletionRequests, setDeletionRequests] = useState<Record<string, any>>({});
+  const [requestingDelete, setRequestingDelete] = useState<LiveSection | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [sendingRequest, setSendingRequest] = useState(false);
 
 
   const fetchLiveSections = async () => {
@@ -112,6 +119,37 @@ const ProfessorLiveSections = () => {
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const loadDeletionRequests = async () => {
+    try {
+      const list = await api('/live-sections/my-deletion-requests');
+      const bySection: Record<string, any> = {};
+      for (const r of list || []) {
+        // newest first from the API, so only the first row per دورة is current
+        if (r.live_section_id && !bySection[String(r.live_section_id)]) {
+          bySection[String(r.live_section_id)] = r;
+        }
+      }
+      setDeletionRequests(bySection);
+    } catch { /* the page is still usable without this */ }
+  };
+  useEffect(() => { loadDeletionRequests(); }, []);
+
+  const submitDeletionRequest = async () => {
+    if (!requestingDelete) return;
+    setSendingRequest(true);
+    try {
+      await api(`/live-sections/${requestingDelete.id}/deletion-request`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: deleteReason.trim() || undefined }),
+      });
+      toastLib.success('أُرسل طلب الحذف إلى الإدارة. ستصلك النتيجة كإشعار.');
+      setRequestingDelete(null); setDeleteReason('');
+      loadDeletionRequests();
+    } catch (e: any) {
+      toastLib.error(e?.message || 'تعذر إرسال الطلب');
+    } finally { setSendingRequest(false); }
   };
 
   // View Details now works the same as Edit Section
@@ -620,7 +658,7 @@ const ProfessorLiveSections = () => {
                           </div>
                         </div>
                       </CardContent>
-                      <CardFooter className="pt-2">
+                      <CardFooter className="pt-2 flex flex-col gap-2">
                         <Button 
                           variant="outline" 
                           size="sm" 
@@ -629,6 +667,26 @@ const ProfessorLiveSections = () => {
                         >
                           View Details
                         </Button>
+                        {deletionRequests[String(section.id)]?.status === 'pending' ? (
+                          <div className="w-full rounded-md bg-orange-50 px-2 py-1.5 text-center text-xs text-orange-700">
+                            طلب الحذف قيد مراجعة الإدارة
+                          </div>
+                        ) : deletionRequests[String(section.id)]?.status === 'rejected' ? (
+                          <div className="w-full rounded-md bg-gray-50 px-2 py-1.5 text-center text-xs text-gray-600">
+                            رُفض طلب الحذف
+                            {deletionRequests[String(section.id)]?.admin_note
+                              ? `: ${deletionRequests[String(section.id)].admin_note}` : ''}
+                          </div>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full text-red-600 hover:bg-red-50 hover:text-red-700"
+                            onClick={() => { setRequestingDelete(section); setDeleteReason(''); }}
+                          >
+                            <Trash2 className="mr-1 h-4 w-4" /> طلب حذف الدورة
+                          </Button>
+                        )}
                       </CardFooter>
                     </Card>
                   ))}
@@ -645,6 +703,42 @@ const ProfessorLiveSections = () => {
       )}
       
       {/* PathSelector Dialog for Drafts */}
+
+      {/* Deleting a دورة is the admin's call: students have paid points for it,
+          and only they can decide whether those points come back. */}
+      <Dialog open={!!requestingDelete}
+        onOpenChange={(v) => { if (!sendingRequest && !v) { setRequestingDelete(null); setDeleteReason(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">طلب حذف «{requestingDelete?.title}»</DialogTitle>
+            <DialogDescription className="text-right">
+              لا يمكنك حذف الدورة بنفسك، لأن طلاباً دفعوا نقاطاً مقابلها والإدارة هي من
+              تقرر إن كانت النقاط تُرجع أم لا. اكتب سبب الطلب وسيصل إلى الإدارة.
+            </DialogDescription>
+          </DialogHeader>
+
+          <textarea
+            value={deleteReason}
+            onChange={(e) => setDeleteReason(e.target.value)}
+            rows={4}
+            placeholder="لماذا تريد حذف هذه الدورة؟ (مثال: أُنشئت بالخطأ / انتهت السنة / محتوى مكرر)"
+            className="w-full rounded-md border border-gray-300 p-2 text-sm"
+          />
+          <p className="text-xs text-gray-500">
+            كلما كان السبب أوضح، كان قرار الإدارة أسرع وأدق.
+          </p>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" disabled={sendingRequest}
+              onClick={() => { setRequestingDelete(null); setDeleteReason(''); }}>إلغاء</Button>
+            <Button variant="destructive" disabled={sendingRequest} onClick={submitDeletionRequest}>
+              {sendingRequest && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              إرسال الطلب للإدارة
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showPathSelector} onOpenChange={setShowPathSelector}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

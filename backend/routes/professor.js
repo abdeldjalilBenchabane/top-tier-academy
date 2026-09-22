@@ -1,6 +1,7 @@
 import express from 'express';
 import { query, getRow, getRows } from '../db.js';
 import { verifyToken, requireRole } from '../middleware/auth.js';
+import { debugLog } from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -8,7 +9,7 @@ const router = express.Router();
 router.get('/pending-private-classes-count', verifyToken, async (req, res) => {
   try {
     const professorId = req.user.id;
-    console.log('API called for professor ID:', professorId);
+    debugLog('API called for professor ID:', professorId);
     
     const result = await getRows(`
       SELECT COUNT(*) as count
@@ -17,9 +18,9 @@ router.get('/pending-private-classes-count', verifyToken, async (req, res) => {
       AND pcr.status = 'في الانتظار'
     `, [professorId]);
 
-    console.log('Query result:', result);
+    debugLog('Query result:', result);
     const count = parseInt(result[0]?.count || 0);
-    console.log('Final count:', count);
+    debugLog('Final count:', count);
     
     res.json({ count });
   } catch (error) {

@@ -10,6 +10,7 @@ import { useLiveSessionsCount } from '@/contexts/LiveSessionsCountContext';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
+import { parseSessionDate } from '@/lib/utils';
 const LiveSessionsAdmin = () => {
     const [pending, setPending] = useState([]);
     const [sessions, setSessions] = useState([]);
@@ -72,8 +73,8 @@ const LiveSessionsAdmin = () => {
 
     // Stats helpers
     const now = new Date();
-    const overview = sessions.filter((s) => s.is_approved && !s.is_rejected && new Date(s.start_time) > now);
-    const library = sessions.filter((s) => s.is_approved && !s.is_rejected && (s.is_ended || new Date(s.start_time) <= now));
+    const overview = sessions.filter((s) => s.is_approved && !s.is_rejected && (parseSessionDate(s.start_time) || new Date(0)) > now);
+    const library = sessions.filter((s) => s.is_approved && !s.is_rejected && (s.is_ended || (parseSessionDate(s.start_time) || new Date(0)) <= now));
     const activeSessions = sessions.filter((s) => ['live', 'starting', 'paused'].includes(s.status));
     const statusCounts = {
         scheduled: sessions.filter(s => s.status === 'scheduled').length,
@@ -93,7 +94,7 @@ const LiveSessionsAdmin = () => {
             <CardHeader>
                 <CardTitle>{session.title}</CardTitle>
                 <div className="text-sm text-gray-500">By Prof. {session.professor_name || session.professor_id}</div>
-                <div className="text-xs text-gray-400">{new Date(session.start_time).toLocaleString()}</div>
+                <div className="text-xs text-gray-400">{parseSessionDate(session.start_time)?.toLocaleString() ?? '—'}</div>
             </CardHeader>
             <CardContent>
                 <div>Duration: {session.duration} min</div>

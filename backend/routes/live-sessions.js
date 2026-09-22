@@ -12,6 +12,7 @@ import NotificationService from '../services/notificationService.js';
 import { createR2Multer } from '../middleware/r2MulterStorage.js';
 import { deleteFromR2, extractKeyFromUrl } from '../services/r2Service.js';
 import { convertDatetimeLocalToUTC, convertUTCToDatetimeLocal } from '../utils/timezone.js';
+import { debugLog } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,7 +23,7 @@ const router = express.Router();
 // Configure multer for live session cover image uploads with R2 storage
 const liveSessionUpload = createR2Multer('live-sessions', null, {
   fileFilter: (req, file, cb) => {
-    console.log('Live session file upload attempt:', {
+    debugLog('Live session file upload attempt:', {
       fieldname: file.fieldname,
       originalname: file.originalname,
       mimetype: file.mimetype,
@@ -61,7 +62,7 @@ router.post('/professors/:professorId/live-sessions',
   requireProfessor, 
   liveSessionUpload.single('cover_image'),
   async (req, res, next) => {
-    console.log('[DEBUG] POST /professors/:professorId/live-sessions', {
+    debugLog('[DEBUG] POST /professors/:professorId/live-sessions', {
         paramId: req.params.professorId,
         userId: req.user.id,
         userRole: req.user.role,
@@ -72,7 +73,7 @@ router.post('/professors/:professorId/live-sessions',
     // Extract data from request body (FormData)
     const { title, start_time, duration, price, material_id, description, section_id, telegram_channel } = req.body;
     
-    console.log('[DEBUG] Extracted data:', {
+    debugLog('[DEBUG] Extracted data:', {
         title,
         start_time,
         duration,
@@ -83,7 +84,7 @@ router.post('/professors/:professorId/live-sessions',
         telegram_channel
     });
     
-    console.log('[DEBUG] start_time type and value:', {
+    debugLog('[DEBUG] start_time type and value:', {
         type: typeof start_time,
         value: start_time,
         isNull: start_time === null,
@@ -104,7 +105,7 @@ router.post('/professors/:professorId/live-sessions',
             }
             // Keep the original datetime-local value
             processedStartTime = start_time;
-            console.log('[DEBUG] Storing start_time as-is:', processedStartTime);
+            debugLog('[DEBUG] Storing start_time as-is:', processedStartTime);
         } catch (error) {
             console.error('[ERROR] Failed to validate start_time:', error);
             return res.status(400).json({ error: 'Invalid date/time format' });
@@ -133,18 +134,18 @@ router.post('/professors/:professorId/live-sessions',
         let cover_image_url = null;
         if (req.file && req.file.buffer) {
             try {
-                console.log('📤 Processing R2 upload for live session cover...');
+                debugLog('📤 Processing R2 upload for live session cover...');
                 
                 // Import R2 functions
                 const { uploadToR2, generateR2Key } = await import('../services/r2Service.js');
                 
                 // Generate R2 key
                 const r2Key = generateR2Key('live-sessions', null, req.file.originalname, 'cover');
-                console.log('🔑 Generated R2 key:', r2Key);
+                debugLog('🔑 Generated R2 key:', r2Key);
                 
                 // Upload to R2
                 const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
-                console.log('✅ Live session cover uploaded to R2:', publicUrl);
+                debugLog('✅ Live session cover uploaded to R2:', publicUrl);
                 
                 // Update file object with R2 URL
                 req.file.path = publicUrl;
@@ -160,16 +161,36 @@ router.post('/professors/:professorId/live-sessions',
         } else if (req.file) {
             // Fallback for non-buffer uploads (shouldn't happen with our setup)
             cover_image_url = req.file.path;
-            console.log('[DEBUG] Cover image uploaded (fallback):', cover_image_url);
+            debugLog('[DEBUG] Cover image uploaded (fallback):', cover_image_url);
+        }
+
+        // A session inside an already-approved دورة inherits that approval.
+        // The admin approved the دورة and everything in it; a session added
+        // afterwards is part of the same thing, and leaving it pending asked
+        // for a decision that had already been made. A standalone session, or
+        // one in a دورة still under review, stays pending as before.
+        let inheritsApproval = false;
+        if (section_id) {
+            const parent = await getRow(
+                'SELECT status FROM live_sections WHERE id = $1', [section_id]);
+            inheritsApproval = parent?.status === 'approved';
         }
 
         const result = await query(
-            'INSERT INTO live_sessions (professor_id, professor_name, title, description, start_time, duration, price, material_id, cover_image_url, section_id, telegram_channel) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
-            [professor_id, professor_name, title, description, processedStartTime, duration, price, material_id, cover_image_url, section_id || null, telegram_channel || null]
+            `INSERT INTO live_sessions
+               (professor_id, professor_name, title, description, start_time, duration,
+                price, material_id, cover_image_url, section_id, telegram_channel,
+                is_approved, approved_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                     CASE WHEN $12 THEN CURRENT_TIMESTAMP ELSE NULL END)
+             RETURNING *`,
+            [professor_id, professor_name, title, description, processedStartTime, duration,
+             price, material_id, cover_image_url, section_id || null, telegram_channel || null,
+             inheritsApproval]
         );
         const session = result.rows[0];
 
-        console.log('[DEBUG] Created live session:', {
+        debugLog('[DEBUG] Created live session:', {
             id: session.id,
             title: session.title,
             section_id: session.section_id,
@@ -179,7 +200,7 @@ router.post('/professors/:professorId/live-sessions',
             duration: session.duration
         });
         
-        console.log('[DEBUG] Insert values used:', {
+        debugLog('[DEBUG] Insert values used:', {
             professor_id,
             professor_name,
             title,
@@ -208,8 +229,10 @@ router.post('/professors/:professorId/live-sessions',
             );
 
             // Send emails to all admins
-            const adminRes = await getRows('SELECT name, email FROM users WHERE role = $1', ['admin']);
-            for (const admin of adminRes.rows) {
+            // getRows returns the rows themselves — `.rows` on that is undefined,
+            // which threw on every session and swallowed the whole notification.
+            const admins = await getRows('SELECT name, email FROM users WHERE role = $1', ['admin']);
+            for (const admin of admins) {
                 await sendLiveSessionCreatedEmailToAdmin(
                     admin.email,
                     admin.name,
@@ -218,13 +241,19 @@ router.post('/professors/:professorId/live-sessions',
                 );
             }
 
-            console.log(`✅ Live session creation notifications and emails sent for session ${session.id}`);
+            debugLog(`✅ Live session creation notifications and emails sent for session ${session.id}`);
         } catch (error) {
             console.error('Error sending live session creation notifications/emails:', error);
             // Don't fail the session creation if notifications fail
         }
 
         res.status(201).json(session);
+
+        // Students who already bought the دورة hear about the new session.
+        if (session.section_id && inheritsApproval) {
+            announceSessionAdded(session).catch((e) =>
+                console.error('[live-added] announce failed:', e.message));
+        }
     } catch (error) {
         console.error('Error creating live session:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -279,7 +308,7 @@ router.put('/live-sessions/:id', verifyToken, requireProfessor, (req, res, next)
                 }
                 // Keep the original datetime-local value
                 processedStartTime = start_time;
-                console.log('[DEBUG] Update - Storing start_time as-is:', processedStartTime);
+                debugLog('[DEBUG] Update - Storing start_time as-is:', processedStartTime);
             } catch (error) {
                 console.error('[ERROR] Failed to validate start_time for update:', error);
                 return res.status(400).json({ error: 'Invalid date/time format' });
@@ -292,18 +321,18 @@ router.put('/live-sessions/:id', verifyToken, requireProfessor, (req, res, next)
             const coverFile = req.files.find(f => f.fieldname === 'cover_image');
             if (coverFile && coverFile.buffer) {
                 try {
-                    console.log('📤 Processing R2 upload for live session cover update...');
+                    debugLog('📤 Processing R2 upload for live session cover update...');
                     
                     // Import R2 functions
                     const { uploadToR2, generateR2Key } = await import('../services/r2Service.js');
                     
                     // Generate R2 key
                     const r2Key = generateR2Key('live-sessions', null, coverFile.originalname, 'cover');
-                    console.log('🔑 Generated R2 key:', r2Key);
+                    debugLog('🔑 Generated R2 key:', r2Key);
                     
                     // Upload to R2
                     const publicUrl = await uploadToR2(coverFile.buffer, r2Key, coverFile.mimetype);
-                    console.log('✅ Live session cover updated to R2:', publicUrl);
+                    debugLog('✅ Live session cover updated to R2:', publicUrl);
                     
                     // Update file object with R2 URL
                     coverFile.path = publicUrl;
@@ -319,7 +348,7 @@ router.put('/live-sessions/:id', verifyToken, requireProfessor, (req, res, next)
             } else if (coverFile) {
                 // Fallback for non-buffer uploads
                 cover_image_url = coverFile.path;
-                console.log('[DEBUG] Cover image uploaded (fallback):', cover_image_url);
+                debugLog('[DEBUG] Cover image uploaded (fallback):', cover_image_url);
             }
         }
 
@@ -379,7 +408,7 @@ router.put('/live-sessions/:id', verifyToken, requireProfessor, (req, res, next)
                         `تم تغيير موعد «${session.title}» إلى ${when}.`,
                         JSON.stringify({ session_id: Number(id), old_start_time: previous.start_time, new_start_time: session.start_time })
                     ).catch(e => console.error('[notify] failed for student', b.student_id, e.message))));
-                    console.log(`Notified ${buyers.length} student(s) that session ${id} was rescheduled`);
+                    debugLog(`Notified ${buyers.length} student(s) that session ${id} was rescheduled`);
                 }
             }
         } catch (notifyError) {
@@ -517,14 +546,19 @@ router.get('/live-sessions', async (req, res) => {
 async function refundSessionBuyers(sessionId, actorId) {
     // A session that already ran was delivered: deleting the record afterwards
     // must not hand the points back. Only sessions that never finished refund.
+    // live_sessions has no is_ended column — selecting it made this query throw,
+    // which meant every admin delete failed with
+    //     column "is_ended" does not exist
+    // and no student was ever refunded. Whether a session finished is derived
+    // from its status and its scheduled end.
     const s = await getRow(
-        'SELECT status, is_ended, start_time, duration FROM live_sessions WHERE id = $1', [sessionId]);
+        'SELECT status, start_time, duration FROM live_sessions WHERE id = $1', [sessionId]);
     if (s) {
-        const ended = s.status === 'ended' || s.is_ended === true ||
+        const ended = s.status === 'ended' ||
             (s.start_time &&
              Date.now() > new Date(s.start_time).getTime() + (s.duration || 60) * 60 * 1000);
         if (ended) {
-            console.log(`Session ${sessionId} already ended — deleting without refunds.`);
+            debugLog(`Session ${sessionId} already ended — deleting without refunds.`);
             return 0;
         }
     }
@@ -566,7 +600,7 @@ async function refundSessionBuyers(sessionId, actorId) {
             console.error(`[refund] session ${sessionId} student ${buyer.student_id}:`, e.message);
         }
     }
-    if (refunded) console.log(`Refunded ${refunded} student(s) for deleted session ${sessionId}`);
+    if (refunded) debugLog(`Refunded ${refunded} student(s) for deleted session ${sessionId}`);
     return refunded;
 }
 
@@ -641,7 +675,7 @@ router.put('/admin/live-sessions/:sessionId',
                         `تم تغيير موعد «${session.title}» إلى ${when}.`,
                         JSON.stringify({ session_id: Number(sessionId), old_start_time: previous.start_time, new_start_time: session.start_time })
                     ).catch(e => console.error('[notify]', e.message))));
-                    console.log(`Notified ${buyers.length} student(s) of reschedule (admin)`);
+                    debugLog(`Notified ${buyers.length} student(s) of reschedule (admin)`);
                 }
             }
         } catch (e) { console.error('[notify] admin reschedule failed:', e.message); }
@@ -669,7 +703,7 @@ router.delete('/admin/live-sessions/:sessionId', verifyToken, requireRole('admin
         await query('DELETE FROM live_session_participants WHERE session_id = $1', [sessionId]);
         await query('DELETE FROM live_sessions WHERE id = $1', [sessionId]);
 
-        console.log(`Live session ${sessionId} ("${session.title}") deleted by admin ${req.user.id}`);
+        debugLog(`Live session ${sessionId} ("${session.title}") deleted by admin ${req.user.id}`);
         res.json({ success: true, refunded });
     } catch (error) {
         console.error('Error deleting live session (admin):', error);
@@ -703,7 +737,7 @@ router.delete('/live-sessions/:sessionId', verifyToken, requireProfessor, async 
                 const r2Key = extractKeyFromUrl(session.cover_image_url);
                 if (r2Key) {
                     await deleteFromR2(r2Key);
-                    console.log(`[DEBUG] Deleted cover image from R2: ${r2Key}`);
+                    debugLog(`[DEBUG] Deleted cover image from R2: ${r2Key}`);
                 }
             } catch (r2Error) {
                 console.error('[DEBUG] Error deleting cover image from R2:', r2Error);
@@ -718,7 +752,7 @@ router.delete('/live-sessions/:sessionId', verifyToken, requireProfessor, async 
         await query('DELETE FROM live_session_participants WHERE session_id = $1', [sessionId]);
         await query('DELETE FROM live_sessions WHERE id = $1', [sessionId]);
 
-        console.log(`[DEBUG] Live session ${sessionId} deleted successfully by professor ${userId}`);
+        debugLog(`[DEBUG] Live session ${sessionId} deleted successfully by professor ${userId}`);
 
         res.json({ message: 'Live session deleted successfully', id: sessionId, refunded });
     } catch (error) {
@@ -861,7 +895,7 @@ router.post('/live-sessions/:sessionId/purchase', verifyToken, requireStudent, a
 
             // await client.query('COMMIT'); // This line is removed as per the new_code
 
-            console.log(`[PURCHASE] Successfully purchased session ${sessionId} for student ${student_id}, amount: ${session.price}`);
+            debugLog(`[PURCHASE] Successfully purchased session ${sessionId} for student ${student_id}, amount: ${session.price}`);
 
             // Send notifications and emails
             try {
@@ -902,8 +936,9 @@ router.post('/live-sessions/:sessionId/purchase', verifyToken, requireStudent, a
                 }
 
                 // Send emails to all admins
-                const adminRes = await getRows('SELECT name, email FROM users WHERE role = $1', ['admin']);
-                for (const admin of adminRes.rows) {
+                // getRows returns the rows; `.rows` on that is undefined.
+                const admins = await getRows('SELECT name, email FROM users WHERE role = $1', ['admin']);
+                for (const admin of admins) {
                     await sendLiveSessionPurchaseEmailToAdmin(
                         admin.email,
                         admin.name,
@@ -913,7 +948,7 @@ router.post('/live-sessions/:sessionId/purchase', verifyToken, requireStudent, a
                     );
                 }
 
-                console.log(`✅ Live session purchase notifications and emails sent for session ${sessionId}`);
+                debugLog(`✅ Live session purchase notifications and emails sent for session ${sessionId}`);
             } catch (error) {
                 console.error('Error sending live session purchase notifications/emails:', error);
                 // Don't fail the purchase if notifications fail
@@ -1065,18 +1100,38 @@ router.get('/live-sessions/:sessionId/access', verifyToken, async (req, res) => 
         const session = sessionRes;
         const isLive = true; // Live sections are always considered "live"
 
-        // Check if user has purchased this session (using purchases table)
-        const purchaseRes = await getRow(
-          'SELECT * FROM purchases WHERE session_id = $1 AND student_id = $2',
+        // A session can be paid for in two different ways, and this used to
+        // check only the first one.
+        const directPurchase = await getRow(
+          'SELECT 1 FROM purchases WHERE session_id = $1 AND student_id = $2',
           [sessionId, userId]
         );
 
-        const hasPurchased = !!purchaseRes; // Use !! to convert null/undefined to boolean
-        const canAccess = hasPurchased; // Allow access if purchased, regardless of live status
+        // Buying the دورة buys everything inside it. Without this, a student
+        // who paid for the whole course was turned away from every session in
+        // it — the purchase is recorded against the section, not the session.
+        let sectionPurchase = null;
+        if (session.section_id) {
+            sectionPurchase = await getRow(
+              'SELECT 1 FROM live_section_purchases WHERE live_section_id = $1 AND student_id = $2',
+              [session.section_id, userId]
+            );
+        }
 
-        console.log(`[ACCESS] Session ${sessionId}, User ${userId}, HasPurchased: ${hasPurchased}, CanAccess: ${canAccess}`);
-        console.log(`[ACCESS] Purchase query result:`, purchaseRes);
-        console.log(`[ACCESS] Response object:`, {
+        // The person teaching it, and the admins, are not customers and will
+        // never appear in either purchase table.
+        const isOwner = String(session.professor_id) === String(userId);
+        const isAdmin = req.user.role === 'admin';
+
+        const hasPurchased = !!(directPurchase || sectionPurchase);
+        // A free standalone session (price 0, not inside a paid دورة) is open
+        // to every signed-in user; there is nothing to buy.
+        const isFree = Number(session.price) === 0 && !session.section_id;
+        const canAccess = hasPurchased || isFree || isOwner || isAdmin;
+
+        debugLog(`[ACCESS] Session ${sessionId}, User ${userId}, HasPurchased: ${hasPurchased}, CanAccess: ${canAccess}`);
+        debugLog(`[ACCESS] direct=${!!directPurchase} section=${!!sectionPurchase} owner=${isOwner} admin=${isAdmin}`);
+        debugLog(`[ACCESS] Response object:`, {
             canAccess: canAccess,
             hasPurchased: hasPurchased,
             isLive: isLive,
@@ -1087,6 +1142,12 @@ router.get('/live-sessions/:sessionId/access', verifyToken, async (req, res) => 
             canAccess: canAccess,
             hasPurchased: hasPurchased,
             isLive: isLive,
+            // How access was granted — useful to a client deciding what to show.
+            accessVia: directPurchase ? 'session_purchase'
+                     : sectionPurchase ? 'section_purchase'
+                     : isOwner ? 'professor'
+                     : isAdmin ? 'admin'
+                     : null,
             session: session
         });
     } catch (error) {
@@ -1110,7 +1171,7 @@ router.get('/rtcToken', verifyToken, (req, res) => {
     const currentTime = Math.floor(Date.now() / 1000);
     const privilegeExpiredTs = currentTime + expireTime;
 
-    console.log('[DEBUG] RTC Token generation:', {
+    debugLog('[DEBUG] RTC Token generation:', {
         appID: appID ? 'SET' : 'MISSING',
         appCertificate: appCertificate ? 'SET' : 'MISSING',
         channel,
@@ -1132,11 +1193,11 @@ router.get('/rtcToken', verifyToken, (req, res) => {
     let numericUid;
     if (uid && uid !== 'null' && !isNaN(Number(uid))) {
         numericUid = Number(uid);
-        console.log('[DEBUG] Using provided UID:', numericUid);
+        debugLog('[DEBUG] Using provided UID:', numericUid);
     } else {
         // Use 0 to let Agora assign UID automatically (prevents conflicts)
         numericUid = 0;
-        console.log('[DEBUG] Using UID 0 (Agora will assign automatically)');
+        debugLog('[DEBUG] Using UID 0 (Agora will assign automatically)');
     }
 
     try {
@@ -1150,8 +1211,8 @@ router.get('/rtcToken', verifyToken, (req, res) => {
             privilegeExpiredTs
         );
 
-        console.log('[DEBUG] Token generated successfully for UID:', numericUid);
-        console.log('[DEBUG] Token length:', token.length);
+        debugLog('[DEBUG] Token generated successfully for UID:', numericUid);
+        debugLog('[DEBUG] Token length:', token.length);
 
         res.json({ token, uid: numericUid });
     } catch (error) {
@@ -1208,7 +1269,7 @@ router.patch('/live-sessions/:id/approve', verifyToken, requireRole(['admin']), 
                 admin.name
             );
 
-            console.log(`✅ Live session approval notifications and emails sent for session ${session.id}`);
+            debugLog(`✅ Live session approval notifications and emails sent for session ${session.id}`);
         } catch (error) {
             console.error('Error sending live session approval notifications/emails:', error);
             // Don't fail the approval if notifications fail
@@ -1268,7 +1329,7 @@ router.patch('/live-sessions/:id/reject', verifyToken, requireRole(['admin']), a
                 reason
             );
 
-            console.log(`✅ Live session rejection notifications and emails sent for session ${session.id}`);
+            debugLog(`✅ Live session rejection notifications and emails sent for session ${session.id}`);
         } catch (error) {
             console.error('Error sending live session rejection notifications/emails:', error);
             // Don't fail the rejection if notifications fail
@@ -1283,7 +1344,7 @@ router.patch('/live-sessions/:id/reject', verifyToken, requireRole(['admin']), a
 
 // GET /api/professors/:professorId/live-sessions → liste les sessions d'un prof
 router.get('/professors/:professorId/live-sessions', verifyToken, requireProfessor, async (req, res) => {
-    console.log('[DEBUG] GET /professors/:professorId/live-sessions', {
+    debugLog('[DEBUG] GET /professors/:professorId/live-sessions', {
         paramId: req.params.professorId,
         userId: req.user.id,
         userRole: req.user.role
@@ -1321,6 +1382,139 @@ router.get('/professors/:professorId/live-sessions', verifyToken, requireProfess
     }
 });
 
+// When a teacher starts a free session, every student gets a push inviting
+// them in. At most once per session per 6 hours, so pausing and resuming (or
+// pressing start twice) doesn't spam everyone. In memory: a restart only means
+// a session could be announced once more.
+const FREE_LIVE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const freeLiveAnnounced = new Map(); // sessionId -> timestamp
+
+async function announceFreeLive(session) {
+    const key = String(session.id);
+    const last = freeLiveAnnounced.get(key);
+    if (last && Date.now() - last < FREE_LIVE_COOLDOWN_MS) return;
+    freeLiveAnnounced.set(key, Date.now());
+
+    const professor = await getRow('SELECT name FROM users WHERE id = $1', [session.professor_id]);
+    const teacher = (professor && professor.name) || 'الأستاذ';
+    const title = `${teacher} في بث مباشر الآن`;
+    const message = `«${session.title || 'حصة مباشرة'}» — حصة مجانية، انضم الآن!`;
+    const metadata = JSON.stringify({ session_id: session.id, free: true });
+    const route = `/live-session/${session.id}`;
+
+    const students = await getRows('SELECT id FROM users WHERE role = $1', ['student']);
+    let created = 0;
+    for (const { id } of students) {
+        try {
+            await NotificationService.createNotification(
+                id, 'free_live_started', title, message, metadata, { route });
+            created += 1;
+        } catch { /* one bad row must not stop the broadcast */ }
+    }
+    debugLog(`[free-live] session ${session.id} announced to ${created}/${students.length} students`);
+}
+
+// Everyone who can attend a paid session: bought it directly (الحصص
+// المباشرة) or bought the دورة it belongs to (الدورات).
+async function buyersOf(session) {
+    const rows = session.section_id
+        ? await getRows(
+            `SELECT student_id FROM purchases WHERE session_id = $1
+             UNION
+             SELECT student_id FROM live_section_purchases WHERE live_section_id = $2`,
+            [session.id, session.section_id])
+        : await getRows(
+            'SELECT DISTINCT student_id FROM purchases WHERE session_id = $1',
+            [session.id]);
+    return rows.map((r) => r.student_id);
+}
+
+async function notifyAll(ids, type, title, message, metadata, route) {
+    let created = 0;
+    for (const id of ids) {
+        try {
+            await NotificationService.createNotification(
+                id, type, title, message, metadata, { route });
+            created += 1;
+        } catch { /* one bad row must not stop the rest */ }
+    }
+    return created;
+}
+
+// A paid session went live: only the students who paid for it are told.
+async function announcePaidLive(session) {
+    const key = String(session.id);
+    const last = freeLiveAnnounced.get(key);
+    if (last && Date.now() - last < FREE_LIVE_COOLDOWN_MS) return;
+    freeLiveAnnounced.set(key, Date.now());
+
+    const buyers = await buyersOf(session);
+    if (buyers.length === 0) return;
+    const professor = await getRow('SELECT name FROM users WHERE id = $1', [session.professor_id]);
+    const teacher = (professor && professor.name) || 'الأستاذ';
+    const created = await notifyAll(
+        buyers,
+        'paid_live_started',
+        `${teacher} بدأ البث المباشر الآن`,
+        `«${session.title || 'حصتك المباشرة'}» بدأت الآن — ادخل إلى حصتك`,
+        JSON.stringify({ session_id: session.id }),
+        `/live-session/${session.id}`);
+    debugLog(`[paid-live] session ${session.id} announced to ${created}/${buyers.length} buyers`);
+}
+
+// A new session was added to a دورة: tell the students who bought the دورة.
+async function announceSessionAdded(session) {
+    const buyers = await getRows(
+        'SELECT DISTINCT student_id FROM live_section_purchases WHERE live_section_id = $1',
+        [session.section_id]);
+    if (buyers.length === 0) return;
+    const section = await getRow('SELECT title FROM live_sections WHERE id = $1', [session.section_id]);
+    const when = session.start_time
+        ? new Date(session.start_time).toLocaleString('ar-DZ', { dateStyle: 'full', timeStyle: 'short' })
+        : '';
+    const created = await notifyAll(
+        buyers.map((b) => b.student_id),
+        'live_session_added',
+        `حصة جديدة في دورة «${(section && section.title) || 'دورتك'}»`,
+        `«${session.title || 'حصة مباشرة'}»${when ? ` — ${when}` : ''}`,
+        JSON.stringify({ session_id: session.id, section_id: session.section_id }),
+        null);
+    debugLog(`[live-added] session ${session.id} announced to ${created} buyers of section ${session.section_id}`);
+}
+
+// GET /api/student/live-now → sessions live right now that this student can
+// join: free standalone ones, ones they bought, and ones in a دورة they bought.
+// Bought ones first. Feeds the "live now" card on the app's home screen.
+router.get('/student/live-now', verifyToken, async (req, res) => {
+    try {
+        const rows = await getRows(`
+            SELECT ls.id, ls.title, ls.price, ls.section_id,
+                   COALESCE(u.name, ls.professor_name) AS professor_name,
+                   COALESCE(NULLIF(ls.cover_image_url, ''), sec.cover_image_url) AS cover,
+                   (COALESCE(ls.price, 0) = 0 AND ls.section_id IS NULL) AS is_free
+            FROM live_sessions ls
+            LEFT JOIN users u ON u.id = ls.professor_id
+            LEFT JOIN live_sections sec ON sec.id = ls.section_id
+            WHERE ls.status = 'live'
+              AND ls.is_approved = TRUE
+              AND COALESCE(ls.is_rejected, FALSE) = FALSE
+              AND (
+                    (COALESCE(ls.price, 0) = 0 AND ls.section_id IS NULL)
+                 OR EXISTS (SELECT 1 FROM purchases p
+                            WHERE p.session_id = ls.id AND p.student_id = $1)
+                 OR (ls.section_id IS NOT NULL AND EXISTS (
+                            SELECT 1 FROM live_section_purchases lp
+                            WHERE lp.live_section_id = ls.section_id AND lp.student_id = $1))
+              )
+            ORDER BY is_free ASC, ls.start_time DESC
+        `, [req.user.id]);
+        res.json({ sessions: rows });
+    } catch (error) {
+        console.error('Error fetching live-now sessions:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // PATCH /api/live-sessions/:sessionId → met à jour le statut (ou autres champs) d'une session
 router.patch('/live-sessions/:sessionId', verifyToken, requireProfessor, async (req, res) => {
     const { sessionId } = req.params;
@@ -1331,6 +1525,7 @@ router.patch('/live-sessions/:sessionId', verifyToken, requireProfessor, async (
     }
 
     try {
+        const before = await getRow('SELECT status FROM live_sessions WHERE id = $1', [sessionId]);
         const result = await query(
             'UPDATE live_sessions SET status = $1 WHERE id = $2 RETURNING *',
             [status, sessionId]
@@ -1338,7 +1533,26 @@ router.patch('/live-sessions/:sessionId', verifyToken, requireProfessor, async (
         if (!result) {
             return res.status(404).json({ error: 'Live session not found' });
         }
-        res.json(result.rows[0]);
+        const updated = result.rows[0];
+        res.json(updated);
+
+        // Everyone already inside the room learns about it now, not on their
+        // next reload: paused, technical problem, back live. Room id is the
+        // session id, as both the web page and the mobile app join it.
+        const io = req.app.get('io');
+        if (io && updated) {
+            io.to(String(sessionId)).emit('session-status', { status: updated.status });
+        }
+
+        // After responding, so the teacher's "start" isn't slowed down by
+        // sending to every student.
+        const wentLive = status === 'live' && before && before.status !== 'live';
+        const isFree = updated && Number(updated.price) === 0 && !updated.section_id;
+        const visible = updated && updated.is_approved !== false && updated.is_rejected !== true;
+        if (wentLive && visible) {
+            (isFree ? announceFreeLive(updated) : announcePaidLive(updated)).catch((e) =>
+                console.error('[live-announce] failed:', e.message));
+        }
     } catch (error) {
         console.error('Error updating live session status:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -1452,7 +1666,7 @@ router.patch('/live-sessions/:sessionId/admin', verifyToken, requireRole(['admin
                             admin.name
                         );
 
-                        console.log(`✅ Live session approval notifications and emails sent for session ${sessionId}`);
+                        debugLog(`✅ Live session approval notifications and emails sent for session ${sessionId}`);
                     } else if (updates.isApproved === false) {
                         // Send rejection notifications and emails
                         const reason = updates.rejectionReason || 'No reason provided';
@@ -1474,7 +1688,7 @@ router.patch('/live-sessions/:sessionId/admin', verifyToken, requireRole(['admin
                             reason
                         );
 
-                        console.log(`✅ Live session rejection notifications and emails sent for session ${sessionId}`);
+                        debugLog(`✅ Live session rejection notifications and emails sent for session ${sessionId}`);
                     }
                 }
             } catch (error) {
