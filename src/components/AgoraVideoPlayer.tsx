@@ -1606,9 +1606,16 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
                 )}
 
                 {role === 'audience' && !isLocalMicMuted && (
-
-                    <div className="absolute top-2 right-2 bg-green-600 text-white px-3 py-1 rounded-full text-xs z-50" style={{ zIndex: 10003, position: 'fixed' }}>الميكروفون نشط</div>
-
+                    // Was position: fixed, which pinned it to the window corner
+                    // and landed it on the page title. It belongs on the video,
+                    // so it stays absolute inside the video box.
+                    <div
+                        className="absolute top-2 left-2 z-50 inline-flex items-center gap-1.5 rounded-full bg-green-600/90 px-2.5 py-1 text-xs font-medium text-white shadow-lg backdrop-blur-sm"
+                        style={{ zIndex: 10003 }}
+                    >
+                        <Mic className="h-3 w-3" />
+                        الميكروفون نشط
+                    </div>
                 )}
 
             </div>
