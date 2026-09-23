@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 
 import { useParams, useNavigate } from 'react-router-dom';
 
-import { ArrowLeft, Users, Heart, MessageSquare, Share2, Settings, MicOff, Mic, MessageCircle, Fullscreen, Pause, Play as PlayIcon, Video, VideoOff, Monitor, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Users, Heart, MessageSquare, Share2, Settings, MicOff, Mic, MessageCircle, Fullscreen, Pause, Play as PlayIcon, Video, VideoOff, Monitor, Eye, EyeOff, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
@@ -119,6 +119,10 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     // appearing on camera, and that has to be a choice made before the
     // stream goes out, not something to undo afterwards.
     const [startWithCamera, setStartWithCamera] = useState<boolean | null>(null);
+    // Which side panel is open, the way a call does it: the picture keeps the
+    // room and the lists come over it, instead of everything stacked down the
+    // page. Only one at a time — two panels would leave no video.
+    const [sidePanel, setSidePanel] = useState<'people' | 'chat' | null>(null);
 
     const [unseenMessages, setUnseenMessages] = useState(0);
 
@@ -2140,16 +2144,68 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
             {/* Main Content - Responsive */}
 
-            <div className="max-w-7xl mx-auto p-2 sm:p-4 flex flex-col lg:grid lg:grid-cols-4 gap-3 sm:gap-6">
+            <div className={`max-w-7xl mx-auto p-2 sm:p-4 flex flex-col gap-3 sm:gap-6 ${sidePanel ? 'lg:grid lg:grid-cols-4' : 'lg:block'}`}>
 
                 {/* Video Player (Agora placeholder) - Responsive */}
 
-                <div className="lg:col-span-3 order-1">
+                <div className={`order-1 ${sidePanel ? 'lg:col-span-3' : ''}`}>
 
                     <div className="bg-black rounded-xl overflow-hidden shadow-2xl relative">
 
                         <div id="agora-video-container" className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 relative flex items-center justify-center" style={{ userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
                             <style>{`
+                                /* The control bar: one floating pill of round
+                                   buttons over the video, instead of a row of
+                                   small rectangles sitting on the picture. */
+                                .tth-bar {
+                                    background: rgba(24, 26, 31, 0.92);
+                                    backdrop-filter: blur(12px);
+                                    -webkit-backdrop-filter: blur(12px);
+                                    border: 1px solid rgba(255,255,255,0.08);
+                                    border-radius: 9999px;
+                                    padding: 6px 8px;
+                                    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+                                    scrollbar-width: none;
+                                }
+                                .tth-bar::-webkit-scrollbar { display: none; }
+                                .tth-bar button {
+                                    border-radius: 9999px !important;
+                                    min-width: 42px;
+                                    height: 42px;
+                                    padding-inline: 12px !important;
+                                    flex: 0 0 auto;
+                                }
+                                .tth-bar select {
+                                    border-radius: 9999px !important;
+                                    height: 38px;
+                                }
+                                @media (max-width: 640px) {
+                                    .tth-bar button { min-width: 38px; height: 38px; padding-inline: 9px !important; }
+                                }
+
+                                /* The teacher's name sits on the picture, the
+                                   way it does in a call, not in a card below. */
+                                .tth-nameplate {
+                                    position: absolute;
+                                    bottom: 12px;
+                                    inset-inline-start: 14px;
+                                    z-index: 10001;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 8px;
+                                    max-width: min(60%, 320px);
+                                    padding: 6px 12px 6px 8px;
+                                    border-radius: 9999px;
+                                    background: rgba(0,0,0,0.55);
+                                    backdrop-filter: blur(8px);
+                                    -webkit-backdrop-filter: blur(8px);
+                                    color: #fff;
+                                    font-size: 13px;
+                                    font-weight: 600;
+                                    pointer-events: none;
+                                }
+                                @media (max-width: 640px) { .tth-nameplate { display: none; } }
+
                                 .ios-fullscreen {
                                     position: fixed !important;
                                     top: 0 !important;
@@ -2293,6 +2349,19 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                     </div>
                                 </div>
                             )}
+
+                            {/* Whose picture this is, written on the picture. */}
+                            {(() => {
+                                const teacher = session?.presenter || session?.professor_name || '';
+                                return teacher ? (
+                                    <div className="tth-nameplate">
+                                        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#194cbf] to-[#61a1ff] text-[11px] font-bold">
+                                            {teacher.charAt(0).toUpperCase()}
+                                        </span>
+                                        <span className="truncate">{teacher}</span>
+                                    </div>
+                                ) : null;
+                            })()}
 
                             {/* Zone vidéo Agora */}
 
@@ -2592,7 +2661,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                             {/* Video Controls - Responsive for Mobile/Tablet */}
 
-                            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex flex-row flex-nowrap gap-1 sm:gap-2 max-w-full px-2 items-center justify-center w-auto" style={{ zIndex: 10002 }}>
+                            <div className="tth-bar absolute bottom-3 sm:bottom-5 left-1/2 transform -translate-x-1/2 flex flex-row flex-nowrap gap-1.5 sm:gap-2 max-w-[calc(100%-1rem)] items-center justify-center w-auto overflow-x-auto" style={{ zIndex: 10002 }}>
 
                                 {/* Fullscreen button (all users) */}
 
@@ -2891,6 +2960,35 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                                 )}
 
+
+                                {/* Open the room list or the chat over the video, the way a call does
+                                    it, rather than stacking them down the page. */}
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className={`border-0 text-xs sm:text-sm ${sidePanel === 'people' ? 'bg-[#194cbf] hover:bg-[#61a1ff] text-white' : 'bg-black/50 hover:bg-black/70 text-white'}`}
+                                    onClick={() => setSidePanel(sidePanel === 'people' ? null : 'people')}
+                                    title="المشاركون"
+                                >
+                                    <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+                                    <span className="ml-1 text-[11px] font-semibold">{participants.length}</span>
+                                </Button>
+
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className={`relative border-0 text-xs sm:text-sm ${sidePanel === 'chat' ? 'bg-[#194cbf] hover:bg-[#61a1ff] text-white' : 'bg-black/50 hover:bg-black/70 text-white'}`}
+                                    onClick={() => setSidePanel(sidePanel === 'chat' ? null : 'chat')}
+                                    title="الدردشة"
+                                >
+                                    <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4" />
+                                    {sidePanel !== 'chat' && unseenMessages > 0 && (
+                                        <span className="absolute -top-1 -right-1 grid h-5 min-w-[1.25rem] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                                            {unseenMessages}
+                                        </span>
+                                    )}
+                                </Button>
+
                             </div>
 
 
@@ -2935,8 +3033,23 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                 {/* Chat Sidebar - Responsive: bottom on mobile/tablet, right on desktop */}
 
-                <div className={`order-2 lg:order-2 lg:col-span-1 ${isFullScreen ? 'block' : 'block lg:block'}`}>
+                <div className={`order-2 lg:order-2 lg:col-span-1 ${sidePanel ? 'block' : 'hidden'}`}>
+                    <div className="mb-2 flex items-center justify-between rounded-xl bg-white/5 px-3 py-2">
+                        <span className="text-sm font-semibold text-white">
+                            {sidePanel === 'people' ? 'المشاركون' : 'الدردشة'}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setSidePanel(null)}
+                            aria-label="إغلاق"
+                            title="إغلاق"
+                            className="rounded-full p-1.5 text-gray-300 transition hover:bg-white/10 hover:text-white"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
 
+                    {sidePanel === 'people' && (
                     <div className="rounded-2xl border border-white/10 bg-white/[0.07] backdrop-blur-sm p-3 sm:p-4 shadow-lg shadow-black/20 mb-3 sm:mb-4">
                 <h3 className="font-bold mb-3 sm:mb-4 text-white flex flex-wrap items-center gap-2 text-sm sm:text-base">
                     <span className="grid place-items-center h-8 w-8 rounded-xl bg-[#194cbf]/25 text-[#9ec1ff]">
@@ -3268,6 +3381,9 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
             </div>
 
 
+                    )}
+
+                    {sidePanel === 'chat' && (
                     <ChatSidebar
 
                         messages={messages}
@@ -3287,6 +3403,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                         onExpand={() => setChatExpanded(true)}
 
                     />
+                    )}
 
                 </div>
 
