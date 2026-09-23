@@ -131,8 +131,17 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     const anyPanel = showPeople || showChat;
 
     const [unseenMessages, setUnseenMessages] = useState(0);
+    // Where the conversation was when the panel was last opened, so the unread
+    // ones can be marked off from the rest. Null means everything is read.
+    const [unreadDividerIndex, setUnreadDividerIndex] = useState<number | null>(null);
+    // The message the teacher wants kept in view for everyone.
+    const [pinnedMessage, setPinnedMessage] = useState<{ sender: string; text: string } | null>(null);
 
     const [lastSeenMessageId, setLastSeenMessageId] = useState(0);
+    // The message handler is registered once, so reading showChat directly
+    // there would keep whatever it was at the time — always false. A ref is
+    // read fresh on every message.
+    const showChatRef = useRef(false);
 
     const [accessChecked, setAccessChecked] = useState(false);
 
@@ -838,8 +847,8 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
             // Increment unseen messages if chat is not visible or user is not in fullscreen
 
-            if (!showFullscreenChat || !isFullScreen) {
-
+            const chatOnScreen = showChatRef.current || (showFullscreenChat && isFullScreen);
+            if (!chatOnScreen) {
                 setUnseenMessages(prev => prev + 1);
 
                 // Save to database
@@ -1008,6 +1017,12 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         // The teacher paused, hit a technical problem, or came back. Sent on
         // every change and once on arrival, so the badge and the banner never
         // show a status the room has already left.
+        newSocket.on('message-pinned', (data: { sender: string; text: string } | null) => {
+
+            setPinnedMessage(data && data.text ? data : null);
+
+        });
+
         newSocket.on('session-status', (data: { status?: string }) => {
 
             if (!data?.status) return;
@@ -1436,6 +1451,18 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
 
 
+    // Pinning is the teacher's: the server checks the role again, so this is
+    // the convenience, not the rule.
+    const handlePinMessage = (message: { sender: string; text: string }) => {
+        if (!socket || !isProfessor) return;
+        socket.emit('pin-message', id, { sender: message.sender, text: message.text });
+    };
+
+    const handleUnpinMessage = () => {
+        if (!socket || !isProfessor) return;
+        socket.emit('unpin-message', id);
+    };
+
     const handleToggleChat = () => {
 
         setChatEnabled((v) => {
@@ -1476,12 +1503,25 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
 
 
-    // Mark messages as seen when chat becomes visible
-
+    // Opening the panel marks the conversation read and remembers where the
+    // new messages began, so a line can be drawn between old and new. Closing
+    // it clears the line, so the next visit marks its own.
     useEffect(() => {
+        showChatRef.current = showChat;
+        if (!showChat) {
+            setUnreadDividerIndex(null);
+            return;
+        }
+        if (unseenMessages > 0) {
+            setUnreadDividerIndex(Math.max(0, messages.length - unseenMessages));
+        }
+        markMessagesAsSeen();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showChat]);
 
+    // Mark messages as seen when chat becomes visible
+    useEffect(() => {
         if (showFullscreenChat && isFullScreen) {
-
             markMessagesAsSeen();
 
         }
@@ -3440,6 +3480,14 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                         isProfessor={isProfessor}
 
                         onExpand={() => setChatExpanded(true)}
+
+                        unreadDividerIndex={unreadDividerIndex}
+
+                        pinnedMessage={pinnedMessage}
+
+                        onPin={handlePinMessage}
+
+                        onUnpin={handleUnpinMessage}
 
                     />
                     </div>

@@ -45,6 +45,10 @@ const roomUsers = {};
 // Persistent mute state for each room
 const roomMuteState = {}; // { [roomId]: true/false }
 const roomChatState = {}; // { [roomId]: true/false } — chat open/closed, sent to late joiners
+// The one message a teacher wants everyone to keep seeing. Memory is the right
+// home: it belongs to the lesson happening now, not to the session's record,
+// and a teacher who restarts mid-lesson pins it again in a second.
+const roomPinned = {}; // { [roomId]: { sender, text } | null }
 
 // The memory above is only a cache: it is emptied by every restart, which
 // used to silently unlock chat and mics while the teacher's screen still
@@ -231,6 +235,9 @@ io.on('connection', (socket) => {
       socket.emit('chat-toggled', chatEnabled);
     });
 
+    // A student arriving after the teacher pinned something still sees it.
+    socket.emit('message-pinned', roomPinned[roomId] ?? null);
+
     // A student who arrives while the lesson is paused, or while the teacher
     // is dealing with a technical problem, has to be told on arrival — the
     // broadcast that announced it went out before they were here. Private
@@ -383,6 +390,20 @@ io.on('connection', (socket) => {
     // Also emit to the sender for immediate feedback
     socket.emit('students-unmuted');
     io.to(roomId).emit('students-muted-state', false);
+  });
+
+  // Only the teacher pins. The client hides the control from students, and
+  // this checks it again, because a hidden button is not a permission.
+  socket.on('pin-message', (roomId, message) => {
+    if (socket.userData?.role !== 'professor') return;
+    roomPinned[roomId] = message && message.text ? message : null;
+    io.to(roomId).emit('message-pinned', roomPinned[roomId]);
+  });
+
+  socket.on('unpin-message', (roomId) => {
+    if (socket.userData?.role !== 'professor') return;
+    roomPinned[roomId] = null;
+    io.to(roomId).emit('message-pinned', null);
   });
 
   socket.on('toggle-chat', (roomId, enabled) => {

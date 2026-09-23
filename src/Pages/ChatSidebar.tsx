@@ -1,7 +1,7 @@
 // src/components/ChatSidebar.tsx
 import React, { useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Maximize2 } from 'lucide-react';
+import { MessageSquare, Maximize2, Pin, PinOff } from 'lucide-react';
 
 interface Message {
     sender: string;
@@ -24,6 +24,14 @@ interface Props {
     // The live page stacks this beside the participants list and wants the
     // two to come out the same size.
     fill?: boolean;
+    // Draw the "new messages" line before this position. Messages carry no
+    // id here, so the boundary is a position in the list, fixed at the moment
+    // the panel was opened.
+    unreadDividerIndex?: number | null;
+    // The message the teacher is holding in view for the room.
+    pinnedMessage?: { sender: string; text: string } | null;
+    onPin?: (message: Message) => void;
+    onUnpin?: () => void;
 }
 
 const ChatSidebar: React.FC<Props> = ({
@@ -35,7 +43,11 @@ const ChatSidebar: React.FC<Props> = ({
     studentsMuted,
     isProfessor,
     onExpand,
-    fill = false
+    fill = false,
+    unreadDividerIndex = null,
+    pinnedMessage = null,
+    onPin,
+    onUnpin
 }) => {
     const chatEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -91,6 +103,28 @@ const ChatSidebar: React.FC<Props> = ({
                     )}
                 </div>
 
+                {pinnedMessage && (
+                    <div className="mb-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3">
+                        <div className="flex items-center gap-2 text-amber-300">
+                            <Pin className="h-3.5 w-3.5" />
+                            <span className="text-[11px] font-bold tracking-wide">مثبّتة</span>
+                            {isProfessor && onUnpin && (
+                                <button
+                                    type="button"
+                                    onClick={onUnpin}
+                                    title="إلغاء التثبيت"
+                                    aria-label="إلغاء التثبيت"
+                                    className="ml-auto rounded-full p-1 text-amber-200 transition hover:bg-amber-400/20"
+                                >
+                                    <PinOff className="h-3.5 w-3.5" />
+                                </button>
+                            )}
+                        </div>
+                        <div className="mt-1 text-xs font-semibold text-amber-100">{pinnedMessage.sender}</div>
+                        <div className="whitespace-pre-line break-words text-sm text-amber-50/90">{pinnedMessage.text}</div>
+                    </div>
+                )}
+
                 <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-3 mb-4 scrollbar-hide">
                     {messages.length === 0 ? (
                         <div className="text-center text-gray-400 py-8">
@@ -100,10 +134,32 @@ const ChatSidebar: React.FC<Props> = ({
                         </div>
                     ) : (
                         messages.map((msg, idx) => (
-                            <div key={idx} className="bg-white/5 rounded-lg p-3">
-                                <div className={`font-medium text-sm ${msg.color}`}>{msg.sender}</div>
-                                <div className="text-sm text-gray-300 break-words whitespace-pre-line">{msg.text}</div>
-                            </div>
+                            <React.Fragment key={idx}>
+                                {unreadDividerIndex !== null && idx === unreadDividerIndex && (
+                                    <div className="flex items-center gap-2 py-1" aria-label="رسائل جديدة">
+                                        <span className="h-px flex-1 bg-red-500/60" />
+                                        <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-300">
+                                            رسائل جديدة
+                                        </span>
+                                        <span className="h-px flex-1 bg-red-500/60" />
+                                    </div>
+                                )}
+                                <div className="group relative rounded-lg bg-white/5 p-3">
+                                    <div className={`font-medium text-sm ${msg.color}`}>{msg.sender}</div>
+                                    <div className="text-sm text-gray-300 break-words whitespace-pre-line">{msg.text}</div>
+                                    {isProfessor && onPin && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onPin(msg)}
+                                            title="تثبيت الرسالة"
+                                            aria-label="تثبيت الرسالة"
+                                            className="absolute top-2 left-2 rounded-full p-1.5 text-gray-400 opacity-0 transition hover:bg-white/10 hover:text-amber-300 focus:opacity-100 group-hover:opacity-100"
+                                        >
+                                            <Pin className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                            </React.Fragment>
                         ))
                     )}
                     <div ref={chatEndRef}></div>
