@@ -2977,33 +2977,19 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
 
 
-            {/* Session Information */}
-
-            <div className="max-w-7xl mx-auto p-2 sm:p-4 mt-3 sm:mt-6">
-
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 sm:p-6">
-
-                    <h1 className="text-xl sm:text-2xl font-bold mb-2">{session.title}</h1>
-
-                    <p className="text-gray-300 mb-4">مقدم من: {session.presenter}</p>
-
-                    <p className="text-gray-400 leading-relaxed mb-4">{session.description}</p>
-
-                </div>
-
-            </div>
-
-
-
-            {/* Interactive Participants List - Responsive */}
-
-            <div className="bg-white/10 rounded-xl p-2 sm:p-4 mt-3 sm:mt-6">
-
-                <h3 className="font-bold mb-2 sm:mb-4 text-white flex items-center gap-2 text-sm sm:text-base">
-
-                    <Users className="w-4 h-4 sm:w-5 sm:h-5" />
-
-                    المشاركون ({participants.length})
+            {/* Who is in the room comes first: it used to sit under the session
+                details, off the bottom of the screen, so a teacher could not see
+                who had arrived without scrolling past text they already knew. */}
+            <div className="max-w-7xl mx-auto px-2 sm:px-4 mt-3 sm:mt-6 space-y-3 sm:space-y-4">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.07] backdrop-blur-sm p-3 sm:p-5 shadow-lg shadow-black/20">
+                <h3 className="font-bold mb-3 sm:mb-4 text-white flex flex-wrap items-center gap-2 text-sm sm:text-base">
+                    <span className="grid place-items-center h-8 w-8 rounded-xl bg-[#194cbf]/25 text-[#9ec1ff]">
+                        <Users className="w-4 h-4" />
+                    </span>
+                    المشاركون
+                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-gray-200">
+                        {participants.length}
+                    </span>
 
                     {isProfessor && (
 
@@ -3310,27 +3296,57 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
 
                 {/* Participants Summary - Responsive */}
-
-                <div className="mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-white/10">
-
+                <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/10">
                     <div className="flex justify-between text-xs sm:text-sm text-gray-300">
-
                         <span>إجمالي المشاركين: {participants.length}</span>
-
-                        <span className="flex items-center gap-1">
-
-                            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full"></div>
-
+                        <span className="flex items-center gap-1.5">
+                            <span className="relative flex h-2 w-2">
+                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-60"></span>
+                                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
+                            </span>
                             <span className="hidden sm:inline">متصلون الآن</span>
-
                             <span className="sm:hidden">متصلون</span>
-
                         </span>
-
                     </div>
+                </div>
+            </div>
 
+            {/* The session details. The teacher's name was read from a field the
+                API does not send for an ordinary session, so "مقدم من:" was
+                always blank; professor_name is the one that is actually there. */}
+            <div className="rounded-2xl border border-white/10 bg-white/[0.07] backdrop-blur-sm p-4 sm:p-6 shadow-lg shadow-black/20">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <h1 className="text-xl sm:text-2xl font-bold text-white leading-snug">
+                        {session.title}
+                    </h1>
+                    {STREAM_STATE[session.status] && (
+                        <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${STREAM_STATE[session.status].cls}`}>
+                            {STREAM_STATE[session.status].label}
+                        </span>
+                    )}
                 </div>
 
+                {(() => {
+                    const teacher = session.presenter || session.professor_name || '';
+                    return teacher ? (
+                        <div className="mt-4 flex items-center gap-3">
+                            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#194cbf] to-[#61a1ff] text-base font-bold text-white">
+                                {teacher.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-xs text-gray-400">الأستاذ</p>
+                                <p className="truncate font-semibold text-white">{teacher}</p>
+                            </div>
+                        </div>
+                    ) : null;
+                })()}
+
+                {session.description && (
+                    <p className="mt-4 rounded-xl bg-black/20 p-3 sm:p-4 leading-relaxed text-gray-300">
+                        {session.description}
+                    </p>
+                )}
+            </div>
             </div>
 
 

@@ -789,8 +789,15 @@ router.get('/live-sessions/:id', verifyToken, async (req, res) => {
                 m.year_id,
                 s.name as speciality_name,
                 COALESCE(y1.name, y2.name) as year_name,
-                COALESCE(l1.name, l2.name) as level_name
+                COALESCE(l1.name, l2.name) as level_name,
+                -- The page shows "مقدم من: {presenter}". A private class sends
+                -- that field; an ordinary session sent the raw row, which has
+                -- professor_name and no presenter at all, so the name was
+                -- always blank. The users table wins, because a teacher who
+                -- renames their account should not stay renamed only here.
+                COALESCE(pu.name, ls.professor_name) as presenter
             FROM live_sessions ls
+            LEFT JOIN users pu ON pu.id = ls.professor_id
             LEFT JOIN materials m ON ls.material_id = m.id
             LEFT JOIN specialities s ON m.speciality_id = s.id
             LEFT JOIN years y1 ON s.year_id = y1.id
