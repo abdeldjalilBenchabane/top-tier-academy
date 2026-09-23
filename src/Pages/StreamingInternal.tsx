@@ -2058,9 +2058,9 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
             <nav dir="rtl" className="bg-[#202124] border-b border-white/10 text-white sticky top-0 z-50">
 
-                <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-4 flex items-center justify-between">
+                <div className="max-w-7xl mx-auto px-2 sm:px-4 py-1.5 flex items-center justify-between gap-2">
 
-                    <div className="flex items-center gap-2 sm:gap-4">
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3">
 
                         <Button
 
@@ -2070,7 +2070,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                             onClick={() => navigate(-1)}
 
-                            className="text-white hover:bg-white/10 text-xs sm:text-sm"
+                            className="shrink-0 h-8 px-2 text-white hover:bg-white/10 text-xs"
 
                         >
 
@@ -2080,58 +2080,44 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                         </Button>
 
-                        <div className="min-w-0 flex-1">
+                        {/* One line: the title, then the small facts beside it. They used to
+                            stack four deep, which made the bar taller than the
+                            controls it sits above. */}
+                        <div className="flex min-w-0 flex-1 items-center gap-2">
 
-                            <h1 className="text-sm sm:text-lg font-semibold truncate">{session.title}</h1>
-
-                            <p className="text-xs sm:text-sm text-gray-300">مشاهدون: {viewerCount}</p>
+                            <h1 className="min-w-0 truncate text-sm font-semibold sm:text-base">{session.title}</h1>
 
                             {STREAM_STATE[session.status] && (
-
-                                <span className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${STREAM_STATE[session.status].cls}`}>
-
+                                <span className={`hidden shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium sm:inline-flex ${STREAM_STATE[session.status].cls}`}>
                                     {session.status === 'paused' || session.status === 'technical_issues' ? (
-
-                                        <span className="w-1.5 h-1.5 rounded-full bg-current" />
-
+                                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
                                     ) : session.status === 'live' ? (
-
-                                        <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-
+                                        <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
                                     ) : null}
-
                                     {STREAM_STATE[session.status].label}
-
                                 </span>
-
                             )}
 
+                            <span className="hidden shrink-0 items-center gap-1 text-[11px] text-gray-400 sm:inline-flex">
+                                <Eye className="h-3 w-3" />
+                                {viewerCount}
+                            </span>
+
                             {!isProfessor && (
-
-                                <div className="flex items-center gap-1 sm:gap-2 mt-1 flex-wrap">
-
-                                    <span className={`inline-flex items-center gap-1 px-1 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium ${studentMuteStates[user?.id] ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300'}`}>
-
-                                        {studentMuteStates[user?.id] ? <MicOff className="w-2 h-2 sm:w-3 sm:h-3" /> : <Mic className="w-2 h-2 sm:w-3 sm:h-3" />}
-
-                                        <span className="hidden sm:inline">{studentMuteStates[user?.id] ? 'مكتوم' : 'ميكروفون نشط'}</span>
-
-                                    </span>
-
-                                    {studentsMuted && (
-
-                                        <span className="inline-flex items-center gap-1 px-1 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium bg-orange-500/20 text-orange-300">
-
-                                            <MicOff className="w-2 h-2 sm:w-3 sm:h-3" />
-
-                                            <span className="hidden sm:inline">مكتوم من قبل الأستاذ</span>
-
-                                        </span>
-
-                                    )}
-
-                                </div>
-
+                                <span
+                                    title={studentsMuted ? 'مكتوم من قبل الأستاذ' : (studentMuteStates[user?.id] ? 'مكتوم' : 'ميكروفون نشط')}
+                                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${
+                                        studentsMuted
+                                            ? 'bg-orange-500/20 text-orange-300'
+                                            : studentMuteStates[user?.id]
+                                            ? 'bg-red-500/20 text-red-300'
+                                            : 'bg-green-500/20 text-green-300'
+                                    }`}
+                                >
+                                    {studentsMuted || studentMuteStates[user?.id]
+                                        ? <MicOff className="h-3 w-3" />
+                                        : <Mic className="h-3 w-3" />}
+                                </span>
                             )}
 
                         </div>
@@ -2147,7 +2133,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                             onClick={() => setShowPeople(!showPeople)}
                             title={showPeople ? 'إخفاء المشاركين' : 'عرض المشاركين'}
                             aria-pressed={showPeople}
-                            className={`flex shrink-0 items-center gap-2 rounded-full border px-2.5 py-1 transition ${
+                            className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2 transition ${
                                 showPeople
                                     ? 'border-[#194cbf] bg-[#194cbf] text-white'
                                     : 'border-white/15 bg-white/5 text-gray-200 hover:bg-white/10'
@@ -2162,14 +2148,14 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                             onClick={() => setShowChat(!showChat)}
                             title={showChat ? 'إخفاء الدردشة' : 'عرض الدردشة'}
                             aria-pressed={showChat}
-                            className={`relative flex shrink-0 items-center gap-2 rounded-full border px-2.5 py-1 transition ${
+                            className={`relative flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2 transition ${
                                 showChat
                                     ? 'border-[#194cbf] bg-[#194cbf] text-white'
                                     : 'border-white/15 bg-white/5 text-gray-200 hover:bg-white/10'
                             }`}
                         >
                             <MessageSquare className="h-4 w-4" />
-                            <span className="text-xs font-semibold">الدردشة</span>
+                            <span className="hidden text-xs font-semibold sm:inline">الدردشة</span>
                             {!showChat && unseenMessages > 0 && (
                                 <span className="absolute -top-1.5 -right-1.5 grid h-5 min-w-[1.25rem] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
                                     {unseenMessages}
