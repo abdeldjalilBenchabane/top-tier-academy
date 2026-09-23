@@ -102,3 +102,24 @@ public/uploads/live-sessions/
 test-*.js
 *.test.js
 *.spec.js
+
+# --- Secrets -------------------------------------------------------------
+# ".env" alone only matches a file named exactly .env. Copies and backups
+# such as backend/.env.bak-dblockdown carried every production key, so
+# anything env-shaped is kept out, wherever it sits.
+.env*
+*.env
+*.env.*
+!env-template.txt
+*.bak
+*.bak-*
+*.pem
+*.key
+*service-account*.json
+*firebase-adminsdk*.json
+
+# --- Data, not code ------------------------------------------------------
+uploads/
+public/uploads/
+*.dump
+*.sql.gz
