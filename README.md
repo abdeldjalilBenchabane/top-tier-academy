@@ -982,3 +982,4 @@ All migration scripts are located in the `backend/` folder and follow the naming
 - `materials.speciality_id` - Link to specialities (can be null)
 
 For detailed migration information, see `DATABASE_MIGRATIONS.md`.
+
