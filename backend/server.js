@@ -46,6 +46,38 @@ const roomUsers = {};
 const roomMuteState = {}; // { [roomId]: true/false }
 const roomChatState = {}; // { [roomId]: true/false } — chat open/closed, sent to late joiners
 
+// The memory above is only a cache: it is emptied by every restart, which
+// used to silently unlock chat and mics while the teacher's screen still
+// showed them locked. The session row is the real record.
+async function loadRoomLocks(roomId) {
+  const sessionId = Number(roomId);
+  if (!Number.isInteger(sessionId) || sessionId <= 0) {
+    return { chatEnabled: roomChatState[roomId] ?? true, studentsMuted: roomMuteState[roomId] ?? false };
+  }
+  try {
+    const row = await pool.query(
+      'SELECT chat_enabled, students_muted FROM live_sessions WHERE id = $1', [sessionId]);
+    const found = row.rows[0];
+    if (found) {
+      roomChatState[roomId] = found.chat_enabled !== false;
+      roomMuteState[roomId] = found.students_muted === true;
+    }
+  } catch (error) {
+    console.error('[locks] could not read session locks:', error.message);
+  }
+  return { chatEnabled: roomChatState[roomId] ?? true, studentsMuted: roomMuteState[roomId] ?? false };
+}
+
+async function saveRoomLock(roomId, column, value) {
+  const sessionId = Number(roomId);
+  if (!Number.isInteger(sessionId) || sessionId <= 0) return;
+  try {
+    await pool.query(`UPDATE live_sessions SET ${column} = $1 WHERE id = $2`, [value, sessionId]);
+  } catch (error) {
+    console.error('[locks] could not save session lock:', error.message);
+  }
+}
+
 // Sessions already announced as ended, so a double click doesn't notify twice.
 const endedAnnounced = new Set();
 
@@ -192,10 +224,12 @@ io.on('connection', (socket) => {
     socket.userData = userData;
     socket.roomId = roomId;
 
-    // Send current mute state to the new user
-    const isMuted = roomMuteState[roomId] ?? false; // default to unmuted
-    socket.emit('students-muted-state', isMuted);
-    socket.emit('chat-toggled', roomChatState[roomId] ?? true);
+    // Send the stored state to the new user, so someone joining late — or
+    // rejoining after leaving — sees exactly what the teacher set.
+    loadRoomLocks(roomId).then(({ chatEnabled, studentsMuted }) => {
+      socket.emit('students-muted-state', studentsMuted);
+      socket.emit('chat-toggled', chatEnabled);
+    });
 
     // A student who arrives while the lesson is paused, or while the teacher
     // is dealing with a technical problem, has to be told on arrival — the
@@ -333,6 +367,7 @@ io.on('connection', (socket) => {
   // Handle professor controls
   socket.on('mute-all', (roomId) => {
     roomMuteState[roomId] = true;
+    saveRoomLock(roomId, 'students_muted', true);
     console.log(`[DEBUG] Professor ${socket.userData?.name} (${socket.id}) muted all students in room ${roomId}`);
     socket.to(roomId).emit('students-muted');
     // Also emit to the sender for immediate feedback
@@ -342,6 +377,7 @@ io.on('connection', (socket) => {
 
   socket.on('unmute-all', (roomId) => {
     roomMuteState[roomId] = false;
+    saveRoomLock(roomId, 'students_muted', false);
     console.log(`[DEBUG] Professor ${socket.userData?.name} (${socket.id}) unmuted all students in room ${roomId}`);
     socket.to(roomId).emit('students-unmuted');
     // Also emit to the sender for immediate feedback
@@ -350,7 +386,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('toggle-chat', (roomId, enabled) => {
-    roomChatState[roomId] = enabled;
+    roomChatState[roomId] = enabled !== false;
+    saveRoomLock(roomId, 'chat_enabled', enabled !== false);
     io.to(roomId).emit('chat-toggled', enabled);
   });
 
