@@ -2937,52 +2937,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                 <div className={`order-2 lg:order-2 lg:col-span-1 ${isFullScreen ? 'block' : 'block lg:block'}`}>
 
-                    <ChatSidebar
-
-                        messages={messages}
-
-                        input={input}
-
-                        setInput={setInput}
-
-                        handleSend={handleSend}
-
-                        chatEnabled={chatEnabled}
-
-                        studentsMuted={studentsMuted}
-
-                        isProfessor={isProfessor}
-
-                        onExpand={() => setChatExpanded(true)}
-
-                    />
-
-                </div>
-
-            </div>
-
-
-
-            {/* The same conversation, given the whole window — for the student
-                reading along and for the teacher following students' questions. */}
-            <ChatExpanded
-                open={chatExpanded}
-                onClose={() => setChatExpanded(false)}
-                messages={messages}
-                input={input}
-                setInput={setInput}
-                handleSend={handleSend}
-                chatEnabled={chatEnabled}
-                isProfessor={isProfessor}
-            />
-
-
-
-            {/* Who is in the room comes first: it used to sit under the session
-                details, off the bottom of the screen, so a teacher could not see
-                who had arrived without scrolling past text they already knew. */}
-            <div className="max-w-7xl mx-auto px-2 sm:px-4 mt-3 sm:mt-6 space-y-3 sm:space-y-4">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.07] backdrop-blur-sm p-3 sm:p-5 shadow-lg shadow-black/20">
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.07] backdrop-blur-sm p-3 sm:p-4 shadow-lg shadow-black/20 mb-3 sm:mb-4">
                 <h3 className="font-bold mb-3 sm:mb-4 text-white flex flex-wrap items-center gap-2 text-sm sm:text-base">
                     <span className="grid place-items-center h-8 w-8 rounded-xl bg-[#194cbf]/25 text-[#9ec1ff]">
                         <Users className="w-4 h-4" />
@@ -3028,7 +2983,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                 ) : (
 
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-4">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-2 gap-3 lg:max-h-[19rem] lg:overflow-y-auto lg:pr-1">
 
                         {participants.map((participant) => {
 
@@ -3312,6 +3267,52 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                 </div>
             </div>
 
+
+                    <ChatSidebar
+
+                        messages={messages}
+
+                        input={input}
+
+                        setInput={setInput}
+
+                        handleSend={handleSend}
+
+                        chatEnabled={chatEnabled}
+
+                        studentsMuted={studentsMuted}
+
+                        isProfessor={isProfessor}
+
+                        onExpand={() => setChatExpanded(true)}
+
+                    />
+
+                </div>
+
+            </div>
+
+
+
+            {/* The same conversation, given the whole window — for the student
+                reading along and for the teacher following students' questions. */}
+            <ChatExpanded
+                open={chatExpanded}
+                onClose={() => setChatExpanded(false)}
+                messages={messages}
+                input={input}
+                setInput={setInput}
+                handleSend={handleSend}
+                chatEnabled={chatEnabled}
+                isProfessor={isProfessor}
+            />
+
+
+
+            {/* The session details, under the video. Who is in the room is not here:
+                it sits beside the video in the side column, where it can be seen
+                without scrolling. */}
+            <div className="max-w-7xl mx-auto px-2 sm:px-4 mt-3 sm:mt-6 space-y-3 sm:space-y-4">
             {/* The session details. The teacher's name was read from a field the
                 API does not send for an ordinary session, so "مقدم من:" was
                 always blank; professor_name is the one that is actually there. */}
