@@ -123,7 +123,11 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     // chat, or both. They share the column and come out the same height, so
     // neither looks like the important one.
     const [showPeople, setShowPeople] = useState(false);
-    const [showChat, setShowChat] = useState(false);
+    // A student arrives with the chat already open: following along and asking
+    // is most of what they do in a lesson, and a closed panel reads as "there
+    // is no chat". A teacher starts with it closed — they are presenting, and
+    // the chip in the corner brings it back with its unread count.
+    const [showChat, setShowChat] = useState(user?.role !== 'professor');
     const anyPanel = showPeople || showChat;
 
     const [unseenMessages, setUnseenMessages] = useState(0);
