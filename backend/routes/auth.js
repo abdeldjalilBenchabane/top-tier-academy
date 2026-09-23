@@ -102,7 +102,7 @@ const generateToken = (user, sessionToken) => {
       // that session is retired — that is what makes "one device" real.
       sid: sessionToken
     },
-    process.env.JWT_SECRET || '***REMOVED***',
+    process.env.JWT_SECRET,
     { expiresIn: AUTH_LIFETIME }
   );
 };
@@ -372,7 +372,7 @@ router.post('/refresh-token', verifyToken, async (req, res) => {
         // a token that outlives the logout that retired it.
         sid: req.user.sid
       },
-      process.env.JWT_SECRET || '***REMOVED***',
+      process.env.JWT_SECRET,
       // Was 30 days, which would have capped the session at a month however
       // long the login token said it had.
       { expiresIn: AUTH_LIFETIME }

@@ -852,12 +852,14 @@ router.post('/live-sessions/:sessionId/purchase', verifyToken, requireStudent, a
         }
 
         // Get student's points balance
+        // A student only gets a user_points row once points first move. Most
+        // students have never had one, and refusing them here meant a free
+        // session could not be joined by the very people it is aimed at —
+        // "No points balance found. Please purchase points first." for
+        // something that costs nothing. No row simply means nothing in it;
+        // the price check below still stops a paid session.
         const studentPoints = await getRow('SELECT balance FROM user_points WHERE user_id = $1', [student_id]);
-        if (!studentPoints) {
-            return res.status(400).json({ error: 'No points balance found. Please purchase points first.' });
-        }
-
-        const currentBalance = studentPoints.balance;
+        const currentBalance = Number(studentPoints?.balance) || 0;
         
         // Only check balance if live session is not free
         if (pointsNeeded > 0 && currentBalance < pointsNeeded) {
@@ -956,7 +958,11 @@ router.post('/live-sessions/:sessionId/purchase', verifyToken, requireStudent, a
 
             // Get updated balance
             const newBalanceRes = await getRow('SELECT balance FROM user_points WHERE user_id = $1', [student_id]);
-            const newBalance = newBalanceRes.balance;
+            // Free sessions move no points, so a student who never had a row
+            // still has none here. Reading .balance off nothing threw after
+            // the purchase was already saved: the student owned the session
+            // and was told the server had failed.
+            const newBalance = Number(newBalanceRes?.balance) || 0;
 
             res.status(201).json({
                 message: 'Live session purchased successfully',

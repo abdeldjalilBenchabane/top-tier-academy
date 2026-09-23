@@ -1,6 +1,15 @@
 import jwt from 'jsonwebtoken';
 import { getRow } from '../db.js';
 
+// No fallback on purpose. A signing key that quietly defaults to a
+// placeholder anyone can guess is not a key. If it is missing, fail here,
+// loudly, rather than accept forged tokens.
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET is not set in backend/.env — refusing to start.');
+  process.exit(1);
+}
+
 // ---------------------------------------------------------------------------
 // Session enforcement.
 //
@@ -53,7 +62,7 @@ export const verifyToken = async (req, res, next) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET || '***REMOVED***');
+    decoded = jwt.verify(token, JWT_SECRET);
   } catch (error) {
     return res.status(400).json({ error: 'Invalid token.' });
   }
@@ -90,7 +99,7 @@ export const verifyTokenAndSession = async (req, res, next) => {
 
   try {
     // Verify JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || '***REMOVED***');
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     
     // If session token is provided, validate it

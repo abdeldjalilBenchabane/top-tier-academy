@@ -1,38 +1,52 @@
-# Database Configuration
-DB_HOST=localhost
+# Template for backend/.env — copy it, then fill in the real values.
+#
+# Every value here is a placeholder. It used to hold the live database
+# password and other real settings, which meant the project could not be
+# published without leaking them. The real file is backend/.env and is
+# never committed.
+
+# --- Database (PostgreSQL) ---
+DB_HOST=127.0.0.1
 DB_PORT=5432
-DB_NAME=tth_database
-DB_USER=postgres
-DB_PASSWORD=***REMOVED***
+DB_NAME=your_database_name
+DB_USER=your_database_user
+DB_PASSWORD=your_database_password
 
-# Server Configuration
+# --- Server ---
 PORT=5001
-NODE_ENV=development
+NODE_ENV=production
 
-# JWT Secret (for authentication)
-JWT_SECRET=***REMOVED***
+# --- Auth ---
+# A long random string, unique to this installation. Generate one with:
+#   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+# The server refuses to start without it, on purpose: a signing key that
+# falls back to a guessable default is not a key.
+JWT_SECRET=replace_me_with_a_long_random_string
 
-# Email Configuration (for password reset)
-# Option 1: Gmail with App Password (recommended for production)
-# 1. Enable 2-Step Verification on your Google account
-# 2. Generate an App Password: Google Account → Security → 2-Step Verification → App passwords
-# 3. Use the 16-character App Password here (not your regular Gmail password)
-EMAIL_USER=pforgot315@gmail.com
-EMAIL_PASSWORD=your_16_character_app_password_here
-FRONTEND_URL=http://localhost:5173
+# --- Email (SMTP) ---
+EMAIL_USER=your_email@example.com
+EMAIL_PASSWORD=your_email_app_password
 
-# Option 2: Mailtrap (for testing/development)
-# Uncomment the lines below and set USE_MAILTRAP=true to use Mailtrap instead of Gmail
-# USE_MAILTRAP=false
-# MAILTRAP_USER=your_mailtrap_username
-# MAILTRAP_PASS=your_mailtrap_password
+# --- Frontend ---
+FRONTEND_URL=https://your-domain.example
 
-# Option 3: Development mode - log emails instead of sending (for frontend testing)
-# LOG_EMAILS=true
-
-# Agora Configuration (for live sessions)
+# --- Agora (live video) ---
 AGORA_APP_ID=your_agora_app_id
-AGORA_APP_CERTIFICATE=***REMOVED***
+AGORA_APP_CERTIFICATE=your_agora_app_certificate
 
-# Chargily Configuration (for payments)
-CHARGILY_API_KEY=your_chargily_api_key 
+# --- Chargily (payments) ---
+CHARGILY_MODE=live
+CHARGILY_PUBLIC_KEY=your_chargily_public_key
+CHARGILY_SECRET_KEY=your_chargily_secret_key
+
+# --- Cloudflare R2 (media storage) ---
+R2_ACCOUNT_ID=your_r2_account_id
+R2_ACCESS_KEY_ID=your_r2_access_key_id
+R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
+R2_BUCKET_NAME=your_bucket_name
+R2_ENDPOINT=https://your_account_id.r2.cloudflarestorage.com
+R2_PUBLIC_URL=https://your-public-r2-domain
+
+# --- Firebase (push notifications) ---
+# Path to the service account JSON, kept outside the repository.
+FIREBASE_SERVICE_ACCOUNT=/root/firebase-service-account.json

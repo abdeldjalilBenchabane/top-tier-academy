@@ -55,7 +55,7 @@ PORT=5000
 NODE_ENV=development
 
 # JWT Secret (for authentication)
-JWT_SECRET=***REMOVED***
+JWT_SECRET=replace_me_with_a_long_random_string
 ```
 
 ### 3. Initialize Database

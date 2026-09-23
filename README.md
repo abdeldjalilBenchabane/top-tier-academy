@@ -318,7 +318,7 @@ PORT=5001
 NODE_ENV=development
 
 # JWT Secret (for authentication)
-JWT_SECRET=***REMOVED***
+JWT_SECRET=replace_me_with_a_long_random_string
 
 # Email Configuration (for password reset)
 EMAIL_USER=your-email@gmail.com
@@ -611,17 +611,17 @@ DB_USER=your_username
 DB_PASSWORD=your_password
 JWT_SECRET=your_secret_key_here
 PORT=5001
-EMAIL_USER=pforgot315@gmail.com
-EMAIL_PASSWORD=***REMOVED***
+EMAIL_USER=your_email_user
+EMAIL_PASSWORD=your_email_password
 FRONTEND_URL=http://localhost:8080
 LOG_EMAILS=false
 # Agora Configuration (for live sessions)
 AGORA_APP_ID=e8a09e60ab1548d4b0f18a0cd440f8b7
-AGORA_APP_CERTIFICATE=***REMOVED***
+AGORA_APP_CERTIFICATE=your_agora_app_certificate
 
 # Chargily Configuration (for payments)
 VITE_SUCCESS_URL=http://localhost:5173/payments/success
-VITE_CHARGILY_API_KEY=***REMOVED***
+VITE_CHARGILY_API_KEY=test_sk_YcXA8HSxOJi6VrbwKPcophmvfIWzCpyqH25mmJx8
 ```
 
 ### CORS Configuration

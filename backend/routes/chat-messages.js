@@ -11,7 +11,7 @@ const pool = new Pool({
   port: process.env.DB_PORT || 5432,
   database: process.env.DB_NAME || 'tth_database',
   user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || '***REMOVED***',
+  password: process.env.DB_PASSWORD,
 });
 
 // Save a new chat message
