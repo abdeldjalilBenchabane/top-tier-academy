@@ -1,5 +1,5 @@
 // src/components/ChatSidebar.tsx
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { MessageSquare, Maximize2 } from 'lucide-react';
 
@@ -20,6 +20,10 @@ interface Props {
     // Opens the same conversation in a full-window view. Optional so the
     // component still works anywhere that has no room to expand into.
     onExpand?: () => void;
+    // Fill the height of whatever holds it, instead of a fixed 400/600px.
+    // The live page stacks this beside the participants list and wants the
+    // two to come out the same size.
+    fill?: boolean;
 }
 
 const ChatSidebar: React.FC<Props> = ({
@@ -30,10 +34,10 @@ const ChatSidebar: React.FC<Props> = ({
     chatEnabled,
     studentsMuted,
     isProfessor,
-    onExpand
+    onExpand,
+    fill = false
 }) => {
     const chatEndRef = useRef<HTMLDivElement>(null);
-    const [participants, setParticipants] = useState<any[]>([]);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     // Auto-expand textarea as user types
@@ -66,7 +70,7 @@ const ChatSidebar: React.FC<Props> = ({
                     display: none;  /* Safari and Chrome */
                 }
             `}</style>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 h-[400px] lg:h-[600px] flex flex-col">
+            <div className={`rounded-2xl border border-white/10 bg-white/[0.07] backdrop-blur-sm p-4 flex flex-col ${fill ? 'h-full' : 'h-[400px] lg:h-[600px]'}`}>
                 <div
                     className={`flex items-center gap-2 mb-4 pb-4 border-b border-white/20 ${onExpand ? 'cursor-pointer' : ''}`}
                     onClick={onExpand}
@@ -137,20 +141,7 @@ const ChatSidebar: React.FC<Props> = ({
                 {studentsMuted && !isProfessor && (
                     <div className="text-xs text-yellow-400 mt-2 text-center">تم كتم الميكروفون من قبل الأستاذ</div>
                 )}
-                {/* Participants list for professor */}
-                {isProfessor && (
-                    <div className="bg-white/10 rounded-xl p-4 mt-6">
-                        <h3 className="font-bold mb-2 text-white">المشاركون</h3>
-                        <ul>
-                            {participants.map((p) => (
-                                <li key={p.id} className="flex items-center justify-between mb-2">
-                                    <span className="text-white">{p.name || p.id}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-            </div>
+                </div>
         </>
     );
 };
