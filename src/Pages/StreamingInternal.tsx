@@ -2046,7 +2046,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
     return (
 
-        <div dir='rtl' className="min-h-screen bg-gradient-to-br from-[#194cbf] to-[#61a1ff] text-white">
+        <div dir='rtl' className="min-h-screen bg-[#202124] text-white">
 
             {debugPanel}
 
@@ -2054,7 +2054,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
             {/* Header - Responsive */}
 
-            <nav dir="rtl" className="bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white shadow-lg sticky top-0 z-50">
+            <nav dir="rtl" className="bg-[#202124] border-b border-white/10 text-white sticky top-0 z-50">
 
                 <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-4 flex items-center justify-between">
 
@@ -2136,6 +2136,24 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                     </div>
 
+                    {/* The room count, in the corner. Tapping it opens the list
+                        over the video rather than sending you down the page. */}
+                    <button
+                        type="button"
+                        onClick={() => setSidePanel(sidePanel === 'people' ? null : 'people')}
+                        title="المشاركون"
+                        className={`flex shrink-0 items-center gap-2 rounded-full border px-2.5 py-1 transition ${
+                            sidePanel === 'people'
+                                ? 'border-[#194cbf] bg-[#194cbf] text-white'
+                                : 'border-white/15 bg-white/5 text-gray-200 hover:bg-white/10'
+                        }`}
+                    >
+                        <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-[#194cbf] to-[#61a1ff] text-[11px] font-bold text-white">
+                            {(session?.presenter || session?.professor_name || 'م').charAt(0).toUpperCase()}
+                        </span>
+                        <span className="text-xs font-semibold">{participants.length}</span>
+                    </button>
+
                 </div>
 
             </nav>
@@ -2150,7 +2168,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                 <div className={`order-1 ${sidePanel ? 'lg:col-span-3' : ''}`}>
 
-                    <div className="bg-black rounded-xl overflow-hidden shadow-2xl relative">
+                    <div className="bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-white/10">
 
                         <div id="agora-video-container" className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 relative flex items-center justify-center" style={{ userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
                             <style>{`
@@ -2158,14 +2176,24 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                    buttons over the video, instead of a row of
                                    small rectangles sitting on the picture. */
                                 .tth-bar {
-                                    background: rgba(24, 26, 31, 0.92);
+                                    background: rgba(32, 33, 36, 0.95);
                                     backdrop-filter: blur(12px);
                                     -webkit-backdrop-filter: blur(12px);
-                                    border: 1px solid rgba(255,255,255,0.08);
-                                    border-radius: 9999px;
-                                    padding: 6px 8px;
+                                    border: 1px solid rgba(255,255,255,0.10);
+                                    border-radius: 18px;
+                                    padding: 8px 10px;
                                     box-shadow: 0 12px 32px rgba(0,0,0,0.5);
                                     scrollbar-width: none;
+                                }
+                                /* Every control is a round grey key, except the
+                                   ones that already say danger or "on" in
+                                   colour — those keep their own background. */
+                                .tth-bar button:not([class*="bg-red"]):not([class*="bg-[#194cbf]"]) {
+                                    background: #3c4043 !important;
+                                    color: #fff !important;
+                                }
+                                .tth-bar button:not([class*="bg-red"]):not([class*="bg-[#194cbf]"]):hover {
+                                    background: #474b4f !important;
                                 }
                                 .tth-bar::-webkit-scrollbar { display: none; }
                                 .tth-bar button {
