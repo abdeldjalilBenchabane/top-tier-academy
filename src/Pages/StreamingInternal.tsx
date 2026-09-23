@@ -858,11 +858,12 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
             setParticipants(prev => {
 
-                // Use userId as unique identifier to prevent duplicates
+                // Same person, new connection: replace the old entry instead of
+                // keeping it. Keeping it left the previous socket id in the
+                // list, and the 'user-left' for that old socket then removed
+                // the student even though they had just rejoined.
 
-                if (prev.find(p => p.userId === userData.userId)) return prev;
-
-                return [...prev, {
+                return [...prev.filter(p => p.userId !== userData.userId), {
 
                     id: userData.id,
 
