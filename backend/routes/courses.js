@@ -688,7 +688,9 @@ router.put('/:id/assign-language-admin', verifyToken, requireRole(['admin']), as
       return res.status(400).json({ error: 'language_level_id is required' });
     }
     
-    if (!price || isNaN(Number(price)) || Number(price) < 0) {
+    // 0 is a price — a free language course — so only an empty or
+    // non-numeric value counts as missing.
+    if (price === undefined || price === null || price === '' || isNaN(Number(price)) || Number(price) < 0) {
       return res.status(400).json({ error: 'Valid price is required for language courses' });
     }
     
@@ -703,9 +705,8 @@ router.put('/:id/assign-language-admin', verifyToken, requireRole(['admin']), as
       return res.status(400).json({ error: 'Can only assign paths to approved courses' });
     }
     
-    if (course.language_level_id) {
-      return res.status(400).json({ error: 'Course already has a language path assigned' });
-    }
+    // Reassigning was refused outright, which made changing a course's path
+    // impossible — the one thing this screen exists to do.
     
     // Start transaction
     const client = await pool.connect();
@@ -714,7 +715,9 @@ router.put('/:id/assign-language-admin', verifyToken, requireRole(['admin']), as
       
       // Update course with language_level_id
       await client.query(
-        'UPDATE courses SET language_level_id = $1 WHERE id = $2',
+        // Clearing the material matters when moving a course across from the
+        // education path: left behind, it would still read as a school course.
+        'UPDATE courses SET language_level_id = $1, material_id = NULL WHERE id = $2',
         [language_level_id, courseId]
       );
       

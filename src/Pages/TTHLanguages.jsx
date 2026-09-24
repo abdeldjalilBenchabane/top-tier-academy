@@ -58,6 +58,19 @@ export default function Languages() {
   // have.
   const [liveTab, setLiveTab] = useState('sections');
 
+  // Land on a tab that has something in it, rather than an empty دورات tab
+  // when the language only has recorded courses.
+  useEffect(() => {
+    const counts = {
+      sections: Object.values(groupedLiveSections).flat().length,
+      sessions: languageSessions.length,
+      courses: Object.values(groupedCourses).flat().length,
+    };
+    if (counts[liveTab] > 0) return;
+    const firstWithContent = ['sections', 'sessions', 'courses'].find((key) => counts[key] > 0);
+    if (firstWithContent) setLiveTab(firstWithContent);
+  }, [groupedLiveSections, languageSessions, groupedCourses, liveTab]);
+
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
@@ -732,7 +745,7 @@ export default function Languages() {
         <div className="relative">
           {loading ? (
             <div className="text-center py-16">Loading...</div>
-          ) : (activeFilter === 'all' && filteredCourses.length === 0) || (activeFilter === 'live' && filteredLiveSections.length === 0 && languageSessions.length === 0) ? (
+          ) : (filteredCourses.length === 0 && filteredLiveSections.length === 0 && languageSessions.length === 0) ? (
             <div className="text-center py-16">
               <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-full flex items-center justify-center">
                 <svg className="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -747,9 +760,9 @@ export default function Languages() {
               </p>
             </div>
           ) : (
-            <div className="space-y-12">
+            <div className="space-y-12 px-4 md:px-8">
               {/* Show Regular Courses */}
-              {activeFilter === 'all' && Object.entries(getFilteredCoursesByLanguage()).map(([languageName, languageCourses]) => (
+              {liveTab === 'courses' && Object.entries(getFilteredCoursesByLanguage()).map(([languageName, languageCourses]) => (
                 <div key={languageName} className="space-y-6">
                   {/* Language Header */}
                   <div className="text-center">
@@ -769,12 +782,19 @@ export default function Languages() {
                 </div>
               ))}
 
-              {/* Two kinds of live content, one at a time. The switch only appears
-                  when there is actually something on both sides. */}
-              {activeFilter === 'live' && languageSessions.length > 0 && Object.keys(groupedLiveSections).length > 0 && (
-                <div dir="rtl" className="flex justify-center gap-2 mb-8">
-                  {[['sections', 'الدورات', Object.values(groupedLiveSections).flat().length],
-                    ['sessions', 'حصص مباشرة', languageSessions.length]].map(([key, label, count]) => (
+              {/* The three kinds of language content, one at a time. A kind with
+                  nothing in it gets no tab, and with only one kind there is
+                  nothing to switch between, so the row disappears. */}
+              {(() => {
+                const tabs = [
+                  ['sections', 'الدورات', Object.values(groupedLiveSections).flat().length],
+                  ['sessions', 'حصص مباشرة', languageSessions.length],
+                  ['courses', 'الحصص المسجلة', Object.values(groupedCourses).flat().length],
+                ].filter(([, , count]) => count > 0);
+                if (tabs.length < 2) return null;
+                return (
+                <div dir="rtl" className="flex flex-wrap justify-center gap-2 mb-8">
+                  {tabs.map(([key, label, count]) => (
                     <button
                       key={key}
                       onClick={() => setLiveTab(key)}
@@ -791,11 +811,12 @@ export default function Languages() {
                     </button>
                   ))}
                 </div>
-              )}
+                );
+              })()}
 
               {/* Standalone live sessions on a language path, under the same
                   language chip as everything else. */}
-              {activeFilter === 'live' && (liveTab === 'sessions' || Object.keys(groupedLiveSections).length === 0) && (() => {
+              {liveTab === 'sessions' && (() => {
                 const shown = languageSessions.filter((session) =>
                   !selectedLanguageFilter || session.language_name === selectedLanguageFilter);
                 if (shown.length === 0) return null;
@@ -815,7 +836,7 @@ export default function Languages() {
               })()}
 
               {/* Show Live Sections */}
-              {activeFilter === 'live' && (liveTab === 'sections' || languageSessions.length === 0) && Object.entries(getFilteredLiveSectionsByLanguage()).map(([languageName, languageLiveSections]) => (
+              {liveTab === 'sections' && Object.entries(getFilteredLiveSectionsByLanguage()).map(([languageName, languageLiveSections]) => (
                 <div key={languageName} className="space-y-6">
                   {/* Language Header */}
                   <div className="text-center">

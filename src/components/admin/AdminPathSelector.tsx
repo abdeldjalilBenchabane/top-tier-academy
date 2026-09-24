@@ -191,7 +191,9 @@ const AdminPathSelector = ({
         toast.success('Course path assigned successfully');
         onSuccess();
       } catch (error) {
-        toast.error('Failed to assign course path');
+        // Say which rule was broken. "Failed" hid "only approved courses",
+        // "already has a path" and a rejected price behind one sentence.
+        toast.error(error instanceof Error && error.message ? error.message : 'Failed to assign course path');
       } finally {
         setIsSubmitting(false);
       }
@@ -210,7 +212,9 @@ const AdminPathSelector = ({
         toast.success('Course path and price assigned successfully');
         onSuccess();
       } catch (error) {
-        toast.error('Failed to assign course path');
+        // Say which rule was broken. "Failed" hid "only approved courses",
+        // "already has a path" and a rejected price behind one sentence.
+        toast.error(error instanceof Error && error.message ? error.message : 'Failed to assign course path');
       } finally {
         setIsSubmitting(false);
       }
