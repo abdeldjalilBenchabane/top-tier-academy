@@ -52,6 +52,11 @@ export default function Languages() {
   }, [searchParams]);
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilter, setActiveFilter] = useState('live'); // 'all' or 'live' - default to 'live'
+  // Within the live view: the دورات, or the standalone live sessions. They
+  // were stacked one above the other, which made the page long and the two
+  // kinds easy to confuse. Starts on the دورات, which is what most languages
+  // have.
+  const [liveTab, setLiveTab] = useState('sections');
 
   useEffect(() => {
     async function fetchData() {
@@ -764,9 +769,33 @@ export default function Languages() {
                 </div>
               ))}
 
-              {/* Standalone live sessions on a language path, under the دورات and
-                  filtered by the same language chip. */}
-              {activeFilter === 'live' && (() => {
+              {/* Two kinds of live content, one at a time. The switch only appears
+                  when there is actually something on both sides. */}
+              {activeFilter === 'live' && languageSessions.length > 0 && Object.keys(groupedLiveSections).length > 0 && (
+                <div dir="rtl" className="flex justify-center gap-2 mb-8">
+                  {[['sections', 'الدورات', Object.values(groupedLiveSections).flat().length],
+                    ['sessions', 'حصص مباشرة', languageSessions.length]].map(([key, label, count]) => (
+                    <button
+                      key={key}
+                      onClick={() => setLiveTab(key)}
+                      className={`px-5 md:px-7 py-2 md:py-3 rounded-full font-semibold transition-all duration-300 text-sm md:text-base ${
+                        liveTab === key
+                          ? 'bg-gradient-to-r from-[#194cbf] to-[#61a1ff] text-white shadow-lg'
+                          : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
+                      }`}
+                    >
+                      {label}
+                      <span className={`mr-2 px-2 py-0.5 rounded-full text-xs ${liveTab === key ? 'bg-white/20' : 'bg-gray-100'}`}>
+                        {count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Standalone live sessions on a language path, under the same
+                  language chip as everything else. */}
+              {activeFilter === 'live' && (liveTab === 'sessions' || Object.keys(groupedLiveSections).length === 0) && (() => {
                 const shown = languageSessions.filter((session) =>
                   !selectedLanguageFilter || session.language_name === selectedLanguageFilter);
                 if (shown.length === 0) return null;
@@ -786,7 +815,7 @@ export default function Languages() {
               })()}
 
               {/* Show Live Sections */}
-              {activeFilter === 'live' && Object.entries(getFilteredLiveSectionsByLanguage()).map(([languageName, languageLiveSections]) => (
+              {activeFilter === 'live' && (liveTab === 'sections' || languageSessions.length === 0) && Object.entries(getFilteredLiveSectionsByLanguage()).map(([languageName, languageLiveSections]) => (
                 <div key={languageName} className="space-y-6">
                   {/* Language Header */}
                   <div className="text-center">
