@@ -4,6 +4,7 @@ import Navbar from "../components/NavBar";
 import Footer from "../components/TTHFooter";
 import CourseCard from "../components/ui/TTHCourseCard";
 import LiveSectionCard from "../components/ui/TTHLiveSectionCard";
+import LiveCard from "../components/ui/TTHLiveCard";
 import LanguageFilter from "../components/ui/TTHLanguageFilter";
 import { languageCourses } from "../data";
 import { pointsAPI } from '@/services/api';
@@ -23,6 +24,9 @@ export default function Languages() {
 
   const [courses, setCourses] = useState([]);
   const [liveSections, setLiveSections] = useState([]);
+  // Standalone live sessions on the language path. They used to sit on the
+  // school live page, where a language lesson has no business being.
+  const [languageSessions, setLanguageSessions] = useState([]);
   const [filteredCourses, setFilteredCourses] = useState([]);
   const [filteredLiveSections, setFilteredLiveSections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +74,21 @@ export default function Languages() {
         // Fetch live sections
         let languageLiveSections = [];
         try {
+          // Live sessions whose path is a language. The list endpoint returns the
+        // path columns, so the page can pick its own out.
+        try {
+          const sessionsRes = await fetch('/api/live-sessions');
+          if (sessionsRes.ok) {
+            const payload = await sessionsRes.json();
+            const all = payload.sessions || payload || [];
+            setLanguageSessions(all.filter((session) =>
+              (session.root_type === 'language' || session.language_level_id) &&
+              session.is_approved !== false && session.is_rejected !== true));
+          }
+        } catch (error) {
+          console.error('Could not load language live sessions:', error);
+        }
+
           const liveSectionsRes = await fetch('/api/live-sections/approved');
           if (liveSectionsRes.ok) {
             const liveSectionsData = await liveSectionsRes.json();
@@ -708,7 +727,7 @@ export default function Languages() {
         <div className="relative">
           {loading ? (
             <div className="text-center py-16">Loading...</div>
-          ) : (activeFilter === 'all' && filteredCourses.length === 0) || (activeFilter === 'live' && filteredLiveSections.length === 0) ? (
+          ) : (activeFilter === 'all' && filteredCourses.length === 0) || (activeFilter === 'live' && filteredLiveSections.length === 0 && languageSessions.length === 0) ? (
             <div className="text-center py-16">
               <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-full flex items-center justify-center">
                 <svg className="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -744,6 +763,27 @@ export default function Languages() {
                   </div>
                 </div>
               ))}
+
+              {/* Standalone live sessions on a language path, under the دورات and
+                  filtered by the same language chip. */}
+              {activeFilter === 'live' && (() => {
+                const shown = languageSessions.filter((session) =>
+                  !selectedLanguageFilter || session.language_name === selectedLanguageFilter);
+                if (shown.length === 0) return null;
+                return (
+                  <div className="space-y-6">
+                    <div className="text-center">
+                      <h3 className="text-2xl font-bold text-gray-800 mb-2">حصص مباشرة</h3>
+                      <p className="text-gray-600">{shown.length} حصة متاحة</p>
+                    </div>
+                    <div dir="rtl" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center relative z-10">
+                      {shown.map((session) => (
+                        <LiveCard key={session.id} session={session} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Show Live Sections */}
               {activeFilter === 'live' && Object.entries(getFilteredLiveSectionsByLanguage()).map(([languageName, languageLiveSections]) => (

@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react';
 
+// A session on the language path belongs on the languages page, beside the
+// language courses and دورات — not in this list, which is the school one.
+const isLanguageSession = (session) =>
+  session?.root_type === 'language' || !!session?.language_level_id;
+
 export const useLiveClasses = () => {
   // Filter state
   const [selectedLevel, setSelectedLevel] = useState('');
@@ -219,7 +224,7 @@ export const useLiveClasses = () => {
         if (response.ok) {
                   const data = await response.json();
         console.log('📡 Live sessions API response:', data);
-        const sessions = data.sessions || data || [];
+        const sessions = (data.sessions || data || []).filter((session) => !isLanguageSession(session));
         console.log('📋 Processed sessions:', sessions);
         
         // Log session count
@@ -474,7 +479,7 @@ export const useLiveClasses = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('🔄 Refreshed live sessions:', data);
-        const sessions = data.sessions || data || [];
+        const sessions = (data.sessions || data || []).filter((session) => !isLanguageSession(session));
         setAllLiveSessions(sessions);
         
         // Extract hierarchical data from sessions

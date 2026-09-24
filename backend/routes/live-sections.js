@@ -126,7 +126,9 @@ router.post('/professors/:professorId/live-sections',
     const professor_name = req.user.name;
 
     // Validate required fields
-    if (!title || !description || !price) {
+    // 0 is a price — a free دورة — so it must not be read as "missing".
+    const priceValue = Number(price);
+    if (!title || !description || price === undefined || price === null || price === '' || Number.isNaN(priceValue) || priceValue < 0) {
       return res.status(400).json({ error: 'Title, description, and price are required' });
     }
 

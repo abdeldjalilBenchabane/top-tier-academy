@@ -86,7 +86,13 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
   
   const [title, setTitle] = useState(editingSection?.title || '');
   const [description, setDescription] = useState(editingSection?.description || '');
-  const [price, setPrice] = useState(editingSection?.price || 500);
+  // A دورة priced at 0 is free, not unpriced. `|| 500` treated the two the
+  // same and quietly put 500 in the box when editing a free one.
+  const [price, setPrice] = useState(
+    editingSection?.price === undefined || editingSection?.price === null
+      ? 500
+      : Number(editingSection.price)
+  );
   const [telegramChannel, setTelegramChannel] = useState(editingSection?.telegram_channel || '');
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [existingCoverUrl, setExistingCoverUrl] = useState(editingSection?.cover_image_url || '');
@@ -846,8 +852,10 @@ const LiveSectionForm = ({ onSuccess, onCancel, editingSection }: LiveSectionFor
       return;
     }
 
-    // Validate form fields
-    if (!title || !description || !price) {
+    // Validate form fields. Zero is a price — free — so only an empty or
+    // non-numeric box counts as missing.
+    const priceValue = Number(price);
+    if (!title || !description || price === '' || price === null || price === undefined || Number.isNaN(priceValue) || priceValue < 0) {
       toast.error('يرجى ملء جميع الحقول المطلوبة');
       return;
     }
