@@ -2,11 +2,15 @@
 import React, { useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { MessageSquare, Maximize2, Pin, PinOff } from 'lucide-react';
+import ChatAvatar, { senderColors } from '@/components/ChatAvatar';
 
 interface Message {
     sender: string;
     text: string;
     color: string;
+    mine?: boolean;
+    socketId?: string;
+    userId?: number | string;
 }
 
 interface Props {
@@ -32,6 +36,8 @@ interface Props {
     pinnedMessage?: { sender: string; text: string } | null;
     onPin?: (message: Message) => void;
     onUnpin?: () => void;
+    // Only to find someone's picture; a name with no match keeps its initial.
+    participants?: any[];
 }
 
 const ChatSidebar: React.FC<Props> = ({
@@ -47,8 +53,16 @@ const ChatSidebar: React.FC<Props> = ({
     unreadDividerIndex = null,
     pinnedMessage = null,
     onPin,
-    onUnpin
+    onUnpin,
+    participants = []
 }) => {
+    const avatarFor = (msg: Message): string | null => {
+        const found = participants.find((p: any) =>
+            (msg.socketId && p.id === msg.socketId) ||
+            (msg.userId !== undefined && String(p.userId) === String(msg.userId)) ||
+            (p.name && p.name === msg.sender));
+        return found?.avatar_url || null;
+    };
     const chatEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -144,9 +158,14 @@ const ChatSidebar: React.FC<Props> = ({
                                         <span className="h-px flex-1 bg-red-500/60" />
                                     </div>
                                 )}
-                                <div className="group relative rounded-lg bg-white/5 p-3">
-                                    <div className={`font-medium text-sm ${msg.color}`}>{msg.sender}</div>
+                                <div className="group relative flex gap-2 rounded-lg bg-white/5 p-3">
+                                    <ChatAvatar name={msg.sender} avatarUrl={avatarFor(msg)} mine={msg.mine === true} size={26} />
+                                    <div className="min-w-0 flex-1">
+                                    <div className={`font-medium text-sm ${senderColors(msg.sender, msg.mine === true).text}`}>
+                                        {msg.mine ? 'أنت' : msg.sender}
+                                    </div>
                                     <div className="text-sm text-gray-300 break-words whitespace-pre-line">{msg.text}</div>
+                                    </div>
                                     {isProfessor && onPin && (
                                         <button
                                             type="button"

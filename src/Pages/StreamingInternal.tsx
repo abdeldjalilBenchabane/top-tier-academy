@@ -802,6 +802,14 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                         id: msg.id,
 
+                        // Who wrote it, said plainly rather than inferred from
+                        // the colour: the expanded chat puts your own messages
+                        // on one side and everyone else's on the other, and
+                        // finds their picture by this id.
+                        mine: msg.user_id === user.id,
+
+                        userId: msg.user_id,
+
                         timestamp: msg.timestamp
 
                     }));
@@ -841,6 +849,12 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                 color: messageData.id === newSocket.id ? 'text-green-300' : 'text-[#61a1ff]',
 
                 text: messageData.text,
+
+                mine: messageData.id === newSocket.id,
+
+                // The sender's socket, which is also how the participants list
+                // identifies them — that is where their picture comes from.
+                socketId: messageData.id,
 
                 id: messageData.id || Date.now() // Add unique ID for tracking
 
@@ -3507,6 +3521,8 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                         onUnpin={handleUnpinMessage}
 
+                        participants={participants}
+
                     />
                     </div>
                     )}
@@ -3528,6 +3544,11 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                 handleSend={handleSend}
                 chatEnabled={chatEnabled}
                 isProfessor={isProfessor}
+                pinnedMessage={pinnedMessage}
+                unreadDividerIndex={unreadDividerIndex}
+                onPin={handlePinMessage}
+                onUnpin={handleUnpinMessage}
+                participants={participants}
             />
 
 
