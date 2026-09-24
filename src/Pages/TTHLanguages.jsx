@@ -765,26 +765,6 @@ export default function Languages() {
           ) : (
             <div className="space-y-12 px-4 md:px-8">
               {/* Show Regular Courses */}
-              {liveTab === 'courses' && Object.entries(getFilteredCoursesByLanguage()).map(([languageName, languageCourses]) => (
-                <div key={languageName} className="space-y-6">
-                  {/* Language Header */}
-                  <div className="text-center">
-                    <h3 className="text-2xl font-bold text-gray-800 mb-2">{languageName}</h3>
-                    <p className="text-gray-600">{languageCourses.length} دورة متاحة</p>
-                  </div>
-                  
-                  {/* Courses Grid for this language */}
-                  <div dir="rtl" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-8 justify-items-center relative z-10">
-                    {languageCourses.map((course) => (
-                      <CourseCard
-                        key={course.id}
-                        course={course}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-
               {/* The three kinds of language content, one at a time. A kind with
                   nothing in it gets no tab, and with only one kind there is
                   nothing to switch between, so the row disappears. */}
@@ -816,6 +796,27 @@ export default function Languages() {
                 </div>
                 );
               })()}
+
+              {liveTab === 'courses' && Object.entries(getFilteredCoursesByLanguage()).map(([languageName, languageCourses]) => (
+                <div key={languageName} className="space-y-6">
+                  {/* Language Header */}
+                  <div className="text-center">
+                    <h3 className="text-2xl font-bold text-gray-800 mb-2">{languageName}</h3>
+                    <p className="text-gray-600">{languageCourses.length} دورة متاحة</p>
+                  </div>
+                  
+                  {/* Courses Grid for this language */}
+                  <div dir="rtl" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-8 justify-items-center relative z-10">
+                    {languageCourses.map((course) => (
+                      <CourseCard
+                        key={course.id}
+                        course={course}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+
 
               {/* Standalone live sessions on a language path, under the same
                   language chip as everything else. */}
