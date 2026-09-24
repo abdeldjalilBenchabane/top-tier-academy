@@ -120,12 +120,14 @@ const LiveSectionCard = ({ section }) => {
         window.location.href = `/TTHLanguages/livesection/${section.id}`;
       }}
     >
-      <div className="relative mt-9 border overflow-hidden">
+      {/* No top margin: it left a strip of empty card above the cover.
+          The stray border came with it. */}
+      <div className="relative overflow-hidden">
         <div className={`transform transition-all duration-700 ease-out ${isHovered ? 'scale-110' : 'scale-100'}`}> 
           <img
             src={cover}
             alt={section.title}
-            className="w-full h-36 object-cover"
+            className="w-full h-44 object-cover"
             onError={e => { e.target.src = '/default-course-cover.png'; }}
           />
         </div>
