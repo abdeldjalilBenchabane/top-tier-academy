@@ -465,7 +465,7 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
   };
 
   return (
-    <div className="flex h-full flex-col bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-200 overflow-hidden border border-white/30 group transform hover:scale-102">
+    <div className="relative flex h-full w-full max-w-[400px] flex-col bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 group">
       {/* Cover Image - Always show image section */}
       <div className="relative h-48 overflow-hidden">
         <img
@@ -536,7 +536,7 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
 
           {/* Price and Points Info */}
           {session.price !== undefined && session.price !== null && (
-            <div className="mb-4 p-3 bg-white/30 backdrop-blur-sm rounded-xl border border-white/50 group-hover:bg-white/40 transition-all duration-200">
+            <div className="mb-3 p-3 bg-gray-50 rounded-xl border border-gray-100 transition-all duration-200">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600 group-hover:text-gray-700 transition-colors duration-200">السعر:</span>
