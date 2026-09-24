@@ -3252,7 +3252,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                                         {/* Profile Picture or Initial */}
 
-                                        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-[#194cbf] to-[#61a1ff] flex items-center justify-center text-white font-bold text-sm sm:text-lg border-2 border-white/20 group-hover:border-green-400 transition-all duration-200">
+                                        <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-[#194cbf] to-[#61a1ff] flex items-center justify-center text-white font-bold text-sm sm:text-lg border-2 transition-all duration-200 ${isMuted ? 'border-red-500' : 'border-green-500'}`}>
 
                                             {participant.avatar_url ? (
 
@@ -3274,13 +3274,13 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                                         </div>
 
-                                        {/* Online Status Indicator */}
-
-                                        <div className="absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 w-3 h-3 sm:w-5 sm:h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
-
-                                            <div className="w-1 h-1 sm:w-2 sm:h-2 bg-white rounded-full"></div>
-
-                                        </div>
+                                        {/* Red when their microphone is off, green when it is live. It used
+                                            to be a green "online" dot, which said nothing: everyone in
+                                            this list is online. */}
+                                        <div
+                                            title={isMuted ? 'مكتوم' : 'ميكروفون نشط'}
+                                            className={`absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 w-3.5 h-3.5 sm:w-5 sm:h-5 rounded-full border-2 border-[#202124] ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}
+                                        />
 
                                         {/* Hover Effect */}
 
@@ -3298,19 +3298,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                                         </p>
 
-                                        {/* Mic status icon for all */}
-
-                                            <span
-
-                                            className={`inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded-full ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}
-
-                                            title={isMuted ? 'مكتوم' : 'ميكروفون نشط'}
-
-                                        >
-
-                                            {isMuted ? <MicOff className="w-2 h-2 sm:w-3 sm:h-3 text-white" /> : <Mic className="w-2 h-2 sm:w-3 sm:h-3 text-white" />}
-
-                                        </span>
+                                        
 
                                         {/* One switch, not two. It used to be a pair of wide buttons, each
                                             disabled half the time, which took more room in the tile

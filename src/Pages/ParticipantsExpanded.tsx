@@ -117,7 +117,15 @@ const ParticipantsExpanded: React.FC<Props> = ({
                                 key={p.userId ?? p.id}
                                 className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5"
                             >
-                                <ChatAvatar name={p.name || 'مستخدم'} avatarUrl={p.avatar_url} mine={isMe} size={36} />
+                                <span className="relative shrink-0">
+                                    <span className={`block rounded-full border-2 ${muted ? 'border-red-500' : 'border-green-500'}`}>
+                                        <ChatAvatar name={p.name || 'مستخدم'} avatarUrl={p.avatar_url} mine={isMe} size={34} />
+                                    </span>
+                                    <span
+                                        title={muted ? 'مكتوم' : 'ميكروفون نشط'}
+                                        className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#0b1020] ${muted ? 'bg-red-500' : 'bg-green-500'}`}
+                                    />
+                                </span>
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-semibold text-white">
                                         {p.name || 'مستخدم'}{isMe && ' (أنت)'}
@@ -125,14 +133,7 @@ const ParticipantsExpanded: React.FC<Props> = ({
                                     <p className="text-[11px] text-gray-400">{isTeacher ? 'أستاذ' : 'طالب'}</p>
                                 </div>
 
-                                <span
-                                    title={muted ? 'مكتوم' : 'ميكروفون نشط'}
-                                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${
-                                        muted ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300'
-                                    }`}
-                                >
-                                    {muted ? <MicOff className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
-                                </span>
+                                
 
                                 {isProfessor && !isTeacher && onToggleStudentMic && (
                                     <button
