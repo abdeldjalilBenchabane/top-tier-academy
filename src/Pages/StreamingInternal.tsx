@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 
 import { useParams, useNavigate } from 'react-router-dom';
 
-import { ArrowLeft, Users, Heart, MessageSquare, Share2, Settings, MicOff, Mic, MessageCircle, Fullscreen, Pause, Play as PlayIcon, Video, VideoOff, Monitor, Eye, EyeOff, X } from 'lucide-react';
+import { ArrowLeft, Users, Heart, MessageSquare, Share2, Settings, MicOff, Mic, MessageCircle, Fullscreen, Pause, Play as PlayIcon, Video, VideoOff, Monitor, Eye, EyeOff, X, Maximize2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
@@ -22,6 +22,7 @@ import { authAPI } from '@/services/api';
 
 import ChatSidebar from './ChatSidebar';
 import ChatExpanded from './ChatExpanded';
+import ParticipantsExpanded from './ParticipantsExpanded';
 
 
 
@@ -115,6 +116,9 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     // require the video to be in fullscreen, so it works for the student
     // watching in a normal window and for the teacher while presenting.
     const [chatExpanded, setChatExpanded] = useState(false);
+    // The room list given the whole window, for when the side panel's two
+    // narrow columns stop being enough to see who is watching.
+    const [peopleExpanded, setPeopleExpanded] = useState(false);
     // null until the teacher has answered. Some teachers present without
     // appearing on camera, and that has to be a choice made before the
     // stream goes out, not something to undo afterwards.
@@ -3154,10 +3158,19 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                     </span>
                     <button
                         type="button"
+                        onClick={() => setPeopleExpanded(true)}
+                        aria-label="توسيع المشاركين"
+                        title="توسيع"
+                        className="ml-auto rounded-full p-1.5 text-gray-300 transition hover:bg-white/10 hover:text-white"
+                    >
+                        <Maximize2 className="h-4 w-4" />
+                    </button>
+                    <button
+                        type="button"
                         onClick={() => setShowPeople(false)}
                         aria-label="إغلاق المشاركين"
                         title="إغلاق"
-                        className="ml-auto rounded-full p-1.5 text-gray-300 transition hover:bg-white/10 hover:text-white"
+                        className="rounded-full p-1.5 text-gray-300 transition hover:bg-white/10 hover:text-white"
                     >
                         <X className="h-4 w-4" />
                     </button>
@@ -3299,98 +3312,30 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                                         </span>
 
-                                        {/* Professor controls: Let student speak / Mute student */}
-
+                                        {/* One switch, not two. It used to be a pair of wide buttons, each
+                                            disabled half the time, which took more room in the tile
+                                            than the student's own name. */}
                                         {canProfToggle && (
-
-                                            <div className="flex flex-col gap-1 mt-1">
-
-                                                <Button
-
-                                                    size="sm"
-
-                                                    variant="default"
-
-                                                    className={`flex items-center gap-1 px-2 py-1 text-xs ${isMuted ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
-
-                                                    disabled={!isMuted} // Only enable if student is muted
-
-                                                    title="إعطاء الطالب الميكروفون (Let student speak)"
-
-                                                    onClick={() => {
-
-                                                        if (socket && isMuted) {
-
-                                                            const signalData = {
-
-                                                                studentId: participant.userId,
-
-                                                                studentName: participant.name,
-
-                                                                muted: false
-
-                                                            };
-
-                                                            console.log('[PROF] Let student speak:', signalData);
-
-                                                            socket.emit('toggle-student-mic', id, signalData);
-
-                                                        }
-
-                                                    }}
-
-                                                >
-
-                                                    <Mic className="w-3 h-3 text-white" />
-
-                                                    <span>إعطاء الميكروفون</span>
-
-                                                </Button>
-
-                                                <Button
-
-                                                    size="sm"
-
-                                                    variant="default"
-
-                                                    className={`flex items-center gap-1 px-2 py-1 text-xs ${!isMuted ? 'bg-red-600 hover:bg-red-700 text-white' : ''}`}
-
-                                                    disabled={isMuted} // Only enable if student is unmuted
-
-                                                    title="كتم الطالب (Mute student)"
-
+                                            <button
+                                                type="button"
+                                                title={isMuted ? 'إعطاء الميكروفون' : 'كتم الطالب'}
+                                                aria-label={isMuted ? 'إعطاء الميكروفون' : 'كتم الطالب'}
                                                 onClick={() => {
-
-                                                        if (socket && !isMuted) {
-
-                                                            const signalData = {
-
-                                                                studentId: participant.userId,
-
-                                                                studentName: participant.name,
-
-                                                                muted: true
-
-                                                            };
-
-                                                            console.log('[PROF] Mute student:', signalData);
-
-                                                            socket.emit('toggle-student-mic', id, signalData);
-
-                                                        }
-
-                                                    }}
-
-                                                >
-
-                                                    <MicOff className="w-3 h-3 text-white" />
-
-                                                    <span>كتم الطالب</span>
-
-                                                </Button>
-
-                                            </div>
-
+                                                    if (!socket) return;
+                                                    socket.emit('toggle-student-mic', id, {
+                                                        studentId: participant.userId,
+                                                        studentName: participant.name,
+                                                        muted: !isMuted,
+                                                    });
+                                                }}
+                                                className={`mt-1 grid h-7 w-7 place-items-center rounded-full transition ${
+                                                    isMuted
+                                                        ? 'bg-green-600/90 text-white hover:bg-green-600'
+                                                        : 'bg-red-600/90 text-white hover:bg-red-600'
+                                                }`}
+                                            >
+                                                {isMuted ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
+                                            </button>
                                         )}
 
                                         {/* Student can toggle own mic if allowed */}
@@ -3535,6 +3480,25 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
             {/* The same conversation, given the whole window — for the student
                 reading along and for the teacher following students' questions. */}
+            <ParticipantsExpanded
+                open={peopleExpanded}
+                onClose={() => setPeopleExpanded(false)}
+                participants={participants}
+                currentUserId={user?.id}
+                isProfessor={isProfessor}
+                studentsMuted={studentsMuted}
+                studentMuteStates={studentMuteStates}
+                isLocalMicMuted={isLocalMicMuted}
+                onToggleStudentMic={(participant, muted) => {
+                    if (!socket) return;
+                    socket.emit('toggle-student-mic', id, {
+                        studentId: participant.userId,
+                        studentName: participant.name,
+                        muted,
+                    });
+                }}
+            />
+
             <ChatExpanded
                 open={chatExpanded}
                 onClose={() => setChatExpanded(false)}
