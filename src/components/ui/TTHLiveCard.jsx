@@ -465,7 +465,7 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
   };
 
   return (
-    <div className="bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-200 overflow-hidden border border-white/30 group transform hover:scale-102">
+    <div className="flex h-full flex-col bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-200 overflow-hidden border border-white/30 group transform hover:scale-102">
       {/* Cover Image - Always show image section */}
       <div className="relative h-48 overflow-hidden">
         <img
@@ -480,13 +480,13 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
       </div>
       
       {/* Header with status */}
-      <div className="p-6 relative">
+      <div className="flex flex-1 flex-col p-4 relative">
         {/* Background pattern */}
         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
         
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-800 group-hover:text-[#194cbf] transition-colors duration-200">
+            <h3 className="text-base font-bold text-gray-800 group-hover:text-[#194cbf] transition-colors duration-200 line-clamp-2 min-h-[2.6rem]">
               {session.title || 'بث مباشر'}
             </h3>
             <span className={`px-3 py-1 rounded-full text-sm font-medium shadow-sm ${getStatusColor(getSessionStatus())}`}>
@@ -495,7 +495,7 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
           </div>
 
           {/* Description */}
-          <p className="text-gray-600 mb-4 line-clamp-2 group-hover:text-gray-700 transition-colors duration-200">
+          <p className="text-gray-600 text-[13px] mb-3 line-clamp-2 min-h-[2.4rem] group-hover:text-gray-700 transition-colors duration-200">
             {session.description || 'انضم إلى هذا البث المباشر للتعلم مع أفضل الأساتذة'}
           </p>
 
@@ -556,7 +556,10 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
             </div>
           )}
 
-          {/* Purchase/Join button */}
+          {/* Purchase/Join button — pushed to the bottom so cards in a row end
+              at the same place whatever their description length. */}
+          <div className="mt-auto" />
+
           {purchaseStatusLoading ? (
             /* Hold the layout while the purchase state loads, without showing
                a "checking" message that flashes past. */

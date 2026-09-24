@@ -134,7 +134,7 @@ const CourseCard = ({ course }) => {
 
   return (
     <div
-      className={`relative bg-white rounded-3xl shadow-lg overflow-hidden w-full max-w-[400px] border border-gray-100 rtl transition-all duration-500 ease-out cursor-pointer ${isHovered ? 'scale-105 shadow-2xl' : 'hover:shadow-xl'}`}
+      className={`relative flex h-full flex-col bg-white rounded-2xl shadow-lg overflow-hidden w-full max-w-[400px] border border-gray-100 rtl transition-all duration-500 ease-out cursor-pointer ${isHovered ? 'scale-[1.02] shadow-2xl' : 'hover:shadow-xl'}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{ fontFamily: 'Nunito, Rowdies, Poppins, sans-serif' }}
@@ -145,7 +145,7 @@ const CourseCard = ({ course }) => {
           <img
             src={cover}
             alt={course.title}
-            className="w-full h-48 object-cover"
+            className="w-full h-36 object-cover"
             onError={e => { e.target.src = '/default-course-cover.png'; }}
           />
         </div>
@@ -161,7 +161,7 @@ const CourseCard = ({ course }) => {
           </div>
         )}
       </div>
-      <div className="p-6 space-y-4">
+      <div className="flex flex-1 flex-col p-4 space-y-2.5">
         <div className="flex items-center justify-between py-3 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-blue-50 rounded-lg">
@@ -176,7 +176,9 @@ const CourseCard = ({ course }) => {
             <span className="text-sm font-medium text-gray-700">{course.duration || ''}</span>
           </div>
         </div>
-        <h3 className="text-xl font-bold text-blue-800 leading-tight hover:text-[#194cbf] transition-colors duration-300 text-right font-rowdies">
+        {/* Two lines, always: a one-line title and a three-line one used to
+            make two cards side by side different heights. */}
+        <h3 className="text-base font-bold text-blue-800 leading-snug hover:text-[#194cbf] transition-colors duration-300 text-right font-rowdies line-clamp-2 min-h-[2.6rem]">
           {course.title}
         </h3>
         {course.created_by_name && (
@@ -185,10 +187,10 @@ const CourseCard = ({ course }) => {
             <span className="text-[#194cbf] font-semibold">{course.created_by_name}</span>
           </div>
         )}
-        <p className="text-gray-600 text-sm leading-relaxed line-clamp-3 text-right font-poppins">
+        <p className="text-gray-600 text-[13px] leading-relaxed line-clamp-2 min-h-[2.4rem] text-right font-poppins">
           {course.description}
         </p>
-        <div className="flex items-center justify-between pt-4">
+        <div className="mt-auto flex items-center justify-between pt-3">
           {/* Watch button if user owns the course */}
           {user && purchased && (
             <Link to={`/coursesList/courses/${course.id}`}>
