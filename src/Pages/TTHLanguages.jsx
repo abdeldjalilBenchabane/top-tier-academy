@@ -58,18 +58,6 @@ export default function Languages() {
   // have.
   const [liveTab, setLiveTab] = useState('sections');
 
-  // Land on a tab that has something in it, rather than an empty دورات tab
-  // when the language only has recorded courses.
-  useEffect(() => {
-    const counts = {
-      sections: Object.values(groupedLiveSections).flat().length,
-      sessions: languageSessions.length,
-      courses: Object.values(groupedCourses).flat().length,
-    };
-    if (counts[liveTab] > 0) return;
-    const firstWithContent = ['sections', 'sessions', 'courses'].find((key) => counts[key] > 0);
-    if (firstWithContent) setLiveTab(firstWithContent);
-  }, [groupedLiveSections, languageSessions, groupedCourses, liveTab]);
 
   useEffect(() => {
     async function fetchData() {
@@ -402,6 +390,21 @@ export default function Languages() {
   };
 
   const groupedLiveSections = groupLiveSectionsByLanguage();
+
+  // Land on a tab that has something in it, rather than an empty دورات tab
+  // when the language only has recorded courses. It must sit below the two
+  // grouped lists: reading a const before its line is a crash, not a
+  // warning, and it took the whole page down.
+  useEffect(() => {
+    const counts = {
+      sections: Object.values(groupedLiveSections).flat().length,
+      sessions: languageSessions.length,
+      courses: Object.values(groupedCourses).flat().length,
+    };
+    if (counts[liveTab] > 0) return;
+    const firstWithContent = ['sections', 'sessions', 'courses'].find((key) => counts[key] > 0);
+    if (firstWithContent) setLiveTab(firstWithContent);
+  }, [groupedLiveSections, languageSessions, groupedCourses, liveTab]);
 
   // Filter courses by selected language for the button filter
   const getFilteredCoursesByLanguage = () => {
