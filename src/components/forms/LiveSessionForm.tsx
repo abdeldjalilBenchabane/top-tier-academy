@@ -404,16 +404,21 @@ const LiveSessionForm = ({ onSuccess, onCancel, editingSession, asAdmin, initial
       return;
     }
 
-    // Validate required fields based on path type
+    // Validate required fields based on path type. It used to demand the
+    // education fields whatever the path was, so a language session — which
+    // has no level, year or material — could never be submitted.
     const hasSpecialities = specialities.length > 0;
+    const isLanguage = pathType === 'language';
     const requiredFields = {
       title: !title,
       description: !description,
       scheduledAt: !scheduledAt,
-      level: !selectedLevel,
-      year: !selectedYear,
-      speciality: hasSpecialities && !selectedSpeciality,
-      material: !selectedMaterial
+      level: !isLanguage && !selectedLevel,
+      year: !isLanguage && !selectedYear,
+      speciality: !isLanguage && hasSpecialities && !selectedSpeciality,
+      material: !isLanguage && !selectedMaterial,
+      language: isLanguage && !selectedLanguage,
+      languageLevel: isLanguage && !selectedLanguageLevel
     };
 
     const missingFields = Object.entries(requiredFields)
@@ -428,7 +433,9 @@ const LiveSessionForm = ({ onSuccess, onCancel, editingSession, asAdmin, initial
         level: 'المرحلة الدراسية',
         year: 'السنة الدراسية',
         speciality: 'التخصص',
-        material: 'المادة الدراسية'
+        material: 'المادة الدراسية',
+        language: 'اللغة',
+        languageLevel: 'مستوى اللغة'
       };
       
       const missingFieldNames = missingFields.map(field => fieldNames[field as keyof typeof fieldNames]).join('، ');
