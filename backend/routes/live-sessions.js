@@ -176,17 +176,38 @@ router.post('/professors/:professorId/live-sessions',
             inheritsApproval = parent?.status === 'approved';
         }
 
+        // The path the professor chose. Only material_id was stored, so a
+        // language session was created with no path at all — and opening it to
+        // edit showed an empty path, because there was nothing to show. The
+        // two update routes already store all three; creation now matches.
+        const rootType = req.body.root_type;
+        let pathRootType = null;
+        let pathLanguageId = null;
+        let pathLanguageLevelId = null;
+        let pathMaterialId = material_id || null;
+        if (rootType === 'language' && req.body.language_level_id) {
+            pathRootType = 'language';
+            pathLanguageId = req.body.language_id || null;
+            pathLanguageLevelId = req.body.language_level_id;
+            // A language session has no material: keeping one would make the
+            // path resolve as education when it is read back.
+            pathMaterialId = null;
+        } else if (pathMaterialId) {
+            pathRootType = 'education';
+        }
+
         const result = await query(
             `INSERT INTO live_sessions
                (professor_id, professor_name, title, description, start_time, duration,
                 price, material_id, cover_image_url, section_id, telegram_channel,
-                is_approved, approved_at)
+                is_approved, approved_at, root_type, language_id, language_level_id)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-                     CASE WHEN $12 THEN CURRENT_TIMESTAMP ELSE NULL END)
+                     CASE WHEN $12 THEN CURRENT_TIMESTAMP ELSE NULL END,
+                     $13, $14, $15)
              RETURNING *`,
             [professor_id, professor_name, title, description, processedStartTime, duration,
-             price, material_id, cover_image_url, section_id || null, telegram_channel || null,
-             inheritsApproval]
+             price, pathMaterialId, cover_image_url, section_id || null, telegram_channel || null,
+             inheritsApproval, pathRootType, pathLanguageId, pathLanguageLevelId]
         );
         const session = result.rows[0];
 

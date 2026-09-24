@@ -71,7 +71,10 @@ const LiveSessionForm = ({ onSuccess, onCancel, editingSession, asAdmin, initial
   const prefillPath = useRef<any>(initialPath || null);
   // The session's current path, shown as text so it is visible even if the
   // cascading selects below fail to populate for any reason.
-  const [currentPath, setCurrentPath] = useState<any>(null);
+  // When the page resolves the path for us, keep it: the notice below asks
+  // whether a path exists, and it only ever saw the one this form fetched
+  // itself — which it does not do when the path is handed in.
+  const [currentPath, setCurrentPath] = useState<any>(initialPath || null);
   // A session can sit under an education material or a language level.
   const [pathType, setPathType] = useState<'education' | 'language'>(initialPath?.root_type === 'language' ? 'language' : 'education');
   const [languages, setLanguages] = useState<any[]>([]);
@@ -631,7 +634,7 @@ const LiveSessionForm = ({ onSuccess, onCancel, editingSession, asAdmin, initial
               <h3 className="text-lg font-semibold">المسار التعليمي</h3>
             </div>
 
-            {isEditing && currentPath && !currentPath.material_id && (
+            {isEditing && currentPath && !currentPath.material_id && !currentPath.language_level_id && (
               <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
                 لا يوجد مسار تعليمي محفوظ لهذا البث. اختر مسارًا من القوائم بالأسفل.
               </div>
