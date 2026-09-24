@@ -759,23 +759,26 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
 
 
-        // Join the chat room
-
-        newSocket.emit('join-room', id, {
-
-            name: user.name || 'مستخدم',
-
-            role: user.role,
-
-            id: user.id,
-
-            avatar_url: user.avatar_url,
-
-            socketId: newSocket.id,
-
-            agoraUid: stableUid
-
-        });
+        // Join the room on every connection, not once at startup.
+        // Socket.IO reconnects by itself after any drop — a restart of the
+        // server, a phone waking up, a lost second of network — but the room
+        // membership lives on the old socket and does not come back with it.
+        // Emitting this once meant that after any reconnection the client sat
+        // in the room's silence: no participants, no chat, nothing arriving,
+        // until the person reloaded the page.
+        const joinRoom = () => {
+            console.log('[DEBUG] joining room', id, 'as', newSocket.id);
+            newSocket.emit('join-room', id, {
+                name: user.name || 'مستخدم',
+                role: user.role,
+                id: user.id,
+                avatar_url: user.avatar_url,
+                socketId: newSocket.id,
+                agoraUid: stableUid
+            });
+        };
+        newSocket.on('connect', joinRoom);
+        if (newSocket.connected) joinRoom();
 
 
 
@@ -1020,6 +1023,14 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
         newSocket.on('message-pinned', (data: { sender: string; text: string } | null) => {
 
             setPinnedMessage(data && data.text ? data : null);
+
+        });
+
+        newSocket.on('session-updated', (data: any) => {
+
+            if (!data) return;
+
+            setSession((prev: any) => (prev ? { ...prev, ...data } : prev));
 
         });
 
@@ -3181,7 +3192,14 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                             const isStudent = participant.role === 'student';
 
-                            const isMuted = studentMuteStates[participant.userId] !== undefined ? studentMuteStates[participant.userId] : true;
+                            // A teacher is not one of the muted students: their badge follows
+                            // their own microphone. Reading the student map for them
+                            // found nothing and fell back to "muted", so a teacher who
+                            // was speaking was shown with a red muted icon.
+                            const isTeacherRow = participant.role === 'professor';
+                            const isMuted = isTeacherRow
+                                ? (isCurrentUser ? isLocalMicMuted : false)
+                                : (studentMuteStates[participant.userId] !== undefined ? studentMuteStates[participant.userId] : true);
 
                             const canProfToggle = isProfessor && isStudent;
 

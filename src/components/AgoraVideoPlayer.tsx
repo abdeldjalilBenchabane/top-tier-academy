@@ -195,6 +195,29 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
         onCameraStateChange?.(isLocalCameraEnabled);
     }, [isLocalCameraEnabled, onCameraStateChange]);
 
+    // Leaving the page did not leave the call. Reloading therefore left the
+    // old connection publishing from the room's point of view, and everyone
+    // else kept listening to a stream that had stopped until the service
+    // timed it out roughly half a minute later — which is what a teacher who
+    // refreshes sees as "the students cannot hear me". Closing it on the way
+    // out makes the old one disappear at once, so the new one is picked up.
+    useEffect(() => {
+        const leaveEverything = () => {
+            try { localAudioTrackRef.current?.close(); } catch { }
+            try { localVideoTrackRef.current?.close(); } catch { }
+            try { screenTrackRef.current?.close(); } catch { }
+            try { screenClientRef.current?.leave(); } catch { }
+            try { clientRef.current?.leave(); } catch { }
+        };
+        // pagehide covers Safari and phones, where beforeunload often never runs.
+        window.addEventListener('pagehide', leaveEverything);
+        window.addEventListener('beforeunload', leaveEverything);
+        return () => {
+            window.removeEventListener('pagehide', leaveEverything);
+            window.removeEventListener('beforeunload', leaveEverything);
+        };
+    }, []);
+
     // What a student can see of the teacher. Kept as state, not read off the
     // refs, because the placeholder has to re-render when these change.
     //

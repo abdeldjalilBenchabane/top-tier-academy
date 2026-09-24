@@ -682,6 +682,19 @@ router.put('/admin/live-sessions/:sessionId',
             `UPDATE live_sessions SET ${sets.join(', ')} WHERE id = $${values.length} RETURNING *`, values);
         const session = result.rows[0];
 
+        // People already in the room get the edit as it happens. Without this
+        // a changed telegram link only appeared to someone who reloaded, and
+        // nobody reloads in the middle of a lesson.
+        const io = req.app.get('io');
+        if (io && session) {
+            io.to(String(sessionId)).emit('session-updated', {
+                title: session.title,
+                description: session.description,
+                telegram_channel: session.telegram_channel,
+                cover_image_url: session.cover_image_url,
+            });
+        }
+
         // Same courtesy as the professor route: tell paying students if it moved.
         try {
             const before = previous.start_time ? new Date(previous.start_time).getTime() : null;
