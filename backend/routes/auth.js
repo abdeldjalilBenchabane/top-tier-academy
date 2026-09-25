@@ -52,10 +52,18 @@ const createUserSession = async (userId, req, role) => {
     const limit = MAX_CONCURRENT_SESSIONS[role] ?? 1;
 
     if (limit <= 1) {
-      // One device only: retire every other session.
+      // One session per kind of client, rather than one in total. A student
+      // signing in on a second phone still signs the first phone out, which
+      // is what the rule is for — but the app and the browser no longer
+      // evict each other, which was signing people out of the app whenever
+      // they opened the site, and out of the site whenever they opened the
+      // app. The app calls itself Dart/x.y (dart:io); browsers do not.
+      const isAppClient = /(^|[^A-Za-z])Dart\//i.test(userAgent) || /okhttp|CFNetwork/i.test(userAgent);
       await query(
-        'UPDATE user_sessions SET is_active = false WHERE user_id = $1 AND is_active = true',
-        [userId]
+        `UPDATE user_sessions SET is_active = false
+          WHERE user_id = $1 AND is_active = true
+            AND (COALESCE(user_agent, '') ILIKE 'Dart/%') = $2`,
+        [userId, isAppClient]
       );
     } else {
       // Keep the (limit - 1) most recently used sessions alive next to the one

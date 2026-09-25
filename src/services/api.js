@@ -56,8 +56,13 @@ const apiRequest = async (endpoint, options = {}) => {
         // Trigger a custom event to notify the app that session is invalid
         window.dispatchEvent(new CustomEvent('sessionInvalidated', { detail: errorData }));
       }
-      
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+
+      // The status travels with the error: the caller has to be able to tell a
+      // rejected token from a server that was briefly unreachable.
+      const err = new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      err.status = response.status;
+      err.sessionInvalid = errorData.sessionInvalid === true;
+      throw err;
     }
     
     return await response.json();

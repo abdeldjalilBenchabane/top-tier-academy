@@ -109,10 +109,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             sessionCheckInterval.current = setInterval(validateSession, 30000);
           }
         })
-        .catch((error) => {
-          console.error('Token validation failed:', error);
-          removeAuthToken();
-          removeSessionToken();
+        .catch((error: any) => {
+          // Only a refusal from the server means the token is no good. Any
+          // failure used to clear it — so a moment without network, or the
+          // backend restarting during a deploy, signed the person out and made
+          // them log in again. Now that happens only when the server actually
+          // says the token is invalid.
+          const rejected = error?.sessionInvalid === true
+            || error?.status === 400
+            || error?.status === 401;
+          if (rejected) {
+            console.warn('Signed out: the server rejected the token.', error?.message);
+            removeAuthToken();
+            removeSessionToken();
+          } else {
+            console.warn('Could not reach the server; staying signed in.', error?.message);
+          }
         })
         .finally(() => {
           setIsLoading(false);
