@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { getRow } from '../db.js';
+import { getRow, query } from '../db.js';
 
 // No fallback on purpose. A signing key that quietly defaults to a
 // placeholder anyone can guess is not a key. If it is missing, fail here,
@@ -34,6 +34,15 @@ export function forgetUserSessions(userId) {
   }
 }
 
+// How long a session row is kept alive ahead of the moment it was last used.
+// It has to be at least the token lifetime, or the row dies while the token
+// it belongs to is still perfectly valid.
+const SESSION_LIFETIME_DAYS = Number(process.env.AUTH_LIFETIME_DAYS) || 90;
+const SESSION_LIFETIME_MS = SESSION_LIFETIME_DAYS * 24 * 60 * 60 * 1000;
+// Only write the new deadline when it has moved by more than this, so an
+// active user costs one UPDATE a day rather than one per cache miss.
+const SESSION_RENEW_AFTER_MS = 24 * 60 * 60 * 1000;
+
 async function sessionIsActive(sid, userId) {
   const hit = sessionCache.get(sid);
   if (hit && Date.now() - hit.checkedAt < SESSION_CACHE_TTL_MS) return hit.active;
@@ -45,10 +54,30 @@ async function sessionIsActive(sid, userId) {
   // A token whose session row is gone stays valid: rows are pruned, and
   // logging every one of those users out would be a worse failure than the
   // one this check exists to prevent.
-  const active = !row
-    || (row.is_active === true && new Date(row.expires_at) > new Date());
+  //
+  // `expires_at` deliberately does not appear here. It is a housekeeping
+  // deadline written once at login and never moved, so it went stale while
+  // the token was still good — every account created under the old seven-day
+  // rule had a row that had already lapsed, and its holder was thrown out
+  // mid-session for no reason. How long a login lasts is the token's own
+  // `exp`, which jwt.verify has already enforced by this point; the row only
+  // answers the other question, whether the login was revoked.
+  const active = !row || row.is_active === true;
 
   sessionCache.set(sid, { userId, active, checkedAt: Date.now() });
+
+  // Keep the row's deadline ahead of the token it belongs to, so the cleanup
+  // that prunes old rows never reaches one that is still in use.
+  if (active && row) {
+    const target = Date.now() + SESSION_LIFETIME_MS;
+    const current = row.expires_at ? new Date(row.expires_at).getTime() : 0;
+    if (target - current > SESSION_RENEW_AFTER_MS) {
+      query('UPDATE user_sessions SET expires_at = $1, last_activity = CURRENT_TIMESTAMP WHERE session_token = $2',
+        [new Date(target), sid])
+        .catch(err => console.warn('Could not extend session', sid, err.message));
+    }
+  }
+
   return active;
 }
 
@@ -117,9 +146,8 @@ export const verifyTokenAndSession = async (req, res, next) => {
         return res.status(401).json({ error: 'Session has been invalidated.', sessionInvalid: true });
       }
       
-      if (new Date(session.expires_at) < new Date()) {
-        return res.status(401).json({ error: 'Session has expired.', sessionInvalid: true });
-      }
+      // No expiry check here either: see sessionIsActive above. The token's
+      // own lifetime is what decides when a login ends.
     }
     
     next();

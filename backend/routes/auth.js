@@ -52,18 +52,12 @@ const createUserSession = async (userId, req, role) => {
     const limit = MAX_CONCURRENT_SESSIONS[role] ?? 1;
 
     if (limit <= 1) {
-      // One session per kind of client, rather than one in total. A student
-      // signing in on a second phone still signs the first phone out, which
-      // is what the rule is for — but the app and the browser no longer
-      // evict each other, which was signing people out of the app whenever
-      // they opened the site, and out of the site whenever they opened the
-      // app. The app calls itself Dart/x.y (dart:io); browsers do not.
-      const isAppClient = /(^|[^A-Za-z])Dart\//i.test(userAgent) || /okhttp|CFNetwork/i.test(userAgent);
+      // One device only, anywhere: signing in on the website signs the app
+      // out and the other way round. That is the point — it is what stops an
+      // account being shared.
       await query(
-        `UPDATE user_sessions SET is_active = false
-          WHERE user_id = $1 AND is_active = true
-            AND (COALESCE(user_agent, '') ILIKE 'Dart/%') = $2`,
-        [userId, isAppClient]
+        'UPDATE user_sessions SET is_active = false WHERE user_id = $1 AND is_active = true',
+        [userId]
       );
     } else {
       // Keep the (limit - 1) most recently used sessions alive next to the one
@@ -331,14 +325,18 @@ router.post('/validate-session', verifyToken, async (req, res) => {
       return res.status(401).json({ error: 'Session has been invalidated', valid: false });
     }
     
-    if (new Date(session.expires_at) < new Date()) {
-      return res.status(401).json({ error: 'Session has expired', valid: false });
-    }
-    
-    // Update last activity
+    // `expires_at` is not checked. It is written once at login and never
+    // moved, so for everyone who signed in under the old seven-day rule it
+    // lapsed long before their token did, and the site logged them out on the
+    // next thirty-second check with nothing actually wrong. The token's own
+    // lifetime decides when a login ends; this row only says whether it was
+    // revoked. The deadline is pushed forward below instead.
     await query(
-      'UPDATE user_sessions SET last_activity = CURRENT_TIMESTAMP WHERE id = $1',
-      [session.id]
+      `UPDATE user_sessions
+          SET last_activity = CURRENT_TIMESTAMP,
+              expires_at = CURRENT_TIMESTAMP + ($2 || ' days')::interval
+        WHERE id = $1`,
+      [session.id, AUTH_LIFETIME_DAYS]
     );
     
     res.json({ valid: true, message: 'Session is valid' });
