@@ -353,14 +353,13 @@ const LiveSessionDetails = () => {
     loadData();
   }, [id, user]);
 
+  // One section at a time. Opening a second one while the first was still
+  // open left two tall cards side by side and pushed everything below them
+  // off the screen.
   const toggleSection = (sectionId: number) => {
-    const newExpanded = new Set(expandedSections);
-    if (newExpanded.has(sectionId)) {
-      newExpanded.delete(sectionId);
-    } else {
-      newExpanded.add(sectionId);
-    }
-    setExpandedSections(newExpanded);
+    setExpandedSections(prev =>
+      prev.has(sectionId) ? new Set<number>() : new Set<number>([sectionId])
+    );
   };
 
   // Refresh sessions every 30 seconds to get updated status
@@ -480,7 +479,7 @@ const LiveSessionDetails = () => {
               </p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
               {contentSections.map((section, sectionIndex) => {
                 const hasLockedContent = section.blocks?.some(
                   block => (block.type === 'video' || block.type === 'image' || block.type === 'pdf') && 

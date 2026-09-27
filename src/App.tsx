@@ -11,6 +11,7 @@ import { PendingCountProvider } from './contexts/PendingCountContext';
 import { LiveSessionsCountProvider } from './contexts/LiveSessionsCountContext';
 import { PendingQuizzesCountProvider } from './contexts/PendingQuizzesCountContext';
 import { PendingPrivateClassesCountProvider } from './contexts/PendingPrivateClassesCountContext';
+import ScrollToTop from './components/ScrollToTop';
 
 // Lazy load all page components
 // TTH Pages
@@ -141,6 +142,7 @@ const App: React.FC = () => {
                     <Toaster />
                     <Sonner />
                     <BrowserRouter>
+                      <ScrollToTop />
                       <Suspense fallback={<LoadingSpinner />}>
                         <Routes>
                           {/* TTH always public */}
