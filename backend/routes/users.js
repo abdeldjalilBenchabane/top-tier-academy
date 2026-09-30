@@ -554,16 +554,23 @@ router.post('/avatar-profile', verifyToken, (req, res, next) => {
       return res.status(400).json({ error: 'File too large. Maximum size is 5MB.' });
     }
 
-    // Delete old avatar if it exists
+    // Remove the avatar being replaced. This used to look for a local file
+    // under public/ via __dirname, which does not exist in an ES module — so
+    // every attempt threw ReferenceError and the route answered 500. Anyone
+    // who already had a picture could not change it from the phone app at
+    // all. Avatars live in R2, so that is where the old one is deleted, the
+    // same way the website's own avatar route does it.
     if (existingUser.avatar_url) {
-      const oldAvatarPath = path.join(__dirname, '..', '..', 'public', existingUser.avatar_url);
       try {
-        if (fs.existsSync(oldAvatarPath)) {
-          fs.unlinkSync(oldAvatarPath);
-          debugLog(`Old avatar deleted: ${oldAvatarPath}`);
+        const { deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
+        const oldKey = extractKeyFromUrl(existingUser.avatar_url);
+        if (oldKey && oldKey !== existingUser.avatar_url) {
+          await deleteFromR2(oldKey);
+          debugLog(`Old avatar removed from R2: ${oldKey}`);
         }
-      } catch (fileError) {
-        console.error('Error deleting old avatar:', fileError);
+      } catch (deleteError) {
+        // Losing the old file is not worth failing the new upload over.
+        console.error('Could not remove the old avatar:', deleteError.message);
       }
     }
 
@@ -613,16 +620,19 @@ router.delete('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
-    // Delete avatar file if it exists
+    // Same __dirname mistake as the avatar route had: this threw for every
+    // user who had a profile picture, so deleting such a user failed with a
+    // 500 and the account stayed. The picture is in R2.
     if (existingUser.avatar_url) {
-      const avatarPath = path.join(__dirname, '..', '..', 'public', existingUser.avatar_url);
       try {
-        if (fs.existsSync(avatarPath)) {
-          fs.unlinkSync(avatarPath);
-          debugLog(`Avatar deleted: ${avatarPath}`);
+        const { deleteFromR2, extractKeyFromUrl } = await import('../services/r2Service.js');
+        const avatarKey = extractKeyFromUrl(existingUser.avatar_url);
+        if (avatarKey && avatarKey !== existingUser.avatar_url) {
+          await deleteFromR2(avatarKey);
+          debugLog(`Avatar removed from R2: ${avatarKey}`);
         }
-      } catch (fileError) {
-        console.error('Error deleting avatar:', fileError);
+      } catch (deleteError) {
+        console.error('Could not remove the avatar:', deleteError.message);
       }
     }
 
