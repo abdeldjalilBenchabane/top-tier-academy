@@ -92,7 +92,7 @@ const TTHSecurity = () => {
                                 </p>
                                 <ul className="list-disc pr-6 space-y-2">
                                     <li>البريد الإلكتروني: <a href="mailto:toptieracademy.setif@gmail.com" className="text-[#194cbf] font-bold hover:underline">toptieracademy.setif@gmail.com</a></li>
-                                    <li>الهاتف: 036821908 / 0563273309 / 0777768983</li>
+                                    <li>الهاتف: 0777768983 / 036008230</li>
                                 </ul>
                             </Section>
                         </div>

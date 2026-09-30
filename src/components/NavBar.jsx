@@ -119,16 +119,14 @@ const Navbar = () => {
           <div className="animate-scroll-left-to-right-mobile md:animate-scroll-left-to-right whitespace-nowrap flex items-center gap-4 md:gap-8 text-xs md:text-sm font-medium">
             {/* Multiple duplicates to ensure all info appears on mobile */}
             <span className="inline-block">للاستفسار إتصلوا على الأرقام التالية:</span>
-            <span className="inline-block">036821908</span>
-            <span className="inline-block">0563273309</span>
             <span className="inline-block">0777768983</span>
+            <span className="inline-block">036008230</span>
             <span className="inline-block">|</span>
             <a href="mailto:toptieracademy.setif@gmail.com" className="inline-block hover:underline whitespace-nowrap">toptieracademy.setif@gmail.com</a>
             {/* Duplicate for seamless loop */}
             <span className="inline-block">للاستفسار إتصلوا على الأرقام التالية:</span>
-            <span className="inline-block">036821908</span>
-            <span className="inline-block">0563273309</span>
             <span className="inline-block">0777768983</span>
+            <span className="inline-block">036008230</span>
             <span className="inline-block">|</span>
             <a href="mailto:toptieracademy.setif@gmail.com" className="inline-block hover:underline whitespace-nowrap">toptieracademy.setif@gmail.com</a>
           </div>

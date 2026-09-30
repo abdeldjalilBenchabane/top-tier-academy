@@ -35,6 +35,10 @@ const generateSessionToken = () => {
 // a shared one.
 const MAX_CONCURRENT_SESSIONS = { admin: 5, professor: 5, student: 1 };
 
+// What the mobile app's requests look like, so a login from the app only
+// retires the previous *app* login and leaves the website's alone.
+const APP_USER_AGENT = /dart|flutter|okhttp|cfnetwork/i;
+
 // Helper function to create a new session, retiring older ones past the limit
 const createUserSession = async (userId, req, role) => {
   try {
@@ -52,12 +56,17 @@ const createUserSession = async (userId, req, role) => {
     const limit = MAX_CONCURRENT_SESSIONS[role] ?? 1;
 
     if (limit <= 1) {
-      // One device only, anywhere: signing in on the website signs the app
-      // out and the other way round. That is the point — it is what stops an
-      // account being shared.
+      // One device per platform: the phone app and the website can be signed
+      // in at the same time, because they are the same student working the
+      // way they actually work. A second phone still replaces the first, and
+      // a second browser replaces the first, so an account still cannot be
+      // spread across a class.
+      const isApp = APP_USER_AGENT.test(userAgent);
       await query(
-        'UPDATE user_sessions SET is_active = false WHERE user_id = $1 AND is_active = true',
-        [userId]
+        `UPDATE user_sessions SET is_active = false
+          WHERE user_id = $1 AND is_active = true
+            AND (COALESCE(user_agent, '') ~* $2) = $3`,
+        [userId, APP_USER_AGENT.source, isApp]
       );
     } else {
       // Keep the (limit - 1) most recently used sessions alive next to the one
