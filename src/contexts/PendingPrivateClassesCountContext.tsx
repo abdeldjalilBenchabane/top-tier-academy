@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { pollWhileVisible, COUNTER_POLL_MS } from '@/lib/pollWhileVisible';
 
 interface PendingPrivateClassesCountContextType {
   pendingPrivateClassesCount: number;
@@ -75,10 +76,7 @@ export const PendingPrivateClassesCountProvider: React.FC<PendingPrivateClassesC
     
     fetchPendingPrivateClassesCount();
     
-    // Refresh every 10 seconds
-    const interval = setInterval(fetchPendingPrivateClassesCount, 10000);
-    
-    return () => clearInterval(interval);
+    return pollWhileVisible(fetchPendingPrivateClassesCount, COUNTER_POLL_MS);
   }, [user, isProfessor, fetchPendingPrivateClassesCount]);
 
   return (

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from './AuthContext';
+import { pollWhileVisible, COUNTER_POLL_MS } from '@/lib/pollWhileVisible';
 
 interface PendingQuizzesCountContextType {
   pendingQuizzesCount: {
@@ -53,19 +54,8 @@ export const PendingQuizzesCountProvider: React.FC<PendingQuizzesCountProviderPr
   };
 
   useEffect(() => {
-    console.log('🔄 Initializing pending quizzes count provider...');
     fetchPendingQuizzesCount();
-    
-    // Refresh count every 10 seconds
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing pending quizzes count...');
-      fetchPendingQuizzesCount();
-    }, 10000);
-    
-    return () => {
-      console.log('🔄 Cleaning up pending quizzes count interval...');
-      clearInterval(interval);
-    };
+    return pollWhileVisible(fetchPendingQuizzesCount, COUNTER_POLL_MS);
   }, [isAdmin]);
 
   return (

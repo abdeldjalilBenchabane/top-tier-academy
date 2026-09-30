@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from './AuthContext';
+import { pollWhileVisible, COUNTER_POLL_MS } from '@/lib/pollWhileVisible';
 
 interface LiveSessionsCountContextType {
   liveSessionsCount: {
@@ -55,19 +56,8 @@ export const LiveSessionsCountProvider: React.FC<LiveSessionsCountProviderProps>
   };
 
   useEffect(() => {
-    console.log('🔄 Initializing live sessions count provider...');
     fetchLiveSessionsCount();
-    
-    // Refresh count every 10 seconds
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing live sessions count...');
-      fetchLiveSessionsCount();
-    }, 10000);
-    
-    return () => {
-      console.log('🔄 Cleaning up live sessions count interval...');
-      clearInterval(interval);
-    };
+    return pollWhileVisible(fetchLiveSessionsCount, COUNTER_POLL_MS);
   }, [isAdmin]);
 
   return (

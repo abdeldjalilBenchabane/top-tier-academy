@@ -173,10 +173,20 @@ const TTHSlides = () => {
     }
   };
 
+  // Count each slide once per visit.
+  //
+  // The carousel moves on every two seconds, and this used to record a view on
+  // every move — so one visitor left on the landing page produced thirty views
+  // a minute, for ever, counting the same handful of slides over and over.
+  // That is what grew slide_analytics to 83,000 rows, and none of it said
+  // anything a single view per slide does not.
+  const viewedSlides = useRef(new Set());
+
   useEffect(() => {
-    if (slides[currentSlide]) {
-      handleSlideView(slides[currentSlide].id);
-    }
+    const slide = slides[currentSlide];
+    if (!slide || viewedSlides.current.has(slide.id)) return;
+    viewedSlides.current.add(slide.id);
+    handleSlideView(slide.id);
   }, [currentSlide, slides]);
 
   if (isLoading) {

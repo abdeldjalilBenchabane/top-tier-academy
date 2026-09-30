@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from './AuthContext';
+import { pollWhileVisible, COUNTER_POLL_MS } from '@/lib/pollWhileVisible';
 
 interface PendingCountContextType {
   pendingCount: number;
@@ -55,19 +56,11 @@ export const PendingCountProvider: React.FC<PendingCountProviderProps> = ({ chil
   };
 
   useEffect(() => {
-    console.log('🔄 Initializing pending count provider...');
     fetchPendingCount();
-    
-    // Refresh count every 5 seconds for more responsive updates
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing pending count...');
-      fetchPendingCount();
-    }, 5000);
-    
-    return () => {
-      console.log('🔄 Cleaning up pending count interval...');
-      clearInterval(interval);
-    };
+    // Was every five seconds, and each round asks for pending courses and
+    // pending live sections, so an open dashboard made two requests every five
+    // seconds for the life of the tab.
+    return pollWhileVisible(fetchPendingCount, COUNTER_POLL_MS);
   }, [isAdmin]);
 
   return (
