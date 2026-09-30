@@ -587,6 +587,11 @@ router.get('/dashboard/recent-activity', verifyToken, requireAdmin, async (req, 
   try {
     debugLog('Fetching recent activity...');
     const { limit = 10 } = req.query;
+    // Each section below takes half the budget. Worked out once, as a whole
+    // number: an odd ?limit gave "LIMIT 3.5" and a non-numeric one gave
+    // "LIMIT NaN", and because every section swallows its own errors the
+    // activity list just came back short with nothing to say why.
+    const half = Math.max(1, Math.floor((parseInt(limit, 10) || 10) / 2));
     
     const activities = [];
     
@@ -596,7 +601,7 @@ router.get('/dashboard/recent-activity', verifyToken, requireAdmin, async (req, 
         SELECT id, name, email, role, created_at 
         FROM users 
         ORDER BY created_at DESC 
-        LIMIT ${parseInt(limit) / 2}
+        LIMIT ${half}
       `);
       
       activities.push(...recentUsers.map(user => ({
@@ -613,10 +618,10 @@ router.get('/dashboard/recent-activity', verifyToken, requireAdmin, async (req, 
     // Get recent course submissions (with fallback)
     try {
       const recentCourses = await getRows(`
-        SELECT id, title, professor_id, created_at 
+        SELECT id, title, created_by, created_at 
         FROM pending_courses 
         ORDER BY created_at DESC 
-        LIMIT ${parseInt(limit) / 2}
+        LIMIT ${half}
       `);
       
       activities.push(...recentCourses.map(course => ({

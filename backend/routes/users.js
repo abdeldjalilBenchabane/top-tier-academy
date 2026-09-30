@@ -11,6 +11,19 @@ import { debugLog } from '../utils/logger.js';
 
 const router = express.Router();
 
+// Hands a request on to the next matching route when the id is not a plain
+// number.
+//
+// "/me", "/test-role", "/student/avatar" and "/me/avatar" all match "/:id" and
+// "/:id/avatar" too, and those patterns are declared first, so :id captured
+// the words instead. GET /users/me answered 403 from the admin-only "/:id"
+// handler rather than returning the caller's own profile, and a student's
+// avatar upload never reached the route written for it. Reordering the file
+// would work as well; this way the patterns say what they mean wherever they
+// sit.
+const numericIdOnly = (req, res, next) =>
+  /^\d+$/.test(req.params.id) ? next() : next('route');
+
 // Configure multer for avatar uploads with R2 storage
 const avatarUpload = createR2Multer('avatars', null, {
   fileFilter: (req, file, cb) => {
@@ -85,7 +98,7 @@ router.get('/teachers', verifyToken, async (req, res) => {
 });
 
 // Get user by ID (admin only)
-router.get('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
+router.get('/:id', numericIdOnly, verifyToken, requireRole(['admin']), async (req, res) => {
   try {
     const user = await getRow(
       'SELECT id, name, email, role, avatar_url, created_at FROM users WHERE id = $1',
@@ -159,7 +172,7 @@ router.post('/', verifyToken, requireRole(['admin']), async (req, res) => {
 });
 
 // Update user (admin only)
-router.put('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
+router.put('/:id', numericIdOnly, verifyToken, requireRole(['admin']), async (req, res) => {
   try {
     const { name, email, password, confirmPassword, role, avatar_url, level_id } = req.body;
     const userId = req.params.id;
@@ -248,7 +261,7 @@ router.put('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
 });
 
 // Upload avatar (admin only)
-router.post('/:id/avatar', verifyToken, requireRole(['admin']), avatarUpload.single('avatar'), async (req, res, next) => {
+router.post('/:id/avatar', numericIdOnly, verifyToken, requireRole(['admin']), avatarUpload.single('avatar'), async (req, res, next) => {
   try {
     const userId = req.params.id;
 
@@ -605,7 +618,7 @@ router.post('/avatar-profile', verifyToken, (req, res, next) => {
 });
 
 // Delete user (admin only)
-router.delete('/:id', verifyToken, requireRole(['admin']), async (req, res) => {
+router.delete('/:id', numericIdOnly, verifyToken, requireRole(['admin']), async (req, res) => {
   try {
     const userId = req.params.id;
 

@@ -11,6 +11,13 @@ import { createR2Multer } from '../middleware/r2MulterStorage.js';
 import { deleteFromR2, extractKeyFromUrl, uploadToR2, generateR2Key } from '../services/r2Service.js';
 import { uploadProgressService } from '../services/uploadProgressService.js';
 import { debugLog } from '../utils/logger.js';
+import { fileURLToPath } from 'url';
+
+// This file is an ES module, where __dirname does not exist. Three places
+// below reached for it anyway: the two legacy local-file branches threw
+// ReferenceError into a catch that logged and carried on, and the admin
+// scan-files endpoint threw it straight back as a 500.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const router = express.Router();
 
