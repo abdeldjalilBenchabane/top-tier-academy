@@ -132,7 +132,7 @@ router.post('/professors/:professorId/live-sessions',
 
         // Handle R2 upload manually after file is buffered
         let cover_image_url = null;
-        if (req.file && req.file.buffer) {
+        if (req.file && req.file.path) {
             try {
                 debugLog('📤 Processing R2 upload for live session cover...');
                 
@@ -144,7 +144,7 @@ router.post('/professors/:professorId/live-sessions',
                 debugLog('🔑 Generated R2 key:', r2Key);
                 
                 // Upload to R2
-                const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+                const publicUrl = await uploadToR2(req.file, r2Key, req.file.mimetype);
                 debugLog('✅ Live session cover uploaded to R2:', publicUrl);
                 
                 // Update file object with R2 URL
@@ -340,7 +340,7 @@ router.put('/live-sessions/:id', verifyToken, requireProfessor, (req, res, next)
         let cover_image_url = null;
         if (req.files && req.files.length > 0) {
             const coverFile = req.files.find(f => f.fieldname === 'cover_image');
-            if (coverFile && coverFile.buffer) {
+            if (coverFile && coverFile.path) {
                 try {
                     debugLog('📤 Processing R2 upload for live session cover update...');
                     
@@ -352,7 +352,7 @@ router.put('/live-sessions/:id', verifyToken, requireProfessor, (req, res, next)
                     debugLog('🔑 Generated R2 key:', r2Key);
                     
                     // Upload to R2
-                    const publicUrl = await uploadToR2(coverFile.buffer, r2Key, coverFile.mimetype);
+                    const publicUrl = await uploadToR2(coverFile, r2Key, coverFile.mimetype);
                     debugLog('✅ Live session cover updated to R2:', publicUrl);
                     
                     // Update file object with R2 URL
@@ -664,11 +664,11 @@ router.put('/admin/live-sessions/:sessionId',
 
         // Optional new cover, uploaded the same way the create route does it.
         const coverFile = (req.files || []).find(f => f.fieldname === 'cover_image');
-        if (coverFile && coverFile.buffer) {
+        if (coverFile && coverFile.path) {
             try {
                 const { uploadToR2, generateR2Key } = await import('../services/r2Service.js');
                 const key = generateR2Key('live-sessions', null, coverFile.originalname, 'cover');
-                push('cover_image_url', await uploadToR2(coverFile.buffer, key, coverFile.mimetype));
+                push('cover_image_url', await uploadToR2(coverFile, key, coverFile.mimetype));
             } catch (e) {
                 console.error('[admin] cover upload failed:', e.message);
             }

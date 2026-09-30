@@ -136,7 +136,7 @@ router.post('/professors/:professorId/live-sections',
     const telegram_channel = req.body.telegram_channel || null;
 
     // Handle R2 upload manually after file is buffered
-    if (req.file && req.file.buffer) {
+    if (req.file && req.file.path) {
       try {
         debugLog('📤 Processing R2 upload for live section cover...');
         
@@ -148,7 +148,7 @@ router.post('/professors/:professorId/live-sections',
         debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
-        const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        const publicUrl = await uploadToR2(req.file, r2Key, req.file.mimetype);
         debugLog('✅ Live section cover uploaded to R2:', publicUrl);
         
         // Update file object with R2 URL
@@ -368,11 +368,11 @@ router.put('/admin/live-sections/:sectionId/path',
 
     // Same manual R2 upload the create route uses.
     let coverUrl = null;
-    if (req.file && req.file.buffer) {
+    if (req.file && req.file.path) {
       try {
         const { uploadToR2, generateR2Key } = await import('../services/r2Service.js');
         const r2Key = generateR2Key('live-sections', null, req.file.originalname, 'cover');
-        coverUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        coverUrl = await uploadToR2(req.file, r2Key, req.file.mimetype);
         debugLog('✅ Admin updated live section cover:', coverUrl);
       } catch (error) {
         console.error('❌ Cover upload failed:', error);
@@ -766,7 +766,7 @@ router.put('/live-sections/:sectionId',
     }
 
     // Handle R2 upload manually after file is buffered
-    if (req.file && req.file.buffer) {
+    if (req.file && req.file.path) {
       try {
         debugLog('📤 Processing R2 upload for live section cover update...');
         
@@ -778,7 +778,7 @@ router.put('/live-sections/:sectionId',
         debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
-        const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        const publicUrl = await uploadToR2(req.file, r2Key, req.file.mimetype);
         debugLog('✅ Live section cover updated to R2:', publicUrl);
         
         // Update file object with R2 URL
@@ -1806,7 +1806,7 @@ router.post('/live-sections/blocks',
   liveSectionContentUpload.single('file'),
   async (req, res, next) => {
     // Handle R2 upload manually after file is buffered
-    if (req.file && req.file.buffer) {
+    if (req.file && req.file.path) {
       try {
         debugLog('📤 Processing R2 upload for live section block file...');
         
@@ -1818,7 +1818,7 @@ router.post('/live-sections/blocks',
         debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
-        const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        const publicUrl = await uploadToR2(req.file, r2Key, req.file.mimetype);
         debugLog('✅ Live section block file uploaded to R2:', publicUrl);
         
         // Update file object with R2 URL
@@ -1916,7 +1916,7 @@ router.put('/live-sections/blocks/:blockId',
   liveSectionContentUpload.single('file'),
   async (req, res, next) => {
     // Handle R2 upload manually after file is buffered
-    if (req.file && req.file.buffer) {
+    if (req.file && req.file.path) {
       try {
         debugLog('📤 Processing R2 upload for live section block file update...');
         
@@ -1928,7 +1928,7 @@ router.put('/live-sections/blocks/:blockId',
         debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
-        const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        const publicUrl = await uploadToR2(req.file, r2Key, req.file.mimetype);
         debugLog('✅ Live section block file updated to R2:', publicUrl);
         
         // Update file object with R2 URL

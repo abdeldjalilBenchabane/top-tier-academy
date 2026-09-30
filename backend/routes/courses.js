@@ -252,9 +252,9 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
       for (const file of req.files) {
         debugLog(`📁 Processing file: ${file.originalname}`);
         debugLog(`📊 File size: ${file.size}`);
-        debugLog(`📦 Buffer available: ${!!file.buffer}`);
+        debugLog(`📦 Spooled to: ${file.path || '(nothing)'}`);
         
-        if (file.buffer) {
+        if (file.path) {
           try {
             // Check file size and warn for large files
             const fileSizeMB = file.size / (1024 * 1024);
@@ -275,7 +275,7 @@ router.post('/', verifyToken, requireRole(['professor']), (req, res, next) => {
             
             // Upload to R2
             debugLog(`📤 Starting upload for ${file.originalname} (${fileSizeMB.toFixed(1)}MB)...`);
-            const publicUrl = await uploadToR2(file.buffer, r2Key, file.mimetype);
+            const publicUrl = await uploadToR2(file, r2Key, file.mimetype);
             debugLog('✅ File uploaded to R2:', publicUrl);
             
             // Mark upload as completed
@@ -1186,7 +1186,7 @@ router.put('/:id/cover', (req, res, next) => {
   debugLog('📁 File upload processed:', req.file);
   
   // Handle R2 upload manually after file is buffered
-  if (req.file && req.file.buffer) {
+  if (req.file && req.file.path) {
     try {
       debugLog('📤 Processing R2 upload for cover...');
       
@@ -1195,7 +1195,7 @@ router.put('/:id/cover', (req, res, next) => {
       debugLog('🔑 Generated R2 key:', r2Key);
       
       // Upload to R2
-      const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+      const publicUrl = await uploadToR2(req.file, r2Key, req.file.mimetype);
       debugLog('✅ Cover uploaded to R2:', publicUrl);
       
       // Update file object with R2 URL
@@ -1749,7 +1749,7 @@ router.post('/blocks', verifyToken, requireRole(['professor', 'admin']), courseU
   debugLog('📁 Block creation request received');
   
   // Handle R2 upload manually after file is buffered
-  if (req.file && req.file.buffer) {
+  if (req.file && req.file.path) {
     try {
       debugLog('📤 Processing R2 upload for block file...');
       
@@ -1758,7 +1758,7 @@ router.post('/blocks', verifyToken, requireRole(['professor', 'admin']), courseU
       debugLog('🔑 Generated R2 key:', r2Key);
       
       // Upload to R2
-      const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+      const publicUrl = await uploadToR2(req.file, r2Key, req.file.mimetype);
       debugLog('✅ Block file uploaded to R2:', publicUrl);
       
       // Update file object with R2 URL

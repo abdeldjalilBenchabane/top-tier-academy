@@ -142,7 +142,7 @@ router.post('/', verifyToken, requireRole(['admin']), (req, res, next) => {
     }
     
     // Handle R2 upload manually after file is buffered
-    if (req.file && req.file.buffer) {
+    if (req.file && req.file.path) {
       try {
         debugLog('📤 Processing R2 upload for slide media...');
         
@@ -154,7 +154,7 @@ router.post('/', verifyToken, requireRole(['admin']), (req, res, next) => {
         debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
-        const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        const publicUrl = await uploadToR2(req.file, r2Key, req.file.mimetype);
         debugLog('✅ Slide media uploaded to R2:', publicUrl);
         
         // Update file object with R2 URL
@@ -269,7 +269,7 @@ router.put('/:id', verifyToken, requireRole(['admin']), (req, res, next) => {
     }
     
     // Handle R2 upload manually after file is buffered
-    if (req.file && req.file.buffer) {
+    if (req.file && req.file.path) {
       try {
         debugLog('📤 Processing R2 upload for slide media update...');
         
@@ -281,7 +281,7 @@ router.put('/:id', verifyToken, requireRole(['admin']), (req, res, next) => {
         debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
-        const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        const publicUrl = await uploadToR2(req.file, r2Key, req.file.mimetype);
         debugLog('✅ Slide media uploaded to R2:', publicUrl);
         
         // Update file object with R2 URL

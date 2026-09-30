@@ -13,61 +13,128 @@ const r2Client = new S3Client({
     accessKeyId: process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
   },
+  // The SDK adds a CRC32 checksum to PutObject by default, and computing one
+  // over a stream means reading the whole stream first — which put the entire
+  // file back in memory and undid the point of streaming it. R2 does not
+  // require these checksums; the transfer is already protected by TLS and by
+  // the Content-Length the request declares.
+  requestChecksumCalculation: 'WHEN_REQUIRED',
+});
+
+// For streamed bodies. A retry inside the SDK would re-send a read stream that
+// has already been consumed — an empty request that looks like a success — so
+// this client does not retry, and uploadToR2 retries by opening a fresh stream.
+const r2StreamClient = new S3Client({
+  region: 'auto',
+  endpoint: process.env.R2_ENDPOINT,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+  maxAttempts: 1,
+  // The SDK adds a CRC32 checksum to PutObject by default, and computing one
+  // over a stream means reading the whole stream first — which put the entire
+  // file back in memory and undid the point of streaming it. R2 does not
+  // require these checksums; the transfer is already protected by TLS and by
+  // the Content-Length the request declares.
+  requestChecksumCalculation: 'WHEN_REQUIRED',
 });
 
 // Bucket name
 const BUCKET_NAME = process.env.R2_BUCKET_NAME;
 
 /**
- * Upload file to R2
- * @param {Buffer} fileBuffer - File buffer
+ * Upload a file to R2.
+ *
+ * Accepts either a Buffer or a multer file whose bytes are already on disk.
+ * The second form is the one that matters: it streams the file straight from
+ * disk to R2 instead of holding it in memory, so a one-gigabyte video costs a
+ * few megabytes of RAM rather than two gigabytes. Uploads used to arrive
+ * through multer.memoryStorage(), which buffered the whole thing and then
+ * concatenated it — two full copies alive at once — and the memory was never
+ * returned to the system afterwards.
+ *
+ * @param {Buffer|{path: string, size?: number}} source - buffer, or a file on disk
  * @param {string} key - File key/path in R2
  * @param {string} contentType - MIME type
  * @returns {Promise<string>} - Public URL
  */
-export const uploadToR2 = async (fileBuffer, key, contentType) => {
-  try {
-    console.log('📤 Uploading to R2:', key);
-    
-    // Check if fileBuffer is valid
-    if (!fileBuffer || !Buffer.isBuffer(fileBuffer)) {
-      throw new Error('Invalid file buffer provided');
-    }
-    
-    console.log('📊 File size:', fileBuffer.length, 'bytes');
-    
-    const command = new PutObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: key,
-      Body: fileBuffer,
-      ContentType: contentType,
-      ACL: 'public-read', // Make file publicly accessible
-    });
-    
-    // Add timeout to prevent hanging (increased to 30 minutes for very large files)
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Upload timeout after 30 minutes')), 1800000);
-    });
-    
-    const uploadPromise = r2Client.send(command);
-    
-    // Race between upload and timeout
-    await Promise.race([uploadPromise, timeoutPromise]);
-    
-    // Return public URL (handle trailing slash properly)
-    const baseUrl = process.env.R2_PUBLIC_URL.endsWith('/') 
-      ? process.env.R2_PUBLIC_URL.slice(0, -1) 
-      : process.env.R2_PUBLIC_URL;
-    const publicUrl = `${baseUrl}/${key}`;
-    console.log(`✅ File uploaded to R2: ${publicUrl}`);
-    return publicUrl;
-  } catch (error) {
-    console.error('❌ Error uploading to R2:', error);
-    if (error.message.includes('timeout')) {
-      throw new Error('Upload timed out. Please try again or check your internet connection. Large files may take longer to upload.');
-    }
-    throw new Error(`Failed to upload file to R2: ${error.message}`);
+export const uploadToR2 = async (source, key, contentType) => {
+  const publicBase = () => {
+    const base = process.env.R2_PUBLIC_URL || '';
+    return base.endsWith('/') ? base.slice(0, -1) : base;
+  };
+
+  // Work out what we were handed, and how many bytes it is. R2 needs the
+  // length up front to sign a streamed body, which is why a bare stream with
+  // no known size is not accepted.
+  let fromDisk = null;
+  let buffer = null;
+  let contentLength;
+
+  if (Buffer.isBuffer(source)) {
+    buffer = source;
+    contentLength = source.length;
+  } else if (source && typeof (source.spooledPath || source.path) === 'string'
+             && (source.spooledPath || source.path).length > 0) {
+    // spooledPath is preferred: a few handlers overwrite path with the public
+    // URL once they are done, and this may run before or after that.
+    fromDisk = source.spooledPath || source.path;
+    contentLength = typeof source.size === 'number' ? source.size : fs.statSync(fromDisk).size;
+  } else if (source && Buffer.isBuffer(source.buffer)) {
+    buffer = source.buffer;
+    contentLength = source.buffer.length;
+  } else {
+    throw new Error('Invalid upload source: expected a Buffer or a file on disk');
   }
+
+  console.log(`📤 Uploading to R2: ${key} (${contentLength} bytes, ${fromDisk ? 'streamed from disk' : 'from memory'})`);
+
+  // A consumed read stream cannot be replayed, so the SDK's own retries are
+  // useless for a streamed body — the retry would send an empty request. One
+  // attempt per call, and a fresh stream for each of our own retries instead.
+  const attempts = fromDisk ? 2 : 1;
+  let lastError;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const command = new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        Body: fromDisk ? fs.createReadStream(fromDisk) : buffer,
+        ContentLength: contentLength,
+        ContentType: contentType,
+        ACL: 'public-read', // Make file publicly accessible
+      });
+
+      // Still capped, so a stalled connection cannot hold a request open for
+      // ever, but generous: a large video on a slow line is not a failure.
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Upload timeout after 30 minutes')), 1800000);
+      });
+
+      const client = fromDisk ? r2StreamClient : r2Client;
+      await Promise.race([
+        client.send(command, { requestTimeout: 0 }),
+        timeoutPromise,
+      ]);
+
+      const publicUrl = `${publicBase()}/${key}`;
+      console.log(`✅ File uploaded to R2: ${publicUrl}`);
+      return publicUrl;
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        console.warn(`⚠️ R2 upload attempt ${attempt} failed (${error.message}); retrying from the start of the file`);
+      }
+    }
+  }
+
+  console.error('❌ Error uploading to R2:', lastError);
+  if (String(lastError?.message || '').includes('timeout')) {
+    throw new Error('Upload timed out. Please try again or check your internet connection. Large files may take longer to upload.');
+  }
+  throw new Error(`Failed to upload file to R2: ${lastError?.message}`);
 };
 
 /**

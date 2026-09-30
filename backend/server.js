@@ -38,6 +38,7 @@ import { getUploadProgress, getActiveUploads } from './middleware/uploadProgress
 import speedTestRouter from './routes/speed-test.js';
 import uploadTestRouter from './routes/upload-test.js';
 import videoProtectionRoutes from './routes/video-protection.js';
+import { cleanUpSpooledUploads, sweepStaleSpooledUploads } from './middleware/r2MulterStorage.js';
 
 const { RtcTokenBuilder, RtcRole } = AgoraToken;// Agora token builder
 
@@ -146,8 +147,19 @@ app.use(cors({
   origin: ['http://5.135.200.148:8080', 'http://localhost:8080', 'http://5.135.200.148:5173'],
   credentials: true 
 }));    // En dev : '*' ; en prod, remplace par ton domaine
-app.use(express.json({ limit: '100gb' }));
-app.use(express.urlencoded({ extended: true, limit: '100gb' }));
+// A JSON body has to be held in memory to be parsed, so the limit is the
+// amount of RAM one request can claim. It was 100gb, which is not a limit at
+// all — a single malformed or hostile request could have taken the machine
+// down. Every JSON body here is metadata; files arrive as multipart and are
+// spooled to disk. Override with JSON_BODY_LIMIT if a route ever needs more.
+const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '10mb';
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: JSON_BODY_LIMIT }));
+
+// Uploads are spooled to disk on their way to R2, not held in memory. This
+// deletes each spooled copy once the response has gone out, however the
+// request ended.
+app.use(cleanUpSpooledUploads);
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '..', 'public', 'uploads')));
@@ -522,4 +534,7 @@ server.listen(PORT, HOST, () => {
   
   // Start the session reminder scheduler
   sessionReminderScheduler.start();
+
+  // Clear anything a previous crash left behind in the upload spool.
+  sweepStaleSpooledUploads();
 });

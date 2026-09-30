@@ -263,7 +263,7 @@ router.post('/:id/avatar', verifyToken, requireRole(['admin']), avatarUpload.sin
     }
 
     // Handle R2 upload manually after file is buffered
-    if (req.file && req.file.buffer) {
+    if (req.file && req.file.path) {
       try {
         debugLog('📤 Processing R2 upload for avatar...');
         
@@ -275,7 +275,7 @@ router.post('/:id/avatar', verifyToken, requireRole(['admin']), avatarUpload.sin
         debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
-        const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        const publicUrl = await uploadToR2(req.file, r2Key, req.file.mimetype);
         debugLog('✅ Avatar uploaded to R2:', publicUrl);
         
         // Update file object with R2 URL
@@ -307,12 +307,12 @@ router.post('/:id/avatar', verifyToken, requireRole(['admin']), avatarUpload.sin
     }
 
     // Save new avatar URL (R2)
-    // The upload middleware keeps the file in memory (multer.memoryStorage),
-    // so it has a buffer and no path — send it to R2 here, the way course
-    // files are handled. Reading req.file.path saved an empty avatar_url.
+    // The upload middleware spools the file to disk and hands it over — send
+    // it to R2 here, the way course files are handled. uploadToR2 streams it
+    // straight from the spool, so nothing is held in memory.
     const r2Key = generateR2Key('avatars', null, req.file.originalname, 'avatar');
     const avatarUrl = await uploadToR2(
-      req.file.buffer, r2Key, req.file.mimetype || 'image/jpeg');
+      req.file, r2Key, req.file.mimetype || 'image/jpeg');
     if (!avatarUrl) {
       return res.status(500).json({ error: 'تعذر حفظ الصورة. حاول مرة أخرى.' });
     }
@@ -355,7 +355,7 @@ router.post('/student/avatar', verifyToken, requireRole(['student']), avatarUplo
     }
 
     // Handle R2 upload manually after file is buffered
-    if (req.file && req.file.buffer) {
+    if (req.file && req.file.path) {
       try {
         debugLog('📤 Processing R2 upload for student avatar...');
         
@@ -367,7 +367,7 @@ router.post('/student/avatar', verifyToken, requireRole(['student']), avatarUplo
         debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
-        const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        const publicUrl = await uploadToR2(req.file, r2Key, req.file.mimetype);
         debugLog('✅ Student avatar uploaded to R2:', publicUrl);
         
         // Update file object with R2 URL
@@ -399,12 +399,12 @@ router.post('/student/avatar', verifyToken, requireRole(['student']), avatarUplo
     }
 
     // Save new avatar URL (R2)
-    // The upload middleware keeps the file in memory (multer.memoryStorage),
-    // so it has a buffer and no path — send it to R2 here, the way course
-    // files are handled. Reading req.file.path saved an empty avatar_url.
+    // The upload middleware spools the file to disk and hands it over — send
+    // it to R2 here, the way course files are handled. uploadToR2 streams it
+    // straight from the spool, so nothing is held in memory.
     const r2Key = generateR2Key('avatars', null, req.file.originalname, 'avatar');
     const avatarUrl = await uploadToR2(
-      req.file.buffer, r2Key, req.file.mimetype || 'image/jpeg');
+      req.file, r2Key, req.file.mimetype || 'image/jpeg');
     if (!avatarUrl) {
       return res.status(500).json({ error: 'تعذر حفظ الصورة. حاول مرة أخرى.' });
     }
@@ -443,7 +443,7 @@ router.post('/me/avatar', verifyToken, avatarUpload.single('avatar'), async (req
     }
 
     // Handle R2 upload manually after file is buffered
-    if (req.file && req.file.buffer) {
+    if (req.file && req.file.path) {
       try {
         debugLog('📤 Processing R2 upload for user avatar...');
         
@@ -455,7 +455,7 @@ router.post('/me/avatar', verifyToken, avatarUpload.single('avatar'), async (req
         debugLog('🔑 Generated R2 key:', r2Key);
         
         // Upload to R2
-        const publicUrl = await uploadToR2(req.file.buffer, r2Key, req.file.mimetype);
+        const publicUrl = await uploadToR2(req.file, r2Key, req.file.mimetype);
         debugLog('✅ User avatar uploaded to R2:', publicUrl);
         
         // Update file object with R2 URL
@@ -487,12 +487,12 @@ router.post('/me/avatar', verifyToken, avatarUpload.single('avatar'), async (req
     }
 
     // Save new avatar URL (R2)
-    // The upload middleware keeps the file in memory (multer.memoryStorage),
-    // so it has a buffer and no path — send it to R2 here, the way course
-    // files are handled. Reading req.file.path saved an empty avatar_url.
+    // The upload middleware spools the file to disk and hands it over — send
+    // it to R2 here, the way course files are handled. uploadToR2 streams it
+    // straight from the spool, so nothing is held in memory.
     const r2Key = generateR2Key('avatars', null, req.file.originalname, 'avatar');
     const avatarUrl = await uploadToR2(
-      req.file.buffer, r2Key, req.file.mimetype || 'image/jpeg');
+      req.file, r2Key, req.file.mimetype || 'image/jpeg');
     if (!avatarUrl) {
       return res.status(500).json({ error: 'تعذر حفظ الصورة. حاول مرة أخرى.' });
     }
@@ -568,12 +568,12 @@ router.post('/avatar-profile', verifyToken, (req, res, next) => {
     }
 
     // Save new avatar URL (R2)
-    // The upload middleware keeps the file in memory (multer.memoryStorage),
-    // so it has a buffer and no path — send it to R2 here, the way course
-    // files are handled. Reading req.file.path saved an empty avatar_url.
+    // The upload middleware spools the file to disk and hands it over — send
+    // it to R2 here, the way course files are handled. uploadToR2 streams it
+    // straight from the spool, so nothing is held in memory.
     const r2Key = generateR2Key('avatars', null, req.file.originalname, 'avatar');
     const avatarUrl = await uploadToR2(
-      req.file.buffer, r2Key, req.file.mimetype || 'image/jpeg');
+      req.file, r2Key, req.file.mimetype || 'image/jpeg');
     if (!avatarUrl) {
       return res.status(500).json({ error: 'تعذر حفظ الصورة. حاول مرة أخرى.' });
     }
