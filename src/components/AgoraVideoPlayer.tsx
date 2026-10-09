@@ -13,6 +13,27 @@ import { Mic, MicOff, Maximize2, VideoOff } from 'lucide-react';
 // same time, and lets every viewer (web and mobile) tell the two apart from
 // the uid alone, including students who join late.
 const SCREEN_UID_BASE = 900000000;
+
+// Agora does not bill per stream; it bills by the SUM of every stream a
+// viewer receives at once, bucketed into HD / FHD / 2K / 2K+ by that total
+// pixel count. The camera alone (1280x720 = 921,600px) sits right at the top
+// of the HD bucket. Screen sharing used to publish with no encoderConfig at
+// all, which defaults to 1920x1080 (2,073,600px) — and because every viewer
+// subscribes to BOTH the camera and the screen at the same time, their
+// combined total was 2,995,200px, which falls in the 2K bucket (2,073,600 to
+// 3,686,400). 2K is priced at $15.99 per 1,000 minutes against $3.99 for HD,
+// a 4x multiplier — and it is paid once per viewer. A single 90-minute live
+// with 394 attendees billed $52.66 this way, almost all of it from one hour
+// of camera-plus-screen overlap.
+//
+// Shrinking the camera to a small thumbnail while the screen is the main
+// content — screen share focuses attention there anyway — keeps the combined
+// total comfortably inside the HD bucket: 960x540 (518,400) + 320x240
+// (76,800) = 595,200px, versus the 921,600px cutoff. The camera returns to
+// full size the moment screen sharing stops.
+const SCREEN_SHARE_CONFIG = { width: 960, height: 540, frameRate: 15, bitrateMax: 1200 };
+const CAMERA_PIP_CONFIG = { width: 320, height: 240, frameRate: 10, bitrateMax: 200 };
+const CAMERA_FULL_CONFIG = '720p_1';
 const isScreenUid = (u: any) => Number(u) >= SCREEN_UID_BASE;
 
 interface AgoraVideoPlayerProps {
@@ -851,13 +872,19 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
         if (screenClient) {
             try { await screenClient.leave(); } catch { }
         }
-        // The camera never stopped publishing; just move it back to full size.
+        // The camera never stopped publishing; just move it back to full size,
+        // and back to full resolution (see CAMERA_PIP_CONFIG above).
         setShowPip(false);
         setScreenBig(true);
         if (localVideoTrackRef.current && videoContainerRef.current) {
             localVideoTrackRef.current.stop();
             localVideoTrackRef.current.play(videoContainerRef.current);
             ensureVideoFullSize('camera');
+            try {
+                await localVideoTrackRef.current.setEncoderConfiguration(CAMERA_FULL_CONFIG);
+            } catch (confErr) {
+                console.warn('[DEBUG] could not restore camera resolution:', confErr);
+            }
         }
         setIsScreenSharing(false);
     }
@@ -872,7 +899,7 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
         try {
             // 'auto': also capture the tab/system sound if the browser offers
             // it and the teacher ticks "share audio"; otherwise video only.
-            const created = await AgoraRTC.createScreenVideoTrack({}, 'auto');
+            const created = await AgoraRTC.createScreenVideoTrack({ encoderConfig: SCREEN_SHARE_CONFIG }, 'auto');
             if (Array.isArray(created)) {
                 [screenTrack, screenAudio] = created;
             } else {
@@ -898,11 +925,19 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
             screenAudioRef.current = screenAudio;
             setIsScreenSharing(true);
 
-            // Local view matches what students see: screen big, camera small.
+            // Local view matches what students see: screen big, camera small. The
+            // camera's publish resolution shrinks to match — see
+            // SCREEN_SHARE_CONFIG above for why this is the part that matters
+            // for cost, not just layout.
             if (localVideoTrackRef.current && pipContainerRef.current) {
                 localVideoTrackRef.current.stop();
                 localVideoTrackRef.current.play(pipContainerRef.current);
                 setShowPip(true);
+                try {
+                    await localVideoTrackRef.current.setEncoderConfiguration(CAMERA_PIP_CONFIG);
+                } catch (confErr) {
+                    console.warn('[DEBUG] could not shrink camera for screen share:', confErr);
+                }
             }
             if (videoContainerRef.current) {
                 screenTrack.play(videoContainerRef.current);
