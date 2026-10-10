@@ -1116,6 +1116,72 @@ router.post('/live-sessions/:sessionId/join', verifyToken, async (req, res) => {
     }
 });
 
+// Whether a student may be in this live session's room, and why.
+//
+// Used by both /access (what the UI asks before showing a join button) and
+// /rtcToken (what actually hands out the key to the room). They used to
+// disagree: /access required a purchase, but /rtcToken only checked that the
+// caller was logged in — so the purchase screen was a suggestion, not a gate.
+// Anyone who knew or guessed a session's numeric id (the id is the Agora
+// channel name directly) could request a token and join without it, paid or
+// free. 193 of the 394 students in one free live had no purchase row at all;
+// for a paid live the same gap means the ticket is optional.
+async function resolveLiveSessionAccess(session, userId, userRole) {
+  const directPurchase = await getRow(
+    'SELECT 1 FROM purchases WHERE session_id = $1 AND student_id = $2',
+    [session.id, userId]
+  );
+
+  // Buying the دورة buys everything inside it. The purchase is recorded
+  // against the section, not each session in it.
+  let sectionPurchase = null;
+  if (session.section_id) {
+    sectionPurchase = await getRow(
+      'SELECT 1 FROM live_section_purchases WHERE live_section_id = $1 AND student_id = $2',
+      [session.section_id, userId]
+    );
+  }
+
+  const isOwner = String(session.professor_id) === String(userId);
+  const isAdmin = userRole === 'admin';
+  const hasPurchased = !!(directPurchase || sectionPurchase);
+  // A free standalone session (price 0, not inside a paid دورة) is open to
+  // every signed-in user; there is nothing to buy.
+  const isFree = Number(session.price) === 0 && !session.section_id;
+
+  return {
+    hasPurchased,
+    isFree,
+    isOwner,
+    isAdmin,
+    canAccess: hasPurchased || isFree || isOwner || isAdmin,
+  };
+}
+
+// For a free session a student reaches without ever clicking a purchase
+// button — the mobile app's older versions do this; it is how it has always
+// worked for them — record the same $0 row the purchase button would have
+// created, so attendance stays counted accurately without breaking anyone
+// already using the app. Never used for a paid session: that gate rejects
+// instead, because fabricating a paid record for free is a different and
+// worse problem than an undercount.
+async function backfillFreeClaim(sessionId, userId) {
+  try {
+    // ON CONFLICT, not just the WHERE NOT EXISTS: a camera-token and a
+    // screen-share-token request for the same join can land close enough
+    // together to race, and purchases has a unique (session_id, student_id).
+    await query(
+      `INSERT INTO purchases (session_id, student_id, amount_paid, purchased_at)
+       VALUES ($1, $2, 0, NOW())
+       ON CONFLICT (session_id, student_id) DO NOTHING`,
+      [sessionId, userId]
+    );
+  } catch (e) {
+    // Never block a free join over a bookkeeping row.
+    console.error('[attendance] could not backfill free claim:', e.message);
+  }
+}
+
 router.get('/live-sessions/:sessionId/access', verifyToken, async (req, res) => {
     const { sessionId } = req.params;
     const userId = req.user.id;
@@ -1147,53 +1213,27 @@ router.get('/live-sessions/:sessionId/access', verifyToken, async (req, res) => 
         const session = sessionRes;
         const isLive = true; // Live sections are always considered "live"
 
-        // A session can be paid for in two different ways, and this used to
-        // check only the first one.
-        const directPurchase = await getRow(
-          'SELECT 1 FROM purchases WHERE session_id = $1 AND student_id = $2',
-          [sessionId, userId]
-        );
+        const access = await resolveLiveSessionAccess(session, userId, req.user.role);
 
-        // Buying the دورة buys everything inside it. Without this, a student
-        // who paid for the whole course was turned away from every session in
-        // it — the purchase is recorded against the section, not the session.
-        let sectionPurchase = null;
-        if (session.section_id) {
-            sectionPurchase = await getRow(
-              'SELECT 1 FROM live_section_purchases WHERE live_section_id = $1 AND student_id = $2',
-              [session.section_id, userId]
-            );
+        // A student reaching a free session through this check — not through
+        // the purchase button — is recorded the same way the button would
+        // have recorded it, so /admin/earnings and attendees_count agree with
+        // who actually showed up.
+        if (access.canAccess && access.isFree && !access.hasPurchased && req.user.role === 'student') {
+            await backfillFreeClaim(sessionId, userId);
         }
 
-        // The person teaching it, and the admins, are not customers and will
-        // never appear in either purchase table.
-        const isOwner = String(session.professor_id) === String(userId);
-        const isAdmin = req.user.role === 'admin';
-
-        const hasPurchased = !!(directPurchase || sectionPurchase);
-        // A free standalone session (price 0, not inside a paid دورة) is open
-        // to every signed-in user; there is nothing to buy.
-        const isFree = Number(session.price) === 0 && !session.section_id;
-        const canAccess = hasPurchased || isFree || isOwner || isAdmin;
-
-        debugLog(`[ACCESS] Session ${sessionId}, User ${userId}, HasPurchased: ${hasPurchased}, CanAccess: ${canAccess}`);
-        debugLog(`[ACCESS] direct=${!!directPurchase} section=${!!sectionPurchase} owner=${isOwner} admin=${isAdmin}`);
-        debugLog(`[ACCESS] Response object:`, {
-            canAccess: canAccess,
-            hasPurchased: hasPurchased,
-            isLive: isLive,
-            session: session
-        });
+        debugLog(`[ACCESS] Session ${sessionId}, User ${userId}, HasPurchased: ${access.hasPurchased}, CanAccess: ${access.canAccess}`);
 
         res.json({
-            canAccess: canAccess,
-            hasPurchased: hasPurchased,
+            canAccess: access.canAccess,
+            hasPurchased: access.hasPurchased,
             isLive: isLive,
             // How access was granted — useful to a client deciding what to show.
-            accessVia: directPurchase ? 'session_purchase'
-                     : sectionPurchase ? 'section_purchase'
-                     : isOwner ? 'professor'
-                     : isAdmin ? 'admin'
+            accessVia: access.hasPurchased ? 'purchase'
+                     : access.isOwner ? 'professor'
+                     : access.isAdmin ? 'admin'
+                     : access.isFree ? 'free'
                      : null,
             session: session
         });
@@ -1204,7 +1244,7 @@ router.get('/live-sessions/:sessionId/access', verifyToken, async (req, res) => 
 });
 
 // GET /rtcToken?channel=:channelName&uid=:uid → génère un token Agora
-router.get('/rtcToken', verifyToken, (req, res) => {
+router.get('/rtcToken', verifyToken, async (req, res) => {
     const appID = process.env.AGORA_APP_ID;
     const appCertificate = process.env.AGORA_APP_CERTIFICATE;
     const channel = req.query.channel;
@@ -1234,6 +1274,30 @@ router.get('/rtcToken', verifyToken, (req, res) => {
 
     if (!channel) {
         return res.status(400).json({ error: 'Channel name is required' });
+    }
+
+    // The channel is the live session's own id — this is the actual door to
+    // the room, and until now it only checked that the caller was logged in.
+    // A student who knew or guessed a session's id could request a token and
+    // join without ever buying it, paid or free: /access asked the question,
+    // but nothing made the answer matter here. Non-numeric channels (the
+    // screen-share connection reuses this same route with the same channel,
+    // see AgoraVideoPlayer.tsx) go through the same check, since the channel
+    // is identical either way.
+    if (/^\d+$/.test(String(channel))) {
+        const session = await getRow('SELECT * FROM live_sessions WHERE id = $1', [channel]);
+        if (!session) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+        const access = await resolveLiveSessionAccess(session, req.user.id, req.user.role);
+        if (!access.canAccess) {
+            return res.status(403).json({ error: 'لم تقم بشراء هذا البث المباشر بعد' });
+        }
+        // Only a student's own attendance is worth recording — not the
+        // professor visiting their own room, not an admin checking in.
+        if (access.isFree && !access.hasPurchased && req.user.role === 'student') {
+            await backfillFreeClaim(session.id, req.user.id);
+        }
     }
 
     // Use the UID from request parameters, or use 0 (Agora will assign automatically)
