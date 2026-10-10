@@ -16,24 +16,20 @@ const SCREEN_UID_BASE = 900000000;
 
 // Agora does not bill per stream; it bills by the SUM of every stream a
 // viewer receives at once, bucketed into HD / FHD / 2K / 2K+ by that total
-// pixel count. Screen sharing publishes at a clean, explicit 1080p — the same
-// quality it always rendered at, just pinned instead of left to whatever the
-// SDK's implicit default happened to be. The camera alone (1280x720 =
-// 921,600px) sits right at the HD cutoff. Neither one is the problem; having
-// BOTH land on the same viewer at once is: 921,600 + 2,073,600 = 2,995,200px,
-// which falls in the 2K bucket (2,073,600 to 3,686,400). 2K is priced at
-// $15.99 per 1,000 minutes against $8.99 for Full HD — nearly double — and
-// it is paid once per viewer. A single 60-minute live with 394 attendees
+// pixel count. The camera (1280x720 = 921,600px) stays fully visible to
+// students at all times, screen sharing included — students need to see the
+// teacher, not just slides. What changes is the screen's own resolution: at
+// an uncapped 1920x1080 (2,073,600px), camera + screen = 2,995,200px, which
+// falls in the 2K bucket (2,073,600 to 3,686,400) at $15.99 per 1,000
+// minutes, paid once per viewer. A single 60-minute live with 394 attendees
 // billed $52.66 this way.
 //
-// So the screen's resolution is not the lever: the slides stay exactly as
-// sharp as before. The camera is. While the screen is the thing everyone is
-// actually looking at, the camera's video stops being SENT to students (the
-// teacher still sees themselves locally, and the microphone keeps working
-// throughout) — not shrunk, removed from what viewers receive entirely, so
-// their total drops to just the screen's 2,073,600px: Full HD, not 2K. It
-// starts sending again, at full size, the instant screen sharing stops.
-const SCREEN_SHARE_CONFIG = { width: 1920, height: 1080, frameRate: 15, bitrateMax: 3000 };
+// Capped instead at 1366x768 — an entirely ordinary laptop resolution, not a
+// noticeable step down from 1080p for a shared screen of slides or a PDF —
+// camera + screen = 1,970,688px, which stays under the Full HD ceiling:
+// $8.99 per 1,000 minutes, 44% cheaper, and nothing about what a student sees
+// changes except the screen share being very slightly less sharp.
+const SCREEN_SHARE_CONFIG = { width: 1366, height: 768, frameRate: 15, bitrateMax: 2200 };
 const isScreenUid = (u: any) => Number(u) >= SCREEN_UID_BASE;
 
 interface AgoraVideoPlayerProps {
@@ -872,21 +868,13 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
         if (screenClient) {
             try { await screenClient.leave(); } catch { }
         }
-        // Move the camera back to full size, and resume sending it to students
-        // (see the unpublish in startScreenShare above).
+        // Move the camera back to full size.
         setShowPip(false);
         setScreenBig(true);
         if (localVideoTrackRef.current && videoContainerRef.current) {
             localVideoTrackRef.current.stop();
             localVideoTrackRef.current.play(videoContainerRef.current);
             ensureVideoFullSize('camera');
-            try {
-                if (clientRef.current) {
-                    await clientRef.current.publish([localVideoTrackRef.current]);
-                }
-            } catch (pubErr) {
-                console.warn('[DEBUG] could not resume sending the camera:', pubErr);
-            }
         }
         setIsScreenSharing(false);
     }
@@ -927,21 +915,14 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
             screenAudioRef.current = screenAudio;
             setIsScreenSharing(true);
 
-            // Local view matches what students see: screen big, camera small. The
-            // camera keeps playing here, for the teacher's own reference, but
-            // stops being sent to students — see SCREEN_SHARE_CONFIG above for
-            // why that is the part that matters for cost, not the screen.
+            // Local view matches what students see: screen big, camera small.
+            // The camera keeps publishing throughout — students see it the
+            // whole time, screen share included; see SCREEN_SHARE_CONFIG
+            // above for where the cost saving actually comes from instead.
             if (localVideoTrackRef.current && pipContainerRef.current) {
                 localVideoTrackRef.current.stop();
                 localVideoTrackRef.current.play(pipContainerRef.current);
                 setShowPip(true);
-                try {
-                    if (clientRef.current) {
-                        await clientRef.current.unpublish([localVideoTrackRef.current]);
-                    }
-                } catch (unpubErr) {
-                    console.warn('[DEBUG] could not stop sending the camera for screen share:', unpubErr);
-                }
             }
             if (videoContainerRef.current) {
                 screenTrack.play(videoContainerRef.current);
