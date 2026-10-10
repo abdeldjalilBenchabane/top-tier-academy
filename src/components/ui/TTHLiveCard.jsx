@@ -431,6 +431,17 @@ const TTHLiveCard = ({ session, onStatusChange }) => {
         setTimeout(() => {
           checkPurchaseStatus();
         }, 1000);
+      } else if (response.status === 409) {
+        // A row for this session already exists — joining a free session now
+        // records that on its own (see the backend's access check), so a
+        // student who had already been in the room once reached this button
+        // with nothing left to buy. That is success, not an error: the
+        // server rejecting a second purchase was shown here as "there is an
+        // error", and only a refresh — which re-checks real ownership —
+        // revealed the student had access the whole time.
+        console.log(`[TTHLiveCard] Already owned (409) — treating as purchased`);
+        setHasPurchased(true);
+        checkPurchaseStatus();
       } else {
         const errorData = await response.json();
         console.error(`[TTHLiveCard] Purchase failed:`, errorData);

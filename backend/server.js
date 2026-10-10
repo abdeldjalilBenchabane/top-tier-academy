@@ -250,6 +250,19 @@ io.on('connection', (socket) => {
     // A student arriving after the teacher pinned something still sees it.
     socket.emit('message-pinned', roomPinned[roomId] ?? null);
 
+    // A blocked student who refreshes is still blocked — read from the
+    // table, not memory, so it survives a backend restart too.
+    if (userData.role === 'student') {
+      pool.query(
+        `SELECT expires_at FROM live_chat_blocks
+          WHERE session_id = $1 AND student_id = $2
+            AND (expires_at IS NULL OR expires_at > NOW())`,
+        [roomId, userData.id]
+      ).then((r) => {
+        if (r.rows.length > 0) socket.emit('chat-blocked', { expiresAt: r.rows[0].expires_at });
+      }).catch((e) => console.error('[chat-block] status lookup failed:', e.message));
+    }
+
     // A student who arrives while the lesson is paused, or while the teacher
     // is dealing with a technical problem, has to be told on arrival — the
     // broadcast that announced it went out before they were here. Private
@@ -343,6 +356,26 @@ io.on('connection', (socket) => {
   socket.on('send-message', async (roomId, messageData) => {
     console.log('Message received in room', roomId, ':', messageData);
 
+    // A blocked student's message never reaches the room: checked here,
+    // once, rather than trusted to a client that could just not show the
+    // disabled input. NULL expires_at is a permanent block.
+    if (socket.userData?.role === 'student') {
+      try {
+        const block = await pool.query(
+          `SELECT expires_at FROM live_chat_blocks
+            WHERE session_id = $1 AND student_id = $2
+              AND (expires_at IS NULL OR expires_at > NOW())`,
+          [roomId, socket.userData.id]
+        );
+        if (block.rows.length > 0) {
+          socket.emit('chat-blocked', { expiresAt: block.rows[0].expires_at });
+          return;
+        }
+      } catch (e) {
+        console.error('[chat-block] check failed:', e.message);
+      }
+    }
+
     try {
       // Save message to database
       const query = `
@@ -422,6 +455,56 @@ io.on('connection', (socket) => {
     roomChatState[roomId] = enabled !== false;
     saveRoomLock(roomId, 'chat_enabled', enabled !== false);
     io.to(roomId).emit('chat-toggled', enabled);
+  });
+
+  // Block one student from writing in chat, for a fixed time or until
+  // explicitly undone. durationMinutes absent/0/null means forever.
+  socket.on('block-student-chat', async (roomId, data) => {
+    if (socket.userData?.role !== 'professor') return;
+    const studentId = Number(data?.studentId);
+    if (!Number.isInteger(studentId)) return;
+    const minutes = Number(data?.durationMinutes) || 0;
+    // Computed here, not left as "NOW() + interval" SQL text passed as a
+    // parameter — a parameterised value is sent as a literal, never
+    // evaluated, so that string would have been stored as the expiry
+    // itself rather than a few minutes from now.
+    const expiresAt = minutes > 0 ? new Date(Date.now() + minutes * 60_000) : null;
+    try {
+      await pool.query(
+        `INSERT INTO live_chat_blocks (session_id, student_id, blocked_by, blocked_at, expires_at)
+         VALUES ($1, $2, $3, NOW(), $4)
+         ON CONFLICT (session_id, student_id)
+         DO UPDATE SET blocked_by = $3, blocked_at = NOW(), expires_at = $4`,
+        [roomId, studentId, socket.userData.id, expiresAt]
+      );
+      const row = await pool.query(
+        'SELECT expires_at FROM live_chat_blocks WHERE session_id = $1 AND student_id = $2',
+        [roomId, studentId]
+      );
+      const payload = {
+        studentId,
+        studentName: data.studentName,
+        expiresAt: row.rows[0]?.expires_at ?? null,
+      };
+      io.to(roomId).emit('student-chat-blocked', payload);
+    } catch (e) {
+      console.error('[chat-block] block failed:', e.message);
+    }
+  });
+
+  socket.on('unblock-student-chat', async (roomId, data) => {
+    if (socket.userData?.role !== 'professor') return;
+    const studentId = Number(data?.studentId);
+    if (!Number.isInteger(studentId)) return;
+    try {
+      await pool.query(
+        'DELETE FROM live_chat_blocks WHERE session_id = $1 AND student_id = $2',
+        [roomId, studentId]
+      );
+      io.to(roomId).emit('student-chat-unblocked', { studentId, studentName: data?.studentName });
+    } catch (e) {
+      console.error('[chat-block] unblock failed:', e.message);
+    }
   });
 
   // Handle individual student mic control

@@ -88,6 +88,12 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     const [loadingSession, setLoadingSession] = useState(true);
 
     const [chatEnabled, setChatEnabled] = useState(true);
+    // null = not blocked; 'forever'; or an ISO string of when it lifts.
+    const [chatBlockedUntil, setChatBlockedUntil] = useState(null);
+    // Which participant's block-duration menu is open, if any.
+    const [blockMenuFor, setBlockMenuFor] = useState(null);
+    // Who is currently blocked, for the badge: userId -> expiresAt | 'forever'.
+    const [blockedStudents, setBlockedStudents] = useState({});
 
     const [messages, setMessages] = useState([]);
 
@@ -1060,6 +1066,27 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
         });
 
+        // Sent straight to this socket: this account is blocked, now or on
+        // arrival (see the backend's join-room handler).
+        newSocket.on('chat-blocked', (data: any) => {
+            setChatBlockedUntil(data?.expiresAt ?? 'forever');
+        });
+        newSocket.on('student-chat-blocked', (data: any) => {
+            if (String(data?.studentId) === String(user?.id)) {
+                setChatBlockedUntil(data?.expiresAt ?? 'forever');
+            }
+            setBlockedStudents((prev: any) => ({ ...prev, [data?.studentId]: data?.expiresAt ?? 'forever' }));
+        });
+        newSocket.on('student-chat-unblocked', (data: any) => {
+            if (String(data?.studentId) === String(user?.id)) {
+                setChatBlockedUntil(null);
+            }
+            setBlockedStudents((prev: any) => {
+                const next = { ...prev };
+                delete next[data?.studentId];
+                return next;
+            });
+        });
 
 
         // Listen for individual student mic control
@@ -3326,6 +3353,70 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                                             </button>
                                         )}
 
+                                        {/* Block/unblock this student's chat — one button, a tiny menu of
+                                            durations on click. Mirrors the mic switch next to it. */}
+                                        {canProfToggle && (
+                                            <div className="relative mt-1">
+                                                <button
+                                                    type="button"
+                                                    title={blockedStudents[participant.userId] ? 'إلغاء حظر الدردشة' : 'حظر الدردشة'}
+                                                    onClick={() => {
+                                                        if (!socket) return;
+                                                        if (blockedStudents[participant.userId]) {
+                                                            socket.emit('unblock-student-chat', id, {
+                                                                studentId: participant.userId,
+                                                                studentName: participant.name,
+                                                            });
+                                                            setBlockMenuFor(null);
+                                                        } else {
+                                                            setBlockMenuFor(
+                                                                blockMenuFor === participant.userId ? null : participant.userId
+                                                            );
+                                                        }
+                                                    }}
+                                                    className={`grid h-7 w-7 place-items-center rounded-full transition ${
+                                                        blockedStudents[participant.userId]
+                                                            ? 'bg-amber-500/90 text-white hover:bg-amber-500'
+                                                            : 'bg-white/10 text-white/80 hover:bg-white/20'
+                                                    }`}
+                                                >
+                                                    {blockedStudents[participant.userId]
+                                                        ? <X className="h-3.5 w-3.5" />
+                                                        : <MessageSquare className="h-3.5 w-3.5" />}
+                                                </button>
+                                                {blockMenuFor === participant.userId && (
+                                                    <div
+                                                        className="absolute z-30 top-full mt-1 left-1/2 -translate-x-1/2 flex flex-col gap-1 rounded-lg bg-[#1a1f2e] border border-white/10 p-1.5 shadow-xl whitespace-nowrap"
+                                                        dir="rtl"
+                                                    >
+                                                        {[
+                                                            { label: 'دقيقة واحدة', minutes: 1 },
+                                                            { label: '5 دقائق', minutes: 5 },
+                                                            { label: '30 دقيقة', minutes: 30 },
+                                                            { label: 'إلى الأبد', minutes: 0 },
+                                                        ].map((opt) => (
+                                                            <button
+                                                                key={opt.minutes}
+                                                                type="button"
+                                                                className="text-xs text-white/90 hover:bg-white/10 rounded px-2 py-1 text-right"
+                                                                onClick={() => {
+                                                                    if (!socket) return;
+                                                                    socket.emit('block-student-chat', id, {
+                                                                        studentId: participant.userId,
+                                                                        studentName: participant.name,
+                                                                        durationMinutes: opt.minutes,
+                                                                    });
+                                                                    setBlockMenuFor(null);
+                                                                }}
+                                                            >
+                                                                حظر {opt.label}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {/* Student can toggle own mic if allowed */}
 
                                         {canStudentToggleOwn && (
@@ -3425,6 +3516,14 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                     )}
 
+                    {showChat && chatBlockedUntil && (
+                        <div dir="rtl" className="px-3 py-2 text-xs text-amber-300 bg-amber-500/10 border-y border-amber-500/20">
+                            {chatBlockedUntil === 'forever'
+                                ? 'تم حظرك من الكتابة في الدردشة من طرف الأستاذ.'
+                                : `تم حظرك من الكتابة في الدردشة حتى ${new Date(chatBlockedUntil).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}.`}
+                        </div>
+                    )}
+
                     {showChat && (
                     <div className="flex-1 min-h-0">
                     <ChatSidebar
@@ -3438,7 +3537,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                         handleSend={handleSend}
 
-                        chatEnabled={chatEnabled}
+                        chatEnabled={chatEnabled && !chatBlockedUntil}
 
                         studentsMuted={studentsMuted}
 
@@ -3494,7 +3593,7 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
                 input={input}
                 setInput={setInput}
                 handleSend={handleSend}
-                chatEnabled={chatEnabled}
+                chatEnabled={chatEnabled && !chatBlockedUntil}
                 isProfessor={isProfessor}
                 pinnedMessage={pinnedMessage}
                 unreadDividerIndex={unreadDividerIndex}
