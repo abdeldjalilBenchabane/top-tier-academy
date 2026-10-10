@@ -1597,11 +1597,15 @@ const AgoraVideoPlayer = forwardRef<AgoraVideoPlayerRef, AgoraVideoPlayerProps &
                     border: '2px solid rgba(255,255,255,0.25)',
                     boxShadow: '0 6px 20px rgba(0,0,0,0.45)',
                     zIndex: 20,
-                    // For the teacher, while the screen is big this tile holds
-                    // the camera — and a camera that is off is just a black
-                    // box. When the views are swapped it holds the screen, and
-                    // that is always worth showing.
-                    display: showPip && (role !== 'host' || !(isScreenSharing && screenBig) || isLocalCameraEnabled) ? 'block' : 'none',
+                    // Used to also hide this box for the teacher specifically
+                    // when the camera was off, keyed on isLocalCameraEnabled —
+                    // a second piece of state that has to stay in exact step
+                    // with showPip every render, or the box disappears for a
+                    // frame even with a real camera feed playing into it.
+                    // Screen and camera must both always be visible, so this
+                    // now follows showPip alone: it is already true exactly
+                    // when there is something to show here.
+                    display: showPip ? 'block' : 'none',
                     // Mirror the teacher's own camera, like the main view does.
                     ...(role === 'host' && screenBig ? { transform: 'scaleX(-1)' } : {}),
                   }}
