@@ -95,6 +95,37 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
     // Who is currently blocked, for the badge: userId -> expiresAt | 'forever'.
     const [blockedStudents, setBlockedStudents] = useState({});
 
+    // A timed block is enforced server-side by re-checking expires_at on
+    // every message, so it already stops working the moment time is up —
+    // nothing extra needed there. But nobody tells either browser that
+    // happened: without this, the professor's button stays amber and a
+    // blocked student's input stays disabled for a block that is, on the
+    // server, already over. These just clear the local state at the moment
+    // each one was always going to end; 'forever' schedules nothing.
+    useEffect(() => {
+        if (!chatBlockedUntil || chatBlockedUntil === 'forever') return;
+        const ms = new Date(chatBlockedUntil).getTime() - Date.now();
+        if (ms <= 0) { setChatBlockedUntil(null); return; }
+        const t = setTimeout(() => setChatBlockedUntil(null), ms);
+        return () => clearTimeout(t);
+    }, [chatBlockedUntil]);
+
+    useEffect(() => {
+        const timers = Object.entries(blockedStudents)
+            .filter(([, until]) => until && until !== 'forever')
+            .map(([studentId, until]) => {
+                const ms = new Date(until).getTime() - Date.now();
+                const clear = () => setBlockedStudents((prev) => {
+                    const next = { ...prev };
+                    delete next[studentId];
+                    return next;
+                });
+                return ms <= 0 ? (clear(), null) : setTimeout(clear, ms);
+            })
+            .filter(Boolean);
+        return () => timers.forEach(clearTimeout);
+    }, [blockedStudents]);
+
     const [messages, setMessages] = useState([]);
 
     const [input, setInput] = useState('');
