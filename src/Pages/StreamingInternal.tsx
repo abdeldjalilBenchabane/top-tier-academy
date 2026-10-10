@@ -14,6 +14,8 @@ import AgoraVideoPlayer, { AgoraVideoPlayerRef } from '@/components/AgoraVideoPl
 
 import ErrorBoundary from '@/components/ErrorBoundary';
 
+import ChatAvatar, { senderColors } from '@/components/ChatAvatar';
+
 import { io, Socket } from 'socket.io-client';
 
 import { api } from '@/lib/api';
@@ -2669,11 +2671,17 @@ const StreamingInternal = ({ id, user, navigate }: { id: string; user: any; navi
 
                                                 messages.map((msg, idx) => (
 
-                                                    <div key={msg.id} className="bg-white/10 rounded-lg p-3">
+                                                    <div key={msg.id} className="flex gap-2 rounded-lg bg-white/5 p-3">
 
-                                                        <div className={`font-medium text-sm ${msg.color}`}>{msg.sender}</div>
+                                                        <ChatAvatar name={msg.sender} avatarUrl={msg.avatarUrl ?? null} mine={msg.mine === true} size={26} />
+
+                                                        <div className="min-w-0 flex-1">
+
+                                                        <div className={`font-medium text-sm ${senderColors(msg.sender, msg.mine === true).text}`}>{msg.mine ? 'أنت' : msg.sender}</div>
 
                                                         <div className="text-sm text-gray-300 break-words whitespace-pre-line">{msg.text}</div>
+
+                                                        </div>
 
                                                     </div>
 

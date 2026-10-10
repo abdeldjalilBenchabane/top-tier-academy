@@ -51,6 +51,22 @@ const roomChatState = {}; // { [roomId]: true/false } — chat open/closed, sent
 // and a teacher who restarts mid-lesson pins it again in a second.
 const roomPinned = {}; // { [roomId]: { sender, text } | null }
 
+// db.js parses a `timestamp without time zone` column as the server's raw
+// text ("2026-10-10 20:37:35.089") so wall-clock values read back correctly
+// instead of being shifted by the UTC conversion node-postgres does by
+// default. But a chat block's expiry is sent to a browser, and a browser
+// parsing that same text has no server to assume — JS reads it as the
+// *viewer's own* local time instead of UTC (which this column always is,
+// since every write here comes from a JS Date). A student's 1-minute block
+// in Algeria's UTC+1 was read as expiring an hour earlier than it did,
+// which is before it even started: the block looked like it had never
+// applied. This makes the timestamp say what timezone it is, which is all
+// a browser actually needs.
+function utcIso(raw) {
+  if (!raw) return null;
+  return new Date(String(raw).replace(' ', 'T') + 'Z').toISOString();
+}
+
 // The memory above is only a cache: it is emptied by every restart, which
 // used to silently unlock chat and mics while the teacher's screen still
 // showed them locked. The session row is the real record.
@@ -259,7 +275,7 @@ io.on('connection', (socket) => {
             AND (expires_at IS NULL OR expires_at > NOW())`,
         [roomId, userData.id]
       ).then((r) => {
-        if (r.rows.length > 0) socket.emit('chat-blocked', { expiresAt: r.rows[0].expires_at });
+        if (r.rows.length > 0) socket.emit('chat-blocked', { expiresAt: utcIso(r.rows[0].expires_at) });
       }).catch((e) => console.error('[chat-block] status lookup failed:', e.message));
     }
 
@@ -368,7 +384,7 @@ io.on('connection', (socket) => {
           [roomId, socket.userData.id]
         );
         if (block.rows.length > 0) {
-          socket.emit('chat-blocked', { expiresAt: block.rows[0].expires_at });
+          socket.emit('chat-blocked', { expiresAt: utcIso(block.rows[0].expires_at) });
           return;
         }
       } catch (e) {
@@ -484,7 +500,7 @@ io.on('connection', (socket) => {
       const payload = {
         studentId,
         studentName: data.studentName,
-        expiresAt: row.rows[0]?.expires_at ?? null,
+        expiresAt: utcIso(row.rows[0]?.expires_at),
       };
       io.to(roomId).emit('student-chat-blocked', payload);
     } catch (e) {
